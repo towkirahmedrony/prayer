@@ -220,7 +220,7 @@ class PrayerNotificationCoordinator(
      * and a remembered set is one more thing that can disagree with the platform.
      */
     private fun cancellationDates(today: LocalDate): List<LocalDate> = planner.windowDates(
-        today = today.minusDays(CANCELLATION_MARGIN_DAYS),
+        today = today.minusDays(CANCELLATION_MARGIN_DAYS.toLong()),
         days = PrayerNotificationPlanner.WINDOW_DAYS + 2 * CANCELLATION_MARGIN_DAYS,
     )
 
