@@ -102,16 +102,6 @@ class QiblaCalculator {
         return 2 * EARTH_RADIUS_METRES * asin(min(1.0, sqrt(a)))
     }
 
-    /**
-     * The eastward longitude difference from [longitude] to the Kaaba, in `(-180, 180]`.
-     *
-     * `(d + 540) mod 360 - 180` folds any difference onto the short way round, so `+350°` and
-     * `-10°` — the same physical separation — are treated identically instead of producing mirrored
-     * answers.
-     */
-    fun signedLongitudeDeltaDegrees(longitude: Double): Double =
-        ((KaabaReference.LONGITUDE_DEGREES - longitude + 540.0) % 360.0) - 180.0
-
     companion object {
 
         /** IUGG mean Earth radius, in metres. */
@@ -127,6 +117,17 @@ class QiblaCalculator {
          * would be meaningless anyway.
          */
         const val DEGENERACY_EPSILON: Double = 1e-6
+
+        /**
+         * The eastward longitude difference from [longitude] to the Kaaba, in `(-180, 180]`.
+         *
+         * `(d + 540) mod 360 - 180` folds any difference onto the short way round, so `+350°` and
+         * `-10°` — the same physical separation — are treated identically instead of producing
+         * mirrored answers. It is a pure function of a single argument, so it lives with the other
+         * static helpers rather than on an instance.
+         */
+        fun signedLongitudeDeltaDegrees(longitude: Double): Double =
+            ((KaabaReference.LONGITUDE_DEGREES - longitude + 540.0) % 360.0) - 180.0
 
         /** Normalizes an angle in degrees into `[0, 360)`. */
         fun normalizeDegrees(degrees: Double): Double {

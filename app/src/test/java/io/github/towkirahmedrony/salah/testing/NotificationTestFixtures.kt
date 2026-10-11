@@ -217,6 +217,27 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
         return true
     }
 
+    override suspend fun saveDeviceLocation(
+        label: String,
+        latitude: Double,
+        longitude: Double,
+        timeZoneId: String,
+        accuracyMetres: Double?,
+        acquiredAtEpochMillis: Long,
+    ): Boolean {
+        val created = LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            timeZoneId = timeZoneId,
+            origin = LocationOrigin.DEVICE_GPS,
+            accuracyMetres = accuracyMetres,
+            acquiredAt = Instant.ofEpochMilli(acquiredAtEpochMillis),
+        ) ?: return false
+        state.value = created
+        return true
+    }
+
     override suspend fun clearLocation() {
         state.value = null
     }
