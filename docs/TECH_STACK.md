@@ -14,7 +14,7 @@ configuration.
 | JDK | `17` | `app/build.gradle.kts` (`compileOptions`), `.github/workflows/android-apk.yml` (Temurin 17) |
 | Compose compiler plugin | `2.4.21` (`org.jetbrains.kotlin.plugin.compose`) | `gradle/libs.versions.toml` (`compose-compiler`) |
 | Jetpack Compose BOM | `2026.09.00` | `gradle/libs.versions.toml` (`composeBom`) |
-| compileSdk | `37` (baseline was `36`, raised by the remote build — see §3.11) | `gradle/libs.versions.toml` |
+| compileSdk | `37` with minor version `0` (`android-37.0`) — baseline was `36`; both changes come from real remote build output, see §5.1 and §5.2 | `gradle/libs.versions.toml`, `app/build.gradle.kts` (`compileSdkMinor`) |
 | targetSdk | `36` | `gradle/libs.versions.toml` |
 | minSdk | `26` | `gradle/libs.versions.toml` |
 
@@ -171,7 +171,7 @@ Workflow: `.github/workflows/android-apk.yml`
 | Checkout | `actions/checkout` pinned to `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
 | JDK | `actions/setup-java` pinned to `de7274f081f381c8f8158605e0321c36c376e2e6` (v6.0.1), Temurin 17 |
 | Gradle + cache | `gradle/actions/setup-gradle` pinned to `3f5f9adaf7d9fecd50b5935e54106014257a94e6` (v6.4.0) |
-| Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-37`, `build-tools;36.0.0`, `build-tools;37.0.0` |
+| Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-37.0`, `build-tools;36.0.0`, `build-tools;37.0.0` (retried with `--channel=3` if the image's package index is stale) |
 | Wrapper validation | `./gradlew --version` must report `Gradle 9.8.1` |
 | Tests | `./gradlew testDebugUnitTest` |
 | Lint | `./gradlew lintDebug` |
@@ -216,3 +216,40 @@ API-36-era releases, which contradicts the specified BOM and moves several libra
 **CI impact:** the workflow installs `platforms;android-37` and `build-tools;37.0.0` in addition
 to `build-tools;36.0.0`; both package identifiers were verified against Google's SDK
 repository index before the change.
+
+### 5.2 The platform package is `platforms;android-37.0`, not `platforms;android-37`
+
+Run `38131358330` then failed in the SDK install step — the package name used in §5.1 does not
+exist in Google's index:
+
+```
+Warning: Failed to find package 'platforms;android-37'
+##[error]Process completed with exit code 1.
+```
+
+Android now publishes **minor API versions**, so API 37 (Android 17) is shipped as
+`platforms;android-37.0` / `platforms;android-37.1` / `platforms;android-37.2`, and a bare
+`platforms;android-37` is no longer published (`android-36.1` similarly exists alongside
+`android-36`). AGP therefore needs the minor version too: `compileSdk = 37` alone resolves to the
+target hash `android-37`, which cannot be installed. The fix uses AGP's documented
+`compileSdkMinor` DSL:
+
+```kotlin
+// app/build.gradle.kts
+compileSdk = 37        // libs.versions.compileSdk
+compileSdkMinor = 0    // libs.versions.compileSdkMinor -> platforms;android-37.0
+```
+
+Verification performed for this adjustment (no local Android SDK in the workspace, so the
+configuration was checked against published artifacts rather than guessed):
+
+- `com.android.tools.build:gradle-api:9.3.3` — `CommonExtension` in the published jar exposes
+  `compileSdkMinor` (`getCompileSdkMinor`/`setCompileSdkMinor`), so the property exists in the
+  AGP version this project pins, not only in newer docs.
+- AGP 9.3 release notes — "The maximum API level that Android Gradle plugin 9.3 supports is API
+  level 37", so compileSdk 37 is inside the supported range for AGP `9.3.3`.
+- Google's SDK repository index — `platforms;android-37.0`, `platforms;android-37.1`,
+  `build-tools;37.0.0` are listed on the stable channel.
+
+If a future AGP release changes the target-hash scheme, the declared minor version is the single
+place to adjust; `targetSdk` and `minSdk` are unaffected.

@@ -61,11 +61,23 @@ jobs:
           fi
           echo "Using sdkmanager at: $SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" --install \
-            "platform-tools" \
-            "platforms;android-37" \
-            "build-tools;36.0.0" \
+
+          # Android 17 (API 37) is a minor-versioned platform: the package is
+          # `platforms;android-37.0`, and `platforms;android-37` does not exist. AGP resolves it
+          # through `compileSdk = 37` + `compileSdkMinor = 0` (app/build.gradle.kts).
+          PACKAGES=(
+            "platform-tools"
+            "platforms;android-37.0"
+            "build-tools;36.0.0"
             "build-tools;37.0.0"
+          )
+          if ! "$SDKMANAGER" --install "${PACKAGES[@]}"; then
+            # Fall back to the canary channel if the stable index of the runner image is stale.
+            echo "Default channel did not resolve every package; retrying on channel 3" >&2
+            "$SDKMANAGER" --channel=3 --install "${PACKAGES[@]}"
+          fi
+          echo "Installed SDK platforms:"
+          ls -1 "$ANDROID_HOME/platforms"
 
       - name: Validate the Gradle wrapper
         run: |

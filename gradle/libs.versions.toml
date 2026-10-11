@@ -5,8 +5,12 @@ kotlin = "2.4.21"
 
 # --- Android platform -------------------------------------------------------------------
 # compileSdk is 37 (not the 36 baseline): the resolved library versions require compiling
-# against API 37. See docs/TECH_STACK.md §3.11 for the exact build error.
+# against API 37. See docs/TECH_STACK.md §5.1 for the exact build error.
+# Android 17 (API 37) is published as a *minor-versioned* platform - Google ships
+# `platforms;android-37.0`, not `platforms;android-37` - so the minor version must be declared
+# as well, otherwise AGP looks for a target that does not exist. See docs/TECH_STACK.md §5.2.
 compileSdk = "37"
+compileSdkMinor = "0"
 targetSdk = "36"
 minSdk = "26"
 

@@ -7,6 +7,9 @@ plugins {
 android {
     namespace = "io.github.towkirahmedrony.salah"
     compileSdk = libs.versions.compileSdk.get().toInt()
+    // API 37 is a minor-versioned platform (`platforms;android-37.0`); without this AGP looks
+    // for `platforms;android-37`, which Google no longer publishes.
+    compileSdkMinor = libs.versions.compileSdkMinor.get().toInt()
 
     defaultConfig {
         applicationId = "io.github.towkirahmedrony.salah"
