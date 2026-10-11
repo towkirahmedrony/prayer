@@ -9,6 +9,7 @@
     <string name="nav_calendar">Calendar</string>
     <string name="nav_ramadan">Ramadan</string>
     <string name="nav_settings">Settings</string>
+    <string name="nav_tools">Tools</string>
 
     <!-- Home: header and dates -->
     <string name="home_prayer_times_arabic" translatable="false">مواقيت الصلاة</string>
