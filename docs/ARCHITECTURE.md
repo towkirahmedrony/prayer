@@ -27,6 +27,11 @@ Implemented:
 - **Azan playback machinery:** lifecycle, single-instance, audio-focus and release rules,
   implemented and unit-tested. No recording is bundled because no licence exists to redistribute
   one, so the settings screen reports the limitation rather than offering a dead control.
+- **Qibla compass:** the initial great-circle bearing to the Kaaba computed locally, a
+  sensor-driven dial built on the device's real orientation sensors, magnetic-declination
+  correction from the platform's geomagnetic model, request-based device location alongside manual
+  coordinates, location provenance and freshness, compass calibration guidance, and ten explicit UI
+  states. Fully offline.
 - Repository/provider boundaries for prayer schedules, prohibited periods, calendars, location,
   preferences and notification settings.
 - Unit tests for domain, data and presentation-mapping logic.
@@ -38,7 +43,9 @@ playback.
 
 Detailed notification documentation lives in
 [`PRAYER_NOTIFICATIONS.md`](PRAYER_NOTIFICATIONS.md); its tests and the manual device checklist are
-in [`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md).
+in [`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md). The same pair exists for the
+Qibla feature: [`QIBLA_COMPASS.md`](QIBLA_COMPASS.md) and
+[`QIBLA_COMPASS_TESTING.md`](QIBLA_COMPASS_TESTING.md).
 
 ## 2. Gradle module decision
 
@@ -80,6 +87,14 @@ io.github.towkirahmedrony.salah
 │   │   │                       PrayerNotificationChannelId, NotificationPermissionStatus,
 │   │   │                       AzanPlaybackManager + AzanAudioSource / AudioPlaybackEngine ports,
 │   │   │                       NotificationSoundPreviewer (port)
+│   │   ├── qibla/              Qibla subsystem, Android-free:
+│   │   │                       KaabaReference, QiblaBearing, QiblaCalculator, HeadingMath
+│   │   │                       (MagneticHeading / TrueHeading), HeadingSmoother, SensorFrames,
+│   │   │                       CompassSensorSource + CompassReading + CompassAccuracyGate,
+│   │   │                       GeomagneticDeclinationProvider, LocationProvider +
+│   │   │                       LocationPermissionChecker + LocationProviderSelection,
+│   │   │                       QiblaPhase / CalibrationAdvice / QiblaStateReducer
+│   │   ├── location/           LocationFreshness
 │   │   ├── repository/         Repository interfaces (location, preferences, schedule,
 │   │   │                       calendar, prohibited periods, notification settings)
 │   │   ├── DiagnosticsLogger   Structured diagnostics port + SalahDiagnosticEvents
@@ -93,6 +108,11 @@ io.github.towkirahmedrony.salah
 │   ├── calendar/               Gregorian from the device clock, re-emitted at local midnight
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
 │   ├── prohibited/             Rule-book-backed repository (ships unconfigured)
+│   ├── qibla/                  Android side of the Qibla feature:
+│   │                           AndroidCompassSensorSource (SensorManager, three sensor families,
+│   │                           display-rotation remap, tilt), AndroidGeomagneticDeclinationProvider
+│   │                           (GeomagneticField), AndroidLocationProvider (LocationManagerCompat,
+│   │                           one-shot), AndroidLocationPermissionChecker
 │   └── notification/           Android side of the notification subsystem:
 │                               AlarmManagerPrayerNotificationScheduler,
 │                               AndroidNotificationChannels, AndroidPrayerNotificationPresenter,
@@ -107,7 +127,8 @@ io.github.towkirahmedrony.salah
 │   ├── home/components/        Section composables (incl. CalculationCard)
 │   ├── settings/               Settings state, view model, screen
 │   ├── notifications/          Prayer notification settings state, view model, screen
-│   └── common/                 PlannedFeatureScreen + resource mappers
+│   ├── qibla/                  Qibla state, view model, screen, labels, compass dial
+│   └── common/                 PlannedFeatureScreen, LocationFormState, resource mappers
 └── navigation/                 SalahDestination, SalahNavHost, SalahApp
 ```
 
@@ -144,7 +165,11 @@ Enforced rules:
    why `PrayerNotificationCoordinator` and `PrayerNotificationDeliverer` — orchestration over ports,
    with no Android import — live in `core/domain/notification`, while `AlarmManager`, `MediaPlayer`
    and `NotificationManager` implementations stay in `data/notification`. The notification settings
-   screen therefore imports only `core`.
+   screen therefore imports only `core`. `feature/qibla` follows the same rule: the sensors, the
+   location service and the geomagnetic model sit behind ports in `core/domain/qibla`, so the
+   screen, the state machine and the arithmetic are testable with fakes and only the thin Android
+   adapters need a device. `LocationFormState` lives in `feature/common` because Settings and the
+   Qibla screen share one manual-entry form and therefore one set of validation rules.
 7. **Immutable state, unidirectional data flow**: repositories expose `Flow`, the ViewModel
    `combine`s them into one immutable state, the screen renders it and sends events back as method
    calls (`onRetry`, `setCalculationMethod`, `saveLocation`).
@@ -261,6 +286,58 @@ What the diagram is asserting:
 - **Nothing is derived twice.** The scheduler does not read the Home UI state and the UI does not
   read the alarm set; both are projections of the same repository and the same preferences.
 
+### 5.2 How a stored location becomes a Qibla direction
+
+```text
+       QiblaScreen  (LifecycleEventEffect ON_START / ON_STOP)
+            │
+            ▼
+       QiblaViewModel ──────────────┬───────────────────────────────────────┐
+            │                        │                                       │
+            │ starts collection      │                                       │
+            ▼                        ▼                                       ▼
+   CompassSensorSource      LocationRepository                   LocationProvider
+   (cold flow; register     (the same DataStore the              (one-shot on request;
+    on collect, unregister   prayer engine and Settings           manual entry needs
+    in awaitClose)           already use)                         neither permission
+            │                        │                            nor network)
+            │ CompassReading         │ LocationInfo
+            │ (magnetic azimuth +    │ (origin, accuracy, acquiredAt)
+            │  accuracy + tilt)      │
+            ▼                        ├──► GeomagneticDeclinationProvider ──► declination
+      HeadingSmoother                │        (GeomagneticField, on device)
+      (unit-circle average,          │
+       adaptive weight)              └──► QiblaCalculator ────────────────► QiblaBearing
+            │                                    (pure; refuses invalid,           │
+            │ smoothed magnetic heading           at-Kaaba and antipodal)          │
+            ▼                                                                     │
+      HeadingMath.toTrueHeading  ◄──── declination ─────────────────────────────┐  │
+            │  TrueHeading                                                      │  │
+            └───────────────────────► HeadingMath.turnFromTrue ◄───────────────┘  │
+                                             │                                    │
+                                             ▼                                    ▼
+                                  QiblaStateReducer.phase(...)  ◄── sensor availability,
+                                             │                      LocationFreshness
+                                             ▼
+                                        QiblaUiState
+```
+
+What the diagram is asserting:
+
+- **Three state holders, because they change at wildly different rates.** The location snapshot is
+  recomputed only when the stored location changes, so the declination model is not evaluated and
+  DataStore is not read at 10 Hz — a sensor sample costs one pure calculation.
+- **The bearing needs nothing but coordinates.** It is closed-form trigonometry, so it is produced
+  with no sensor, no permission and no network. Only the dial depends on hardware.
+- **Declination crosses the boundary exactly once, as a type.** `toTrueHeading` consumes a
+  `MagneticHeading` and produces a `TrueHeading`; nothing accepts a `TrueHeading` and adds
+  declination, so double correction is unrepresentable rather than merely discouraged.
+- **One location, one store.** The Qibla screen writes through the same `LocationRepository` and the
+  same DataStore as the prayer engine and Settings, so the bearing can never be computed from a
+  location other parts of the app do not see.
+- **The state machine is decided in one tested place.** The precedence between "no location", "no
+  bearing" and "no sensor" lives in `QiblaStateReducer`, not in a chain of `if`s in the layout.
+
 ## 6. Provider abstraction
 
 ```kotlin
@@ -313,7 +390,9 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 - `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla` and
   `notifications`. Unimplemented destinations render `PlannedFeatureScreen`, explicitly labelled
   “Not implemented yet”. `notifications` is a real destination reached from Settings and is not in
-  the bottom bar, because it is configuration rather than a place the user works.
+  the bottom bar, because it is configuration rather than a place the user works. `qibla` is a real
+  screen reached from the Home screen's Islamic tools, and is not in the bottom bar because it is a
+  tool rather than a place the user dwells.
 - Navigation state is saved/restored per destination (`saveState`/`restoreState`,
   `launchSingleTop`), so returning to Home keeps its state.
 
@@ -335,13 +414,20 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 | Notification identity | `PrayerNotificationIdsTest`, `PrayerNotificationRequestTest`, `PrayerNotificationChannelIdTest` | Request-code uniqueness across 400 days × 6 targets × 2 kinds, URI round trip, malformed-input rejection, bounded and stable channel ids |
 | Notification settings | `PrayerNotificationSettingsTest`, `DataStorePrayerNotificationPreferencesRepositoryTest` | Defaults, clamping, sparseness, real persistence across recreation, safe fallback on bad stored data, coexistence with the other preferences in one store |
 | Scheduling, recovery, delivery | `PrayerNotificationCoordinatorTest`, `PrayerNotificationDelivererTest` | Reboot recovery, duplicate broadcasts, master switch, location/date/time-zone change, exact-alarm fallback, missing permission, one failure not aborting the rest, suppression rules, staleness, Azan attempt boundaries, structured logging with no coordinates |
+| Qibla bearing | `QiblaCalculatorTest` | Two independently implemented formulations (a 3-D tangent-plane projection and the spherical law of cosines) checked against the production formula across a global grid, a frozen 13-city table, human-checkable sanity cases, range and wraparound, invalid and non-finite input, the poles, the Kaaba point, the antipode, and the great-circle distance against a chord derivation |
+| Heading and north reference | `HeadingMathTest`, `HeadingSmootherTest`, `SensorFramesTest`, `CompassAccuracyGateTest` | Normalization and non-finite folding, signed shortest difference and its antisymmetry, declination applied once with the double-correction property asserted at a non-zero declination, measured smoothing lag bounds and jitter reduction, the four screen-rotation frames and their cycle, and the calibration warm-up gate |
+| Qibla state and inputs | `QiblaStateReducerTest`, `LocationProviderSelectionTest`, `LocationFreshnessTest` | Every phase and the precedence between them, every calibration advice, exhaustiveness over the accuracy values, provider ordering per granted precision, and both freshness window boundaries including clock skew |
+| Location provenance | `DataStoreLocationRepositoryTest` | Real DataStore on a temporary file: manual and device round trips, metadata not inherited on a manual save, implausible accuracy discarded, recreation, clearing without touching other preferences, stores written before origins were recorded, and partial writes |
 | Azan playback | `AzanPlaybackManagerTest` | Single instance, stop, release, missing asset, engine failure — against a fake engine; device behaviour is unverified because no recording is bundled |
 
 Not yet covered (and therefore not claimed): Compose UI tests, instrumentation tests, Android's
-actual alarm and notification delivery on a device, `MediaPlayer` against real audio, and any
-religious-correctness validation, which requires verified timetables and review rather than unit
-tests. The notification subsystem's device-only scenarios are listed, unperformed, in
-[`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md) §4. The engine's reference values are regression values from the pinned engine version through
+actual alarm and notification delivery on a device, `MediaPlayer` against real audio, real sensor
+delivery and the three-family fallback, `remapCoordinateSystem` behaviour under a physical screen
+rotation, `GeomagneticField` declination values, a real location fix, and any religious-correctness
+validation, which requires verified timetables and review rather than unit tests. The device-only
+scenarios for both features are listed, unperformed, in
+[`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md) §4 and
+[`QIBLA_COMPASS_TESTING.md`](QIBLA_COMPASS_TESTING.md) §4. The engine's reference values are regression values from the pinned engine version through
 Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATION.md` §6.
 
 ## 10. Extension points
@@ -365,6 +451,13 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
   `PRAYER_NOTIFICATIONS.md` §5.4.
 - **A different time-critical mechanism**: implement `PrayerNotificationScheduler`. The planner,
   coordinator, delivery path and UI are unaffected.
+- **A different sensor strategy**: implement `CompassSensorSource`. The smoothing, the declination
+  step, the state machine and the screen are unaffected — which is why the three-family fallback was
+  cheap to add and is cheap to extend.
+- **A different declination model**: implement `GeomagneticDeclinationProvider`. The correction step
+  and the north-reference types do not change.
+- **A Qibla map or a remote computation**: would need an `INTERNET` permission, which Salah
+  deliberately does not hold. The bearing is closed-form and offline by design.
 - **Splitting modules**: move packages into `core:*`, `data:*`, `feature:*` Gradle modules; the
   rules in §4 are already the intended boundaries.
 
@@ -375,11 +468,19 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
 - Prohibited prayer windows are **implemented but unconfigured**: the rule book ships empty, so the
   app reports the honest unavailability state.
 - The schedule cache is in-memory only; process death clears it (and it is cheaply recalculated).
-- No network client, no Room and no WorkManager job exist. The manifest declares exactly four
-  permissions, all for notifications (`POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`,
-  `SCHEDULE_EXACT_ALARM`, `VIBRATE`) — there is still **no** `INTERNET` permission.
+- No network client, no Room and no WorkManager job exist. The manifest declares exactly six
+  permissions, each tied to a feature (`POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`,
+  `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`) — there is
+  still **no** `INTERNET` permission, and no background location.
 - **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
   missing for licensing reasons, and the UI says so instead of offering a control that cannot work.
+- **The Qibla bearing is exact; the compass is not.** The bearing is closed-form trigonometry over
+  stored coordinates, verified against independent formulations. The dial's error is dominated by
+  local magnetic interference and device magnetometer quality, which no software can correct, and
+  the screen states that rather than implying a precision it does not have.
+- **The Qibla feature has not been verified on a physical device.** Sensors, screen rotation,
+  declination values and real location fixes require hardware; the checklist is written and
+  unperformed (`QIBLA_COMPASS_TESTING.md` §4).
 - Notification delivery has **not** been verified on a physical device. Reboot recovery, Doze
   behaviour, system permission surfaces and real alarm timing require hardware; the checklist is
   written but unperformed (`PRAYER_NOTIFICATIONS_TESTING.md` §4).

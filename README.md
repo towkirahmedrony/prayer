@@ -4,10 +4,11 @@ Salah is an **offline-first Islamic companion for Android**: prayer times, calen
 tooling and Islamic utilities designed to keep working without an internet connection and
 without an account.
 
-> **Current status:** the project foundation, the **local prayer-time calculation engine** and
-> **prayer notifications** are implemented and covered by tests. Several long-term features
-> described below are *planned*. This README states exactly which is which, and the app itself
-> labels unimplemented sections as “Not implemented yet” instead of showing placeholder data.
+> **Current status:** the project foundation, the **local prayer-time calculation engine**,
+> **prayer notifications** and the **Qibla compass** are implemented and covered by tests. Several
+> long-term features described below are *planned*. This README states exactly which is which, and
+> the app itself labels unimplemented sections as “Not implemented yet” instead of showing
+> placeholder data.
 
 ---
 
@@ -23,18 +24,26 @@ without an account.
 | Next prayer + countdown resolved from the real schedule | Implemented |
 | Home screen: branding, date header, location, calculation indicator, timetable, solar events, next-prayer card, prohibited-times section, shortcuts, data-source status | Implemented |
 | **Prayer notifications** — reminders at the calculated prayer times, scheduled with `AlarmManager` from the same offline schedule the Home screen shows | **Implemented, offline** |
+| **Qibla bearing** — initial great-circle direction to the Kaaba, in degrees from true north, plus the great-circle distance | **Implemented, offline** |
+| **Qibla compass** — real sensor-driven dial with heading, signed turn and alignment, built on the fused rotation vector with two documented fallbacks | **Implemented** |
+| Magnetic declination from the platform's World Magnetic Model, applied to the heading exactly once | Implemented |
+| Location from the device on request (approximate or precise) with timeouts, permission and service states | Implemented |
+| Manual coordinates that need no permission and no network, stored in the existing location repository | Implemented |
+| Location provenance and freshness, so a saved position is never presented as a current one | Implemented |
+| Compass calibration guidance from the platform's own accuracy signal, with a warm-up gate; no invented accuracy score | Implemented |
+| Qibla screen states for permission denied, services off, timeout, no sensor, tilted device and undefined direction | Implemented |
 | Per-prayer notification settings: enable, sound (device default / bundled Salah chime / silent), vibration, optional advance reminder | Implemented, persisted locally |
 | Global master switch, separate sunrise (solar event) reminder, sound preview, schedule status | Implemented |
 | Reboot, clock, time-zone, date and app-update recovery; duplicate-alarm prevention; exact-alarm fallback | Implemented |
 | Prayer notification settings screen, reached from Settings | Implemented |
-| Navigation: Home, Prayer, Calendar, Ramadan, Settings, Qibla, Notifications | Implemented (boundaries) |
+| Navigation: Home, Prayer, Calendar, Ramadan, Settings, Notifications, Qibla | Implemented (Qibla is a real screen; Prayer, Calendar and Ramadan remain labelled boundaries) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, Home mapping and the notification subsystem | Implemented (191 tests) |
+| Unit tests for engine, domain, data, Home mapping, the notification subsystem and the Qibla feature | Implemented (303 tests) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |
 | Bangladesh Bangla and Hijri calendar conversion | **Not implemented** — honestly reported as unavailable |
-| Ramadan, Qibla, Quran, widgets, networking, Room, device location | Not implemented |
+| Ramadan, Quran, widgets, networking, Room | Not implemented |
 
 ## Why it looks the way it does
 
@@ -63,6 +72,14 @@ Salah only shows values it actually has:
 - **Android's limits are stated, not glossed over.** If exact alarms are not permitted, if
   notification permission is denied, or if a channel has been silenced by the user, the app says
   what that means instead of implying a guarantee Android does not offer.
+- **The Qibla bearing is geography, so it needs nothing.** It is calculated from the stored
+  coordinates in closed form, so a device with no magnetometer, or a user who has declined location
+  access, still gets an exact direction; only the live dial is withheld, and with a stated reason.
+- **The dial never claims more than it measures.** A heading is only compared with the Qibla when
+  it is on the same north reference, and the flat-convention reading is withheld rather than shown
+  when the device is tilted past the point where the projection means anything.
+- **Magnetic declination is applied exactly once, and the types make a second application
+  impossible** rather than relying on a reviewer to notice.
 
 The calculated times are **not** claimed to match any authority's published timetable: that
 requires an actual comparison for the same location and date, which has not been done. See
@@ -85,7 +102,10 @@ requires an actual comparison for the same location and date, which has not been
 | Build | Gradle `9.8.1` (Kotlin DSL, version catalog), AGP `9.3.3`, JDK `17` |
 | SDK | `compileSdk` `37` (minor `0`, i.e. `android-37.0`), `targetSdk` `36`, `minSdk` `26` |
 | Notifications | `AlarmManager` (exact where permitted, windowed fallback) + `NotificationManagerCompat`; 7 notification channels |
-| Permissions | `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE` — no `INTERNET`, no location permission |
+| Sensors | `SensorManager` — rotation vector, geomagnetic rotation vector, or accelerometer + magnetometer; 10 Hz sampling; no foreground service |
+| Location | `LocationManagerCompat.getCurrentLocation` — one-shot and cancellable, no Play Services dependency |
+| Declination | `GeomagneticField` — the platform's World Magnetic Model, on device |
+| Permissions | `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION` — no `INTERNET`, no background location |
 | Tests | JUnit 4 + kotlinx-coroutines-test |
 
 Full version list, official references and compatibility decisions: [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
@@ -107,6 +127,9 @@ The calculation engine and its pinned version are explained in
    is required.
 7. Notifications are scheduled, delivered and recovered after a reboot **without any network
    access**. Salah declares no `INTERNET` permission at all, so there is nothing it could send.
+8. The Qibla bearing is computed locally from a locally stored position, and magnetic declination
+   is evaluated on device from the platform's own geomagnetic model. Automatic location uses the
+   device's own provider, and manual coordinates work with neither network nor permission.
 
 ## Repository structure
 
@@ -116,10 +139,13 @@ The calculation engine and its pinned version are explained in
 ├── app/
 │   └── src/main/java/io/github/towkirahmedrony/salah/
 │       ├── core/{model,domain,designsystem}   pure logic, ports, calculator, theme
-│       │   └── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
+│       │   ├── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
+│       │   ├── domain/qibla/                  bearing, heading maths, frames, state reducer
+│       │   └── domain/location/               location freshness
 │       ├── data/{preferences,location,calendar,prayer,prohibited}
-│       │   └── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
-│       ├── feature/{app,home,settings,notifications,common}
+│       │   ├── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
+│       │   └── qibla/                         SensorManager, GeomagneticField, LocationManagerCompat
+│       ├── feature/{app,home,settings,notifications,qibla,common}
 │       ├── navigation/                        destinations, nav host, app shell
 │       └── di/                                Koin container
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
@@ -127,6 +153,8 @@ The calculation engine and its pinned version are explained in
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
 ├── docs/PRAYER_NOTIFICATIONS.md               scheduler, permissions, channels, Azan, limitations
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
+├── docs/QIBLA_COMPASS.md                      bearing formula, sensors, declination, limits
+├── docs/QIBLA_COMPASS_TESTING.md              automated coverage + the manual device checklist
 ├── docs/TECH_STACK.md                         real versions + compatibility decisions
 ├── docs/ARCHITECTURE.md                       structure, rules, extension points
 ├── gradle/libs.versions.toml                  version catalog
@@ -166,7 +194,15 @@ and no signing credentials.
 - Prohibited-time rules are **not** configured: the mechanism and tests exist, the reviewed rule
   set does not.
 - No Bangla or Hijri conversion; only the device Gregorian date is available.
-- No Ramadan schedule, Qibla compass, Quran, duas or tasbih.
+- No Ramadan schedule, Quran, duas or tasbih.
+- **The Qibla dial is not better than a few degrees outdoors, and worse near metal.** The bearing
+  itself is exact; what varies is the compass. Nearby magnets, speakers, car dashboards and
+  device-specific magnetometer quality dominate the error, and Salah says so rather than implying
+  otherwise.
+- **The Qibla compass has not been verified on a physical device.** Rotating the screen, tilting the
+  device, the sensor-family fallback, real declination values and a real location fix all need
+  hardware. The checklist exists and is explicitly unperformed:
+  [`docs/QIBLA_COMPASS_TESTING.md`](docs/QIBLA_COMPASS_TESTING.md) §4.
 - **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
   missing for licensing reasons, and the UI reports that rather than offering a control that cannot
   work.
@@ -190,11 +226,11 @@ and no signing credentials.
 3. **Licensed Azan audio** — source a recording whose redistribution rights are established, add it
    to `res/raw`, and return it from `BundledAzanAudioSource`. Decide deliberately whether
    unattended long-form playback warrants a foreground service.
-4. **On-device verification of notifications** — work through the manual checklist on real hardware
-   and record the results, including device-specific Doze and battery behaviour.
+4. **On-device verification** — work through the notification and Qibla checklists on real hardware
+   and record the results, including device-specific Doze, battery and magnetometer behaviour.
 5. **Remote providers and caching** — optional AlAdhan integration with validation, caching and
    provenance display.
-6. **Qibla, Quran and content modules.**
+6. **Quran and content modules.**
 
 ## Contributing
 
