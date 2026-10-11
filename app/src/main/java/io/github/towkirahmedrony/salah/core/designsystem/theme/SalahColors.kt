@@ -17,14 +17,18 @@ private val SandLine = Color(0xFFE4DCCB)
 private val InkStrong = Color(0xFF1B1C18)
 private val InkMuted = Color(0xFF4C4639)
 
+// Night palette: ink-green canvas, raised card surface and a gold accent.
 private val EmeraldLight = Color(0xFF8AD7B6)
 private val EmeraldContainerDark = Color(0xFF0A4C39)
-private val BrassLight = Color(0xFFDCC08A)
+private val Gold = Color(0xFFD8B26B)
+private val GoldInk = Color(0xFF1A1405)
+private val GoldWash = Color(0xFF2E2819)
 private val SlateLight = Color(0xFFA8C6E0)
-private val NightBase = Color(0xFF101512)
-private val NightElevated = Color(0xFF131A16)
-private val NightMuted = Color(0xFFC4C0B4)
-private val NightLine = Color(0xFF3B4038)
+private val NightBase = Color(0xFF0C1311)
+private val NightElevated = Color(0xFF141C19)
+private val NightRaised = Color(0xFF1E2824)
+private val NightMuted = Color(0xFFA3AEA8)
+private val NightLine = Color(0xFF26312C)
 
 /** Light scheme: warm ivory paper with deep emerald ink. */
 internal val SalahLightColorScheme = lightColorScheme(
@@ -50,26 +54,26 @@ internal val SalahLightColorScheme = lightColorScheme(
     onError = Color.White,
 )
 
-/** Dark scheme: deep green-black with a soft emerald light. */
+/** Dark scheme: ink-green canvas, raised cards, soft emerald light and a gold accent. */
 internal val SalahDarkColorScheme = darkColorScheme(
     primary = EmeraldLight,
     onPrimary = Color(0xFF00382A),
     primaryContainer = EmeraldContainerDark,
     onPrimaryContainer = EmeraldMist,
-    secondary = BrassLight,
-    onSecondary = Color(0xFF3B2E10),
-    secondaryContainer = Color(0xFF56431C),
-    onSecondaryContainer = BrassSoft,
+    secondary = Gold,
+    onSecondary = GoldInk,
+    secondaryContainer = GoldWash,
+    onSecondaryContainer = Gold,
     tertiary = SlateLight,
     onTertiary = Color(0xFF102A3C),
     background = NightBase,
-    onBackground = Color(0xFFE6E2D8),
+    onBackground = Color(0xFFEDEAE0),
     surface = NightElevated,
-    onSurface = Color(0xFFE6E2D8),
-    surfaceVariant = NightLine,
+    onSurface = Color(0xFFEDEAE0),
+    surfaceVariant = NightRaised,
     onSurfaceVariant = NightMuted,
     outline = Color(0xFF8C9186),
     outlineVariant = NightLine,
-    error = Color(0xFFF2B8B5),
-    onError = Color(0xFF601410),
+    error = Color(0xFFE0875A),
+    onError = Color(0xFF3A1606),
 )

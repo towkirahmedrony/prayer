@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,17 +22,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
-import io.github.towkirahmedrony.salah.feature.home.components.BrandHeader
 import io.github.towkirahmedrony.salah.feature.home.components.CalculationCard
-import io.github.towkirahmedrony.salah.feature.home.components.CalendarCard
 import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
+import io.github.towkirahmedrony.salah.feature.home.components.HomeHeader
 import io.github.towkirahmedrony.salah.feature.home.components.LocationCard
-import io.github.towkirahmedrony.salah.feature.home.components.NextPrayerCard
-import io.github.towkirahmedrony.salah.feature.home.components.ProhibitedTimesCard
+import io.github.towkirahmedrony.salah.feature.home.components.NextPrayerHero
+import io.github.towkirahmedrony.salah.feature.home.components.PrayerStrip
+import io.github.towkirahmedrony.salah.feature.home.components.ProhibitedPanel
 import io.github.towkirahmedrony.salah.feature.home.components.ProvenanceCard
 import io.github.towkirahmedrony.salah.feature.home.components.ShortcutsCard
-import io.github.towkirahmedrony.salah.feature.home.components.SolarEventsCard
-import io.github.towkirahmedrony.salah.feature.home.components.TimetableCard
+import io.github.towkirahmedrony.salah.feature.home.components.SolarStrip
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -129,11 +127,14 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item(key = "brand") {
-            BrandHeader()
+        item(key = "header") {
+            HomeHeader(
+                state = state,
+                onOpenSettings = { onNavigate("settings") },
+            )
         }
 
         if (state.failureDetail != null) {
@@ -142,8 +143,24 @@ private fun HomeContent(
             }
         }
 
-        item(key = "dates") {
-            CalendarCard(state = state)
+        item(key = "next-prayer") {
+            NextPrayerHero(state = state.nextPrayer)
+        }
+
+        item(key = "prayer-strip") {
+            PrayerStrip(rows = state.prayerRows)
+        }
+
+        item(key = "solar") {
+            SolarStrip(rows = state.solarRows)
+        }
+
+        item(key = "prohibited") {
+            ProhibitedPanel(state = state.prohibited)
+        }
+
+        item(key = "shortcuts") {
+            ShortcutsCard(onNavigate = onNavigate)
         }
 
         item(key = "location") {
@@ -158,26 +175,6 @@ private fun HomeContent(
                 state = state.calculation,
                 onOpenSettings = { onNavigate("settings") },
             )
-        }
-
-        item(key = "next-prayer") {
-            NextPrayerCard(state = state.nextPrayer)
-        }
-
-        item(key = "timetable") {
-            TimetableCard(state = state)
-        }
-
-        item(key = "solar") {
-            SolarEventsCard(state = state)
-        }
-
-        item(key = "prohibited") {
-            ProhibitedTimesCard(state = state.prohibited)
-        }
-
-        item(key = "shortcuts") {
-            ShortcutsCard(onNavigate = onNavigate)
         }
 
         item(key = "provenance") {
