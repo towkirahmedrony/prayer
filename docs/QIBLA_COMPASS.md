@@ -103,8 +103,17 @@ Salah **refuses** rather than guesses in four cases, each returned as
 | Reason | Condition | Why refuse |
 |---|---|---|
 | `INVALID_COORDINATES` | latitude outside ±90, longitude outside ±180, or any non-finite value | A latitude of 91° is a caller bug, not a position near the pole. Clamping it would answer a question nobody asked. |
-| `AT_KAABA` | within `MINIMUM_SEPARATION_METRES` (1 m) of the reference point | The direction from a point to itself does not exist, and is numerically unstable adjacent to it. |
-| `ANTIPODAL` | the formula's horizontal component is below `DEGENERACY_EPSILON` (`1e-6`, about 4 m from the exact antipode) | Near the antipode every direction to the Kaaba is an equal-length path, so the bearing is genuinely ill-conditioned. Critically, `atan2(0, 0)` returns `0.0` in IEEE arithmetic — without an explicit guard the app would confidently report **due north** from a point in the South Pacific. |
+| `AT_KAABA` | within `KaabaReference.MINIMUM_SEPARATION_METRES` (1 m) of the reference point | The direction from a point to itself does not exist, and is numerically unstable adjacent to it. |
+| `ANTIPODAL` | within `ANTIPODAL_SEPARATION_METRES` (1 m of arc) of the exact antipode, detected from the formula's horizontal component | Near the antipode every direction to the Kaaba is an equal-length path, so the bearing is genuinely ill-conditioned. Critically, `atan2(0, 0)` returns `0.0` in IEEE arithmetic — without an explicit guard the app would confidently report **due north** from a point in the South Pacific. |
+
+The two refusals are deliberately measured in **different units**, and that is not an accident of
+implementation. The horizontal component of the formula has magnitude `|sin δ|`, where `δ` is the
+angular distance to the Kaaba, so it is small near the antipode — *and equally small near the Kaaba
+itself*. A single magnitude threshold therefore cannot tell the two apart, and the first version of
+this code reported `ANTIPODAL` for anything between 1 m and 6.4 m from the Kaaba. The near-Kaaba case
+is settled by haversine distance, where it is well conditioned; the near-antipode case is settled by
+the horizontal component, where the haversine loses tens of kilometres of precision through
+cancellation but the component does not. `QiblaCalculatorTest` pins both boundaries.
 
 Longitude differences are folded into `(-180, 180]` by
 `((λ2 − λ1 + 540) mod 360) − 180`, so `+350°` and `−10°` — the same physical separation — are treated

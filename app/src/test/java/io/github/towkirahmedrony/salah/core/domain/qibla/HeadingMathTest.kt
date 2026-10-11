@@ -2,7 +2,9 @@ package io.github.towkirahmedrony.salah.core.domain.qibla
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 
 /**
  * Angle arithmetic and the north-reference discipline.
@@ -90,6 +92,13 @@ class HeadingMathTest {
             for (to in 0 until 360 step 17) {
                 val forward = HeadingMath.shortestSignedDelta(from.toDouble(), to.toDouble())
                 val backward = HeadingMath.shortestSignedDelta(to.toDouble(), from.toDouble())
+
+                // Exactly half a turn is excluded on purpose. The documented range is `(-180, 180]`,
+                // so a half turn is reported as `+180` in both directions — which is the right
+                // instruction ("turn 180 either way") but is not antisymmetric. That case has its
+                // own test immediately above.
+                if (abs(forward) == 180.0 && abs(backward) == 180.0) continue
+
                 assertEquals("asymmetry at $from -> $to", 0.0, forward + backward, 1e-9)
             }
         }
@@ -124,18 +133,24 @@ class HeadingMathTest {
     }
 
     @Test
-    fun `the turn to the Qibla is independent of declination once both angles are true`() {
-        // A property worth pinning: because the turn compares two true-north angles, changing the
-        // declination shifts both by the same amount and the turn is unchanged. If a bug applied
-        // declination to the bearing as well as the heading, this would fail for a non-zero
-        // declination and pass at zero — which is exactly why a non-zero value is used.
+    fun `declination is applied exactly once, not twice`() {
         val magneticHeading = 100.0
         val bearing = 277.567140
 
-        val withSmallDeclination = turn(magneticHeading, bearing, declination = 1.0)
-        val withLargeDeclination = turn(magneticHeading, bearing, declination = 20.0)
+        // A non-zero declination is essential: at zero, applying it once and applying it twice give
+        // the same answer, so a double-correction bug would be invisible.
+        listOf(1.0, 12.5, 20.0).forEach { declination ->
+            val actual = turn(magneticHeading, bearing, declination)
 
-        assertEquals(withSmallDeclination, withLargeDeclination, 1e-9)
+            val appliedOnce = HeadingMath.shortestSignedDelta(magneticHeading + declination, bearing)
+            assertEquals("declination $declination not applied once", appliedOnce, actual, 1e-9)
+
+            val appliedTwice = HeadingMath.shortestSignedDelta(magneticHeading + 2 * declination, bearing)
+            assertTrue(
+                "declination $declination looks like it was applied twice",
+                abs(appliedTwice - actual) > 1e-6,
+            )
+        }
     }
 
     @Test

@@ -73,7 +73,12 @@ class QiblaCalculator {
         val east = sin(deltaLambda) * cos(phi2)
         val north = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(deltaLambda)
 
-        if (hypot(east, north) < DEGENERACY_EPSILON) {
+        // The horizontal component has magnitude |sin δ| where δ is the angular distance to the
+        // Kaaba, so it is small near the *antipode* — and it is also small near the Kaaba itself,
+        // which is why that case is settled by distance first. Near the antipode this quantity is
+        // computed without cancellation, unlike the haversine distance, so it is the reliable test
+        // there.
+        if (hypot(east, north) < ANTIPODAL_EPSILON) {
             return QiblaBearing.Unavailable(QiblaUnavailableReason.ANTIPODAL)
         }
 
@@ -108,15 +113,25 @@ class QiblaCalculator {
         const val EARTH_RADIUS_METRES: Double = 6_371_008.8
 
         /**
-         * Horizontal-component magnitude below which the bearing is treated as undefined.
+         * How close to the antipode the direction stops being meaningful, in metres of arc.
          *
-         * This is a *conditioning* threshold, not just a numerical one. Close to the antipode the
-         * direction to the Kaaba turns through nearly 180° per metre of displacement, so a number
-         * computed there carries no information. `1e-6` corresponds to roughly 4 m from the exact
-         * antipode — well outside floating-point noise, and inside the region where the answer
-         * would be meaningless anyway.
+         * A *conditioning* threshold rather than a numerical one: close to the antipode the bearing
+         * to the Kaaba turns through nearly 180° per metre of displacement, so any figure computed
+         * there carries no information. One metre matches
+         * [KaabaReference.MINIMUM_SEPARATION_METRES], and because the two thresholds are expressed
+         * in different units — a haversine distance for the Kaaba, the horizontal component for the
+         * antipode — neither can be reached inside the other's region.
          */
-        const val DEGENERACY_EPSILON: Double = 1e-6
+        const val ANTIPODAL_SEPARATION_METRES: Double = 1.0
+
+        /**
+         * The horizontal component below which the antipodal case is declared, in the same units the
+         * formula produces.
+         *
+         * `sin δ ≈ δ` near the antipode, so dividing the separation in metres by the Earth's radius
+         * gives the threshold the magnitude is compared against.
+         */
+        val ANTIPODAL_EPSILON: Double = ANTIPODAL_SEPARATION_METRES / EARTH_RADIUS_METRES
 
         /**
          * The eastward longitude difference from [longitude] to the Kaaba, in `(-180, 180]`.
