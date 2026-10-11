@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.home
 
 import io.github.towkirahmedrony.salah.core.domain.CountdownFormatter
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
+import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
@@ -128,18 +129,14 @@ class HomeUiStateFactory(
     /**
      * Builds the formatter for the user's preference.
      *
-     * `SYSTEM` follows the device locale, which is the only option that respects a locale whose
-     * conventional clock is neither 12- nor 24-hour in the way the fixed patterns assume.
+     * Delegates to [timeFormatterFor] so prayer reminders format times by exactly the same rule as
+     * the Home screen, instead of the two drifting apart.
      */
     private fun timeFormatter(
         zone: ZoneId,
         locale: Locale,
         preference: TimeFormatPreference,
-    ): DateTimeFormatter = when (preference) {
-        TimeFormatPreference.SYSTEM -> DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-        TimeFormatPreference.TWELVE_HOUR -> DateTimeFormatter.ofPattern("h:mm a", locale)
-        TimeFormatPreference.TWENTY_FOUR_HOUR -> DateTimeFormatter.ofPattern("HH:mm", locale)
-    }.withLocale(locale).withZone(zone)
+    ): DateTimeFormatter = timeFormatterFor(zone = zone, locale = locale, preference = preference)
 
     private fun CalendarDateState.toSection(): CalendarSection = when (this) {
         is CalendarDateState.Available -> CalendarSection(

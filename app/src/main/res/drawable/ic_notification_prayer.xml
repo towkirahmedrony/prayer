@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar icon for prayer reminders.
+
+  Drawn as a single-colour vector with no background so Android can tint it for the status bar, as
+  the platform requires: a coloured or detailed icon is rendered as a white blob. It is a separate
+  drawable from the launcher icon on purpose — the launcher foreground carries colour and a
+  background, which is wrong for a notification small icon.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+
+    <!-- Crescent: an outer disc with an offset disc subtracted. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M15.6,3.4a9,9 0 1,0 0,17.2a7.2,7.2 0 1,1 0,-17.2z" />
+
+    <!-- Small star, part of the same silhouette. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18.1,7.0l0.62,1.26l1.39,0.2l-1.0,0.98l0.24,1.38l-1.25,-0.66l-1.25,0.66l0.24,-1.38l-1.0,-0.98l1.39,-0.2z" />
+</vector>

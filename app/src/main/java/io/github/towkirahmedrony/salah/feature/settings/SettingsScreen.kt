@@ -60,6 +60,7 @@ import org.koin.androidx.compose.koinViewModel
  */
 @Composable
 fun SettingsScreen(
+    onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
@@ -101,6 +102,29 @@ fun SettingsScreen(
                 selected = uiState.themeMode == ThemeMode.DARK,
                 onClick = { viewModel.setThemeMode(ThemeMode.DARK) },
             )
+        }
+
+        // Prayer notifications -----------------------------------------------
+        // A single entry point rather than the controls themselves: the notification screen
+        // carries per-prayer detail and two platform permission states, which do not belong in a
+        // general settings list. Nothing is duplicated here and nothing is implied about whether
+        // notifications are on - the screen that owns that state shows it.
+        SalahSectionCard {
+            Text(
+                text = stringResource(R.string.settings_notifications_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_notifications_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(onClick = onOpenNotifications) {
+                Text(text = stringResource(R.string.settings_notifications_open))
+            }
         }
 
         // Manual location ----------------------------------------------------

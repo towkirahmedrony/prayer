@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plural forms used by prayer reminders.
+
+  A lead-in reminder reads "Fajr in 10 minutes", which has to be a plural resource rather than a
+  "%d minutes" format string so that a locale with different plural rules gets the right form.
+
+  Unlike the rest of Salah's strings this file is deliberately translatable: the reminder text is
+  user-facing notification content and must be localisable.
+-->
+<resources>
+    <plurals name="notification_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+</resources>

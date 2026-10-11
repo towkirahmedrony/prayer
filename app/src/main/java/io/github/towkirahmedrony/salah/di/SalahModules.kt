@@ -2,17 +2,38 @@ package io.github.towkirahmedrony.salah.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
+import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEngine
+import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
+import io.github.towkirahmedrony.salah.core.domain.notification.AzanPlaybackManager
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionStatusProvider
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationSoundPreviewer
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPresenter
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerTimesProvider
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodCalculator
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleBook
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
+import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
+import io.github.towkirahmedrony.salah.data.notification.AndroidDiagnosticsLogger
+import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationChannels
+import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationPermissionStatusProvider
+import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationSoundPreviewer
+import io.github.towkirahmedrony.salah.data.notification.AndroidPrayerNotificationPresenter
+import io.github.towkirahmedrony.salah.data.notification.BundledAzanAudioSource
+import io.github.towkirahmedrony.salah.data.notification.DataStorePrayerNotificationPreferencesRepository
+import io.github.towkirahmedrony.salah.data.notification.MediaPlayerAudioPlaybackEngine
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationDeliverer
 import io.github.towkirahmedrony.salah.data.preferences.DataStoreUserPreferencesRepository
 import io.github.towkirahmedrony.salah.data.preferences.salahPreferencesDataStore
 import io.github.towkirahmedrony.salah.data.prayer.AdhanPrayerTimesProvider
@@ -21,7 +42,11 @@ import io.github.towkirahmedrony.salah.data.prohibited.RuleBookProhibitedPeriods
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
+import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
 import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -30,8 +55,10 @@ import java.time.Clock
 /**
  * Single dependency container for Salah.
  *
- * Bindings are declared against domain interfaces, so swapping the prayer provider or the
- * persistence layer is a change here and nowhere else.
+ * Bindings are declared against domain interfaces, so swapping the prayer provider, the
+ * persistence layer, the alarm backing or the Azan audio source is a change here and nowhere else.
+ * That is what lets the notification scheduler be unit-tested with fakes for every one of its
+ * collaborators while the app runs against the real platform implementations.
  */
 val salahModules = module {
 
@@ -40,10 +67,30 @@ val salahModules = module {
     // device time-zone change takes effect immediately instead of after a process restart.
     single<Clock> { Clock.systemUTC() }
 
+    /**
+     * Application-lifetime scope for work that must outlive a broadcast receiver.
+     *
+     * A manifest receiver gets a short time budget, so the coordinator runs here under `goAsync()`
+     * instead of on the receiver's main thread. One shared scope, so nothing can leak a scope per
+     * broadcast.
+     */
+    single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+
+    // Diagnostics -------------------------------------------------------------
+    // Background behaviour — alarms, receivers, reboot recovery — has no screen, so the log is the
+    // only evidence it ran. The port keeps the domain testable with a recording fake.
+    single<DiagnosticsLogger> { AndroidDiagnosticsLogger() }
+
     // Local persistence -------------------------------------------------------
+    // One DataStore for every preference in Salah: calculation settings, theme, location and
+    // notification settings. A second store could disagree with the first about whether
+    // notifications are on.
     single<DataStore<Preferences>> { androidContext().salahPreferencesDataStore }
     single<UserPreferencesRepository> { DataStoreUserPreferencesRepository(get()) }
     single<LocationRepository> { DataStoreLocationRepository(get()) }
+    single<PrayerNotificationPreferencesRepository> {
+        DataStorePrayerNotificationPreferencesRepository(get())
+    }
 
     // Calendar ----------------------------------------------------------------
     single<CalendarRepository> { DeviceClockCalendarRepository(get()) }
@@ -63,6 +110,58 @@ val salahModules = module {
     single { ProhibitedPeriodCalculator() }
     single<ProhibitedPeriodsRepository> {
         RuleBookProhibitedPeriodsRepository(ruleBook = get(), calculator = get())
+    }
+
+    // Notifications -----------------------------------------------------------
+    // The planner is pure: it decides what should be scheduled and nothing else.
+    single { PrayerNotificationPlanner() }
+    single<NotificationPermissionStatusProvider> { AndroidNotificationPermissionStatusProvider(androidContext()) }
+    single { AndroidNotificationChannels(androidContext()) }
+    single<PrayerNotificationScheduler> {
+        AlarmManagerPrayerNotificationScheduler(
+            context = androidContext(),
+            permissions = get(),
+            logger = get(),
+        )
+    }
+    single<PrayerNotificationPresenter> { AndroidPrayerNotificationPresenter(androidContext()) }
+    single<NotificationSoundPreviewer> { AndroidNotificationSoundPreviewer(androidContext()) }
+
+    // Azan playback. The audio *source* is what is missing, not the machinery: no licensed
+    // recording is bundled, so `resolve()` returns null and playback is reported as unavailable.
+    // See docs/PRAYER_NOTIFICATIONS.md §5.
+    single<AzanAudioSource> { BundledAzanAudioSource() }
+    single<AudioPlaybackEngine> { MediaPlayerAudioPlaybackEngine(androidContext()) }
+    single { AzanPlaybackManager(audioSource = get(), engine = get(), logger = get()) }
+
+    // The delivery path: one class decides whether a fired alarm becomes a visible reminder.
+    single {
+        PrayerNotificationDeliverer(
+            notificationSettings = get(),
+            userPreferences = get(),
+            locations = get(),
+            permissions = get(),
+            presenter = get(),
+            azanPlayback = get(),
+            logger = get(),
+            clock = get(),
+        )
+    }
+
+    // The single reconciliation entry point every trigger funnels through: app start, settings
+    // change, location change, reboot, clock or time-zone change, app update, and delivery.
+    single {
+        PrayerNotificationCoordinator(
+            planner = get(),
+            notificationSettings = get(),
+            userPreferences = get(),
+            locations = get(),
+            schedules = get(),
+            scheduler = get(),
+            permissions = get(),
+            logger = get(),
+            clock = get(),
+        )
     }
 
     // Domain ------------------------------------------------------------------
@@ -86,6 +185,16 @@ val salahModules = module {
         SettingsViewModel(
             userPreferencesRepository = get(),
             locationRepository = get(),
+        )
+    }
+    viewModel {
+        PrayerNotificationSettingsViewModel(
+            notificationPreferences = get(),
+            locationRepository = get(),
+            permissions = get(),
+            coordinator = get(),
+            soundPreviewer = get(),
+            azanPlayback = get(),
         )
     }
 }

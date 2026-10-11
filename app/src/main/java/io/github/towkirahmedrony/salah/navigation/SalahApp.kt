@@ -87,6 +87,9 @@ private fun DestinationGlyph(destination: SalahDestination, tint: Color) {
         SalahDestination.RAMADAN -> LanternGlyph(tint = tint)
         SalahDestination.SETTINGS -> GearGlyph(tint = tint)
         SalahDestination.QIBLA -> QiblaGlyph(tint = tint)
+        // Reached from Settings, so it never renders in the bottom bar; the crescent matches the
+        // Prayer destination it belongs to.
+        SalahDestination.NOTIFICATIONS -> CrescentGlyph(tint = tint)
     }
 }
 

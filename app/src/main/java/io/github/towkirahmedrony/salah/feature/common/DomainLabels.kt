@@ -5,6 +5,7 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
+import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
@@ -103,6 +104,27 @@ fun TimeFormatPreference.labelRes(): Int = when (this) {
     TimeFormatPreference.SYSTEM -> R.string.time_format_system
     TimeFormatPreference.TWELVE_HOUR -> R.string.time_format_twelve_hour
     TimeFormatPreference.TWENTY_FOUR_HOUR -> R.string.time_format_twenty_four_hour
+}
+
+/**
+ * Reminder sound names.
+ *
+ * A sound choice is never a bare name: [hintRes] states what will actually be heard, so `Silent`
+ * cannot be mistaken for "no reminder" and the bundled chime is not presented as something it is
+ * not.
+ */
+@StringRes
+fun NotificationSound.labelRes(): Int = when (this) {
+    NotificationSound.SYSTEM_DEFAULT -> R.string.notification_sound_system_default
+    NotificationSound.SALAH_CHIME -> R.string.notification_sound_salah_chime
+    NotificationSound.SILENT -> R.string.notification_sound_silent
+}
+
+@StringRes
+fun NotificationSound.hintRes(): Int = when (this) {
+    NotificationSound.SYSTEM_DEFAULT -> R.string.notification_sound_system_default_hint
+    NotificationSound.SALAH_CHIME -> R.string.notification_sound_salah_chime_hint
+    NotificationSound.SILENT -> R.string.notification_sound_silent_hint
 }
 
 @StringRes

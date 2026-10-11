@@ -127,6 +127,11 @@
     <string name="action_retry">Retry</string>
     <string name="action_open_settings">Open Settings</string>
 
+    <!-- Settings: prayer notifications entry point -->
+    <string name="settings_notifications_title">Prayer notifications</string>
+    <string name="settings_notifications_body">Reminders for each prayer, the sound and vibration each one uses, and whether Azan playback is available. Settings are stored on this device and work offline.</string>
+    <string name="settings_notifications_open">Open notification settings</string>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_theme_title">Appearance</string>
@@ -163,7 +168,7 @@
     <string name="settings_adjustment_minutes">%1$s min</string>
     <string name="settings_calculation_saved">Saved. Prayer times have been recalculated.</string>
     <string name="settings_about_title">About Salah</string>
-    <string name="settings_about_body">Salah is an offline-first Islamic companion. Gregorian dates come from the device clock, and prayer times are calculated locally by an astronomical engine. Bangla and Hijri conversion, prohibited-time rules and notifications are not implemented yet.</string>
+    <string name="settings_about_body">Salah is an offline-first Islamic companion. Gregorian dates come from the device clock, prayer times are calculated locally by an astronomical engine, and prayer reminders are scheduled and delivered without a network connection. Bangla and Hijri conversion is not implemented, prohibited-time rules are not configured, and Azan audio is not bundled \u2014 each of those is stated in the app where it applies.</string>
     <string name="settings_version">Version %1$s (build %2$d)</string>
 
     <!-- Work in progress destinations -->
@@ -171,11 +176,91 @@
     <string name="wip_planned_title">Planned capabilities</string>
     <string name="wip_body">This destination exists as a navigation boundary. Nothing is implemented here yet, so no value in this section is presented as a working feature.</string>
     <string name="feature_prayer_title">Prayer</string>
-    <string name="feature_prayer_body">Daily times are calculated by the local engine on the Home screen. Monthly timetables and notification scheduling are planned.</string>
+    <string name="feature_prayer_body">Daily times are calculated by the local engine on the Home screen, and prayer reminders are scheduled on this device. Monthly timetables are planned.</string>
     <string name="feature_calendar_title">Calendar</string>
     <string name="feature_calendar_body">Gregorian, Bangladesh Bangla and Hijri conversion with confirmed-date overrides is planned. Only the Gregorian date from the device clock is implemented today.</string>
     <string name="feature_ramadan_title">Ramadan</string>
     <string name="feature_ramadan_body">Sehri and Iftar schedules will be derived from the same prayer schedule used by the Home screen, which is already calculated locally. The Ramadan timetable itself is not implemented yet, so no Ramadan schedule is shown.</string>
     <string name="feature_qibla_title">Qibla</string>
     <string name="feature_qibla_body">A compass screen needs location and sensor support, which are not implemented yet.</string>
+    <!-- Navigation: prayer notifications -->
+    <string name="nav_notifications">Notifications</string>
+
+    <!-- Prayer notification settings screen -->
+    <string name="notifications_title">Prayer notifications</string>
+    <string name="notifications_intro">Salah schedules reminders from the prayer times it calculates on this device. Everything here works offline and is stored on the device only.</string>
+    <string name="notifications_permission_title">Android permissions</string>
+    <string name="notifications_permission_notifications">Notification permission</string>
+    <string name="notifications_permission_exact_alarms">Exact alarms</string>
+    <string name="notifications_permission_granted">Allowed</string>
+    <string name="notifications_permission_denied">Not allowed</string>
+    <string name="notifications_permission_body">These are two separate permissions and Salah asks for each one only when you press the button. Notification permission lets a reminder appear in the shade. Exact alarms lets a reminder run at the prayer time even while the phone is dozing; without it Salah still schedules the reminder, but Android may run it up to ten minutes late.</string>
+    <string name="notifications_permission_grant">Allow notifications</string>
+    <string name="notifications_permission_manage">Notification settings</string>
+    <string name="notifications_exact_alarm_grant">Allow exact alarms</string>
+    <string name="notifications_exact_alarm_fallback">Exact alarms are not allowed, so reminders are scheduled with a window instead. They will still arrive, but Android may delay them by a few minutes and a phone in deep power saving may delay them further.</string>
+    <string name="notifications_master_title">All prayer notifications</string>
+    <string name="notifications_master_body_on">Salah keeps reminders for today and tomorrow up to date, and rebuilds them after a restart.</string>
+    <string name="notifications_master_body_off">No reminder is scheduled and Salah has cancelled the ones it had scheduled. Turning this back on schedules the prayers you have enabled below.</string>
+    <string name="notifications_schedule_title">Scheduled reminders</string>
+    <string name="notifications_schedule_count">Scheduled reminders: %1$d, covering the next %2$d days (today and tomorrow).</string>
+    <string name="notifications_schedule_missing_dates">No timetable could be calculated for %1$d of those days, so the reminders already stored for them were left untouched rather than dropped.</string>
+    <string name="notifications_schedule_unknown">No reconciliation has run in this session yet.</string>
+    <string name="notifications_schedule_body">Salah recalculates the schedule whenever you change a setting here, change your location or calculation method, change the device time or time zone, or restart the phone.</string>
+    <string name="notifications_schedule_recalculate">Recalculate now</string>
+    <string name="notifications_schedule_no_location">Notifications need a location, because prayer times are calculated from it. Add one under Settings, then open this screen again.</string>
+    <string name="notifications_prayers_title">Prayers</string>
+    <string name="notifications_prayers_body">Each prayer can be configured on its own. A reminder can stay enabled while its sound is silent.</string>
+    <string name="notifications_prayer_master_off">Paused by the switch above.</string>
+    <string name="notifications_prayer_disabled">No reminder is scheduled for this prayer.</string>
+    <string name="notifications_prayer_sound">Sound</string>
+    <string name="notifications_prayer_test_sound">Play this sound</string>
+    <string name="notifications_prayer_vibration">Vibrate</string>
+    <string name="notifications_prayer_vibration_body">Where the device and its settings allow it.</string>
+    <string name="notifications_prayer_advance">Remind me before</string>
+    <string name="notifications_prayer_advance_body">An additional reminder ahead of the prayer. Off means only the prayer-time reminder is scheduled.</string>
+    <string name="notifications_prayer_advance_off">Off</string>
+    <string name="notifications_prayer_advance_value">%1$d min before</string>
+    <string name="notifications_solar_title">Sunrise reminder</string>
+    <string name="notifications_solar_body">Sunrise is a solar event, not one of the five obligatory prayers, so it is configured separately and is off by default. Its reminder says sunrise, never prayer.</string>
+    <string name="notifications_azan_title">Azan playback</string>
+    <string name="notifications_azan_available">Available</string>
+    <string name="notifications_azan_unavailable">Not available in this build</string>
+    <string name="notifications_azan_body_unavailable">Salah can play a full Azan recording, but no recording is bundled: redistributing one needs rights this project does not have, and a generated tone would not be an Azan. Rather than offer a control that cannot work, Salah plays the notification sound you chose above. Adding a licensed recording is a one-line change to the audio source, and the playback code and its tests already exist.</string>
+    <string name="notifications_azan_body_available">A licensed recording is bundled, so an at-time prayer reminder also starts playback. Notifications and playback are separate: turning off one never turns off the other.</string>
+    <string name="notifications_azan_attribution">Recording: %1$s</string>
+    <string name="notifications_limitations_title">What Android decides, not Salah</string>
+    <string name="notifications_limitations_body">Do Not Disturb, battery optimisation and the device maker\'s power management all sit between Salah and the screen. Salah schedules reminders with Android\'s supported alarm and notification APIs and does not try to bypass any of them, so a reminder can be delayed or silenced by settings Salah cannot override.</string>
+    <string name="notifications_channel_note">Sounds and vibration live in Android notification channels. Changing a prayer\'s sound here routes it to the matching channel; if you have already customised that channel in system settings, Android keeps your choice.</string>
+    <string name="notifications_offline_note">Reminders are calculated, scheduled and delivered without an internet connection. No account is required and nothing is sent anywhere.</string>
+    <string name="notifications_status_no_permission">Reminders cannot appear until notification permission is granted.</string>
+    <string name="notifications_message_preview_started">Playing the sound you selected.</string>
+    <string name="notifications_message_preview_failed">That sound could not be played on this device.</string>
+    <string name="notifications_message_recalculated">Schedule recalculated.</string>
+    <string name="notifications_message_schedule_unavailable">No timetable could be calculated, so no reminder was scheduled.</string>
+
+    <!-- Notification sounds -->
+    <string name="notification_sound_system_default">Default sound</string>
+    <string name="notification_sound_system_default_hint">The device\'s own notification sound.</string>
+    <string name="notification_sound_salah_chime">Salah chime</string>
+    <string name="notification_sound_salah_chime_hint">A short tone bundled with Salah. Works offline.</string>
+    <string name="notification_sound_silent">Silent</string>
+    <string name="notification_sound_silent_hint">No sound. The reminder still appears in the notification shade.</string>
+
+    <!-- Notification channels (shown in Android\'s app notification settings) -->
+    <string name="notification_channel_prayer_name">Prayer reminders — %1$s, %2$s</string>
+    <string name="notification_channel_vibration_on">vibration on</string>
+    <string name="notification_channel_vibration_off">no vibration</string>
+    <string name="notification_channel_prayer_description">Prayer-time reminders calculated by Salah.</string>
+    <string name="notification_channel_status_name">Salah status</string>
+    <string name="notification_channel_status_description">Non-urgent Salah messages. Separate from prayer reminders.</string>
+
+    <!-- Prayer reminder notification content -->
+    <string name="notification_title_prayer_time">%1$s is now</string>
+    <string name="notification_title_prayer_advance">%1$s in %2$s</string>
+    <string name="notification_title_sunrise">Sunrise</string>
+    <string name="notification_body_prayer_time">It is time for %1$s. The time calculated for your location is %2$s.</string>
+    <string name="notification_body_prayer_advance">%1$s is at %2$s.</string>
+    <string name="notification_body_sunrise">Sunrise is at %1$s. Sunrise is a solar event, not one of the five obligatory prayers.</string>
+
 </resources>

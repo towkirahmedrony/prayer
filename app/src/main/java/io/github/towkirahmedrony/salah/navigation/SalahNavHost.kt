@@ -13,13 +13,15 @@ import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
 import io.github.towkirahmedrony.salah.feature.common.PlannedFeatureScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
+import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
 
 /**
  * The navigation graph.
  *
- * Home and Settings are implemented; Prayer, Calendar, Ramadan and Qibla are declared so the
- * boundaries exist, and each renders an explicit "not implemented yet" screen.
+ * Home, Settings and the prayer-notification settings screen are implemented; Prayer, Calendar,
+ * Ramadan and Qibla are declared so the boundaries exist, and each renders an explicit
+ * "not implemented yet" screen.
  */
 @Composable
 fun SalahNavHost(
@@ -68,7 +70,13 @@ fun SalahNavHost(
         }
 
         composable(SalahDestination.SETTINGS.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onOpenNotifications = { navController.navigate(SalahDestination.NOTIFICATIONS.route) },
+            )
+        }
+
+        composable(SalahDestination.NOTIFICATIONS.route) {
+            PrayerNotificationSettingsScreen()
         }
     }
 }

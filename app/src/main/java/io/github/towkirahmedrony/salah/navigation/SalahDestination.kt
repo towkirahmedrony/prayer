@@ -20,6 +20,17 @@ enum class SalahDestination(
     CALENDAR("calendar", R.string.nav_calendar),
     RAMADAN("ramadan", R.string.nav_ramadan),
     SETTINGS("settings", R.string.nav_settings),
+
+    /**
+     * Prayer notification settings.
+     *
+     * A destination of its own rather than a section of Settings: it carries per-prayer detail, two
+     * independent platform permission states and the live schedule status, which is more than a
+     * settings list can show honestly. Reached from Settings, and not in the bottom bar because it
+     * is a configuration screen, not a place the user works.
+     */
+    NOTIFICATIONS("notifications", R.string.nav_notifications, inBottomBar = false),
+
     QIBLA("qibla", R.string.shortcut_qibla, inBottomBar = false),
     ;
 

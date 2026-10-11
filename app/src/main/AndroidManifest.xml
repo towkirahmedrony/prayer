@@ -2,10 +2,39 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      Salah does not request any permission in this phase. No location, network,
-      notification, or alarm permission is needed while the prayer engine and the
-      notification scheduler are not yet implemented.
+      Salah's permissions, each with the exact feature that needs it. Nothing is declared "just in
+      case", and no permission is requested at startup: every one is either granted at install time
+      or asked for from the prayer-notification settings screen, when the user takes the action that
+      requires it. See docs/PRAYER_NOTIFICATIONS.md §3.
+
+        POST_NOTIFICATIONS    API 33+ runtime permission. Without it the platform accepts a posted
+                              notification but never shows it. Asked for from the notifications
+                              screen when the user enables reminders.
+
+        RECEIVE_BOOT_COMPLETED
+                              Alarms do not survive a reboot. Without this the schedule would be
+                              silently lost until the user next opened the app.
+
+        SCHEDULE_EXACT_ALARM   API 31+ special permission. Without it setExactAndAllowWhileIdle
+                              throws, so Salah falls back to a windowed alarm and tells the user
+                              that reminders may be a few minutes late. Asked for separately from
+                              notification permission, because they are different permissions with
+                              different capabilities.
+
+        VIBRATE               Required for notification vibration. Salah offers a per-prayer
+                              vibration preference, so the permission is used.
+
+      Deliberately NOT requested:
+        * no location permission — the location is entered by hand;
+        * no FOREGROUND_SERVICE permission — no long-running service exists (see §5 of the doc,
+          which explains why long-form background Azan playback is not implemented);
+        * no INTERNET permission — the whole feature is offline. Salah has none in this phase.
     -->
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".SalahApplication"
@@ -30,6 +59,42 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          The alarm that fires when a reminder is due.
+
+          Not exported: it is reached only by Salah's own PendingIntents, which name this class
+          explicitly. The alarm Intent therefore has no implicit action another app could resolve,
+          so nothing outside Salah can trigger a prayer notification.
+        -->
+        <receiver
+            android:name=".data.notification.PrayerNotificationReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!--
+          Reboot, clock, time-zone, date and app-update recovery.
+
+          Exported because these are broadcasts the *system* delivers to manifest receivers, and
+          every action listed is a protected broadcast that only the system may send — so exporting
+          it does not let another app drive a reconciliation. The work performed is idempotent
+          either way: a reconciliation repeated is a reconciliation with the same result.
+
+          Alarms do not survive a reboot, which is exactly why this receiver exists.
+        -->
+        <receiver
+            android:name=".data.notification.SystemEventReconciliationReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
