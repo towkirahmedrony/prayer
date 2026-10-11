@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette used before Compose takes over the window. -->
+    <color name="salah_window_background">#FBF8F1</color>
+    <color name="salah_window_background_dark">#0F1512</color>
+    <color name="ic_launcher_background">#0B6B4F</color>
+</resources>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Salah</string>
+    <string name="app_tagline">Your Complete Islamic Companion</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_prayer">Prayer</string>
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_ramadan">Ramadan</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home: header and dates -->
+    <string name="home_prayer_times_arabic" translatable="false">مواقيت الصلاة</string>
+    <string name="home_weekday_unknown">Weekday unavailable</string>
+    <string name="home_bangla_date_title">বাংলা তারিখ</string>
+    <string name="home_hijri_date_title">হিজরি তারিখ</string>
+    <string name="home_gregorian_label">Gregorian</string>
+
+    <!-- Home: location -->
+    <string name="home_location_title">Location</string>
+    <string name="home_location_none_title">No location configured</string>
+    <string name="home_location_none_body">Salah needs a location before prayer times can be calculated. Add a manual location in Settings.</string>
+    <string name="home_location_manual">Manual location</string>
+    <string name="home_location_coordinates">%1$.4f, %2$.4f</string>
+    <string name="home_location_timezone">Time zone: %1$s</string>
+
+    <!-- Home: prayer schedule -->
+    <string name="home_prayer_timetable_title">Daily timetable</string>
+    <string name="home_solar_title">Sunrise, solar noon and sunset</string>
+    <string name="home_solar_note">Solar events, listed separately from the five prayers.</string>
+    <string name="home_next_prayer_title">Next prayer</string>
+    <string name="home_next_prayer_none">No countdown is shown because no prayer schedule is available yet.</string>
+    <string name="home_next_prayer_at">at %1$s</string>
+    <string name="home_next_prayer_remaining">%1$s remaining</string>
+    <string name="home_time_unavailable" translatable="false">—</string>
+    <string name="home_prohibited_title">Prohibited prayer times</string>
+    <string name="home_prohibited_none">No prohibited-time windows are shown, because verified rules have not been reviewed and configured. Salah will not display invented intervals.</string>
+    <string name="home_shortcuts_title">Islamic tools</string>
+
+    <!-- Prayer and solar event names -->
+    <string name="prayer_fajr">Fajr</string>
+    <string name="prayer_sunrise">Sunrise</string>
+    <string name="prayer_dhuhr">Dhuhr</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Maghrib</string>
+    <string name="prayer_isha">Isha</string>
+    <string name="event_sunrise">Sunrise</string>
+    <string name="event_solar_noon">Solar noon</string>
+    <string name="event_sunset">Sunset</string>
+
+    <!-- Shortcuts -->
+    <string name="shortcut_qibla">Qibla</string>
+    <string name="shortcut_ramadan_subtitle">Sehri and Iftar timetable</string>
+    <string name="shortcut_calendar_subtitle">Gregorian, Bangla and Hijri</string>
+    <string name="shortcut_qibla_subtitle">Compass direction</string>
+    <string name="shortcut_settings_subtitle">Appearance and location</string>
+
+    <!-- Data source status -->
+    <string name="status_title">Data source</string>
+    <string name="status_offline_ready">Offline-first · local storage on this device</string>
+    <string name="status_source_label">Source: %1$s</string>
+    <string name="status_source_unconfigured">not configured</string>
+    <string name="status_source_local_calculation">local astronomical calculation</string>
+    <string name="status_source_remote_api">remote provider (%1$s)</string>
+    <string name="status_source_user_timetable">user timetable (%1$s)</string>
+    <string name="status_observed_at">Observed at %1$s</string>
+
+    <!-- Unavailability reasons (mapped from the domain) -->
+    <string name="reason_no_location">Add a location in Settings to enable this section.</string>
+    <string name="reason_calculation_not_configured">Prayer calculation is not configured yet.</string>
+    <string name="reason_rules_not_verified">Verified rules are not configured yet.</string>
+    <string name="reason_calendar_not_implemented">Calendar conversion is not implemented yet.</string>
+    <string name="reason_network_unavailable">The remote provider is unavailable. Cached local data, if any, is still shown.</string>
+    <string name="reason_unknown">This section is not available yet.</string>
+    <string name="calendar_source_computed">computed on this device</string>
+
+    <!-- Shared states -->
+    <string name="state_loading">Loading…</string>
+    <string name="state_error_title">Something went wrong</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_open_settings">Open Settings</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_theme_title">Appearance</string>
+    <string name="settings_theme_system">Follow system</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_location_title">Manual location</string>
+    <string name="settings_location_body">Device location access is not requested in this phase. Salah stores the location you enter here on this device only.</string>
+    <string name="settings_location_label">Location name</string>
+    <string name="settings_latitude">Latitude (-90 to 90)</string>
+    <string name="settings_longitude">Longitude (-180 to 180)</string>
+    <string name="settings_time_zone">Time zone ID</string>
+    <string name="settings_save">Save location</string>
+    <string name="settings_clear">Clear location</string>
+    <string name="settings_location_saved">Location saved and stored locally.</string>
+    <string name="settings_location_cleared">Location cleared.</string>
+    <string name="settings_location_invalid">Check the coordinates and the time zone ID (for example 23.8103, 90.4125 and Asia/Dhaka).</string>
+    <string name="settings_engine_title">Prayer calculation</string>
+    <string name="settings_engine_body">No calculation engine is integrated yet, so Salah does not display prayer times. A local astronomical provider is planned for the next phase.</string>
+    <string name="settings_about_title">About Salah</string>
+    <string name="settings_about_body">Salah is an offline-first Islamic companion. Gregorian dates come from the device clock. Bangla and Hijri conversion, prayer calculation, prohibited-time rules and notifications are not implemented yet.</string>
+    <string name="settings_version">Version %1$s (build %2$d)</string>
+
+    <!-- Work in progress destinations -->
+    <string name="wip_badge">Not implemented yet</string>
+    <string name="wip_planned_title">Planned capabilities</string>
+    <string name="wip_body">This destination exists as a navigation boundary. Nothing is implemented here yet, so no value in this section is presented as a working feature.</string>
+    <string name="feature_prayer_title">Prayer</string>
+    <string name="feature_prayer_body">Monthly timetables, calculation profiles, manual adjustments and notification scheduling are planned. No calculation engine is integrated yet, so no times are displayed.</string>
+    <string name="feature_calendar_title">Calendar</string>
+    <string name="feature_calendar_body">Gregorian, Bangladesh Bangla and Hijri conversion with confirmed-date overrides is planned. Only the Gregorian date from the device clock is implemented today.</string>
+    <string name="feature_ramadan_title">Ramadan</string>
+    <string name="feature_ramadan_body">Sehri and Iftar schedules will be derived from the same prayer schedule used by the Home screen. Because the prayer engine is not configured, no Ramadan timetable is shown.</string>
+    <string name="feature_qibla_title">Qibla</string>
+    <string name="feature_qibla_body">A compass screen needs location and sensor support, which are not implemented yet.</string>
+</resources>

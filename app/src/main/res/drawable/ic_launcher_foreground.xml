@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Crescent -->
+    <path
+        android:fillColor="#E9C46A"
+        android:fillType="evenOdd"
+        android:pathData="M54,28 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M56.5,28 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+
+    <!-- Dome -->
+    <path
+        android:fillColor="#FBF8F1"
+        android:pathData="M54,39 C45,39 38,46.5 38,56 L38,72 L70,72 L70,56 C70,46.5 63,39 54,39 Z" />
+
+    <!-- Base -->
+    <path
+        android:fillColor="#C7EFDC"
+        android:pathData="M30,72 L78,72 L78,79 L30,79 Z" />
+</vector>
