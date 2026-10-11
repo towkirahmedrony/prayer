@@ -555,8 +555,9 @@ private fun TimeRow(
             } else {
                 MaterialTheme.colorScheme.onSurface
             },
-        fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
-    )
+            fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
 }
 
 /** Signed minute count, so an adjustment cannot be misread as an unsigned offset. */
@@ -619,7 +620,6 @@ fun CalculationCard(
             Text(text = stringResource(R.string.action_open_settings))
         }
     }
-}
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFBF8F1)

@@ -147,12 +147,17 @@ No HTTP client (Retrofit or Ktor) is declared. The first phase performs no netwo
 and offline-first means local state is the read source. A client is introduced with the first
 remote provider, together with its validation and caching rules.
 
-### 3.9 Prayer calculation engine: boundary only
+### 3.9 Prayer calculation engine: Adhan Kotlin, pinned to `0.0.5`
 
-`PrayerTimesProvider` is the port, `UnconfiguredLocalPrayerTimesProvider` is the wired
-implementation, and it reports `NOT_CONFIGURED`. The Adhan Kotlin library (candidate:
-`adhan2:0.0.7`) is *not* integrated in this phase, so no version is claimed as verified here and
-no prayer time is displayed. See `docs/ARCHITECTURE.md` for the integration criteria.
+`PrayerTimesProvider` is the port and `AdhanPrayerTimesProvider` is the wired implementation; the
+local engine is integrated and prayer times are calculated on the device. The library is
+`com.batoulapps.adhan:adhan2`, pinned to **`0.0.5`**.
+
+`0.0.5` is pinned deliberately: the newer `0.0.6`/`0.0.7` releases are compiled for a JVM target
+of 21 (class-file major version 65) and cannot be loaded by this project's JDK 17 toolchain
+(class-file version 61), which reproduces an `UnsupportedClassVersionError`. `0.0.5` is the newest
+release published for a JVM target the project can run. Upgrading it requires moving the toolchain
+to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
 
 ### 3.10 Build and release configuration
 

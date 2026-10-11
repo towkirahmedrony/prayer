@@ -175,7 +175,7 @@
     <string name="feature_calendar_title">Calendar</string>
     <string name="feature_calendar_body">Gregorian, Bangladesh Bangla and Hijri conversion with confirmed-date overrides is planned. Only the Gregorian date from the device clock is implemented today.</string>
     <string name="feature_ramadan_title">Ramadan</string>
-    <string name="feature_ramadan_body">Sehri and Iftar schedules will be derived from the same prayer schedule used by the Home screen. Because the prayer engine is not configured, no Ramadan timetable is shown.</string>
+    <string name="feature_ramadan_body">Sehri and Iftar schedules will be derived from the same prayer schedule used by the Home screen, which is already calculated locally. The Ramadan timetable itself is not implemented yet, so no Ramadan schedule is shown.</string>
     <string name="feature_qibla_title">Qibla</string>
     <string name="feature_qibla_body">A compass screen needs location and sensor support, which are not implemented yet.</string>
 </resources>
