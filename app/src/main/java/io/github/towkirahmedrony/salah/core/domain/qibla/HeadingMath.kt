@@ -47,7 +47,7 @@ object HeadingMath {
     fun magnetic(degrees: Double): MagneticHeading = MagneticHeading(normalize(degrees))
 
     /** Builds a normalized [TrueHeading]. */
-    fun true(degrees: Double): TrueHeading = TrueHeading(normalize(degrees))
+    fun trueHeading(degrees: Double): TrueHeading = TrueHeading(normalize(degrees))
 
     /**
      * Converts a magnetic heading to a true heading by adding the local magnetic declination.

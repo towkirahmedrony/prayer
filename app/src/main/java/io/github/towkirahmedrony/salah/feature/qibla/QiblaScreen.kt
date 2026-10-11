@@ -148,7 +148,7 @@ private fun QiblaContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = stringResource(R.string.nav_qibla_title),
+            text = stringResource(R.string.shortcut_qibla),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )

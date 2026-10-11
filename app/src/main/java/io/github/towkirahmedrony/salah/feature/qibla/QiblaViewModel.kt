@@ -408,7 +408,7 @@ class QiblaViewModel(
 
         val turn = trueHeading?.let { heading ->
             (current.bearing as? QiblaBearing.Available)?.let { available ->
-                HeadingMath.turnFromTrue(heading, HeadingMath.true(available.degrees))
+                HeadingMath.turnFromTrue(heading, HeadingMath.trueHeading(available.degrees))
             }
         }
 

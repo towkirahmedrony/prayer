@@ -49,7 +49,7 @@ class HeadingMathTest {
     @Test
     fun `the heading builders normalize what they are given`() {
         assertEquals(350.0, HeadingMath.magnetic(-10.0).degrees, 0.0)
-        assertEquals(10.0, HeadingMath.true(370.0).degrees, 0.0)
+        assertEquals(10.0, HeadingMath.trueHeading(370.0).degrees, 0.0)
     }
 
     // --- Signed shortest difference -------------------------------------------
@@ -144,7 +144,7 @@ class HeadingMathTest {
         val declination = 5.0
         val trueHeading = HeadingMath.toTrueHeading(magnetic, declination)
 
-        val turn = HeadingMath.turnFromTrue(trueHeading, HeadingMath.true(277.0))
+        val turn = HeadingMath.turnFromTrue(trueHeading, HeadingMath.trueHeading(277.0))
 
         // 105 from true north, Qibla at 277: 172 degrees clockwise, which is inside the half turn.
         assertEquals(172.0, turn, 1e-9)
@@ -153,7 +153,7 @@ class HeadingMathTest {
     @Test
     fun `the turn wraps correctly when the Qibla is just past north`() {
         // Facing 181 degrees, Qibla at 179: two degrees anticlockwise, not 358 clockwise.
-        val turn = HeadingMath.turnFromTrue(HeadingMath.true(181.0), HeadingMath.true(179.0))
+        val turn = HeadingMath.turnFromTrue(HeadingMath.trueHeading(181.0), HeadingMath.trueHeading(179.0))
 
         assertEquals(-2.0, turn, 1e-9)
     }
@@ -162,14 +162,14 @@ class HeadingMathTest {
 
     @Test
     fun `the dial rotates by the negative of the heading`() {
-        assertEquals(-90.0, HeadingMath.dialRotationDegrees(HeadingMath.true(90.0)), 1e-9)
-        assertEquals(-270.0, HeadingMath.dialRotationDegrees(HeadingMath.true(270.0)), 1e-9)
-        assertEquals(-359.0, HeadingMath.dialRotationDegrees(HeadingMath.true(359.0)), 1e-9)
+        assertEquals(-90.0, HeadingMath.dialRotationDegrees(HeadingMath.trueHeading(90.0)), 1e-9)
+        assertEquals(-270.0, HeadingMath.dialRotationDegrees(HeadingMath.trueHeading(270.0)), 1e-9)
+        assertEquals(-359.0, HeadingMath.dialRotationDegrees(HeadingMath.trueHeading(359.0)), 1e-9)
     }
 
     private fun turn(magneticDegrees: Double, bearingDegrees: Double, declination: Double): Double =
         HeadingMath.turnFromTrue(
             HeadingMath.toTrueHeading(HeadingMath.magnetic(magneticDegrees), declination),
-            HeadingMath.true(bearingDegrees),
+            HeadingMath.trueHeading(bearingDegrees),
         )
 }
