@@ -71,11 +71,16 @@ class NextPrayerResolverTest {
 
     @Test
     fun `never treats sunrise as a prayer`() {
-        val beforeSunrise = resolver.resolve(completeSchedule(), time(5, 30))
-        val afterSunrise = resolver.resolve(completeSchedule(), time(6, 15))
+        // Sunrise (06:10) falls between Fajr (04:55) and Dhuhr (11:52). The resolver reads the
+        // `prayers` list only, so once Fajr has begun the next prayer is Dhuhr - the sunrise
+        // solar event is never offered as a prayer.
+        val betweenFajrAndSunrise = resolver.resolve(completeSchedule(), time(5, 30))
+        val justAfterSunrise = resolver.resolve(completeSchedule(), time(6, 11))
 
-        assertEquals(PrayerName.FAJR, beforeSunrise?.prayer)
-        assertEquals(PrayerName.DHUHR, afterSunrise?.prayer)
+        assertEquals(PrayerName.DHUHR, betweenFajrAndSunrise?.prayer)
+        assertEquals(time(11, 52), betweenFajrAndSunrise?.time)
+        assertEquals(PrayerName.DHUHR, justAfterSunrise?.prayer)
+        assertEquals(time(11, 52), justAfterSunrise?.time)
     }
 
     @Test
