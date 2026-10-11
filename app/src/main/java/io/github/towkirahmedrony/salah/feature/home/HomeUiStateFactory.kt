@@ -6,16 +6,17 @@ import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
-import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.PrayerName
-import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
+import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
+import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
+import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
-import java.time.Clock
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.time.ZonedDateTime
 import java.util.Locale
 
 /**
@@ -27,16 +28,21 @@ import java.util.Locale
  *  - a countdown appears only when a complete schedule for *today* exists;
  *  - missing Bangla/Hijri conversion is reported as unavailable, never invented;
  *  - sunrise, solar noon and sunset are rendered as solar events, never as prayers;
- *  - a provider failure is surfaced as [HomeUiState.Ready.failureDetail], not swallowed.
+ *  - a provider failure is surfaced as [HomeUiState.Ready.failureDetail], not swallowed;
+ *  - the method that produced a timetable is always reported next to it.
+ *
+ * Times are rendered in the prayer location's zone, using the user's time-format preference.
+ * The device's own zone is used only as a last-resort fallback when neither a schedule nor a
+ * configured location exists to supply one.
  */
 class HomeUiStateFactory(
     private val nextPrayerResolver: NextPrayerResolver,
-    private val clock: Clock,
 ) {
 
     fun create(
         calendar: CalendarSnapshot?,
         location: LocationInfo?,
+        settings: PrayerSettings,
         scheduleState: PrayerScheduleState,
         prohibitedState: ProhibitedPeriodsState,
         now: ZonedDateTime,
@@ -49,20 +55,18 @@ class HomeUiStateFactory(
             ?: return HomeUiState.Failed(detail = "The Gregorian date is unavailable.")
 
         val schedule = (scheduleState as? PrayerScheduleState.Available)?.schedule
-        val zone = schedule?.zoneId ?: location?.zoneId ?: clock.zone
+        val zone = schedule?.zoneId ?: location?.zoneId ?: ZoneId.systemDefault()
         val locale = Locale.getDefault()
 
-        val timeFormatter = DateTimeFormatter
-            .ofLocalizedTime(FormatStyle.SHORT)
-            .withLocale(locale)
-            .withZone(zone)
+        val timeFormatter = timeFormatter(zone, locale, settings.timeFormat)
         val stampFormatter = DateTimeFormatter
             .ofLocalizedDateTime(FormatStyle.MEDIUM)
             .withLocale(locale)
             .withZone(zone)
 
+        // The resolver returns null rather than guessing when the schedule is for another day,
+        // incomplete, or already finished, so the countdown can never be fabricated.
         val nextPrayer = nextPrayerResolver.resolve(schedule, now)
-        val prayerSectionNote = scheduleState.asTimetableNote()
 
         return HomeUiState.Ready(
             gregorianDate = gregorian.formattedDate,
@@ -82,16 +86,25 @@ class HomeUiStateFactory(
                     null
                 },
             ),
-            timetableNote = prayerSectionNote,
+            calculation = CalculationSection(
+                method = settings.method,
+                asrMethod = settings.asrMethod,
+                highLatitudeRule = settings.highLatitudeRule,
+                hasAdjustments = settings.hasAdjustments,
+                timeFormat = settings.timeFormat,
+            ),
+            timetableNote = scheduleState.asTimetableNote(),
             nextPrayer = NextPrayerSection(
                 prayer = nextPrayer?.prayer,
                 time = nextPrayer?.let { timeFormatter.format(it.time) },
                 countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
             ),
             prayerRows = PrayerName.entries.map { prayer ->
+                val entry = schedule?.prayers?.firstOrNull { it.prayer == prayer }
                 PrayerRow(
                     prayer = prayer,
-                    timeLabel = schedule?.timeOf(prayer)?.let(timeFormatter::format),
+                    timeLabel = entry?.let { timeFormatter.format(it.time) },
+                    adjustmentMinutes = entry?.adjustmentMinutes ?: 0,
                     isNext = nextPrayer?.prayer == prayer,
                 )
             },
@@ -103,10 +116,7 @@ class HomeUiStateFactory(
             },
             prohibited = prohibitedState.toSection(timeFormatter),
             provenance = ProvenanceSection(
-                source = (scheduleState as? PrayerScheduleState.Available)?.origin?.source
-                    ?: (scheduleState as? PrayerScheduleState.Unavailable)?.origin?.source
-                    ?: (scheduleState as? PrayerScheduleState.Failed)?.origin?.source
-                    ?: PrayerTimeSource.UNCONFIGURED,
+                source = scheduleState.originSource(),
                 providerId = scheduleState.providerId(),
                 observedAtLabel = scheduleState.observedAt()?.let(stampFormatter::format),
                 offlineReady = scheduleState.isAvailableOffline(),
@@ -114,6 +124,22 @@ class HomeUiStateFactory(
             failureDetail = (scheduleState as? PrayerScheduleState.Failed)?.detail,
         )
     }
+
+    /**
+     * Builds the formatter for the user's preference.
+     *
+     * `SYSTEM` follows the device locale, which is the only option that respects a locale whose
+     * conventional clock is neither 12- nor 24-hour in the way the fixed patterns assume.
+     */
+    private fun timeFormatter(
+        zone: ZoneId,
+        locale: Locale,
+        preference: TimeFormatPreference,
+    ): DateTimeFormatter = when (preference) {
+        TimeFormatPreference.SYSTEM -> DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        TimeFormatPreference.TWELVE_HOUR -> DateTimeFormatter.ofPattern("h:mm a", locale)
+        TimeFormatPreference.TWENTY_FOUR_HOUR -> DateTimeFormatter.ofPattern("HH:mm", locale)
+    }.withLocale(locale).withZone(zone)
 
     private fun CalendarDateState.toSection(): CalendarSection = when (this) {
         is CalendarDateState.Available -> CalendarSection(
@@ -140,6 +166,8 @@ class HomeUiStateFactory(
 
             is ProhibitedPeriodsState.NotAvailable -> ProhibitedSection(
                 windows = emptyList(),
+                // The reason travels with its detail so the screen can explain the exact gap
+                // instead of falling back to a generic sentence about verified rules.
                 unavailable = reason,
             )
         }
@@ -149,6 +177,13 @@ class HomeUiStateFactory(
         is PrayerScheduleState.Unavailable -> reason
         is PrayerScheduleState.Failed -> UnavailabilityReason.UNKNOWN
         PrayerScheduleState.Loading -> UnavailabilityReason.UNKNOWN
+    }
+
+    private fun PrayerScheduleState.originSource(): PrayerTimeSource = when (this) {
+        is PrayerScheduleState.Available -> origin.source
+        is PrayerScheduleState.Unavailable -> origin.source
+        is PrayerScheduleState.Failed -> origin.source
+        PrayerScheduleState.Loading -> PrayerTimeSource.UNCONFIGURED
     }
 
     private fun PrayerScheduleState.providerId(): String? = when (this) {

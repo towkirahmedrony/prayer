@@ -14,6 +14,15 @@ enum class UnavailabilityReason {
     /** No prayer-time provider is integrated yet. */
     CALCULATION_NOT_CONFIGURED,
 
+    /**
+     * The engine is configured but cannot produce times for this location and date.
+     *
+     * This is a legitimate outcome rather than a fault: inside the polar circles the sun can
+     * stay above or below the twilight angle for the whole day, so Fajr, Isha and sometimes
+     * sunrise have no defined time. Salah reports it instead of guessing.
+     */
+    CALCULATION_NOT_POSSIBLE,
+
     /** Prohibited-time rules have not been reviewed and encoded yet. */
     RULES_NOT_VERIFIED,
 

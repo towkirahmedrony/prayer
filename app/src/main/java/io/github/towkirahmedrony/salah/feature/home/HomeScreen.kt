@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.feature.home.components.BrandHeader
+import io.github.towkirahmedrony.salah.feature.home.components.CalculationCard
 import io.github.towkirahmedrony.salah.feature.home.components.CalendarCard
 import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
 import io.github.towkirahmedrony.salah.feature.home.components.LocationCard
@@ -148,6 +149,13 @@ private fun HomeContent(
         item(key = "location") {
             LocationCard(
                 location = state.location,
+                onOpenSettings = { onNavigate("settings") },
+            )
+        }
+
+        item(key = "calculation") {
+            CalculationCard(
+                state = state.calculation,
                 onOpenSettings = { onNavigate("settings") },
             )
         }

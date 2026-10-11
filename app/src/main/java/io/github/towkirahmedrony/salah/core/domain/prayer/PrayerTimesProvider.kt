@@ -41,9 +41,11 @@ sealed interface PrayerTimesProviderResult {
  * astronomical algorithm, an HTTP API, or an imported timetable. The Home screen depends on
  * this interface only, so a provider can be added or replaced without touching the UI.
  *
- * Planned implementations (not present in this phase):
- *  - a local astronomical engine (the Adhan Kotlin library is the candidate, pending a
- *    verified calculation profile);
+ * Implemented:
+ *  - [io.github.towkirahmedrony.salah.data.prayer.AdhanPrayerTimesProvider], the local
+ *    astronomical engine (Adhan Kotlin). It is the primary source and works entirely offline.
+ *
+ * Not implemented:
  *  - a remote provider such as AlAdhan, validated before it is stored;
  *  - a user-imported timetable from a verified local source.
  */

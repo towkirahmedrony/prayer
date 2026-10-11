@@ -2,12 +2,15 @@ package io.github.towkirahmedrony.salah.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -15,30 +18,41 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
-import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /**
  * Provides the Home screen with a single immutable state.
  *
- * All sources are local: the device clock through [CalendarRepository], and locally stored
- * preferences and location through their repositories. Nothing here performs network work, and
- * no API failure can crash the screen — failures arrive as values that the UI explains.
+ * Explicitly **not** present here: any astronomical or calendar computation. The view model only
+ * assembles flows — the location and the prayer settings, the device clock, the schedule
+ * repository and the prohibited-period repository.
  *
- * The countdown only ticks while a real schedule exists. When the prayer engine is not
- * configured the time source emits once, so the UI stays static instead of running a fake
- * countdown.
+ * The request the schedule is calculated for is derived from the location, the settings and the
+ * current moment, then de-duplicated. That single [distinctUntilChanged] is what prevents
+ * recalculation loops: the clock ticks every second, but a request that has not actually changed
+ * never reaches the repository again. Changing the location, the calculation method, the Asr
+ * method, the high-latitude rule, a manual adjustment, the device time zone or the calendar date
+ * all produce a genuinely new request, which the repository answers by recalculating.
+ *
+ * The tick runs only while the screen is subscribed ([SharingStarted.WhileSubscribed]), so
+ * nothing keeps ticking in the background once the user leaves Home. No WorkManager job is
+ * involved: a countdown is not a deferrable task, and a periodic job would be the wrong
+ * mechanism for it. Prayer *notifications* are a later phase, and their extension point is
+ * [PrayerScheduleRepository]: a scheduler can depend on that interface directly and never needs
+ * the Home screen to be visible.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val locationRepository: LocationRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val prayerScheduleRepository: PrayerScheduleRepository,
     private val calendarRepository: CalendarRepository,
     private val prohibitedPeriodsRepository: ProhibitedPeriodsRepository,
@@ -48,54 +62,86 @@ class HomeViewModel(
 
     private val location: Flow<LocationInfo?> = locationRepository.location
 
-    private val scheduleState: Flow<PrayerScheduleState> = location.flatMapLatest { configured ->
-        prayerScheduleRepository.observeSchedule(configured, LocalDate.now(clock))
-    }
+    private val settings: Flow<PrayerSettings> = userPreferencesRepository.prayerSettings
 
-    private val prohibitedState: Flow<ProhibitedPeriodsState> = location.flatMapLatest { configured ->
-        prohibitedPeriodsRepository.observePeriods(configured, LocalDate.now(clock))
-    }
+    /**
+     * The current instant, re-read every second while the screen is visible.
+     *
+     * The zone is read fresh on every tick rather than taken from the injected [clock], because
+     * [Clock] captures its zone when it is created: reading it here means a time-zone change on
+     * the device takes effect immediately instead of after a restart.
+     *
+     * Shared, so exactly one timer runs no matter how many consumers observe it.
+     */
+    private val moment: StateFlow<ZonedDateTime> = flow {
+        while (true) {
+            emit(ZonedDateTime.ofInstant(clock.instant(), ZoneId.systemDefault()))
+            delay(TICK_INTERVAL_MILLIS)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),
+        initialValue = ZonedDateTime.ofInstant(clock.instant(), ZoneId.systemDefault()),
+    )
 
-    private val now: Flow<ZonedDateTime> = scheduleState.flatMapLatest { state ->
-        if (state is PrayerScheduleState.Available) tickingClock() else flowOf(ZonedDateTime.now(clock))
-    }
+    /** `null` means no location is configured; the repository reports that state explicitly. */
+    private val request: Flow<PrayerScheduleRequest?> = combine(location, settings, moment) { configured, currentSettings, at ->
+        configured?.let { location ->
+            PrayerScheduleRequest(
+                // The day to calculate is the day it is *at the location*, not on the device.
+                date = at.withZoneSameInstant(location.zoneId).toLocalDate(),
+                location = location,
+                profile = currentSettings.toProfile(),
+            )
+        }
+    }.distinctUntilChanged()
+
+    private val scheduleState: Flow<PrayerScheduleState> =
+        request.flatMapLatest { current -> prayerScheduleRepository.ensureSchedule(current) }
+
+    private val prohibitedState: Flow<ProhibitedPeriodsState> =
+        scheduleState.flatMapLatest { state ->
+            prohibitedPeriodsRepository.observePeriods((state as? PrayerScheduleState.Available)?.schedule)
+        }
+
+    private val schedulePart: Flow<SchedulePart> =
+        combine(settings, scheduleState) { currentSettings, state -> SchedulePart(currentSettings, state) }
 
     val uiState: StateFlow<HomeUiState> = combine(
         calendarRepository.observeToday(),
         location,
-        scheduleState,
+        schedulePart,
         prohibitedState,
-        now,
-    ) { calendar, configuredLocation, schedule, prohibited, currentMoment ->
+        moment,
+    ) { calendar, configuredLocation, part, prohibited, currentMoment ->
         uiStateFactory.create(
             calendar = calendar,
             location = configuredLocation,
-            scheduleState = schedule,
+            settings = part.settings,
+            scheduleState = part.state,
             prohibitedState = prohibited,
             now = currentMoment,
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(subscribeTimeoutMillis),
+        started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),
         initialValue = HomeUiState.Loading,
     )
 
-    /** Re-runs the provider lookup after a failure. The result reaches [uiState] as a value. */
+    /** Recalculates after a failure. The outcome reaches [uiState] as a value, never as a throw. */
     fun onRetry() {
         viewModelScope.launch {
-            val configured = location.first()
-            prayerScheduleRepository.refresh(configured, LocalDate.now(clock))
+            prayerScheduleRepository.refresh(request.first())
         }
     }
 
-    private fun tickingClock(): Flow<ZonedDateTime> = flow {
-        while (true) {
-            emit(ZonedDateTime.now(clock))
-            delay(1_000L)
-        }
-    }
+    private data class SchedulePart(
+        val settings: PrayerSettings,
+        val state: PrayerScheduleState,
+    )
 
     private companion object {
-        const val subscribeTimeoutMillis = 5_000L
+        const val SUBSCRIBE_TIMEOUT_MILLIS = 5_000L
+        const val TICK_INTERVAL_MILLIS = 1_000L
     }
 }

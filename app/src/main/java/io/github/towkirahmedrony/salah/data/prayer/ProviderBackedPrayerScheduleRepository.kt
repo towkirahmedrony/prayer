@@ -7,123 +7,126 @@ import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerTimesProviderRes
 import io.github.towkirahmedrony.salah.core.domain.prayer.ProviderAvailability
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
-import io.github.towkirahmedrony.salah.core.model.LocationInfo
-import io.github.towkirahmedrony.salah.core.model.PrayerCalculationProfile
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
-import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.flow
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Offline-first [PrayerScheduleRepository].
  *
- * Local state is the primary read source: [observeSchedule] answers from the local cache and
- * never performs I/O, so the UI is never blocked by the network. Only [refresh] talks to the
- * configured [PrayerTimesProvider], and every failure mode is converted into a
- * [PrayerScheduleState] value instead of an exception.
+ * Local state is the primary read source: [ensureSchedule] answers from an in-memory entry and
+ * never performs I/O on its first emission, so the UI is never blocked. Only a cache miss — or
+ * an explicit [refresh] — reaches the configured [PrayerTimesProvider], and every failure mode
+ * is converted into a [PrayerScheduleState] value instead of an exception.
  *
- * The cache is intentionally in-memory for this phase. It becomes a Room-backed cache in the
- * same change that introduces the first persisted schedule, which is why no database is added
- * here (see docs/ARCHITECTURE.md).
+ * **Cache key and invalidation.** An entry may be served only when its date, its location and
+ * its calculation profile all equal the incoming request. Changing the location, the time zone,
+ * the calculation method, the Asr method, the high-latitude rule, a manual adjustment or the
+ * calendar date therefore invalidates the entry automatically, because `equals` on those value
+ * types is what performs the comparison. There is no separate "invalidate" call to forget.
+ *
+ * **Why there is no database here.** A daily schedule is pure arithmetic over a date and a
+ * coordinate pair: it is recomputed in microseconds, offline, with no input Salah does not
+ * already store. Persisting derived schedules would add a schema, a migration path and a new
+ * class of staleness bug in exchange for nothing. User preferences and the location are the
+ * real durable state, and both live in DataStore. See `docs/ARCHITECTURE.md` §5.
  */
 class ProviderBackedPrayerScheduleRepository(
     private val provider: PrayerTimesProvider,
     private val clock: Clock,
-    private val profile: PrayerCalculationProfile,
 ) : PrayerScheduleRepository {
 
     private val cachedSchedule = MutableStateFlow<PrayerSchedule?>(null)
-    private val lastFailure = MutableStateFlow<String?>(null)
 
-    override fun observeSchedule(location: LocationInfo?, date: LocalDate): Flow<PrayerScheduleState> {
-        if (location == null) {
-            return flowOf(
-                PrayerScheduleState.Unavailable(
-                    reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
-                    detail = NO_LOCATION_DETAIL,
-                    origin = origin(),
-                ),
-            )
+    override fun ensureSchedule(request: PrayerScheduleRequest?): Flow<PrayerScheduleState> = flow {
+        if (request == null) {
+            emit(noLocationConfigured())
+            return@flow
         }
-        return combine(cachedSchedule, lastFailure) { cached, failure ->
-            val usable = cached?.takeIf { it.date == date && it.location == location }
-            when {
-                usable != null -> PrayerScheduleState.Available(
-                    schedule = usable,
-                    origin = origin(observedAt = usable.generatedAt),
-                )
 
-                failure != null -> PrayerScheduleState.Failed(
-                    detail = failure,
-                    origin = origin(),
-                )
-
-                provider.availability() == ProviderAvailability.CONFIGURED -> PrayerScheduleState.Unavailable(
-                    reason = UnavailabilityReason.UNKNOWN,
-                    detail = "The provider is configured but has not produced a schedule yet.",
-                    origin = origin(),
-                )
-
-                else -> PrayerScheduleState.Unavailable(
-                    reason = UnavailabilityReason.CALCULATION_NOT_CONFIGURED,
-                    detail = CALCULATION_NOT_CONFIGURED_DETAIL,
-                    origin = origin(),
-                )
-            }
-        }
+        val cached = cachedSchedule.value?.takeIf { it.matches(request) }
+        emit(if (cached == null) refresh(request) else available(cached))
     }
 
-    override suspend fun refresh(location: LocationInfo?, date: LocalDate): PrayerScheduleState {
-        if (location == null) {
+    override suspend fun refresh(request: PrayerScheduleRequest?): PrayerScheduleState {
+        if (request == null) return noLocationConfigured()
+
+        if (provider.availability() != ProviderAvailability.CONFIGURED) {
             return PrayerScheduleState.Unavailable(
-                reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
-                detail = NO_LOCATION_DETAIL,
+                reason = UnavailabilityReason.CALCULATION_NOT_CONFIGURED,
+                detail = NOT_CONFIGURED_DETAIL,
                 origin = origin(),
             )
         }
 
-        val request = PrayerScheduleRequest(date = date, location = location, profile = profile)
         val result = try {
             provider.schedule(request)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
-            val detail = "Provider '${provider.id}' failed: ${error.message ?: error::class.simpleName}"
-            lastFailure.value = detail
-            return PrayerScheduleState.Failed(detail = detail, origin = origin())
+            return PrayerScheduleState.Failed(
+                detail = "Provider '${provider.id}' failed: ${error.message ?: error::class.simpleName}",
+                origin = origin(),
+            )
         }
 
         return when (result) {
             is PrayerTimesProviderResult.Success -> {
-                lastFailure.value = null
-                cachedSchedule.value = result.schedule
-                PrayerScheduleState.Available(
-                    schedule = result.schedule,
-                    origin = origin(observedAt = result.schedule.generatedAt),
-                )
+                val produced = result.schedule
+                if (!produced.belongsTo(request)) {
+                    // Times for another day or another city must never be shown as this
+                    // request's answer, whatever the provider claims.
+                    return PrayerScheduleState.Failed(
+                        detail = "Provider '${provider.id}' answered with a schedule for " +
+                            "${produced.date} at ${produced.location.label}, not for the requested " +
+                            "${request.date} at ${request.location.label}.",
+                        origin = origin(),
+                    )
+                }
+                // Only ever replace the entry with a schedule for the exact request that
+                // produced it, so a slow response for an old request cannot overwrite a newer one.
+                if (produced.matches(request)) cachedSchedule.value = produced
+                available(produced)
             }
 
-            is PrayerTimesProviderResult.Unavailable -> {
-                lastFailure.value = null
-                PrayerScheduleState.Unavailable(
-                    reason = result.reason,
-                    detail = result.detail,
-                    origin = origin(),
-                )
-            }
+            is PrayerTimesProviderResult.Unavailable -> PrayerScheduleState.Unavailable(
+                reason = result.reason,
+                detail = result.detail,
+                origin = origin(),
+            )
 
-            is PrayerTimesProviderResult.Failure -> {
-                lastFailure.value = result.detail
-                PrayerScheduleState.Failed(detail = result.detail, origin = origin())
-            }
+            is PrayerTimesProviderResult.Failure -> PrayerScheduleState.Failed(
+                detail = result.detail,
+                origin = origin(),
+            )
         }
     }
+
+    /** A schedule may be displayed only for the day and place it was produced for. */
+    private fun PrayerSchedule.belongsTo(request: PrayerScheduleRequest): Boolean =
+        date == request.date && location == request.location
+
+    /** A schedule is cached, and re-served, only for the exact request it was calculated from. */
+    private fun PrayerSchedule.matches(request: PrayerScheduleRequest): Boolean =
+        belongsTo(request) && profile == request.profile
+
+    private fun available(schedule: PrayerSchedule): PrayerScheduleState.Available =
+        PrayerScheduleState.Available(
+            schedule = schedule,
+            origin = origin(observedAt = schedule.generatedAt),
+        )
+
+    private fun noLocationConfigured(): PrayerScheduleState.Unavailable =
+        PrayerScheduleState.Unavailable(
+            reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+            detail = NO_LOCATION_DETAIL,
+            origin = origin(),
+        )
 
     private fun origin(observedAt: Instant = clock.instant()): DataSourceInfo = DataSourceInfo(
         source = provider.source,
@@ -135,7 +138,8 @@ class ProviderBackedPrayerScheduleRepository(
     private companion object {
         const val NO_LOCATION_DETAIL =
             "No location has been configured yet, so no calculation input exists."
-        const val CALCULATION_NOT_CONFIGURED_DETAIL =
-            "No prayer calculation engine is integrated yet, so Salah does not display prayer times."
+
+        const val NOT_CONFIGURED_DETAIL =
+            "No prayer calculation engine is available, so Salah does not display prayer times."
     }
 }

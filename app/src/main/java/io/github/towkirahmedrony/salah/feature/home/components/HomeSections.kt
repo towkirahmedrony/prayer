@@ -46,6 +46,8 @@ import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.common.sectionTitleRes
+import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
+import io.github.towkirahmedrony.salah.feature.home.CalculationSection
 import io.github.towkirahmedrony.salah.feature.home.CalendarSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.LocationSection
@@ -339,6 +341,7 @@ fun TimetableCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
                 label = stringResource(row.prayer.labelRes()),
                 time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
                 highlighted = row.isNext,
+                adjustmentMinutes = row.adjustmentMinutes,
             )
             if (index != state.prayerRows.lastIndex) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -369,6 +372,7 @@ fun SolarEventsCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
                 label = stringResource(row.event.labelRes()),
                 time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
                 highlighted = false,
+                adjustmentMinutes = 0,
             )
             if (index != state.solarRows.lastIndex) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -512,21 +516,37 @@ private fun sourceLabel(state: ProvenanceSection): String = when (state.source) 
 }
 
 @Composable
-private fun TimeRow(label: String, time: String, highlighted: Boolean) {
+private fun TimeRow(
+    label: String,
+    time: String,
+    highlighted: Boolean,
+    adjustmentMinutes: Int,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
-            color = if (highlighted) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+        Column {
+            Text(
+                text = label,
+                style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                color = if (highlighted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            // Disclosed next to the time it moved, so a corrected time is never presented as a
+            // raw calculation result.
+            if (adjustmentMinutes != 0) {
+                Text(
+                    text = stringResource(R.string.home_adjusted_by, signedMinutes(adjustmentMinutes)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         Text(
             text = time,
             style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
@@ -535,9 +555,71 @@ private fun TimeRow(label: String, time: String, highlighted: Boolean) {
             } else {
                 MaterialTheme.colorScheme.onSurface
             },
-            fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+        fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+    )
+}
+
+/** Signed minute count, so an adjustment cannot be misread as an unsigned offset. */
+private fun signedMinutes(minutes: Int): String =
+    if (minutes > 0) "+$minutes" else minutes.toString()
+
+/**
+ * States how the displayed timetable was produced.
+ *
+ * Shown because calculation settings genuinely change the answer: two methods disagree on Fajr
+ * and Isha, and the Asr method changes Asr by up to tens of minutes. A time is never presented
+ * without the settings behind it, and the user is one tap from changing them.
+ */
+@Composable
+fun CalculationCard(
+    state: CalculationSection,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SalahSectionCard(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.home_calculation_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = stringResource(R.string.home_calculation_method, stringResource(state.method.labelRes())),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.home_calculation_asr, stringResource(state.asrMethod.labelRes())),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        // Only shown when the rule is pinned explicitly; `Automatic` is the engine's own choice
+        // for the latitude and does not need to be explained on the Home screen.
+        if (state.highLatitudeRule != HighLatitudeRule.AUTOMATIC) {
+            Text(
+                text = stringResource(
+                    R.string.home_calculation_high_latitude,
+                    stringResource(state.highLatitudeRule.labelRes()),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (state.hasAdjustments) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.home_calculation_adjusted),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        TextButton(onClick = onOpenSettings) {
+            Text(text = stringResource(R.string.action_open_settings))
+        }
     }
+}
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFBF8F1)

@@ -25,6 +25,16 @@ koin = "4.2.2"
 coroutines = "1.11.0"
 junit = "4.13.2"
 
+# --- Prayer calculation engine ----------------------------------------------------------
+# Adhan Kotlin (batoulapps/adhan-kotlin), published as `com.batoulapps.adhan:adhan2`.
+#
+# Pinned to 0.0.5 deliberately. 0.0.6 and 0.0.7 are compiled for a JVM target of 21, so their
+# class files are version 65 and cannot be loaded by the JDK 17 toolchain this project builds,
+# tests and lints with (reproduced: `UnsupportedClassVersionError: ... class file version 65.0,
+# this version of the Java Runtime only recognizes class file versions up to 61.0`). 0.0.5 is
+# the newest release published for JVM 17. See docs/PRAYER_CALCULATION.md section 1.
+adhan = "0.0.5"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -45,6 +55,9 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Local astronomical prayer-time calculation. Works entirely offline; no network is involved.
+adhan-kotlin = { group = "com.batoulapps.adhan", name = "adhan2", version.ref = "adhan" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }

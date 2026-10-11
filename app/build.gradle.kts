@@ -76,6 +76,9 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Local astronomical prayer-time engine (Adhan Kotlin). Runs on-device, offline.
+    implementation(libs.adhan.kotlin)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
