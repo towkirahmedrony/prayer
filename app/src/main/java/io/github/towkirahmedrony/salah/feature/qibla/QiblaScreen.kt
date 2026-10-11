@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -654,7 +655,7 @@ private fun freshnessText(
     val stamp = acquiredAt?.let {
         DateTimeFormatter
             .ofLocalizedDateTime(FormatStyle.MEDIUM)
-            .withLocale(Locale.getDefault())
+            .withLocale(numberLocale())
             .withZone(ZoneId.systemDefault())
             .format(it)
     }
@@ -670,8 +671,25 @@ private fun freshnessText(
     return parts.joinToString(separator = " · ")
 }
 
-private fun formatTenths(value: Double): String = "%.1f".format(Locale.getDefault(), value)
+@Composable
+private fun formatTenths(value: Double): String = "%.1f".format(numberLocale(), value)
 
-private fun formatWhole(value: Double): String = "%.0f".format(Locale.getDefault(), value)
+@Composable
+private fun formatWhole(value: Double): String = "%.0f".format(numberLocale(), value)
 
-private fun formatCoordinates(value: Double): String = "%.4f".format(Locale.getDefault(), value)
+@Composable
+private fun formatCoordinates(value: Double): String = "%.4f".format(numberLocale(), value)
+
+/**
+ * The locale numbers should be formatted in.
+ *
+ * Read through the composition rather than from `Locale.getDefault()`, so that a locale change
+ * recomposes the formatted values instead of leaving a stale figure on screen. `Locale.ROOT` is the
+ * fallback for the degenerate case of an empty `LocaleList`, which keeps the decimal separator
+ * deterministic rather than falling back to a non-observable read.
+ */
+@Composable
+private fun numberLocale(): Locale {
+    val configuration = LocalConfiguration.current
+    return if (configuration.locales.size() > 0) configuration.locales[0] else Locale.ROOT
+}
