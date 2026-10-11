@@ -24,17 +24,44 @@
         VIBRATE               Required for notification vibration. Salah offers a per-prayer
                               vibration preference, so the permission is used.
 
+        ACCESS_COARSE_LOCATION
+        ACCESS_FINE_LOCATION  The Qibla screen can ask the device for a position instead of
+                              making the user type coordinates. Both are declared so that the
+                              Android 12+ runtime dialog can offer "Approximate" and "Precise"
+                              and the user keeps that choice; Salah works with either, and manual
+                              coordinates work with neither. Asked for only when the user taps the
+                              button on the Qibla screen — see docs/QIBLA_COMPASS.md section 4.
+
       Deliberately NOT requested:
-        * no location permission — the location is entered by hand;
-        * no FOREGROUND_SERVICE permission — no long-running service exists (see §5 of the doc,
-          which explains why long-form background Azan playback is not implemented);
-        * no INTERNET permission — the whole feature is offline. Salah has none in this phase.
+        * no ACCESS_BACKGROUND_LOCATION — the Qibla screen needs a position only while it is in
+          front of the user, and a background grant would be a permission without a purpose;
+        * no FOREGROUND_SERVICE permission — no long-running service exists (see section 5 of the
+          notifications doc, which explains why long-form background Azan playback is not
+          implemented);
+        * no INTERNET permission — every feature is offline, including the Qibla bearing, which is
+          pure spherical trigonometry over a stored position.
     -->
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!--
+      Hardware is declared optional, not required.
+
+      Salah's Qibla screen is designed to be honest about what a device can do: without a
+      magnetometer it still shows the exact bearing and says why the dial cannot turn, and without a
+      location provider the user can enter coordinates by hand. Marking these required would remove
+      the app from those devices entirely, which is the opposite of the intent.
+    -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
 
     <application
         android:name=".SalahApplication"

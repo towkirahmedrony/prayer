@@ -182,8 +182,6 @@
     <string name="feature_calendar_body">Gregorian, Bangladesh Bangla and Hijri conversion with confirmed-date overrides is planned. Only the Gregorian date from the device clock is implemented today.</string>
     <string name="feature_ramadan_title">Ramadan</string>
     <string name="feature_ramadan_body">Sehri and Iftar schedules will be derived from the same prayer schedule used by the Home screen, which is already calculated locally. The Ramadan timetable itself is not implemented yet, so no Ramadan schedule is shown.</string>
-    <string name="feature_qibla_title">Qibla</string>
-    <string name="feature_qibla_body">A compass screen needs location and sensor support, which are not implemented yet.</string>
     <!-- Navigation: prayer notifications -->
     <string name="nav_notifications">Notifications</string>
 
@@ -264,4 +262,101 @@
     <string name="notification_body_prayer_advance">%1$s is at %2$s.</string>
     <string name="notification_body_sunrise">Sunrise is at %1$s. Sunrise is a solar event, not one of the five obligatory prayers.</string>
 
+    <!-- Qibla compass -->
+    <string name="qibla_intro">The Qibla bearing is calculated on this device from the stored coordinates. It needs no network and no account.</string>
+
+    <string name="qibla_section_compass">Compass</string>
+    <string name="qibla_section_location">Location</string>
+    <string name="qibla_section_sensor">Compass sensor</string>
+    <string name="qibla_section_limits">Accuracy and limits</string>
+
+    <string name="qibla_status_initial">No location yet</string>
+    <string name="qibla_status_requesting_location">Getting your location…</string>
+    <string name="qibla_status_permission_denied">Location not allowed</string>
+    <string name="qibla_status_location_unavailable">Location unavailable</string>
+    <string name="qibla_status_calculation_error">No direction</string>
+    <string name="qibla_status_sensor_unavailable">No compass sensor</string>
+    <string name="qibla_status_awaiting_heading">Waiting for the compass</string>
+    <string name="qibla_status_calibration_recommended">Calibration suggested</string>
+    <string name="qibla_status_operational">Compass active</string>
+
+    <string name="qibla_turn_unknown">Set a location to see the Qibla direction.</string>
+    <string name="qibla_turn_needs_compass">Bearing known. This device has no live compass, so use the bearing with a separate compass.</string>
+    <string name="qibla_turn_hold_flat">Hold the device flat to use the dial.</string>
+    <string name="qibla_turn_aligned">Facing the Qibla</string>
+    <string name="qibla_turn_right">Turn right %1$s°</string>
+    <string name="qibla_turn_left">Turn left %1$s°</string>
+    <string name="qibla_aligned_tolerance">Within %1$s°</string>
+
+    <string name="qibla_bearing_label">Qibla bearing</string>
+    <string name="qibla_bearing_value">%1$s° from true north</string>
+    <string name="qibla_heading_label">Device heading</string>
+    <string name="qibla_heading_true">%1$s° from true north</string>
+    <string name="qibla_heading_magnetic_only">%1$s° from magnetic north</string>
+    <string name="qibla_distance_label">Distance to the Kaaba</string>
+    <string name="qibla_distance_value">%1$s km</string>
+
+    <string name="qibla_error_invalid_coordinates">The stored coordinates are not valid, so no bearing can be calculated.</string>
+    <string name="qibla_error_at_kaaba">You are at the Kaaba reference point itself, where the direction to it is undefined.</string>
+    <string name="qibla_error_antipodal">You are at the point furthest from the Kaaba on Earth, where every direction towards it is the same distance and no single bearing exists.</string>
+
+    <string name="qibla_sensor_unavailable">This device has no magnetometer-backed sensor, so Salah cannot show which way the device is pointing. The bearing above is still exact — use it with a separate compass or the sun.</string>
+    <string name="qibla_sensor_detected">Sensor</string>
+    <string name="qibla_sensor_magnetic_accuracy">Magnetic accuracy</string>
+    <string name="qibla_sensor_rotation_vector">Rotation vector (fused)</string>
+    <string name="qibla_sensor_geomagnetic">Geomagnetic rotation vector</string>
+    <string name="qibla_sensor_accelerometer_magnetic">Accelerometer and magnetic field</string>
+    <string name="qibla_accuracy_unknown">Unknown</string>
+    <string name="qibla_accuracy_unreliable">Unreliable</string>
+    <string name="qibla_accuracy_low">Low</string>
+    <string name="qibla_accuracy_medium">Medium</string>
+    <string name="qibla_accuracy_high">High</string>
+
+    <string name="qibla_tilt_warning">Hold the device flat. At this angle the compass heading is not reliable, so the dial and the turn are withheld.</string>
+    <string name="qibla_no_declination">Magnetic declination could not be estimated for this location, so the heading is shown from magnetic north and no alignment is claimed.</string>
+
+    <string name="qibla_calibration_title">Compass accuracy is low</string>
+    <string name="qibla_calibration_body">Android reports that this device\'s magnetic readings are not well calibrated. Moving the device in a figure-eight a few times usually helps. Keep it clear of magnets, speakers and metal, which disturb the reading.</string>
+    <string name="qibla_calibration_dismiss">Dismiss for now</string>
+
+    <string name="qibla_location_none">No location yet. Use this device\'s location, or enter coordinates below — manual coordinates need no permission and no network.</string>
+    <string name="qibla_location_permission_denied">Location access is not allowed. Enter coordinates below instead: the Qibla bearing needs a position, not a permission.</string>
+    <string name="qibla_location_unavailable_body">No position could be obtained. Enter coordinates below, or try again.</string>
+    <string name="qibla_location_not_current">This is a saved position, not a current reading.</string>
+    <string name="qibla_location_declared">Entered by hand</string>
+    <string name="qibla_location_fresh">Updated just now</string>
+    <string name="qibla_location_saved">Saved position</string>
+    <string name="qibla_location_unknown_time">Saved position, time not recorded</string>
+    <string name="qibla_location_updated">%1$s</string>
+    <string name="qibla_location_accuracy">±%1$s m</string>
+    <string name="qibla_coordinates">%1$s°, %2$s°</string>
+    <string name="qibla_location_allow">Allow location access</string>
+    <string name="qibla_location_refresh">Refresh location</string>
+    <string name="qibla_location_requesting">Getting your location…</string>
+    <string name="qibla_location_settings">Location settings</string>
+    <string name="qibla_location_approximate_note">Approximate location is in use. It is enough for the Qibla: a position error of a few kilometres moves the bearing by only a few hundredths of a degree.</string>
+
+    <string name="qibla_manual_title">Enter coordinates</string>
+    <string name="qibla_manual_body">Stored on this device only. Works with no network and no location permission.</string>
+    <string name="qibla_manual_label">Name</string>
+    <string name="qibla_manual_latitude">Latitude</string>
+    <string name="qibla_manual_longitude">Longitude</string>
+    <string name="qibla_manual_time_zone">Time zone</string>
+    <string name="qibla_manual_time_zone_hint">IANA zone, for example Asia/Dhaka. Change it if these coordinates are in another zone.</string>
+    <string name="qibla_manual_invalid">That location was not accepted. Check the name, that latitude is between -90 and 90, longitude between -180 and 180, and that the time zone is a valid IANA name.</string>
+    <string name="qibla_manual_save">Save location</string>
+    <string name="qibla_manual_clear">Remove location</string>
+
+    <string name="qibla_msg_location_saved">Location saved.</string>
+    <string name="qibla_msg_location_rejected">That location was not accepted.</string>
+    <string name="qibla_msg_location_cleared">Location removed.</string>
+    <string name="qibla_msg_device_acquired">Location updated from this device.</string>
+    <string name="qibla_msg_permission_denied">Location access was declined. Manual coordinates still work.</string>
+    <string name="qibla_msg_services_disabled">Location is switched off for this device. Turn it on, or enter coordinates below.</string>
+    <string name="qibla_msg_timed_out">No position arrived in time. Try again, or enter coordinates below.</string>
+    <string name="qibla_msg_failed">The location provider could not supply a position.</string>
+    <string name="qibla_message_dismiss">Dismiss</string>
+
+    <string name="qibla_limits_body">The bearing is exact spherical trigonometry over the stored coordinates. What the dial shows depends on the device: magnetometer quality, nearby magnets and metal, how flat the device is held, and the accuracy of the magnetic-declination model. Salah corrects the heading to true north exactly once and never presents an uncorrected heading as aligned. Treat the dial as good to a few degrees outdoors, and less near large metal objects.</string>
+    <string name="qibla_kaaba_source">Kaaba reference: %1$s</string>
 </resources>

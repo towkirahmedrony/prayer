@@ -92,4 +92,39 @@ object SalahDiagnosticEvents {
 
     /** Azan playback failed. */
     const val AZAN_FAILED = "azan_playback_failed"
+
+    // Qibla compass -----------------------------------------------------------
+
+    /** The user asked for a position. */
+    const val QIBLA_LOCATION_REQUESTED = "qibla_location_requested"
+
+    /** A position was obtained. Logged with its accuracy and source, never its coordinates. */
+    const val QIBLA_LOCATION_ACQUIRED = "qibla_location_acquired"
+
+    /** A position could not be obtained. */
+    const val QIBLA_LOCATION_FAILED = "qibla_location_failed"
+
+    /** The location the bearing is currently calculated from changed. */
+    const val QIBLA_LOCATION_SOURCE_CHANGED = "qibla_location_source_changed"
+
+    /** Which sensor combination, if any, the device offers. */
+    const val QIBLA_SENSOR_AVAILABILITY = "qibla_sensor_availability"
+
+    /** A sensor was found but could not be registered. */
+    const val QIBLA_SENSOR_REGISTRATION_FAILED = "qibla_sensor_registration_failed"
+
+    /** Heading updates started. */
+    const val QIBLA_COMPASS_STARTED = "qibla_compass_started"
+
+    /** Heading updates stopped, because the screen no longer needs them. */
+    const val QIBLA_COMPASS_STOPPED = "qibla_compass_stopped"
+
+    /** The platform reported magnetic accuracy poor enough to suggest calibration. */
+    const val QIBLA_CALIBRATION_RECOMMENDED = "qibla_calibration_recommended"
+
+    /** A bearing was calculated. Logged with the resulting angle, which is not private. */
+    const val QIBLA_BEARING_CALCULATED = "qibla_bearing_calculated"
+
+    /** A bearing could not be calculated, and why. */
+    const val QIBLA_BEARING_FAILED = "qibla_bearing_failed"
 }

@@ -14,6 +14,11 @@ import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificati
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerTimesProvider
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodCalculator
+import io.github.towkirahmedrony.salah.core.domain.qibla.CompassSensorSource
+import io.github.towkirahmedrony.salah.core.domain.qibla.GeomagneticDeclinationProvider
+import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionChecker
+import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
+import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaCalculator
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleBook
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
@@ -39,10 +44,15 @@ import io.github.towkirahmedrony.salah.data.preferences.salahPreferencesDataStor
 import io.github.towkirahmedrony.salah.data.prayer.AdhanPrayerTimesProvider
 import io.github.towkirahmedrony.salah.data.prayer.ProviderBackedPrayerScheduleRepository
 import io.github.towkirahmedrony.salah.data.prohibited.RuleBookProhibitedPeriodsRepository
+import io.github.towkirahmedrony.salah.data.qibla.AndroidCompassSensorSource
+import io.github.towkirahmedrony.salah.data.qibla.AndroidGeomagneticDeclinationProvider
+import io.github.towkirahmedrony.salah.data.qibla.AndroidLocationPermissionChecker
+import io.github.towkirahmedrony.salah.data.qibla.AndroidLocationProvider
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
+import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
 import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -164,6 +174,18 @@ val salahModules = module {
         )
     }
 
+    // Qibla -------------------------------------------------------------------
+    // The bearing is pure geography: a calculator plus the coordinates it is given. It needs no
+    // permission, no network and no sensor, which is why it is bound independently of the compass.
+    single { QiblaCalculator() }
+
+    // The device sensors and the platform location service, behind ports so the screen is testable
+    // and so a device without a magnetometer degrades to "bearing only" rather than failing.
+    single<CompassSensorSource> { AndroidCompassSensorSource(androidContext(), get()) }
+    single<GeomagneticDeclinationProvider> { AndroidGeomagneticDeclinationProvider() }
+    single<LocationPermissionChecker> { AndroidLocationPermissionChecker(androidContext()) }
+    single<LocationProvider> { AndroidLocationProvider(androidContext(), get(), get()) }
+
     // Domain ------------------------------------------------------------------
     single { NextPrayerResolver() }
     single { HomeUiStateFactory(nextPrayerResolver = get()) }
@@ -185,6 +207,18 @@ val salahModules = module {
         SettingsViewModel(
             userPreferencesRepository = get(),
             locationRepository = get(),
+        )
+    }
+    viewModel {
+        QiblaViewModel(
+            locations = get(),
+            compassSensor = get(),
+            locationProvider = get(),
+            permissionChecker = get(),
+            declinationProvider = get(),
+            qiblaCalculator = get(),
+            logger = get(),
+            clock = get(),
         )
     }
     viewModel {
