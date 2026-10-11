@@ -4,7 +4,9 @@ agp = "9.3.3"
 kotlin = "2.4.21"
 
 # --- Android platform -------------------------------------------------------------------
-compileSdk = "36"
+# compileSdk is 37 (not the 36 baseline): the resolved library versions require compiling
+# against API 37. See docs/TECH_STACK.md §3.11 for the exact build error.
+compileSdk = "37"
 targetSdk = "36"
 minSdk = "26"
 

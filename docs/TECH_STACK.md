@@ -14,7 +14,7 @@ configuration.
 | JDK | `17` | `app/build.gradle.kts` (`compileOptions`), `.github/workflows/android-apk.yml` (Temurin 17) |
 | Compose compiler plugin | `2.4.21` (`org.jetbrains.kotlin.plugin.compose`) | `gradle/libs.versions.toml` (`compose-compiler`) |
 | Jetpack Compose BOM | `2026.09.00` | `gradle/libs.versions.toml` (`composeBom`) |
-| compileSdk | `36` | `gradle/libs.versions.toml` |
+| compileSdk | `37` (baseline was `36`, raised by the remote build — see §3.11) | `gradle/libs.versions.toml` |
 | targetSdk | `36` | `gradle/libs.versions.toml` |
 | minSdk | `26` | `gradle/libs.versions.toml` |
 
@@ -171,7 +171,7 @@ Workflow: `.github/workflows/android-apk.yml`
 | Checkout | `actions/checkout` pinned to `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
 | JDK | `actions/setup-java` pinned to `de7274f081f381c8f8158605e0321c36c376e2e6` (v6.0.1), Temurin 17 |
 | Gradle + cache | `gradle/actions/setup-gradle` pinned to `3f5f9adaf7d9fecd50b5935e54106014257a94e6` (v6.4.0) |
-| Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-36`, `build-tools;36.0.0` |
+| Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-37`, `build-tools;36.0.0`, `build-tools;37.0.0` |
 | Wrapper validation | `./gradlew --version` must report `Gradle 9.8.1` |
 | Tests | `./gradlew testDebugUnitTest` |
 | Lint | `./gradlew lintDebug` |
@@ -182,3 +182,37 @@ Workflow: `.github/workflows/android-apk.yml`
 Third-party actions are pinned to immutable commit SHAs with the corresponding release tag
 recorded in a trailing comment. Job permissions are `contents: read` only. No secrets are used
 by the workflow, and the debug build requires no signing credentials.
+
+## 5. Adjustments made from real build output
+
+### 5.1 compileSdk raised from 36 to 37
+
+The baseline specified `compileSdk`/`targetSdk` 36. The first remote build failed in
+`checkDebugAarMetadata` before any test ran. Abridged from the Actions log for run
+`38130939759`:
+
+```
+Dependency 'androidx.compose.ui:ui-android:1.12.1' requires libraries and applications that
+  depend on it to compile against version 37 or later of the Android APIs.
+  :app is currently compiled against android-36.
+  Recommended action: Update this project to use a newer compileSdk of at least 37
+  … 16. Dependency 'androidx.core:core-ktx:1.19.1' requires … version 37 or later …
+at com.android.build.gradle.internal.tasks.CheckAarMetadataWorkAction.execute(CheckAarMetadataTask.kt:251)
+BUILD FAILED in 1m 9s
+```
+
+The same message appeared for `androidx.compose.runtime:runtime-saveable-android:1.12.1`,
+`androidx.compose.ui:ui-android:1.12.1`,
+`androidx.lifecycle:lifecycle-runtime-compose-android:2.11.0`,
+`androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.0` and `androidx.core:core-ktx:1.19.1`
+(16 dependencies in total) — i.e. the current Compose BOM and AndroidX releases simply target
+API 37.
+
+**Adjustment:** `compileSdk` → `37`. `targetSdk` stays `36` (the Play target-SDK requirement and
+the runtime behaviour of the baseline) and `minSdk` stays `26`. This keeps every library version
+from the baseline; the alternative would be downgrading the Compose BOM, lifecycle and core to
+API-36-era releases, which contradicts the specified BOM and moves several libraries at once.
+
+**CI impact:** the workflow installs `platforms;android-37` and `build-tools;37.0.0` in addition
+to `build-tools;36.0.0`; both package identifiers were verified against Google's SDK
+repository index before the change.

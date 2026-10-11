@@ -55,7 +55,7 @@ Salah only shows values it actually has:
 | Dependency injection | Koin `4.2.2` |
 | Navigation | Navigation Compose `2.10.2` |
 | Build | Gradle `9.8.1` (Kotlin DSL, version catalog), AGP `9.3.3`, JDK `17` |
-| SDK | `compileSdk`/`targetSdk` `36`, `minSdk` `26` |
+| SDK | `compileSdk` `37`, `targetSdk` `36`, `minSdk` `26` |
 | Tests | JUnit 4 + kotlinx-coroutines-test |
 
 Full version list, official references and compatibility decisions: [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
@@ -103,7 +103,7 @@ The APK is **not** built locally. `.github/workflows/android-apk.yml` runs on:
 - manual runs (`workflow_dispatch`)
 
 Each run: checkout → Temurin JDK 17 → Gradle setup with caching → Android SDK packages
-(`platforms;android-36`, `build-tools;36.0.0`) → wrapper validation → `testDebugUnitTest` →
+(`platforms;android-37`, `build-tools;37.0.0`) → wrapper validation → `testDebugUnitTest` →
 `lintDebug` → `assembleDebug` → non-empty APK check → artifact upload.
 
 **Where to find the APK:** open the repository on GitHub → *Actions* → the
