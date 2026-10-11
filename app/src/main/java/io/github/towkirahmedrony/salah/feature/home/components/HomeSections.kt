@@ -320,10 +320,11 @@ fun TimetableCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
             )
             Text(
                 text = stringResource(R.string.home_prayer_times_arabic),
-                style = MaterialTheme.typography.titleMedium,
+                // `Text` has no `textDirection` parameter: the direction is part of the text style.
+                style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Rtl),
                 color = MaterialTheme.colorScheme.primary,
-                textDirection = TextDirection.Rtl,
-                textAlign = TextAlign.End,
+                // With an RTL direction, `Start` is the right-hand side, where Arabic reads from.
+                textAlign = TextAlign.Start,
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
