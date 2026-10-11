@@ -53,18 +53,20 @@ sealed interface ReconcileOutcome {
  * location's** zone. Today alone is not enough — after Isha the next reminder belongs to tomorrow,
  * and a phone that spends the night in Doze must already have tomorrow's alarms registered.
  *
- * **What it cancels.** The cancellation set is derived, not remembered. For every date whose
- * schedule was actually obtained, the planner enumerates the full `(target, kind)` cross-product
- * and the coordinator cancels everything not in the new plan. There is no registry to drift out of
- * date, and a reminder scheduled under settings the user has since changed is still found. An
- * extra day *before* today is included, because a time-zone change can shift the local date by one
- * day and the previous day's alarms must not survive it.
+ * **What it cancels.** The cancellation set is derived, not remembered: for every date a previous
+ * plan could have used, the planner enumerates the full `(target, kind)` cross-product and the
+ * coordinator cancels everything not in the new plan. There is no registry to drift out of date,
+ * and a reminder scheduled under settings the user has since changed is still found.
+ *
+ * The set spans more days than the plan does, because the *previous* run's notion of "today" may
+ * not have been this one — the location's zone and the device's zone can put the same instant on
+ * different dates, and a location change can shift it too. See [cancellationDates] for the bound.
  *
  * **What it deliberately does not do.** If a date's schedule cannot be produced, that date's
- * existing alarms are left alone. Prayer times for a given date and place do not change on their
- * own, so the alarms already registered for it are still the best known times; cancelling them
- * because of a transient calculation failure would silently drop reminders. Only dates whose
- * desired set is actually known are reconciled.
+ * existing alarms are left alone — unless the date is already in the past, where no alarm can ever
+ * be legitimate again. Prayer times for a given date and place do not change on their own, so the
+ * alarms already registered for it are still the best known times; cancelling them because of a
+ * transient calculation failure would silently drop reminders.
  *
  * **Offline.** Nothing here performs a network request. The schedule comes from the existing
  * offline-first [PrayerScheduleRepository], whose provider is a local astronomical calculation, so
@@ -98,12 +100,10 @@ class PrayerNotificationCoordinator(
             val zone = location?.zoneId ?: ZoneId.systemDefault()
             val today = todayIn(zone)
 
-            // The window we will cancel across, whether or not a plan can be produced. It spans
-            // yesterday too, so a one-day shift caused by a time-zone change is covered.
-            val cancellableDates = planner.windowDates(
-                today = today.minusDays(1),
-                days = PrayerNotificationPlanner.WINDOW_DAYS + 1,
-            )
+            // Every date a *previous* plan could have used. This is wider than the planning window
+            // because the previous plan's notion of "today" may not have been this one — see
+            // [cancellationDates].
+            val cancellableDates = cancellationDates(today)
 
             if (!settings.masterEnabled) {
                 val cancelled = cancelAll(cancellableDates, reason = ReconcileReason.SETTINGS_CHANGED)
@@ -134,13 +134,22 @@ class PrayerNotificationCoordinator(
                 now = ZonedDateTime.ofInstant(clock.instant(), zone),
             )
 
-            // Only dates whose desired set is actually known are reconciled, plus yesterday (whose
-            // reminders are in the past and must not linger).
-            val clearableDates = available.map { it.date } + today.minusDays(1)
+            // A date may be reconciled only when we know what belongs there:
+            //   * a date in the past can never be a legitimate future event, so its slots always go;
+            //   * a date with a schedule is reconciled precisely against the new plan;
+            //   * a date with no schedule is left untouched, because a transient calculation failure
+            //     must not silently drop reminders whose times are still the best known ones.
+            val datesWithSchedule = available.mapTo(mutableSetOf()) { it.date }
+            val plannedSlots = planned.mapTo(mutableSetOf()) { it.slot }
+
             var cancelled = 0
-            planner.obsoleteSlots(clearableDates, planned).forEach { slot ->
-                if (attempt(SalahDiagnosticEvents.ALARM_CANCELLED) { scheduler.cancel(slot) }) cancelled++
-            }
+            planner.windowSlots(cancellableDates)
+                .filter { slot ->
+                    slot !in plannedSlots && (slot.date < today || slot.date in datesWithSchedule)
+                }
+                .forEach { slot ->
+                    if (attempt(SalahDiagnosticEvents.ALARM_CANCELLED) { scheduler.cancel(slot) }) cancelled++
+                }
 
             var scheduled = 0
             var failed = 0
@@ -187,6 +196,39 @@ class PrayerNotificationCoordinator(
             ReconcileOutcome.Failed(error.message ?: error::class.simpleName.orEmpty())
         }
     }
+
+    /**
+     * Every date a previous reconciliation could have scheduled against, given today is [today].
+     *
+     * **Why this is wider than the planning window.** A cancel has to reach alarms that were
+     * planned by an *earlier* run, and that run's "today" may not be this one. Two things can move
+     * it:
+     *
+     *  1. **The zone the date is derived in.** Dates come from the prayer location's zone, but when
+     *     no location is configured the fallback is the device's own zone. Legal offsets span
+     *     UTC-12:00 to UTC+14:00 — 26 hours — so the same instant can be a different calendar date,
+     *     and in the worst case two days apart.
+     *  2. **A location change.** Moving to a different zone can shift the location's local date, and
+     *     therefore which days the previous plan covered.
+     *
+     * With a planning window of two days, a previous plan therefore covers at most
+     * `[today - 2, today + 3]`. The margin of [CANCELLATION_MARGIN_DAYS] on each side yields
+     * `[today - 3, today + 4]`, which contains that whole range with room to spare.
+     *
+     * Cancelling a slot that has no alarm is a harmless no-op, so a superset is the cheap and
+     * correct choice. Narrowing this to "exactly what was scheduled" would require remembering it,
+     * and a remembered set is one more thing that can disagree with the platform.
+     */
+    private fun cancellationDates(today: LocalDate): List<LocalDate> = planner.windowDates(
+        today = today.minusDays(CANCELLATION_MARGIN_DAYS),
+        days = PrayerNotificationPlanner.WINDOW_DAYS + 2 * CANCELLATION_MARGIN_DAYS,
+    )
+
+    /**
+     * The cancellation dates for [today], exposed so a test can assert the span covers every local
+     * date a previous plan could have used, on any device zone.
+     */
+    internal fun cancellationDatesFor(today: LocalDate): List<LocalDate> = cancellationDates(today)
 
     /**
      * Cancels every alarm Salah could have for [slots]' dates.
@@ -283,4 +325,14 @@ class PrayerNotificationCoordinator(
 
     private fun todayIn(zone: ZoneId): LocalDate =
         ZonedDateTime.ofInstant(clock.instant(), zone).toLocalDate()
+
+    companion object {
+        /**
+         * Extra days cancelled on each side of the planning window.
+         *
+         * Not a fudge factor: it is the radius needed to cover the difference between the local
+         * date this run derives and the one an earlier run derived. See [cancellationDates].
+         */
+        const val CANCELLATION_MARGIN_DAYS: Int = 3
+    }
 }

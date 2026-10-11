@@ -234,6 +234,67 @@ class PrayerNotificationCoordinatorTest {
     }
 
     @Test
+    fun `the cancellation window covers every local date a previous plan could have used`() {
+        val (coordinator, _) = coordinator()
+
+        val span = coordinator.cancellationDatesFor(today).toSet()
+
+        // Legal zone offsets span UTC-12:00 to UTC+14:00, so the same instant can be a different
+        // calendar date in the device zone than in the prayer location's — up to two days apart.
+        // A previous plan therefore covers at most [today - 2, today + 3], and every one of those
+        // dates has to be reachable by the cancel pass or an obsolete alarm survives.
+        (-2..3).forEach { offset ->
+            val date = today.plusDays(offset.toLong())
+            assertTrue("cancellation must reach $date (offset $offset)", span.contains(date))
+        }
+    }
+
+    @Test
+    fun `cancelling everything reaches alarms planned relative to a different local date`() = runTest {
+        // Alarms registered for the plan window, then the location is cleared. The dates used to
+        // cancel come from the device zone, which need not be the location's: on a UTC device the
+        // location's "today" is a day behind, so a window anchored only on the device's date would
+        // leave the later day's alarms behind.
+        val (coordinator, _) = coordinator()
+        coordinator.reconcile(ReconcileReason.APP_START)
+        assertEquals(10, scheduler.registered.size)
+
+        val (withoutLocation, _) = coordinator(location = null)
+        withoutLocation.reconcile(ReconcileReason.LOCATION_CHANGED)
+
+        assertTrue(
+            "every date in the previous plan must be cancelled, not just the device's date",
+            scheduler.registered.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `a past date is always reconciled even when its schedule cannot be produced`() = runTest {
+        val (coordinator, _) = coordinator()
+        val stale = PrayerAlarmSlot(yesterday, ReminderTarget.ISHA, PrayerReminderKind.AT_TIME)
+        val staleTime = testSchedule(yesterday, zone).timeOf(PrayerName.ISHA)!!
+        scheduler.schedule(
+            io.github.towkirahmedrony.salah.core.domain.notification.PlannedPrayerNotification(
+                slot = stale,
+                triggerAt = staleTime,
+                eventAt = staleTime,
+                advanceMinutes = 0,
+                sound = NotificationSound.SYSTEM_DEFAULT,
+                vibration = true,
+            ),
+        )
+
+        // No schedule can be produced for any date, so nothing but the past may be touched.
+        val (broken, _) = coordinator(schedules = emptyMap())
+        broken.reconcile(ReconcileReason.EXPLICIT)
+
+        assertFalse(
+            "a date in the past can never be a legitimate future event",
+            scheduler.registered.containsKey(stale),
+        )
+    }
+
+    @Test
     fun `a day with no schedule keeps the alarms already stored for it`() = runTest {
         val (coordinator, _) = coordinator()
         coordinator.reconcile(ReconcileReason.APP_START)

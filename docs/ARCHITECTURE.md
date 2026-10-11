@@ -20,13 +20,25 @@ Implemented:
 - **Manual location** with validation, persisted locally, working with no permission and offline.
 - Navigation: Home, Prayer, Calendar, Ramadan, Settings (bottom bar) plus a Qibla destination
   reached from Home.
-- Repository/provider boundaries for prayer schedules, prohibited periods, calendars, location
-  and preferences.
+- **Prayer notifications:** reminders scheduled at the calculated prayer times by `AlarmManager`,
+  with per-prayer sound, vibration and advance-reminder settings, a global master switch, a separate
+  sunrise reminder, notification channels, exact-alarm fallback, and recovery after reboot, clock,
+  time-zone, date and app-update changes. Fully offline.
+- **Azan playback machinery:** lifecycle, single-instance, audio-focus and release rules,
+  implemented and unit-tested. No recording is bundled because no licence exists to redistribute
+  one, so the settings screen reports the limitation rather than offering a dead control.
+- Repository/provider boundaries for prayer schedules, prohibited periods, calendars, location,
+  preferences and notification settings.
 - Unit tests for domain, data and presentation-mapping logic.
 - GitHub Actions workflow that runs tests, lint and builds the debug APK.
 
-Deliberately **not** implemented (see §11): Bangla/Hijri conversion, prohibited-time rules,
-notifications, network providers, Room, widgets, Qibla compass, device location.
+Deliberately **not** implemented (see §11): Bangla/Hijri conversion, prohibited-time rules, bundled
+Azan audio, network providers, Room, widgets, Qibla compass, device location, foreground-service
+playback.
+
+Detailed notification documentation lives in
+[`PRAYER_NOTIFICATIONS.md`](PRAYER_NOTIFICATIONS.md); its tests and the manual device checklist are
+in [`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md).
 
 ## 2. Gradle module decision
 
@@ -58,9 +70,21 @@ io.github.towkirahmedrony.salah
 │   ├── domain/
 │   │   ├── prayer/             PrayerTimesProvider (port), PrayerScheduleRequest/State
 │   │   ├── prohibited/         ProhibitedWindowKind/RuleSet/RuleBook + ProhibitedPeriodCalculator
+│   │   ├── notification/       Notification subsystem, Android-free:
+│   │   │                       ReminderTarget, PrayerAlarmSlot, PrayerReminderKind,
+│   │   │                       PlannedPrayerNotification, PrayerNotificationIds,
+│   │   │                       PrayerNotificationRequest, PrayerNotificationPlanner,
+│   │   │                       PrayerNotificationScheduler (port), ReconcileReason,
+│   │   │                       PrayerNotificationCoordinator, PrayerNotificationDeliverer,
+│   │   │                       PrayerReminderDelivery, DeliveryOutcome,
+│   │   │                       PrayerNotificationChannelId, NotificationPermissionStatus,
+│   │   │                       AzanPlaybackManager + AzanAudioSource / AudioPlaybackEngine ports,
+│   │   │                       NotificationSoundPreviewer (port)
 │   │   ├── repository/         Repository interfaces (location, preferences, schedule,
-│   │   │                       calendar, prohibited periods)
+│   │   │                       calendar, prohibited periods, notification settings)
+│   │   ├── DiagnosticsLogger   Structured diagnostics port + SalahDiagnosticEvents
 │   │   ├── NextPrayerResolver  Pure next-prayer resolution
+│   │   ├── TimeFormatting      Shared clock-format helper (Home + notifications)
 │   │   └── CountdownFormatter  Pure countdown formatting
 │   └── designsystem/           theme/, glyphs, shared components
 ├── data/
@@ -68,12 +92,21 @@ io.github.towkirahmedrony.salah
 │   ├── location/               DataStore-backed manual location
 │   ├── calendar/               Gregorian from the device clock, re-emitted at local midnight
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
-│   └── prohibited/             Rule-book-backed repository (ships unconfigured)
+│   ├── prohibited/             Rule-book-backed repository (ships unconfigured)
+│   └── notification/           Android side of the notification subsystem:
+│                               AlarmManagerPrayerNotificationScheduler,
+│                               AndroidNotificationChannels, AndroidPrayerNotificationPresenter,
+│                               PrayerNotificationReceiver, SystemEventReconciliationReceiver,
+│                               DataStorePrayerNotificationPreferencesRepository,
+│                               AndroidNotificationPermissionStatusProvider,
+│                               AndroidNotificationSoundPreviewer, AndroidDiagnosticsLogger,
+│                               BundledAzanAudioSource, MediaPlayerAudioPlaybackEngine
 ├── feature/
 │   ├── app/                    AppViewModel (theme)
 │   ├── home/                   HomeUiState, HomeUiStateFactory, HomeViewModel, HomeScreen
 │   ├── home/components/        Section composables (incl. CalculationCard)
 │   ├── settings/               Settings state, view model, screen
+│   ├── notifications/          Prayer notification settings state, view model, screen
 │   └── common/                 PlannedFeatureScreen + resource mappers
 └── navigation/                 SalahDestination, SalahNavHost, SalahApp
 ```
@@ -107,7 +140,11 @@ Enforced rules:
 5. **Domain models have no Android dependencies** — no `Context`, no `Resources`, no Compose.
    Resource mapping happens in `feature/common/DomainLabels.kt`.
 6. **No circular dependencies**: `core` never imports `data` or `feature`; `data` never imports
-   `feature`; `feature` imports `core` and is injected with `data` implementations by `di`.
+   `feature`; `feature` imports `core` and is injected with `data` implementations by `di`. This is
+   why `PrayerNotificationCoordinator` and `PrayerNotificationDeliverer` — orchestration over ports,
+   with no Android import — live in `core/domain/notification`, while `AlarmManager`, `MediaPlayer`
+   and `NotificationManager` implementations stay in `data/notification`. The notification settings
+   screen therefore imports only `core`.
 7. **Immutable state, unidirectional data flow**: repositories expose `Flow`, the ViewModel
    `combine`s them into one immutable state, the screen renders it and sends events back as method
    calls (`onRetry`, `setCalculationMethod`, `saveLocation`).
@@ -160,6 +197,70 @@ location + settings + 1s tick ──► request ────┘           │
 - **Provenance travels with the data.** `DataSourceInfo(source, providerId, observedAt,
   isAvailableOffline)` is attached to every schedule state and rendered in the provenance card.
 
+### 5.1 How a prayer schedule becomes a reminder
+
+The notification subsystem is a **second consumer of the same repository**, not a second
+calculation path:
+
+```text
+                        trigger (app start / settings / location / reboot / date /
+                                 time-zone / app update / just delivered)
+                                          │
+                                          ▼
+                       PrayerNotificationCoordinator.reconcile(reason)
+                                          │
+        ┌─────────────────────────────────┼─────────────────────────────────┐
+        ▼                                 ▼                                 ▼
+PrayerNotificationPreferences    LocationRepository              UserPreferencesRepository
+      (DataStore)                     (DataStore)                    (DataStore)
+        │                                 │                                 │
+        │ settings                        │ location (zone) + profile        │
+        ▼                                 ▼                                 │
+   master switch off?            PrayerScheduleRepository.ensureSchedule◄───┘
+        │ yes → cancel all, stop        (THE SAME offline-first repository
+        │                                the Home screen uses)
+        │                                 │ one schedule per date in
+        │                                 │ the 2-day window
+        │                                 ▼
+        │                        PrayerNotificationPlanner  (pure)
+        │                  schedules + settings + Clock instant
+        │                                 │
+        │                                 ▼
+        │                  List<PlannedPrayerNotification>
+        │                                 │
+        └────────────► PrayerNotificationScheduler ──► AlarmManager
+                       cancel(obsolete) + schedule(plan)   (exact, or windowed
+                                                            fallback)
+                                          │
+                                          ▼
+                             PrayerNotificationReceiver (fired alarm)
+                                          │
+                                          ▼
+                             PrayerNotificationDeliverer
+                     re-reads settings + permission + Clock
+                                          │
+                    ┌─────────────────────┴─────────────────────┐
+                    ▼                                           ▼
+        AndroidPrayerNotificationPresenter            AzanPlaybackManager
+              (post / suppress / fail)                (play / unavailable)
+```
+
+What the diagram is asserting:
+
+- **One calculation, two consumers.** The scheduler reads
+  `PrayerScheduleRepository.ensureSchedule` — the same call `HomeViewModel` makes — so the times on
+  screen and the times scheduled cannot diverge, and there is no second engine to keep in step.
+- **The request is still the cache key.** The coordinator builds a `PrayerScheduleRequest` per date
+  from the location and the persisted `PrayerCalculationProfile`, so a change to the calculation
+  method produces a genuinely new schedule rather than a cached one.
+- **The clock is injected, not read.** `Clock` is bound once in `di/SalahModules.kt` and every
+  conversion into the location's zone is explicit, which is what makes time-change handling testable.
+- **Planning is pure.** `PrayerNotificationPlanner` takes schedules, settings and an instant and
+  returns reminders. It has no Android import, no coroutine and no repository, so the whole of
+  "what should be scheduled" is unit-tested directly.
+- **Nothing is derived twice.** The scheduler does not read the Home UI state and the UI does not
+  read the alarm set; both are projections of the same repository and the same preferences.
+
 ## 6. Provider abstraction
 
 ```kotlin
@@ -209,8 +310,10 @@ when pinned, adjustment disclosure) so a time is never presented without the set
   explicit light/dark overrides.
 - `core/designsystem/SalahGlyphs.kt`: icons drawn with Compose `Canvas`, so no icon library
   dependency exists.
-- `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla`. Unimplemented
-  destinations render `PlannedFeatureScreen`, explicitly labelled “Not implemented yet”.
+- `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla` and
+  `notifications`. Unimplemented destinations render `PlannedFeatureScreen`, explicitly labelled
+  “Not implemented yet”. `notifications` is a real destination reached from Settings and is not in
+  the bottom bar, because it is configuration rather than a place the user works.
 - Navigation state is saved/restored per destination (`saveState`/`restoreState`,
   `launchSingleTop`), so returning to Home keeps its state.
 
@@ -228,10 +331,17 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 | Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting, transactional updates, safe fallback on unknown values |
 | Home mapping rules | `HomeUiStateFactoryTest` | No fabricated data, countdown only for a real schedule, sunrise not a prayer, failure surfaced, time-format preference |
 | Calendar rollover | `DeviceClockCalendarRepositoryTest` | Local-midnight re-emission, no polling, DST-length local day |
+| Notification planning | `PrayerNotificationPlannerTest` | Enabled/disabled, master switch, past events, advance reminders, sunrise separated from prayers, missing schedule, duplicates, deterministic order, cancellation set |
+| Notification identity | `PrayerNotificationIdsTest`, `PrayerNotificationRequestTest`, `PrayerNotificationChannelIdTest` | Request-code uniqueness across 400 days × 6 targets × 2 kinds, URI round trip, malformed-input rejection, bounded and stable channel ids |
+| Notification settings | `PrayerNotificationSettingsTest`, `DataStorePrayerNotificationPreferencesRepositoryTest` | Defaults, clamping, sparseness, real persistence across recreation, safe fallback on bad stored data, coexistence with the other preferences in one store |
+| Scheduling, recovery, delivery | `PrayerNotificationCoordinatorTest`, `PrayerNotificationDelivererTest` | Reboot recovery, duplicate broadcasts, master switch, location/date/time-zone change, exact-alarm fallback, missing permission, one failure not aborting the rest, suppression rules, staleness, Azan attempt boundaries, structured logging with no coordinates |
+| Azan playback | `AzanPlaybackManagerTest` | Single instance, stop, release, missing asset, engine failure — against a fake engine; device behaviour is unverified because no recording is bundled |
 
-Not yet covered (and therefore not claimed): Compose UI tests, instrumentation tests, and any
+Not yet covered (and therefore not claimed): Compose UI tests, instrumentation tests, Android's
+actual alarm and notification delivery on a device, `MediaPlayer` against real audio, and any
 religious-correctness validation, which requires verified timetables and review rather than unit
-tests. The engine's reference values are regression values from the pinned engine version through
+tests. The notification subsystem's device-only scenarios are listed, unperformed, in
+[`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md) §4. The engine's reference values are regression values from the pinned engine version through
 Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATION.md` §6.
 
 ## 10. Extension points
@@ -244,9 +354,17 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
   `CalendarDateState.Available`; the Home screen already renders that shape.
 - **Prohibited periods**: add one reviewed `ProhibitedRuleSet` to `ProhibitedRuleBook`; the
   calculator, repository and state types already exist and are tested.
-- **Notifications**: a scheduler must observe the same repository/domain types and must not be
-  reached from any screen, so it can be added without touching the UI. Exact-alarm permission and
-  device-restart handling belong to that phase.
+- **Notifications**: implemented. `PrayerNotificationPlanner` is the only place that decides what
+  is scheduled, so a new reminder type (a Ramadan reminder, a Qibla alert) is a change to the
+  planner plus a `ReminderTarget` constant — the coordinator, receivers, channels and UI need no
+  new mechanism.
+- **Azan audio**: implement `AzanAudioSource` to return a licensed recording (or return it from
+  `BundledAzanAudioSource.resolve()`) and playback begins working, because the lifecycle, focus,
+  single-instance and release rules already exist and are tested. A foreground-service variant for
+  unattended long-form playback is a separate, deliberate piece of work — see
+  `PRAYER_NOTIFICATIONS.md` §5.4.
+- **A different time-critical mechanism**: implement `PrayerNotificationScheduler`. The planner,
+  coordinator, delivery path and UI are unaffected.
 - **Splitting modules**: move packages into `core:*`, `data:*`, `feature:*` Gradle modules; the
   rules in §4 are already the intended boundaries.
 
@@ -257,7 +375,14 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
 - Prohibited prayer windows are **implemented but unconfigured**: the rule book ships empty, so the
   app reports the honest unavailability state.
 - The schedule cache is in-memory only; process death clears it (and it is cheaply recalculated).
-- No network client, no Room, no background work, no permissions are declared in the manifest.
+- No network client, no Room and no WorkManager job exist. The manifest declares exactly four
+  permissions, all for notifications (`POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`,
+  `SCHEDULE_EXACT_ALARM`, `VIBRATE`) — there is still **no** `INTERNET` permission.
+- **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
+  missing for licensing reasons, and the UI says so instead of offering a control that cannot work.
+- Notification delivery has **not** been verified on a physical device. Reboot recovery, Doze
+  behaviour, system permission surfaces and real alarm timing require hardware; the checklist is
+  written but unperformed (`PRAYER_NOTIFICATIONS_TESTING.md` §4).
 - Bangla and Hijri conversion are not implemented; only the device Gregorian date is available.
 - Reason strings and UI text are English; full localisation and Bangla translations are future
   work.

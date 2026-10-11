@@ -4,10 +4,10 @@ Salah is an **offline-first Islamic companion for Android**: prayer times, calen
 tooling and Islamic utilities designed to keep working without an internet connection and
 without an account.
 
-> **Current status:** the project foundation and the **local prayer-time calculation engine** are
-> implemented and covered by tests. Several long-term features described below are *planned*. This
-> README states exactly which is which, and the app itself labels unimplemented sections as
-> “Not implemented yet” instead of showing placeholder data.
+> **Current status:** the project foundation, the **local prayer-time calculation engine** and
+> **prayer notifications** are implemented and covered by tests. Several long-term features
+> described below are *planned*. This README states exactly which is which, and the app itself
+> labels unimplemented sections as “Not implemented yet” instead of showing placeholder data.
 
 ---
 
@@ -22,13 +22,19 @@ without an account.
 | Manual location (validated coordinates + IANA zone), stored on device | Implemented |
 | Next prayer + countdown resolved from the real schedule | Implemented |
 | Home screen: branding, date header, location, calculation indicator, timetable, solar events, next-prayer card, prohibited-times section, shortcuts, data-source status | Implemented |
-| Navigation: Home, Prayer, Calendar, Ramadan, Settings, Qibla | Implemented (boundaries) |
+| **Prayer notifications** — reminders at the calculated prayer times, scheduled with `AlarmManager` from the same offline schedule the Home screen shows | **Implemented, offline** |
+| Per-prayer notification settings: enable, sound (device default / bundled Salah chime / silent), vibration, optional advance reminder | Implemented, persisted locally |
+| Global master switch, separate sunrise (solar event) reminder, sound preview, schedule status | Implemented |
+| Reboot, clock, time-zone, date and app-update recovery; duplicate-alarm prevention; exact-alarm fallback | Implemented |
+| Prayer notification settings screen, reached from Settings | Implemented |
+| Navigation: Home, Prayer, Calendar, Ramadan, Settings, Qibla, Notifications | Implemented (boundaries) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data and Home mapping rules | Implemented |
+| Unit tests for engine, domain, data, Home mapping and the notification subsystem | Implemented (191 tests) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
+| **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |
 | Bangladesh Bangla and Hijri calendar conversion | **Not implemented** — honestly reported as unavailable |
-| Ramadan, Qibla, Quran, notifications, widgets, networking, Room, device location | Not implemented |
+| Ramadan, Qibla, Quran, widgets, networking, Room, device location | Not implemented |
 
 ## Why it looks the way it does
 
@@ -47,6 +53,16 @@ Salah only shows values it actually has:
   that no reviewed rules have been configured.
 - **Timings are shown with the settings behind them** — the calculation method and Asr method are
   disclosed, and any manual minute adjustment is labelled next to the time it moved.
+- **Reminders come from those same calculated times.** The scheduler reads the identical
+  `PrayerScheduleRepository` the Home screen reads, so a reminder can never announce a time the
+  timetable does not show, and a missing timetable produces **no** reminder rather than a guessed
+  one.
+- **Azan audio is not bundled and is not pretended.** No recording ships, so the settings screen
+  states that playback is unavailable and why, rather than showing a switch that could never be
+  turned on.
+- **Android's limits are stated, not glossed over.** If exact alarms are not permitted, if
+  notification permission is denied, or if a channel has been silenced by the user, the app says
+  what that means instead of implying a guarantee Android does not offer.
 
 The calculated times are **not** claimed to match any authority's published timetable: that
 requires an actual comparison for the same location and date, which has not been done. See
@@ -68,6 +84,8 @@ requires an actual comparison for the same location and date, which has not been
 | Navigation | Navigation Compose `2.10.2` |
 | Build | Gradle `9.8.1` (Kotlin DSL, version catalog), AGP `9.3.3`, JDK `17` |
 | SDK | `compileSdk` `37` (minor `0`, i.e. `android-37.0`), `targetSdk` `36`, `minSdk` `26` |
+| Notifications | `AlarmManager` (exact where permitted, windowed fallback) + `NotificationManagerCompat`; 7 notification channels |
+| Permissions | `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE` — no `INTERNET`, no location permission |
 | Tests | JUnit 4 + kotlinx-coroutines-test |
 
 Full version list, official references and compatibility decisions: [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
@@ -85,8 +103,10 @@ The calculation engine and its pinned version are explained in
    produced with, so it can never appear current after the user changes location or settings.
 5. Cached data carries provenance (`source`, `providerId`, `observedAt`, `available offline`), so
    the user can see where a value came from.
-6. Preferences and the manual location live on the device; no account is required, and no
-   permission is requested.
+6. Preferences, the manual location and the notification settings live on the device; no account
+   is required.
+7. Notifications are scheduled, delivered and recovered after a reboot **without any network
+   access**. Salah declares no `INTERNET` permission at all, so there is nothing it could send.
 
 ## Repository structure
 
@@ -96,12 +116,17 @@ The calculation engine and its pinned version are explained in
 ├── app/
 │   └── src/main/java/io/github/towkirahmedrony/salah/
 │       ├── core/{model,domain,designsystem}   pure logic, ports, calculator, theme
+│       │   └── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
 │       ├── data/{preferences,location,calendar,prayer,prohibited}
-│       ├── feature/{app,home,settings,common}
+│       │   └── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
+│       ├── feature/{app,home,settings,notifications,common}
 │       ├── navigation/                        destinations, nav host, app shell
 │       └── di/                                Koin container
+│   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
+├── docs/PRAYER_NOTIFICATIONS.md               scheduler, permissions, channels, Azan, limitations
+├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
 ├── docs/TECH_STACK.md                         real versions + compatibility decisions
 ├── docs/ARCHITECTURE.md                       structure, rules, extension points
 ├── gradle/libs.versions.toml                  version catalog
@@ -111,6 +136,11 @@ The calculation engine and its pinned version are explained in
 
 The project uses a **single `:app` module with package boundaries** at this stage; the packages
 mirror the intended future modules. The reasoning is documented in `docs/ARCHITECTURE.md`.
+
+**On `res/raw/salah_chime.wav`:** this is the only audio asset in the repository. It is a short
+reminder tone that was **synthesised for this project** and carries no third-party rights, so it can
+be redistributed with the source. It is explicitly *not* an Azan recording, and no Azan recording is
+bundled — see [`docs/PRAYER_NOTIFICATIONS.md`](docs/PRAYER_NOTIFICATIONS.md) §5.
 
 ## Building the APK (GitHub Actions)
 
@@ -136,7 +166,17 @@ and no signing credentials.
 - Prohibited-time rules are **not** configured: the mechanism and tests exist, the reviewed rule
   set does not.
 - No Bangla or Hijri conversion; only the device Gregorian date is available.
-- No Ramadan schedule, Qibla compass, Quran, duas, tasbih or notifications.
+- No Ramadan schedule, Qibla compass, Quran, duas or tasbih.
+- **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
+  missing for licensing reasons, and the UI reports that rather than offering a control that cannot
+  work.
+- **Notification delivery has not been verified on a physical device.** Reboot recovery, Doze
+  behaviour, system permission surfaces and real alarm timing need hardware. The checklist exists
+  and is explicitly unperformed:
+  [`docs/PRAYER_NOTIFICATIONS_TESTING.md`](docs/PRAYER_NOTIFICATIONS_TESTING.md) §4.
+- Notification reminders may be delayed or silenced by Android: without exact-alarm access they use
+  a ten-minute window, and Do Not Disturb, battery optimisation and a force-stopped app can defer or
+  withhold them. Salah uses only supported APIs and does not attempt to bypass these.
 - No network client, no Room database; the schedule cache is in-memory (and cheaply recomputed).
 - No device-location provider: location is entered manually. No location permission is requested.
 - UI strings are English only; Bangla/Arabic script rendering relies on system fonts.
@@ -147,12 +187,14 @@ and no signing credentials.
    conversion logic independent of the UI.
 2. **Prohibited periods and Ramadan** — add a reviewed `ProhibitedRuleSet` (the calculator is
    ready) and derive Sehri/Iftar from the same prayer schedule.
-3. **Notifications** — `AlarmManager`/`NotificationManager` scheduling outside the UI, driven by
-   `PrayerScheduleRepository`, with explicit handling of exact-alarm permission and device
-   restarts.
-4. **Remote providers and caching** — optional AlAdhan integration with validation, caching and
+3. **Licensed Azan audio** — source a recording whose redistribution rights are established, add it
+   to `res/raw`, and return it from `BundledAzanAudioSource`. Decide deliberately whether
+   unattended long-form playback warrants a foreground service.
+4. **On-device verification of notifications** — work through the manual checklist on real hardware
+   and record the results, including device-specific Doze and battery behaviour.
+5. **Remote providers and caching** — optional AlAdhan integration with validation, caching and
    provenance display.
-5. **Qibla, Quran and content modules.**
+6. **Qibla, Quran and content modules.**
 
 ## Contributing
 
