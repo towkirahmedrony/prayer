@@ -4,9 +4,9 @@ import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -67,9 +67,17 @@ class DeviceClockCalendarRepositoryTest {
         return Duration.between(from, midnight).toMillis()
     }
 
-    private fun CoroutineScope.observe(clock: Clock): MutableList<CalendarSnapshot> {
+    /**
+     * Starts collecting the repository on [TestScope.backgroundScope], so the collector is
+     * cancelled when the test body finishes. The repository re-emits on a never-ending local
+     * midnight loop, so a collector launched on the test scope itself would keep `runTest`
+     * waiting forever.
+     */
+    private fun TestScope.observe(clock: Clock): MutableList<CalendarSnapshot> {
         val snapshots = mutableListOf<CalendarSnapshot>()
-        launch { DeviceClockCalendarRepository(clock).observeToday().collect { snapshots += it } }
+        backgroundScope.launch {
+            DeviceClockCalendarRepository(clock).observeToday().collect { snapshots += it }
+        }
         return snapshots
     }
 
