@@ -51,6 +51,22 @@ cleared in Android settings or by the user returns the app to setup, because the
 no longer verify, and offering it as if it were still selectable, would be a quiet lie. The location
 screen (`LocationScreen`) manages an existing location with the same rules.
 
+**Where the screen is shown.** The shell (`SalahApp`) renders one of exactly three things, and the
+stored location decides which: the navigation graph when a location is usable, `LocationSetupScreen`
+when `requiresSetup`, and Home's own skeleton while the answer is still `Checking`. While setup is
+required there is no navigation graph and no bottom bar — nowhere to go that would not have to invent
+a time — and no code marks setup as finished, because **saving a location is what closes the gate**.
+`AppViewModel.locationSetup` is the only thing the shell consults, and it is derived (above), so the
+answer survives process death and is re-derived identically on the next launch.
+
+**What the screen is.** One scrolling column: the app's mark and name, the heading, what a location
+is for, an illustration of Bangladesh, then the device option and the manual option separated by
+`OR SELECT MANUALLY`, and a closing line. Like the rest of the app it is drawn from the theme's
+colours and type scale, so it follows light and dark mode. The illustration is generated from the
+**same** `bd_boundary.tsv` the country policy validates against — projected, simplified to a couple of
+hundred points and drawn as a path — so the shape shown is the country the app already knows rather
+than a second drawing of it.
+
 ## 3. GPS and manual selection
 
 **Device fix.** `LocationProvider` is a one-shot port. The Android implementation
@@ -60,11 +76,19 @@ never saved on sight: it is checked against the country policy, attributed to an
 and shown as a *pending* fix the user confirms. Nothing replaces the stored location until the user
 taps **Use this location**.
 
-**Manual selection.** The picker lists the divisions, then the districts of the chosen division, then
-the upazilas/thanas of the chosen district. `AreaSelection` is the guard: choosing a level clears the
-levels below it, and an id that does not belong under the chosen parent is ignored rather than stored,
-so a half-valid hierarchy cannot exist. A complete selection saves the **upazila's published centre**
-and the division/district/upazila names.
+**Manual selection.** Three levels, in order: the divisions, then the districts of the chosen division,
+then the upazilas/thanas of the chosen district. `AreaSelection` is the guard: choosing a level clears
+the levels below it, and an id that does not belong under the chosen parent is ignored rather than
+stored, so a half-valid hierarchy cannot exist. A complete selection saves the **upazila's published
+centre** and the division/district/upazila names.
+
+The two screens present the same three levels differently — the setup screen as three dropdowns
+(division, district, upazila/thana), the management screen as an expandable list per level — because
+they answer different questions: "pick an area" against "check and change the area you have". Both
+read `LocationUiState` and call the same `selectDivision` / `selectDistrict` / `selectUpazila` /
+`saveSelectedArea` actions, so the rules above are enforced once, in the view model and in
+`AreaSelection` — never in the layout. A level is offered only once its parent is chosen, and one
+whose parent has not been chosen is disabled rather than shown empty.
 
 **Manual coordinates.** The Settings screen and the Qibla screen accept typed coordinates and an IANA
 zone. These are stored as entered; the country check is not applied to a typed coordinate (the Settings
@@ -268,6 +292,18 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   tolerance not being reported as inside Bangladesh.
 - `AreaResolverTest`, `AreaSelectionTest`, `LocationSetupTest` — level selection, the hierarchy guards,
   attribution thresholds, and the setup gate for every reason.
+- `AppViewModelTest` — the gate the shell acts on, driven through the real `AppViewModel`: a fresh
+  install is asked for a location, a stored usable one goes straight to the app, an outside-Bangladesh
+  or unknown-area location is asked for again with its reason, an unreadable dataset is reported and
+  does not lock out an already-valid location, a stored location is decided without waiting for the
+  dataset read, and the answer moves in **both** directions as the stored location is saved and
+  cleared (the property that rules out a `setup_complete` flag).
+- `LocationViewModelTest` — what a tap does, on virtual time with the real view model, resolvers and
+  coordinator: a fix is held rather than saved on sight and only stored on confirmation, a declined
+  permission and a timeout each leave their message and the manual option, a position outside
+  Bangladesh is refused and stores nothing, a second tap during a fix starts one request, the
+  cascade drops a child its new parent cannot keep, and a confirmed selection stores the chosen
+  area's published centre with `AREA_SELECTION` provenance while a partial one is refused.
 - `DeviceFixAdoptionPolicyTest` — the Qibla write-path decision (adopted vs preserved, and why).
 - `LocationPermissionPolicyTest` — the permission affordance decision.
 - `LocationFreshnessTest`, `GeoMathTest`, `LocationInfoTest`, `DataStoreLocationRepositoryTest` —
@@ -289,6 +325,10 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
 - **The location screens have not been verified on a physical device.** The picker's TalkBack semantics,
   the permission flows and a real GNSS fix need hardware; the pure decisions behind them are
   unit-tested.
+- **The setup screen's layout has been reviewed against the design in source, not rendered.** Its
+  states are asserted through the view model and the screen is a pure function of `LocationUiState`,
+  but no emulator or screenshot comparison was run, so its spacing and proportions on a real device are
+  unverified. The dropdown fields in particular have had no TalkBack review.
 - **69 of 507 upazilas have no Bangla name** and display their English name; no translation was guessed.
 - The Bangla resource file remains partial for the explanatory strings that make accuracy claims (see
   `app/lint.xml`), so those strings appear in English under a Bangla device locale.

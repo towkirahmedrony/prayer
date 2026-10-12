@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -25,78 +26,123 @@ import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.feature.app.AppViewModel
+import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
+import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
+import org.koin.androidx.compose.koinViewModel
 
+/**
+ * Application shell.
+ *
+ * **The location gate.** Everything Salah shows is derived from a place, so the shell decides in one
+ * spot whether a usable location exists: while none does, the location setup screen *is* the app —
+ * no navigation graph, no bottom bar, and therefore no way to reach a screen that would have to
+ * invent a time. Once a location exists the graph is shown, and if the location is later cleared the
+ * gate closes again on that same recomposition.
+ *
+ * The gate is a decision about the *stored location*, not a flag: [AppViewModel.locationSetup]
+ * derives it from the location and the bundled dataset, so "setup is complete" and "a usable
+ * location exists" can never disagree. Nothing here marks setup as finished — saving a location is
+ * what does that, and it is also what makes this screen disappear.
+ */
 @Composable
 fun SalahApp(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    appViewModel: AppViewModel = koinViewModel(),
 ) {
+    val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
+
+    SalahTheme(themeMode = themeMode) {
+        when {
+            setupState is LocationSetupState.Complete -> AppShell()
+
+            setupState.requiresSetup -> Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+            ) { innerPadding ->
+                LocationSetupScreen(modifier = Modifier.padding(innerPadding))
+            }
+
+            // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:
+            // the gate is short-lived, and the Home layout arriving into a screen that already has
+            // its shape is a smaller change than a spinner being swapped out for a whole screen.
+            else -> Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+            ) { innerPadding ->
+                HomeSkeleton(modifier = Modifier.padding(innerPadding))
+            }
+        }
+    }
+}
+
+/** The navigation graph with the bottom bar, shown once a usable location exists. */
+@Composable
+private fun AppShell() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    SalahTheme(themeMode = themeMode) {
-        Scaffold(
-            bottomBar = {
-                NavigationBar(
-                    containerColor = ForestGreenPrimary,
-                    contentColor = Color.White,
-                    tonalElevation = 0.dp,
-                ) {
-                    val destinations: List<SalahDestination> = listOf(
-                        SalahDestination.HOME,
-                        SalahDestination.PRAYER,
-                        SalahDestination.CALENDAR,
-                        SalahDestination.SETTINGS,
-                    )
-
-                    destinations.forEach { dest ->
-                        val selected = currentRoute == dest.route
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = {
-                                navController.navigate(dest.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = {
-                                val tint = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
-                                when (dest) {
-                                    SalahDestination.HOME -> DomeGlyph(tint = tint)
-                                    SalahDestination.PRAYER -> LanternGlyph(tint = tint)
-                                    SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
-                                    SalahDestination.SETTINGS -> GearGlyph(tint = tint)
-                                    else -> DomeGlyph(tint = tint)
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = stringResource(dest.labelRes),
-                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.6f),
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = Color.White.copy(alpha = 0.15f),
-                            ),
-                        )
-                    }
-                }
-            },
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(MaterialTheme.colorScheme.background),
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = ForestGreenPrimary,
+                contentColor = Color.White,
+                tonalElevation = 0.dp,
             ) {
-                SalahNavHost(
-                    navController = navController,
+                val destinations: List<SalahDestination> = listOf(
+                    SalahDestination.HOME,
+                    SalahDestination.PRAYER,
+                    SalahDestination.CALENDAR,
+                    SalahDestination.SETTINGS,
                 )
+
+                destinations.forEach { dest ->
+                    val selected = currentRoute == dest.route
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            navController.navigate(dest.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = {
+                            val tint = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
+                            when (dest) {
+                                SalahDestination.HOME -> DomeGlyph(tint = tint)
+                                SalahDestination.PRAYER -> LanternGlyph(tint = tint)
+                                SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
+                                SalahDestination.SETTINGS -> GearGlyph(tint = tint)
+                                else -> DomeGlyph(tint = tint)
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(dest.labelRes),
+                                color = if (selected) Color.White else Color.White.copy(alpha = 0.6f),
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = Color.White.copy(alpha = 0.15f),
+                        ),
+                    )
+                }
             }
+        },
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            SalahNavHost(
+                navController = navController,
+            )
         }
     }
 }

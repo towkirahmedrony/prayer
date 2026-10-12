@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
@@ -207,4 +209,62 @@ fun LocationPinGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, m
     }
     drawPath(pin, tint, style = Stroke(width = 1.8f))
     drawCircle(tint, radius = 2f, center = Offset(12f, 10f))
+}
+
+/**
+ * The same pin, filled.
+ *
+ * The mark the location setup card uses for the manual option. The hole is punched with
+ * [PathFillType.EvenOdd] rather than drawn as a white circle, so it stays the card's own colour in
+ * either theme instead of a white dot on a dark card.
+ */
+@Composable
+fun LocationPinFilledGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val pin = Path().apply {
+        fillType = PathFillType.EvenOdd
+        moveTo(12f, 21f)
+        cubicTo(10f, 18f, 5f, 13.7f, 5f, 10f)
+        cubicTo(5f, 6.1f, 8f, 3f, 12f, 3f)
+        cubicTo(16f, 3f, 19f, 6.1f, 19f, 10f)
+        cubicTo(19f, 13.7f, 14f, 18f, 12f, 21f)
+        close()
+        addOval(Rect(center = Offset(12f, 10f), radius = 2.8f))
+    }
+    drawPath(pin, tint)
+}
+
+/** A downward chevron, for a control that opens a list. */
+@Composable
+fun ChevronDownGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.9f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val chevron = Path().apply {
+        moveTo(6.5f, 9.5f)
+        lineTo(12f, 15f)
+        lineTo(17.5f, 9.5f)
+    }
+    drawPath(chevron, tint, style = stroke)
+}
+
+/**
+ * A broadcast mark: a dot with two waves leaving it on each side.
+ *
+ * Used where a screen offers to ask the device for its own position, so the two ways of giving Salah
+ * a location are told apart by their icons as well as by their titles.
+ */
+@Composable
+fun SignalGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawCircle(tint, radius = 1.7f, center = Offset(12f, 12f))
+    listOf(4.6f, 7.6f).forEach { radius ->
+        listOf(135f, -45f).forEach { startAngle ->
+            drawArc(
+                color = tint,
+                startAngle = startAngle,
+                sweepAngle = 90f,
+                useCenter = false,
+                topLeft = Offset(12f - radius, 12f - radius),
+                size = Size(radius * 2f, radius * 2f),
+                style = Stroke(width = 1.7f),
+            )
+        }
+    }
 }

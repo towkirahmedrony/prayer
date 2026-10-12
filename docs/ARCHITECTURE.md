@@ -485,6 +485,8 @@ data source.
 | Offline-first repository | `ProviderBackedPrayerScheduleRepositoryTest` | No location, engine not configured, cache reuse without re-calling the provider, recalculation on date/location/profile change, stale or wrong-place response rejection, exception → visible failure |
 | Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting including the calendar preferences, transactional updates, the Hijri offset clamped on write and read, safe fallback on unknown values, and calendar/prayer/theme preferences not overwriting one another |
 | Home mapping rules | `HomeUiStateFactoryTest` | No fabricated data, countdown only for a real schedule, sunrise not a prayer, failure surfaced, time-format preference |
+| First-launch location gate | `AppViewModelTest` | The decision the shell renders: fresh install → setup, stored usable location → the app, outside-Bangladesh and unknown-area locations → setup with the reason, unreadable dataset reported without locking out a valid location, a stored location decided without waiting for the dataset, and the gate moving in **both** directions as the location is saved and cleared |
+| Location actions | `LocationViewModelTest` | A fix held for confirmation rather than saved, permission denial and timeout leaving the manual option, an out-of-country fix refused, one request per tap, the hierarchy cascade dropping an incompatible child, and a confirmed selection storing the chosen area's published centre |
 | Home data contract | `HomeViewModelTest` | Real resolvers and factory, faked repositories: the active period and countdown come from the repository's schedule for the saved location; the schedule is calculated once per request and not once per tick; a new local day and a new saved location each re-request; Home waits for a real schedule before showing times, but not for the calendar; no location is reported as such rather than fabricated. Runs on virtual time via `Dispatchers.setMain` — see §9.1 |
 | Calendar rollover and day resolution | `DeviceClockCalendarRepositoryTest` | Local-midnight re-emission, no polling, DST-length local day, the Hijri month boundary at midnight, the date language, out-of-range reporting for both converters, a month laid out with real Bangla/Hijri dates and Ramadan day numbers, the Ramadan window and its movement with the Hijri offset |
 | Bangladesh Bangla calendar | `BanglaCalendarTest` | Published 2019 rules (six 31-day months, Falgun 29/30, Chaitra 30) against reference dates, every month start, the 14 April New Year, leap years, a whole supported year round-tripped, refusal before 2019 and after 2399 |
@@ -526,11 +528,13 @@ elapsed time and a no-op log line — and the view model's flow assembly is test
 emulator or Robolectric.
 
 Nothing else in the test source set imports `android.*`, so no existing test relied on a stub
-throwing and the flag cannot hide a real "not mocked" failure elsewhere. `HomeViewModelTest`
-installs a `StandardTestDispatcher` as `Dispatchers.Main` (the dispatcher behind `viewModelScope`)
-and passes the same dispatcher to `runTest`, so the view model and the test share one scheduler and
-one virtual clock. The clock itself is a hand-moved `Clock`, so no test depends on the wall clock or
-on the machine's time zone.
+throwing and the flag cannot hide a real "not mocked" failure elsewhere. `HomeViewModelTest`,
+`AppViewModelTest` and `LocationViewModelTest` each install a `StandardTestDispatcher` as
+`Dispatchers.Main` (the dispatcher behind `viewModelScope`) and pass the same dispatcher to
+`runTest`, so the view model and the test share one scheduler and one virtual clock. The clock itself
+is a hand-moved `Clock` (or a fixed one), so no test depends on the wall clock or on the machine's
+time zone. Where a test needs "the view model is still waiting" as an observable state — a dataset
+read, a location fix — the fake holds its answer on a `CompletableDeferred` rather than delaying.
 
 ## 10. Extension points
 

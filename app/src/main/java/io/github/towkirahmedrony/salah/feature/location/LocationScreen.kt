@@ -63,66 +63,13 @@ import io.github.towkirahmedrony.salah.feature.common.sourceLabelRes
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * The first-launch location screen.
- *
- * Shown by the app shell whenever [io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState]
- * says no usable location exists, *before* any location-dependent screen. It offers exactly two ways
- * forward — a device fix or a manual area — and neither of them requires the other, so a user who
- * declines location permission is not trapped in a prompt loop.
- */
-@Composable
-fun LocationSetupScreen(
-    modifier: Modifier = Modifier,
-    viewModel: LocationViewModel = koinViewModel(),
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LifecycleEventEffect(Lifecycle.Event.ON_START) {
-        viewModel.start()
-    }
-
-    val settingsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) {
-        viewModel.refreshPermissionState()
-    }
-
-    // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
-    // platform facts it needs, so a permanently denied permission opens app settings instead of
-    // re-launching a dialog the system would silently ignore.
-    val onUseDeviceLocation = rememberDeviceLocationAction(
-        viewModel = viewModel,
-        permissionState = state.permissionState,
-    )
-
-    LocationContent(
-        state = state,
-        isSetup = true,
-        modifier = modifier,
-        onUseDeviceLocation = onUseDeviceLocation,
-        onOpenLocationSettings = {
-            settingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-        },
-        onOpenAreaPicker = viewModel::openAreaPicker,
-        onCloseAreaPicker = viewModel::closeAreaPicker,
-        onSelectDivision = viewModel::selectDivision,
-        onSelectDistrict = viewModel::selectDistrict,
-        onSelectUpazila = viewModel::selectUpazila,
-        onSaveSelection = viewModel::saveSelectedArea,
-        onConfirmFix = viewModel::confirmPendingFix,
-        onDiscardFix = viewModel::discardPendingFix,
-        onClearLocation = viewModel::clearLocation,
-        onDismissMessage = viewModel::dismissMessage,
-    )
-}
-
-/**
  * The location management screen, reached from Settings.
  *
- * The same content as the setup screen with the framing changed: it starts from the stored location,
- * shows it with its provenance, and offers the same two ways to replace it plus removal. Keeping one
- * implementation means the first launch and every later change apply exactly the same validation —
- * there is no second code path that could accept a location the first one would refuse.
+ * The framing the first-launch [LocationSetupScreen] does not have: it starts from the stored location,
+ * shows it with its provenance, and offers the same two ways to replace it plus removal. Both screens
+ * read one state and call one view model, so the first launch and every later change apply exactly the
+ * same validation — there is no second code path that could accept a location the first one would
+ * refuse.
  */
 @Composable
 fun LocationScreen(
@@ -152,7 +99,6 @@ fun LocationScreen(
 
     LocationContent(
         state = state,
-        isSetup = false,
         modifier = modifier,
         onUseDeviceLocation = onUseDeviceLocation,
         onOpenLocationSettings = {
@@ -172,16 +118,19 @@ fun LocationScreen(
 }
 
 /**
- * The screen body, shared by both entry points.
+ * The management screen's body.
  *
- * Order matters and is deliberate: what Salah needs and why, then the two ways to give it, then a
- * pending fix or the open picker, then the actions and any message. Nothing is shown before the
- * dataset has been read, because a picker with no divisions in it is worse than a spinner.
+ * Order matters and is deliberate: the dataset's status, then the stored location, then the two ways
+ * to replace it, then a pending fix or the open picker, then the actions and any message. Nothing is
+ * shown before the dataset has been read, because a picker with no divisions in it is worse than a
+ * spinner.
+ *
+ * The first-launch screen is a separate composable with its own framing; both render the same state
+ * and call the same view model, so there is still exactly one set of rules behind the two.
  */
 @Composable
 private fun LocationContent(
     state: LocationUiState,
-    isSetup: Boolean,
     modifier: Modifier = Modifier,
     onUseDeviceLocation: () -> Unit,
     onOpenLocationSettings: () -> Unit,
@@ -204,36 +153,10 @@ private fun LocationContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = stringResource(
-                if (isSetup) R.string.location_setup_title else R.string.location_title,
-            ),
+            text = stringResource(R.string.location_title),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
-
-        if (isSetup) {
-            SalahSectionCard {
-                Text(
-                    text = stringResource(R.string.location_why_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.location_setup_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.location_why_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                SalahUnavailableNote(text = stringResource(R.string.location_bangladesh_only))
-            }
-        }
 
         // Dataset status -----------------------------------------------------
         if (state.isLoading) {
@@ -278,9 +201,7 @@ private fun LocationContent(
         }
 
         // Stored location ----------------------------------------------------
-        if (!isSetup) {
-            state.stored?.let { stored -> StoredLocationCard(stored = stored) }
-        }
+        state.stored?.let { stored -> StoredLocationCard(stored = stored) }
 
         // A device fix awaiting confirmation --------------------------------
         state.pendingFix?.let { fix ->
@@ -344,7 +265,7 @@ private fun LocationContent(
         }
 
         // Actions on an existing location ------------------------------------
-        if (!isSetup && state.stored != null && !state.isPickerOpen && state.pendingFix == null) {
+        if (state.stored != null && !state.isPickerOpen && state.pendingFix == null) {
             state.stored?.let { stored ->
                 if (stored.freshness.shouldOfferRefresh || stored.origin == LocationOrigin.AREA_SELECTION) {
                     OutlinedButton(
@@ -370,10 +291,6 @@ private fun LocationContent(
             TextButton(onClick = onOpenLocationSettings) {
                 Text(text = stringResource(R.string.location_action_open_location_settings))
             }
-        }
-
-        if (isSetup) {
-            SalahUnavailableNote(text = stringResource(R.string.location_area_reference_note))
         }
 
         state.message?.let { message ->
@@ -499,7 +416,7 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
 }
 
 @Composable
-private fun PendingFixCard(
+internal fun PendingFixCard(
     fix: PendingDeviceFix,
     onConfirm: () -> Unit,
     onDiscard: () -> Unit,
@@ -760,7 +677,7 @@ private fun LocationDetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun LocationMessageRow(message: LocationMessage, onDismiss: () -> Unit) {
+internal fun LocationMessageRow(message: LocationMessage, onDismiss: () -> Unit) {
     val text = when (message) {
         LocationMessage.Saved -> stringResource(R.string.location_message_saved)
         LocationMessage.SaveRejected -> stringResource(R.string.location_message_rejected)
@@ -808,7 +725,7 @@ private fun freshnessRes(freshness: LocationFreshness): Int = when (freshness) {
  * permission denied.
  */
 @Composable
-private fun rememberDeviceLocationAction(
+internal fun rememberDeviceLocationAction(
     viewModel: LocationViewModel,
     permissionState: LocationPermissionState,
 ): () -> Unit {

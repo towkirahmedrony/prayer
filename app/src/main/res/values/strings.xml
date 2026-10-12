@@ -513,7 +513,7 @@
     <!-- Location: setup, management and the division / district / upazila picker -->
     <string name="nav_location">Location</string>
     <string name="location_title">Location</string>
-    <string name="location_setup_title">Choose your location</string>
+    <string name="location_setup_title">Let\'s set your location</string>
     <string name="location_setup_body">Salah calculates prayer times, the Qibla direction, the Ramadan calendar and the Sehri and Iftar reminders from your coordinates, and everything is computed on this device.</string>
     <string name="location_bangladesh_only">This version of Salah supports locations in Bangladesh only. The bundled area dataset, the calculation settings and the Hijri and Bangla calendars are all Bangladesh-specific.</string>
     <string name="location_why_title">Why a location is needed</string>
@@ -597,6 +597,20 @@
     <string name="location_message_cleared">Location removed. Salah will ask for a location again before calculating times.</string>
     <string name="location_message_dataset_unavailable">The bundled location dataset could not be read, so an area cannot be chosen.</string>
     <string name="location_message_dismiss">Dismiss</string>
+
+    <!-- Location setup: the first-launch screen, before any location-dependent screen -->
+    <string name="location_setup_subheading">Get accurate prayer times, Qibla direction, and Ramadan timings for your area in Bangladesh.</string>
+    <string name="location_setup_gps_title">Use Current Location</string>
+    <string name="location_setup_gps_body">Automatically detect your location for area-specific prayer times.</string>
+    <string name="location_setup_gps_action">Use GPS Location</string>
+    <string name="location_setup_gps_caption">Your location is used to personalize your prayer times.</string>
+    <string name="location_setup_or_divider">OR SELECT MANUALLY</string>
+    <string name="location_setup_manual_title">Choose Location Manually</string>
+    <string name="location_setup_manual_body">Select your area in Bangladesh without enabling GPS.</string>
+    <string name="location_setup_manual_confirm">Confirm Location</string>
+    <string name="location_setup_footer">Your selected area will be used to calculate local prayer times. GPS is optional.</string>
+    <string name="location_setup_made_for">Made for Muslims in Bangladesh</string>
+    <string name="location_setup_area_note">A chosen area saves that area\'s published reference coordinates, not your exact position.</string>
 
     <string name="settings_location_system_title">Location in Bangladesh</string>
     <string name="settings_location_system_body">Your location decides prayer times, the Qibla direction and the Sehri and Iftar times. Choose it by division, district and upazila or thana, or read it from this device. Salah currently supports locations in Bangladesh only.</string>
