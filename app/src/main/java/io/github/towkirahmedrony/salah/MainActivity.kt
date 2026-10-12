@@ -1,7 +1,7 @@
 package io.github.towkirahmedrony.salah
 
+import android.app.AlertDialog
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,11 +27,15 @@ class MainActivity : ComponentActivity() {
         }
         StartupTrace.mark("setContent_called")
 
-        // Temporary: show the startup timeline once the location gate opens.
+        // Temporary: show the full startup timeline once the location gate opens.
         lifecycleScope.launch {
             appViewModel.locationSetup.first { it !is LocationSetupState.Checking }
             StartupTrace.mark("gate_open")
-            Toast.makeText(this@MainActivity, StartupTrace.summary(), Toast.LENGTH_LONG).show()
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Startup (ms since process start)")
+                .setMessage(StartupTrace.summary())
+                .setPositiveButton("OK", null)
+                .show()
         }
     }
 }
