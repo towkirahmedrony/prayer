@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.data.qibla
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
 import android.location.LocationManager
@@ -10,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationAcquisitionResult
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionChecker
+import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPrecision
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProviderSelection
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationSource
@@ -17,28 +19,22 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * One-shot device positioning over `LocationManager`.
  *
- * **Why `LocationManager` and not the fused provider.** Google Play Services is not a dependency of
- * this project and does not need to become one for a single fix. The framework provider needs no
- * account, works on devices without Play Services, and is accurate enough that the difference does
- * not show up in a bearing.
+ * **Speed strategy.** The result is only used for prayer times and for naming an area against a
+ * 20 km / 75 km threshold, so a network fix is accurate enough. The order is therefore:
  *
- * **Why `LocationManagerCompat.getCurrentLocation` and not
- * `LocationManager.getCurrentLocation`.** The framework method exists only from API 30, and the
- * pre-30 alternative — `requestLocationUpdates` plus manual removal — is deprecated and would have
- * forced a hand-rolled single-shot listener. The androidx compatibility method provides exactly the
- * same one-shot, cancellable request from API 14 upwards, so there is a single code path with no
- * deprecated calls and no version branch to get wrong.
+ * 1. A recent cached fix from any enabled provider (returns immediately).
+ * 2. A live network fix, limited to [NETWORK_SLICE].
+ * 3. A live GPS fix with whatever time remains (only when precise location is granted).
  *
- * **Why one-shot.** A continuous subscription would keep the GNSS receiver awake to answer a
- * question that does not change while the user stands still. The position is stored and reused, which
- * is also what makes the feature work offline.
+ * The cached fix keeps the platform's own timestamp, so the freshness logic still ages it honestly.
  *
- * **No coordinates are logged.** The acquisition event records the accuracy and the provider, never
- * the latitude or longitude.
+ * **No coordinates are logged.** Only the provider, precision and accuracy are recorded.
  */
 class AndroidLocationProvider(
     private val context: Context,
@@ -65,26 +61,82 @@ class AndroidLocationProvider(
             return fail(LocationAcquisitionResult.ServicesDisabled, "services_disabled")
         }
 
-        val source = LocationProviderSelection.bestEnabled(precision) { candidate ->
-            runCatching { manager.isProviderEnabled(candidate.toAndroidProvider()) }
-                .getOrDefault(false)
-        } ?: return fail(LocationAcquisitionResult.ServicesDisabled, "no_provider_enabled")
-
-        val result = withTimeoutOrNull(timeout) { requestOnce(manager, source) }
-            ?: fail(LocationAcquisitionResult.TimedOut, "timeout")
-
-        if (result is LocationAcquisitionResult.Acquired) {
-            logger.info(
-                SalahDiagnosticEvents.QIBLA_LOCATION_ACQUIRED,
-                mapOf(
-                    // Precision bucket, not a coordinate: the log stays free of the user's position.
-                    "provider" to source.name,
-                    "precision" to precision.name,
-                    "accuracyMetres" to result.accuracyMetres,
-                ),
-            )
+        val enabled = LocationProviderSelection.candidates(LocationPrecision.PRECISE)
+            .filter { isEnabled(manager, it) }
+        if (enabled.isEmpty()) {
+            return fail(LocationAcquisitionResult.ServicesDisabled, "no_provider_enabled")
         }
-        return result
+
+        // 1. Recent cached fix: instant.
+        cachedFix(manager, enabled)?.let { cached ->
+            logAcquired("CACHED", precision, cached)
+            return cached
+        }
+
+        // 2 and 3. Live fix. Network first (fast, enough for an area name), GPS as the fallback.
+        // PASSIVE never produces a fix on request, so it is only useful for the cached step.
+        val liveOrder = LocationProviderSelection.candidates(LocationPrecision.APPROXIMATE)
+            .filter { it != LocationSource.PASSIVE }
+            .filter { it in enabled }
+            .filter { precision == LocationPrecision.PRECISE || it != LocationSource.GPS }
+
+        val start = TimeSource.Monotonic.markNow()
+        var failure: LocationAcquisitionResult.Failed? = null
+
+        for ((index, source) in liveOrder.withIndex()) {
+            val remaining = timeout - start.elapsedNow()
+            if (!remaining.isPositive()) break
+            val isLast = index == liveOrder.lastIndex
+            val slice = if (isLast) remaining else minOf(remaining, NETWORK_SLICE)
+
+            when (val result = withTimeoutOrNull(slice) { requestOnce(manager, source) }) {
+                is LocationAcquisitionResult.Acquired -> {
+                    logAcquired(source.name, precision, result)
+                    return result
+                }
+                LocationAcquisitionResult.PermissionDenied ->
+                    return fail(result, "permission_denied")
+                is LocationAcquisitionResult.Failed -> failure = result
+                else -> Unit
+            }
+        }
+
+        return failure ?: fail(LocationAcquisitionResult.TimedOut, "timeout")
+    }
+
+    private fun isEnabled(manager: LocationManager, source: LocationSource): Boolean =
+        runCatching { manager.isProviderEnabled(source.toAndroidProvider()) }.getOrDefault(false)
+
+    /** Newest cached fix that is recent and reasonably accurate, or `null`. */
+    @SuppressLint("MissingPermission")
+    private fun cachedFix(
+        manager: LocationManager,
+        sources: List<LocationSource>,
+    ): LocationAcquisitionResult.Acquired? {
+        val now = System.currentTimeMillis()
+        return sources
+            .mapNotNull { source ->
+                runCatching { manager.getLastKnownLocation(source.toAndroidProvider()) }.getOrNull()
+            }
+            .filter { it.time > 0L && now - it.time in 0..MAX_CACHED_AGE_MILLIS }
+            .filter { !it.hasAccuracy() || it.accuracy <= MAX_CACHED_ACCURACY_METRES }
+            .maxByOrNull { it.time }
+            ?.toAcquisitionResult()
+    }
+
+    private fun logAcquired(
+        origin: String,
+        precision: LocationPrecision,
+        result: LocationAcquisitionResult.Acquired,
+    ) {
+        logger.info(
+            SalahDiagnosticEvents.QIBLA_LOCATION_ACQUIRED,
+            mapOf(
+                "provider" to origin,
+                "precision" to precision.name,
+                "accuracyMetres" to result.accuracyMetres,
+            ),
+        )
     }
 
     private suspend fun requestOnce(
@@ -131,15 +183,10 @@ class AndroidLocationProvider(
     }
 
     /**
-     * Converts a platform fix.
-     *
-     * `Location.time` is the UTC instant of the fix and is `0` when the provider did not set one. That
-     * `0` is preserved as "no recorded time" rather than being replaced with the current clock: a fix
-     * that may have been cached by the platform is then aged as unknown and offered a refresh, instead
-     * of being relabelled as a reading taken just now. The platform's own, valid time is passed through
-     * unchanged.
+     * Converts a platform fix. `Location.time` of `0` means "no recorded time" and is preserved as
+     * `null`, so such a fix is aged as unknown instead of being relabelled as just taken.
      */
-    private fun Location.toAcquisitionResult(): LocationAcquisitionResult =
+    private fun Location.toAcquisitionResult(): LocationAcquisitionResult.Acquired =
         LocationAcquisitionResult.Acquired(
             latitude = latitude,
             longitude = longitude,
@@ -151,5 +198,16 @@ class AndroidLocationProvider(
         LocationSource.GPS -> LocationManager.GPS_PROVIDER
         LocationSource.NETWORK -> LocationManager.NETWORK_PROVIDER
         LocationSource.PASSIVE -> LocationManager.PASSIVE_PROVIDER
+    }
+
+    private companion object {
+        /** How long the network provider gets before GPS is tried. */
+        val NETWORK_SLICE: Duration = 6.seconds
+
+        /** A cached fix older than this is ignored (10 minutes). */
+        const val MAX_CACHED_AGE_MILLIS: Long = 10L * 60L * 1000L
+
+        /** A cached fix less accurate than this is ignored. */
+        const val MAX_CACHED_ACCURACY_METRES: Float = 5_000f
     }
 }
