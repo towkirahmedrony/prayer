@@ -90,7 +90,8 @@ private fun HomeContent(
         item(key = "location-header") {
             LocationAndDateHeader(
                 state = state,
-                onOpenLocation = { onNavigate("settings") },
+                onOpenLocation = { onNavigate("location") },
+                onOpenCalendar = { onNavigate("calendar") },
             )
         }
 
@@ -107,12 +108,14 @@ private fun HomeContent(
         item(key = "prayer-times") {
             TodayPrayerTimesSection(
                 rows = state.prayerRows,
+                currentPrayer = state.currentPrayer.prayer,
                 onViewAll = { onNavigate("calendar") },
             )
         }
 
         item(key = "forbidden-times") {
             ForbiddenTimesCard(
+                state = state,
                 onViewDetails = { onNavigate("calendar") },
             )
         }

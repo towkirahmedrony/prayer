@@ -24,6 +24,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimar
 import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldAccent
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.feature.common.labelRes
+import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.CurrentPrayerSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
@@ -66,16 +67,17 @@ fun HomeTopBar(
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = "🔔", fontSize = 16.sp)
+                BellGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(22.dp))
             }
             Box(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(ForestGreenPrimary),
+                    .border(1.5.dp, ForestGreenPrimary, CircleShape)
+                    .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = "👤", fontSize = 16.sp, color = Color.White)
+                PersonGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(25.dp))
             }
         }
     }
@@ -85,6 +87,7 @@ fun HomeTopBar(
 fun LocationAndDateHeader(
     state: HomeUiState.Ready,
     onOpenLocation: () -> Unit,
+    onOpenCalendar: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -99,10 +102,11 @@ fun LocationAndDateHeader(
                 modifier = Modifier.clickable(onClick = onOpenLocation),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = "📍", fontSize = 16.sp)
-                Spacer(modifier = Modifier.width(6.dp))
+                LocationPinGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = state.location.label ?: "Dhaka, Bangladesh",
+                    text = state.location.label
+                        ?: stringResource(state.location.unavailable?.messageRes() ?: R.string.home_location_none_title),
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -112,7 +116,8 @@ fun LocationAndDateHeader(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "${state.weekday ?: "Monday"}, ${state.gregorianDate ?: "12 October 2026"}",
+                text = state.gregorianDate?.let { date -> state.weekday?.let { "$it, $date" } ?: date }
+                    ?: stringResource(R.string.home_date_pending),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -128,7 +133,8 @@ fun LocationAndDateHeader(
             modifier = Modifier
                 .size(40.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .border(1.dp, ForestGreenPrimary.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
+                .border(1.dp, ForestGreenPrimary.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                .clickable(onClick = onOpenCalendar),
             contentAlignment = Alignment.Center,
         ) {
             CalendarGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(20.dp))
@@ -141,10 +147,15 @@ fun CurrentPrayerHeroCard(
     state: CurrentPrayerSection,
     modifier: Modifier = Modifier,
 ) {
-    val prayerName = state.prayer?.let { stringResource(it.labelRes()) } ?: "Dhuhr"
-    val countdown = state.countdown ?: "01:24:36"
-    val nextLabel = state.endsWithPrayer?.let { stringResource(it.labelRes()) } ?: "Asr"
-    val nextTime = state.endTime ?: "3:28 PM"
+    val active = state.isActive && state.prayer != null
+    val prayer = state.prayer ?: state.next.prayer
+    val prayerName = prayer?.let { stringResource(it.labelRes()) }
+        ?: stringResource(state.unavailable?.messageRes() ?: R.string.reason_unknown)
+    val countdown = state.countdown ?: state.next.countdown
+    val nextLabel = state.endsWithPrayer?.let { stringResource(it.labelRes()) }
+        ?: state.endsWithSolarEvent?.let { stringResource(it.labelRes()) }
+        ?: state.next.prayer?.let { stringResource(it.labelRes()) }
+    val nextTime = state.endTime ?: state.next.time
 
     Box(
         modifier = modifier
@@ -162,7 +173,7 @@ fun CurrentPrayerHeroCard(
 
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "CURRENT PRAYER",
+                text = if (active) "CURRENT PRAYER" else "UP NEXT",
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
                 color = Color.White.copy(alpha = 0.75f),
                 fontWeight = FontWeight.SemiBold,
@@ -175,52 +186,56 @@ fun CurrentPrayerHeroCard(
                 color = Color.White,
             )
             Text(
-                text = "Currently in prayer time",
+                text = if (active) "Currently in prayer time" else "Next prayer",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = countdown,
-                style = MaterialTheme.typography.displaySmall.copy(fontSize = 38.sp, fontWeight = FontWeight.Bold),
-                color = Color.White,
-            )
-            Text(
-                text = "Time until $nextLabel begins",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.85f),
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            // Timeline progress bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color.White.copy(alpha = 0.25f)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(4.dp)
-                        .background(Color.White),
+            Spacer(modifier = Modifier.height(14.dp))
+            if (countdown != null) {
+                Text(
+                    text = countdown,
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 38.sp, fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+                val countdownCaption = when {
+                    active && nextLabel != null -> "Time until $nextLabel"
+                    !active && nextLabel != null -> "Time until $nextLabel begins"
+                    else -> "Time remaining"
+                }
+                Text(
+                    text = countdownCaption,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            } else {
+                Text(
+                    text = stringResource(state.unavailable?.messageRes() ?: R.string.home_time_unavailable),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f),
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                val startTime = if (active) state.startTime else null
                 Text(
-                    text = "$prayerName — ${state.startTime ?: "12:05 PM"}",
+                    text = if (active && startTime != null) "$prayerName — $startTime" else "Next prayer",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = "$nextLabel — $nextTime",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
+                if (nextLabel != null && nextTime != null) {
+                    Text(
+                        text = if (active) "$nextLabel — $nextTime" else "$prayerName — $nextTime",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -230,6 +245,7 @@ fun CurrentPrayerHeroCard(
 fun TodayPrayerTimesSection(
     rows: List<PrayerRow>,
     onViewAll: () -> Unit,
+    currentPrayer: PrayerName? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -258,7 +274,7 @@ fun TodayPrayerTimesSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             rows.forEach { row ->
-                val isSelected = row.isNext || row.prayer == PrayerName.DHUHR
+                val isSelected = currentPrayer?.let { row.prayer == it } ?: row.isNext
                 TodayPrayerCard(row = row, isSelected = isSelected, modifier = Modifier.weight(1f))
             }
         }
@@ -304,6 +320,7 @@ private fun TodayPrayerCard(row: PrayerRow, isSelected: Boolean, modifier: Modif
 
 @Composable
 fun ForbiddenTimesCard(
+    state: HomeUiState.Ready,
     onViewDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -339,10 +356,24 @@ fun ForbiddenTimesCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = "Sunrise — 5:55 AM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(text = "Zawal — 11:59 AM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(text = "Sunset — 5:42 PM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                    if (state.prohibited.windows.isEmpty()) {
+                        Text(
+                            text = stringResource(state.prohibited.unavailable?.messageRes() ?: R.string.reason_unknown),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        state.prohibited.windows.take(3).forEach { window ->
+                            Text(
+                                text = "${stringResource(window.kind.labelRes())} — ${window.startsAt}–${window.endsAt}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
                 Text(text = "☼", fontSize = 42.sp, color = GoldAccent)
             }

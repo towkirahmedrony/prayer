@@ -156,3 +156,55 @@ fun SunRaysArt(tint: Color, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+fun BellGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val outline = Path().apply {
+        moveTo(5f, 17.5f)
+        cubicTo(7f, 15.8f, 7.5f, 14.2f, 7.5f, 11.5f)
+        cubicTo(7.5f, 8.7f, 9.4f, 6.5f, 12f, 6.5f)
+        cubicTo(14.6f, 6.5f, 16.5f, 8.7f, 16.5f, 11.5f)
+        cubicTo(16.5f, 14.2f, 17f, 15.8f, 19f, 17.5f)
+        close()
+    }
+    drawPath(outline, tint, style = Stroke(width = 1.8f))
+    drawLine(tint, Offset(4.5f, 18.5f), Offset(19.5f, 18.5f), strokeWidth = 1.8f)
+    drawArc(
+        color = tint,
+        startAngle = 0f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(10f, 18.5f),
+        size = Size(4f, 4f),
+        style = Stroke(width = 1.6f),
+    )
+}
+
+@Composable
+fun PersonGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawCircle(tint, radius = 10f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))
+    drawCircle(tint, radius = 3f, center = Offset(12f, 9f), style = Stroke(width = 1.7f))
+    drawArc(
+        color = tint,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(6.5f, 12f),
+        size = Size(11f, 8f),
+        style = Stroke(width = 1.7f),
+    )
+}
+
+@Composable
+fun LocationPinGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val pin = Path().apply {
+        moveTo(12f, 21f)
+        cubicTo(10f, 18f, 5f, 13.7f, 5f, 10f)
+        cubicTo(5f, 6.1f, 8f, 3f, 12f, 3f)
+        cubicTo(16f, 3f, 19f, 6.1f, 19f, 10f)
+        cubicTo(19f, 13.7f, 14f, 18f, 12f, 21f)
+        close()
+    }
+    drawPath(pin, tint, style = Stroke(width = 1.8f))
+    drawCircle(tint, radius = 2f, center = Offset(12f, 10f))
+}

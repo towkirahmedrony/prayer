@@ -14,14 +14,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
@@ -43,10 +44,10 @@ fun SalahApp(
                     tonalElevation = 0.dp,
                 ) {
                     val destinations: List<SalahDestination> = listOf(
-                        SalahDestination.Home,
-                        SalahDestination.Calendar,
-                        SalahDestination.Ramadan,
-                        SalahDestination.Settings,
+                        SalahDestination.HOME,
+                        SalahDestination.PRAYER,
+                        SalahDestination.CALENDAR,
+                        SalahDestination.SETTINGS,
                     )
 
                     destinations.forEach { dest ->
@@ -65,22 +66,16 @@ fun SalahApp(
                             icon = {
                                 val tint = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
                                 when (dest) {
-                                    SalahDestination.Home -> DomeGlyph(tint = tint)
-                                    SalahDestination.Calendar -> CrescentGlyph(tint = tint)
-                                    SalahDestination.Ramadan -> CalendarGlyph(tint = tint)
-                                    SalahDestination.Settings -> GearGlyph(tint = tint)
+                                    SalahDestination.HOME -> DomeGlyph(tint = tint)
+                                    SalahDestination.PRAYER -> LanternGlyph(tint = tint)
+                                    SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
+                                    SalahDestination.SETTINGS -> GearGlyph(tint = tint)
                                     else -> DomeGlyph(tint = tint)
                                 }
                             },
                             label = {
                                 Text(
-                                    text = when (dest) {
-                                        SalahDestination.Home -> "Home"
-                                        SalahDestination.Calendar -> "Prayer"
-                                        SalahDestination.Ramadan -> "Calendar"
-                                        SalahDestination.Settings -> "Settings"
-                                        else -> dest.route
-                                    },
+                                    text = stringResource(dest.labelRes),
                                     color = if (selected) Color.White else Color.White.copy(alpha = 0.6f),
                                 )
                             },
