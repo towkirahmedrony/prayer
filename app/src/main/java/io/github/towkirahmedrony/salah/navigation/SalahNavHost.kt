@@ -12,16 +12,17 @@ import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.feature.common.PlannedFeatureScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
-import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
+import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
+import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
 
 /**
  * The navigation graph.
  *
- * Home, Settings, the prayer-notification settings screen and the Qibla compass are implemented;
- * Prayer, Calendar and Ramadan are declared so the boundaries exist, and each renders an explicit
- * "not implemented yet" screen.
+ * Home, Tools, Settings, prayer-notification settings and the Qibla compass
+ * are implemented. Prayer, Calendar and Ramadan render explicit
+ * "not implemented yet" screens.
  */
 @Composable
 fun SalahNavHost(
@@ -53,6 +54,10 @@ fun SalahNavHost(
             )
         }
 
+        composable(SalahDestination.TOOLS.route) {
+            ToolsScreen(onNavigate = { route -> navController.navigate(route) })
+        }
+
         composable(SalahDestination.RAMADAN.route) {
             PlannedFeatureScreen(
                 title = stringResource(R.string.feature_ramadan_title),
@@ -67,7 +72,9 @@ fun SalahNavHost(
 
         composable(SalahDestination.SETTINGS.route) {
             SettingsScreen(
-                onOpenNotifications = { navController.navigate(SalahDestination.NOTIFICATIONS.route) },
+                onOpenNotifications = {
+                    navController.navigate(SalahDestination.NOTIFICATIONS.route)
+                },
             )
         }
 

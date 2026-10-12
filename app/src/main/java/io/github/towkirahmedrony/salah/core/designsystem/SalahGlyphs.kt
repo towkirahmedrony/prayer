@@ -137,3 +137,23 @@ fun GearGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier
         drawLine(tint, Offset(innerX, innerY), Offset(outerX, outerY), strokeWidth = 1.7f)
     }
 }
+
+/** Four tiles: the Tools destination. */
+@Composable
+fun ToolsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.7f)
+    listOf(
+        Offset(4f, 4f),
+        Offset(13.4f, 4f),
+        Offset(4f, 13.4f),
+        Offset(13.4f, 13.4f),
+    ).forEach { origin ->
+        drawRoundRect(
+            color = tint,
+            topLeft = origin,
+            size = Size(6.6f, 6.6f),
+            cornerRadius = CornerRadius(1.8f, 1.8f),
+            style = stroke,
+        )
+    }
+}

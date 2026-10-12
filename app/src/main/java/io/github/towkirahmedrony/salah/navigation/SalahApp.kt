@@ -21,13 +21,14 @@ import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.ToolsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * Application shell: theme, scaffold and the bottom navigation that draws the five
- * destinations of Salah.
+ * Application shell: theme, scaffold and the bottom navigation that draws the four top-level
+ * destinations of Salah (Home, Calendar, Tools and Settings).
  */
 @Composable
 fun SalahApp() {
@@ -82,13 +83,14 @@ private fun SalahBottomBar(
 private fun DestinationGlyph(destination: SalahDestination, tint: Color) {
     when (destination) {
         SalahDestination.HOME -> DomeGlyph(tint = tint)
-        SalahDestination.PRAYER -> CrescentGlyph(tint = tint)
         SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
-        SalahDestination.RAMADAN -> LanternGlyph(tint = tint)
+        SalahDestination.TOOLS -> ToolsGlyph(tint = tint)
         SalahDestination.SETTINGS -> GearGlyph(tint = tint)
+        // The destinations below are not in the bottom bar; the glyphs only keep this `when`
+        // exhaustive and match the section each one belongs to.
+        SalahDestination.PRAYER -> CrescentGlyph(tint = tint)
+        SalahDestination.RAMADAN -> LanternGlyph(tint = tint)
         SalahDestination.QIBLA -> QiblaGlyph(tint = tint)
-        // Reached from Settings, so it never renders in the bottom bar; the crescent matches the
-        // Prayer destination it belongs to.
         SalahDestination.NOTIFICATIONS -> CrescentGlyph(tint = tint)
     }
 }

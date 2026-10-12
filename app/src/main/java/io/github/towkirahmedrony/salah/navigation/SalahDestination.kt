@@ -9,6 +9,9 @@ import io.github.towkirahmedrony.salah.R
  * Every destination exists so the graph is complete and the user can see what the product will
  * contain. Destinations that are not implemented yet render a clearly labelled
  * [io.github.towkirahmedrony.salah.feature.common.PlannedFeatureScreen], never fake content.
+ *
+ * The bottom bar shows Home, Calendar, Tools and Settings. Ramadan and Qibla are reached from
+ * Tools, and the notification settings from Settings.
  */
 enum class SalahDestination(
     val route: String,
@@ -16,9 +19,16 @@ enum class SalahDestination(
     val inBottomBar: Boolean = true,
 ) {
     HOME("home", R.string.nav_home),
-    PRAYER("prayer", R.string.nav_prayer),
+
+    /** Not in the bottom bar and not linked from anywhere yet; kept so the route still exists. */
+    PRAYER("prayer", R.string.nav_prayer, inBottomBar = false),
+
     CALENDAR("calendar", R.string.nav_calendar),
-    RAMADAN("ramadan", R.string.nav_ramadan),
+
+    /** Entry point to Qibla and Ramadan. */
+    TOOLS("tools", R.string.nav_tools),
+
+    RAMADAN("ramadan", R.string.nav_ramadan, inBottomBar = false),
     SETTINGS("settings", R.string.nav_settings),
 
     /**
