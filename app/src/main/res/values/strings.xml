@@ -501,7 +501,7 @@
     <string name="location_advanced_coordinates">Stored coordinates: %1$s</string>
     <string name="location_advanced_dataset_selected">Chosen from: %1$s</string>
     <string name="location_advanced_bangladesh_verified">Verified against the bundled Bangladesh boundary.</string>
-    <string name="location_advanced_bangladesh_unverified">Not verified against a boundary; only the country's bounding box was checked.</string>
+    <string name="location_advanced_bangladesh_unverified">Not verified against a boundary; only the country\'s bounding box was checked.</string>
     <string name="location_advanced_bangladesh_within_tolerance">Within the boundary tolerance: just outside the bundled border line, accepted for GPS uncertainty rather than confirmed inside.</string>
     <string name="location_freshness_declared">Chosen by you. It does not expire.</string>
     <string name="location_freshness_fresh">Obtained just now.</string>
@@ -535,7 +535,7 @@
     <string name="location_gps_unmatched">This position could not be matched to an administrative area%1$s. The coordinates are still real and will be used for prayer times; the area is simply left unresolved.</string>
     <string name="location_gps_unmatched_distance"> (the nearest area centre is about %1$s away)</string>
     <string name="location_gps_verified">Confirmed inside Bangladesh using the bundled national boundary.</string>
-    <string name="location_gps_unverified">The bundled boundary was unavailable, so this position could not be verified against Bangladesh's border.</string>
+    <string name="location_gps_unverified">The bundled boundary was unavailable, so this position could not be verified against Bangladesh\'s border.</string>
     <string name="location_gps_within_tolerance">Within the boundary tolerance: this position is just outside the bundled Bangladesh border line, so it was accepted for GPS uncertainty rather than confirmed inside the country.</string>
 
     <string name="location_message_saved">Location saved. Prayer times and reminders have been recalculated for it.</string>

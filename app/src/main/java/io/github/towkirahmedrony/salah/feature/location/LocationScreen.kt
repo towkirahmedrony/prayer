@@ -847,7 +847,7 @@ private fun rememberDeviceLocationAction(
                 state = permissionState,
                 hasRequestedDialog = hasRequestedDialog,
                 shouldShowRationale = shouldShowRationale,
-            ),
+            )
         ) {
             LocationPermissionAction.ALREADY_GRANTED -> viewModel.useCurrentLocation()
             LocationPermissionAction.REQUEST -> {

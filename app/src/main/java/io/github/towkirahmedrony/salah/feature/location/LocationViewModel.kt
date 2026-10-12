@@ -294,11 +294,17 @@ class LocationViewModel(
         }
     }
 
-    fun selectDivision(areaId: String) = updateSelection { dataset -> selectDivision(areaId, dataset) }
+    fun selectDivision(areaId: String) = updateSelection { selection, dataset ->
+        selection.selectDivision(areaId, dataset)
+    }
 
-    fun selectDistrict(areaId: String) = updateSelection { dataset -> selectDistrict(areaId, dataset) }
+    fun selectDistrict(areaId: String) = updateSelection { selection, dataset ->
+        selection.selectDistrict(areaId, dataset)
+    }
 
-    fun selectUpazila(areaId: String) = updateSelection { dataset -> selectUpazila(areaId, dataset) }
+    fun selectUpazila(areaId: String) = updateSelection { selection, dataset ->
+        selection.selectUpazila(areaId, dataset)
+    }
 
     /** Saves the chosen hierarchy, using the selected area's published coordinate. */
     fun saveSelectedArea() {
@@ -354,11 +360,17 @@ class LocationViewModel(
         transient.update { it.copy(message = null) }
     }
 
+    /**
+     * Applies a selection change against the loaded dataset.
+     *
+     * The transform receives the *current* selection, so the rules that make a hierarchy valid stay
+     * enforced by [AreaSelection] itself instead of being re-derived here.
+     */
     private fun updateSelection(
-        transform: (BangladeshLocationDataset) -> AreaSelection,
+        transform: (AreaSelection, BangladeshLocationDataset) -> AreaSelection,
     ) {
         val dataset = datasetSlot.value.dataset ?: return
-        transient.update { current -> current.copy(selection = transform(dataset)) }
+        transient.update { current -> current.copy(selection = transform(current.selection, dataset)) }
     }
 
     private fun show(message: LocationMessage) {
@@ -404,8 +416,8 @@ class LocationViewModel(
             stored = stored?.let { describe(it, dataset) },
             selection = selection,
             divisionOptions = dataset?.divisions.orEmpty(),
-            districtOptions = selection.districts(dataset),
-            upazilaOptions = selection.upazilas(dataset),
+            districtOptions = dataset?.let { selection.districts(it) }.orEmpty(),
+            upazilaOptions = dataset?.let { selection.upazilas(it) }.orEmpty(),
             selectionSummary = reference?.hierarchyLabel,
             selectionCoordinateText = resolvedArea?.let {
                 LocationFormatting.coordinates(GeoPoint(it.latitude, it.longitude))

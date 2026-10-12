@@ -35,22 +35,40 @@ class AreaResolverTest {
 
     @Test
     fun `a fix within the district but beyond the upazila threshold resolves at district level`() {
-        // One district whose only upazila centre is ~55 km away: too far to name the upazila, close
-        // enough to name the district.
+        // A district whose only upazila centre is ~45 km away from the fix, while the district centre
+        // is ~11 km away: too far to name the upazila, close enough to name the district.
+        val districtCentre = GeoPoint(23.00, 90.00)
+        val upazilaCentre = GeoPoint(23.50, 90.00)
+        val fix = GeoPoint(23.10, 90.00)
         val sparse = inlineDataset(
             row("DIVISION", "BD30", "BD", "Somewhere", "", "23.00", "90.00"),
             row("DISTRICT", "BD3001", "BD30", "Central", "", "23.00", "90.00"),
             row("UPAZILA", "BD3001001", "BD3001", "Far", "", "23.50", "90.00"),
         )
 
-        val resolution = AreaResolver.resolve(GeoPoint(23.00, 90.00), sparse)
+        // The case is only meaningful if it really is beyond the upazila threshold and inside the
+        // district one, so both are measured here rather than assumed.
+        val toUpazila = GeoMath.distanceMetres(fix, upazilaCentre)
+        assertTrue("the upazila centre must be beyond the upazila threshold, was $toUpazila m", toUpazila > AreaResolver.UPAZILA_MATCH_METRES)
+        assertTrue("the district centre must be inside the district threshold", GeoMath.distanceMetres(fix, districtCentre) < AreaResolver.DISTRICT_MATCH_METRES)
+
+        val resolution = AreaResolver.resolve(fix, sparse)
 
         assertTrue("expected a suggestion, got $resolution", resolution is AreaResolution.Suggested)
         val suggestion = (resolution as AreaResolution.Suggested).suggestion
         assertEquals(BangladeshAreaLevel.DISTRICT, suggestion.matchedLevel)
         assertEquals("BD3001", suggestion.reference.districtId)
         assertNull("a district-level match must not name an upazila", suggestion.reference.upazilaId)
-        assertTrue("expected a district-scale distance, got ${suggestion.distanceMetres}", suggestion.distanceMetres > 20_000.0)
+        // The reported distance is the district centre's, not the closer-of-the-two: it says how
+        // precisely the fix was located, so a district-level answer must report the district's own
+        // distance.
+        assertEquals(
+            "a district-level match must report the distance to the district centre",
+            GeoMath.distanceMetres(fix, districtCentre),
+            suggestion.distanceMetres,
+            1.0,
+        )
+        assertTrue("the upazila centre was closer than reported", toUpazila > suggestion.distanceMetres)
     }
 
     @Test
