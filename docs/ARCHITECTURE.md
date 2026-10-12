@@ -411,7 +411,7 @@ Only one provider is bound at a time in `di/SalahModules.kt`; the UI never learn
 | No location for the schedule | `timetableNote = NO_LOCATION_CONFIGURED` | Note in the timetable; no times, no countdown |
 | Twilight not reached (polar) | `timetableNote = CALCULATION_NOT_POSSIBLE` | Note explains it; no times, no countdown |
 | Provider failed | `failureDetail` | Error banner with Retry; other sections remain |
-| Rules not verified | `prohibited.unavailable = RULES_NOT_VERIFIED` | Explanation instead of intervals |
+| Nothing applicable in the rule book | `prohibited.unavailable = RULES_NOT_VERIFIED` | Explanation instead of intervals |
 | Bangla/Hijri missing | `CALENDAR_NOT_IMPLEMENTED` | Explanation instead of a fabricated date |
 
 An `Available` schedule also drives the calculation card (method, Asr method, high-latitude rule
@@ -443,7 +443,7 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 | Next-prayer resolution | `NextPrayerResolverTest` | Sunrise excluded, exact-time boundary, no countdown after Isha, other-date schedule, incomplete schedule, cross-zone instants |
 | Countdown formatting | `CountdownFormatterTest` | `Locale.ROOT`, negative clamped |
 | Prohibited-window calculus | `ProhibitedPeriodCalculatorTest` | Anchors, ordering, zone, refusal on an unreviewed rule set, loud failure on a missing anchor (synthetic rule set, not a religious source) |
-| Prohibited repository wiring | `RuleBookProhibitedPeriodsRepositoryTest` | Shipped rule book is empty → `RULES_NOT_VERIFIED`; a reviewed set produces windows |
+| Prohibited repository wiring | `RuleBookProhibitedPeriodsRepositoryTest` | Shipped policy → three windows plus the not-reviewed disclosure; reviewed set takes precedence; nothing applicable → `RULES_NOT_VERIFIED`; missing anchor → `NotAvailable` |
 | Location validation | `LocationInfoTest` | Ranges, IANA zone, blank label, NaN |
 | Offline-first repository | `ProviderBackedPrayerScheduleRepositoryTest` | No location, engine not configured, cache reuse without re-calling the provider, recalculation on date/location/profile change, stale or wrong-place response rejection, exception → visible failure |
 | Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting including the calendar preferences, transactional updates, the Hijri offset clamped on write and read, safe fallback on unknown values, and calendar/prayer/theme preferences not overwriting one another |
@@ -490,7 +490,7 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
 - **A different Bangla or Hijri rule set**: the converters are pure and take no device state, so a
   variant is a new class behind `CalendarRepository` plus its own tests. `BanglaCalendar` documents
   the range it is verified for, which any replacement must do too.
-- **Prohibited periods**: add one reviewed `ProhibitedRuleSet` to `ProhibitedRuleBook`; the
+- **Prohibited periods**: the configured policy ships and is disclosed; add one reviewed `ProhibitedRuleSet`
   calculator, repository and state types already exist and are tested.
 - **Notifications**: implemented. `PrayerNotificationPlanner` is the only place that decides what
   is scheduled, so a new reminder type (a Ramadan reminder, a Qibla alert) is a change to the

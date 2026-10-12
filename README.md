@@ -51,7 +51,7 @@ without an account.
 | Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (516 test methods) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
-| Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |
+| Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
 | A moon-sighting or authority-confirmed Hijri date, and an integrated authority Sehri/Iftar timetable | **Not implemented** — so no date or time is ever labelled as confirmed |
 | Quran, widgets, networking, Room | Not implemented |
 
@@ -80,7 +80,7 @@ Salah only shows values it actually has:
   polar twilight, or a provider failure) and shows no invented values.
 - **Sunrise, solar noon and sunset** are modelled and rendered as **solar events**, never as
   prayers, and are read from an unadjusted engine call so a method's offsets cannot move them.
-- **Prohibited prayer times** are not invented. The rule book ships empty, so the section explains
+- **Prohibited prayer times** follow an explicit, documented policy. The card names the convention in
   that no reviewed rules have been configured.
 - **Timings are shown with the settings behind them** — the calculation method and Asr method are
   disclosed, and any manual minute adjustment is labelled next to the time it moved.
@@ -281,7 +281,7 @@ and no signing credentials.
 
 ## Roadmap
 
-1. **Prohibited periods** — add a reviewed `ProhibitedRuleSet`; the calculator is ready and tested.
+1. **Prohibited periods** — the shipped policy is applied and disclosed; add a reviewed `ProhibitedRuleSet` with its sources to replace it.
 2. **A verified authority source** — if a published, redistributable Sehri/Iftar timetable or a
    moon-sighting announcement feed is ever integrated, it must be linked to its source, labelled as
    such, and must leave the local calculation working when it cannot be reached.

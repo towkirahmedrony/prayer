@@ -44,8 +44,42 @@
     <string name="home_next_prayer_at">at %1$s</string>
     <string name="home_next_prayer_remaining">%1$s remaining</string>
     <string name="home_time_unavailable" translatable="false">—</string>
+
+    <!--
+      Home: the prayer period that is open right now.
+
+      The countdown here is deliberately labelled as the time until the next prayer *time*, never as
+      the time left to perform the prayer. Salah does not rule on how long a prayer may be offered or
+      whether a missed one must be made up, and no wording here may imply otherwise.
+    -->
+    <string name="home_current_prayer_title">Current prayer</string>
+    <string name="home_current_prayer_active">Currently active</string>
+    <string name="home_current_prayer_started">Started %1$s</string>
+    <string name="home_current_prayer_started_earlier">Started the previous day</string>
+    <string name="home_current_prayer_until_prayer">Time until next prayer time: %1$s at %2$s</string>
+    <string name="home_current_prayer_until_prayer_next_day">Time until next prayer time: %1$s at %2$s, the next day</string>
+    <!-- The closing boundary is named, so Fajr's period reads "Time until Sunrise: 05:54". -->
+    <string name="home_current_prayer_until_event">Time until %1$s: %2$s</string>
+    <string name="home_current_prayer_between">No prayer period is currently active.</string>
+    <string name="home_current_prayer_next">Next: %1$s at %2$s</string>
+
+    <!-- Home: prohibited prayer times -->
     <string name="home_prohibited_title">Prohibited prayer times</string>
-    <string name="home_prohibited_none">No prohibited-time windows are shown, because verified rules have not been reviewed and configured. Salah will not display invented intervals.</string>
+    <string name="home_prohibited_none">No prohibited-time intervals are shown, because no set of prohibited-time rules has been configured. Salah will not display invented intervals.</string>
+    <string name="home_prohibited_note">Each interval is anchored to a solar event calculated for your saved location. An interval covers only the moment around its event, not the whole prayer period around it.</string>
+    <string name="prohibited_window_range">%1$s – %2$s</string>
+    <string name="prohibited_event_at">%1$s at %2$s</string>
+    <string name="prohibited_phase_active">Active now</string>
+    <string name="prohibited_phase_upcoming">Upcoming</string>
+    <string name="prohibited_phase_passed">Passed today</string>
+    <string name="prohibited_countdown_until_open">Opens in %1$s</string>
+    <string name="prohibited_countdown_until_close">Closes in %1$s</string>
+    <string name="prohibited_convention_title">Configured convention</string>
+    <string name="prohibited_convention_not_reviewed">These boundaries are Salah\'s own documented policy, shown as such. They have not been confirmed by a qualified reviewer, and the minute values differ between scholarly conventions.</string>
+    <string name="prohibited_convention_reviewed">These boundaries were confirmed by a qualified reviewer, together with the references recorded for them.</string>
+    <string name="prohibited_kind_sunrise_ascent">Sunrise ascent</string>
+    <string name="prohibited_kind_zenith_decline">Solar noon (zawal)</string>
+    <string name="prohibited_kind_sunset_setting">Sunset setting</string>
     <string name="home_shortcuts_title">Islamic tools</string>
 
     <!-- Calculation methods (names of the conventions the local engine implements) -->

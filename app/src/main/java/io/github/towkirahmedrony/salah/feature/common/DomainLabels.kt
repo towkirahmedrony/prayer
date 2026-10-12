@@ -2,6 +2,8 @@ package io.github.towkirahmedrony.salah.feature.common
 
 import androidx.annotation.StringRes
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
@@ -35,6 +37,28 @@ fun SolarEvent.labelRes(): Int = when (this) {
     SolarEvent.SUNRISE -> R.string.event_sunrise
     SolarEvent.SOLAR_NOON -> R.string.event_solar_noon
     SolarEvent.SUNSET -> R.string.event_sunset
+}
+
+/**
+ * Names of the prohibited intervals.
+ *
+ * Each name states which event the interval belongs to. They are labels for the interval, not for
+ * the prayer period around it: the interval around sunrise is not the whole Fajr period, and the
+ * wording must not suggest that it is.
+ */
+@StringRes
+fun ProhibitedWindowKind.labelRes(): Int = when (this) {
+    ProhibitedWindowKind.SUNRISE_ASCENT -> R.string.prohibited_kind_sunrise_ascent
+    ProhibitedWindowKind.ZENITH_DECLINE -> R.string.prohibited_kind_zenith_decline
+    ProhibitedWindowKind.SUNSET_SETTING -> R.string.prohibited_kind_sunset_setting
+}
+
+/** Where an interval stands: active, upcoming, or already past for this local date. */
+@StringRes
+fun ProhibitedPeriodPhase.labelRes(): Int = when (this) {
+    ProhibitedPeriodPhase.ACTIVE -> R.string.prohibited_phase_active
+    ProhibitedPeriodPhase.UPCOMING -> R.string.prohibited_phase_upcoming
+    ProhibitedPeriodPhase.PASSED -> R.string.prohibited_phase_passed
 }
 
 @StringRes

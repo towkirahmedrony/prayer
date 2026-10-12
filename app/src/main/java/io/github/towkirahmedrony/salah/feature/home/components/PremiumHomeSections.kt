@@ -32,11 +32,15 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.feature.common.labelRes
+import io.github.towkirahmedrony.salah.feature.common.messageRes
+import io.github.towkirahmedrony.salah.feature.home.CurrentPrayerSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.NextPrayerSection
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
 import io.github.towkirahmedrony.salah.feature.home.ProhibitedSection
+import io.github.towkirahmedrony.salah.feature.home.ProhibitedWindowRow
 import io.github.towkirahmedrony.salah.feature.home.SolarRow
 
 /**
@@ -106,6 +110,157 @@ fun HomeHeader(
         }
         Spacer(modifier = Modifier.width(12.dp))
         CrescentGlyph(tint = scheme.secondary)
+    }
+}
+
+/**
+ * Hero card: the prayer period that is open right now, and how long is left in it.
+ *
+ * This is the primary prayer reading on Home. It answers a different question from the next-prayer
+ * card below it — "which period am I in, and when does it close?" rather than "what is coming?" —
+ * so both are shown, with the current period first.
+ *
+ * The countdown is labelled as the time until the next prayer *time*. It is a reading of the
+ * timetable, not a ruling on how long the prayer itself may be performed, and the wording here must
+ * not be changed to suggest otherwise.
+ */
+@Composable
+fun CurrentPrayerHero(state: CurrentPrayerSection, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(scheme.surface)
+            .border(1.dp, scheme.primary.copy(alpha = 0.45f), shape)
+            .padding(horizontal = 20.dp, vertical = 20.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(100.dp))
+                .background(scheme.primaryContainer)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.home_current_prayer_title),
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.onPrimaryContainer,
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+
+        val prayer = state.prayer
+        when {
+            // A period is open: the prayer, its start and the boundary that closes it.
+            state.isActive && prayer != null -> {
+                Text(
+                    text = stringResource(prayer.labelRes()),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = scheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.home_current_prayer_active),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.primary,
+                )
+                state.countdown?.let { countdown ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = countdown,
+                        style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+                        color = scheme.onSurface,
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                // A null start means the period began before today's timetable. Saying so is
+                // honest; showing the previous day's time here would not be.
+                Text(
+                    text = state.startTime
+                        ?.let { start -> stringResource(R.string.home_current_prayer_started, start) }
+                        ?: stringResource(R.string.home_current_prayer_started_earlier),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.secondary,
+                )
+                boundaryLine(state = state)?.let { line ->
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.secondary,
+                    )
+                }
+            }
+
+            // Nothing can be resolved: the card explains the gap rather than showing a period it
+            // cannot derive.
+            state.unavailable != null -> {
+                SalahUnavailableNote(
+                    text = stringResource(state.unavailable.messageRes()),
+                )
+            }
+
+            // Between two periods: the mid-morning, between sunrise and Dhuhr. This is a reading of
+            // the timetable, not an error, so it is stated rather than excused.
+            else -> {
+                Text(
+                    text = stringResource(R.string.home_current_prayer_between),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = scheme.onSurface,
+                )
+                state.countdown?.let { countdown ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = countdown,
+                        style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+                        color = scheme.onSurface,
+                    )
+                }
+                boundaryLine(state = state)?.let { line ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.secondary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The sentence naming what closes the open period.
+ *
+ * A prayer boundary and a solar event read differently on purpose: Fajr's period closes at sunrise,
+ * which is not one of the five prayers, and the label has to say so.
+ */
+@Composable
+private fun boundaryLine(state: CurrentPrayerSection): String? {
+    val endTime = state.endTime ?: return null
+    val endingPrayer = state.endsWithPrayer
+    val endingEvent = state.endsWithSolarEvent
+    return when {
+        endingPrayer != null && state.endsNextDay -> stringResource(
+            R.string.home_current_prayer_until_prayer_next_day,
+            stringResource(endingPrayer.labelRes()),
+            endTime,
+        )
+
+        endingPrayer != null -> stringResource(
+            R.string.home_current_prayer_until_prayer,
+            stringResource(endingPrayer.labelRes()),
+            endTime,
+        )
+
+        endingEvent != null -> stringResource(
+            R.string.home_current_prayer_until_event,
+            stringResource(endingEvent.labelRes()),
+            endTime,
+        )
+
+        else -> null
     }
 }
 
@@ -271,7 +426,16 @@ fun SolarStrip(rows: List<SolarRow>, modifier: Modifier = Modifier) {
     }
 }
 
-/** Prohibited prayer times: the real windows, or the existing explanation when none exist. */
+/**
+ * Prohibited prayer times: one row per configured interval, or an explanation when none can be
+ * calculated.
+ *
+ * Each row names the interval, the solar event it is anchored to, its start and end, whether it is
+ * active, upcoming or already past today, and — while it is upcoming or active — how long is left
+ * before it opens or closes. The convention behind the boundaries is stated once, underneath,
+ * because those minutes differ between scholarly conventions and Salah applies its own documented
+ * policy rather than a universally agreed figure.
+ */
 @Composable
 fun ProhibitedPanel(state: ProhibitedSection, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -290,24 +454,132 @@ fun ProhibitedPanel(state: ProhibitedSection, modifier: Modifier = Modifier) {
                 color = scheme.onSurface,
             )
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.home_prohibited_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant,
+        )
 
         if (state.windows.isEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
             SalahUnavailableNote(text = stringResource(R.string.home_prohibited_none))
         } else {
-            state.windows.forEachIndexed { index, window ->
-                if (index > 0) {
-                    HorizontalDivider(color = scheme.outlineVariant)
-                }
+            state.windows.forEach { window ->
+                HorizontalDivider(color = scheme.outlineVariant)
+                ProhibitedWindow(window = window)
+            }
+
+            state.convention?.let { convention ->
+                HorizontalDivider(color = scheme.outlineVariant)
                 Text(
-                    text = window,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.prohibited_convention_title),
+                    style = MaterialTheme.typography.labelMedium,
                     color = scheme.onSurface,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 9.dp),
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    // Which convention is in force is stated from the rule set itself, so the
+                    // wording cannot drift away from the boundaries actually applied.
+                    text = stringResource(
+                        if (convention.isReviewed) {
+                            R.string.prohibited_convention_reviewed
+                        } else {
+                            R.string.prohibited_convention_not_reviewed
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProhibitedWindow(window: ProhibitedWindowRow) {
+    val scheme = MaterialTheme.colorScheme
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(window.kind.labelRes()),
+                style = MaterialTheme.typography.bodyLarge,
+                color = scheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+            PhasePill(
+                text = stringResource(window.phase.labelRes()),
+                active = window.phase == ProhibitedPeriodPhase.ACTIVE,
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(
+                R.string.prohibited_window_range,
+                window.startsAt,
+                window.endsAt,
+            ),
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            color = scheme.onSurface,
+        )
+        // The anchor event is shown separately from the interval: for the zenith interval these are
+        // different instants, and the solar transit is not the displayed Dhuhr prayer time.
+        window.eventTime?.let { eventTime ->
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = stringResource(
+                    R.string.prohibited_event_at,
+                    stringResource(window.event.labelRes()),
+                    eventTime,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+        window.countdown?.let { countdown ->
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = when (window.phase) {
+                    ProhibitedPeriodPhase.UPCOMING ->
+                        stringResource(R.string.prohibited_countdown_until_open, countdown)
+
+                    ProhibitedPeriodPhase.ACTIVE ->
+                        stringResource(R.string.prohibited_countdown_until_close, countdown)
+
+                    ProhibitedPeriodPhase.PASSED -> ""
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                color = if (window.phase == ProhibitedPeriodPhase.ACTIVE) scheme.error else scheme.onSurface,
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        // The configured boundaries, read straight off the rule set that produced the interval.
+        Text(
+            text = window.explanation,
+            style = MaterialTheme.typography.bodySmall,
+            color = scheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Small status pill: filled while an interval is active, outlined otherwise. */
+@Composable
+private fun PhasePill(text: String, active: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(100.dp)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (active) scheme.error else scheme.surfaceVariant)
+            .then(if (active) Modifier else Modifier.border(1.dp, scheme.outlineVariant, shape))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (active) scheme.onError else scheme.onSurfaceVariant,
+        )
     }
 }

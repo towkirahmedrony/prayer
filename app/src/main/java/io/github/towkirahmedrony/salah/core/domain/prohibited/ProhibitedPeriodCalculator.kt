@@ -9,10 +9,10 @@ import java.time.ZonedDateTime
  * Derives prohibited-prayer windows from an already calculated [PrayerSchedule].
  *
  * The calculator is deliberately dumb about religion and exact about arithmetic: every boundary
- * it applies comes from the [ProhibitedRuleSet] it is given, and it refuses to run at all on a
- * rule set that has not been reviewed. There is therefore no duration, angle or tolerance
- * hardcoded here, and no default rule set is baked in — a wrong answer is only possible if
- * someone hands it a wrong rule set on purpose.
+ * it applies comes from the [ProhibitedRuleSet] it is given, and it refuses to run on a rule set
+ * that is not applicable — configured by the application or reviewed by a qualified reviewer.
+ * There is therefore no duration, angle or tolerance hardcoded here, and no default rule set is
+ * baked in — a wrong answer is only possible if someone hands it a wrong rule set on purpose.
  *
  * It is kept separate from ordinary prayer-time calculation: it consumes a schedule and never
  * influences one, so prohibited windows can never move a prayer time.
@@ -27,14 +27,14 @@ class ProhibitedPeriodCalculator {
     /**
      * Returns the windows [ruleSet] defines, in chronological order.
      *
-     * @throws IllegalArgumentException when [ruleSet] has not been reviewed, or when the
-     *   schedule is missing an anchor the rule set needs. Both are programming errors: the
-     *   repository must check [ProhibitedRuleBook.isConfigured] first and the schedule must be
-     *   complete. Returning a shorter list would silently under-report a prohibition.
+     * @throws IllegalArgumentException when [ruleSet] is not applicable, or when the schedule is
+     *   missing an anchor the rule set needs. Both are programming errors: the repository checks
+     *   [ProhibitedRuleBook.isConfigured] first and the schedule must be complete. Returning a
+     *   shorter list would silently under-report a prohibition.
      */
     fun calculate(schedule: PrayerSchedule, ruleSet: ProhibitedRuleSet): List<ProhibitedPeriod> {
-        require(ruleSet.isReviewed) {
-            "Rule set '${ruleSet.id}' has not been reviewed and must not be applied."
+        require(ruleSet.isApplicable) {
+            "Rule set '${ruleSet.id}' has not been configured or reviewed and must not be applied."
         }
         if (!schedule.isComplete) {
             throw IllegalArgumentException("A schedule without all five prayers cannot anchor prohibited windows.")

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.feature.home.components.CalculationCard
+import io.github.towkirahmedrony.salah.feature.home.components.CurrentPrayerHero
 import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
 import io.github.towkirahmedrony.salah.feature.home.components.HomeHeader
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
@@ -125,6 +126,12 @@ private fun HomeContent(
             item(key = "failure") {
                 FailureBanner(detail = state.failureDetail, onRetry = onRetry)
             }
+        }
+
+        // The period that is open right now leads; the next prayer follows as the secondary
+        // reading. Both are driven by the same tick, so they cannot disagree about the clock.
+        item(key = "current-prayer") {
+            CurrentPrayerHero(state = state.currentPrayer)
         }
 
         item(key = "next-prayer") {

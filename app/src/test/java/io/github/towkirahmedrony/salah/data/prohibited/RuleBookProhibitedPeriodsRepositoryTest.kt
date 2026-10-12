@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.data.prohibited
 
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ConfiguredProhibitedRuleSet
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodCalculator
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleBook
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleSet
@@ -78,7 +79,7 @@ class RuleBookProhibitedPeriodsRepositoryTest {
         val book = ProhibitedRuleBook()
 
         assertFalse(book.isConfigured)
-        assertTrue(book.reviewed.isEmpty())
+        assertTrue(book.applicable.isEmpty())
 
         val state = repository(book).observePeriods(schedule).first()
 
@@ -113,6 +114,82 @@ class RuleBookProhibitedPeriodsRepositoryTest {
 
         assertTrue(state is ProhibitedPeriodsState.Available)
         assertEquals(3, (state as ProhibitedPeriodsState.Available).periods.size)
+    }
+
+    @Test
+    fun `the rule set the application ships with produces windows and discloses itself`() = runTest {
+        val book = ConfiguredProhibitedRuleSet.ruleBook()
+        assertTrue(book.isConfigured)
+
+        val state = repository(book).observePeriods(schedule).first()
+
+        assertTrue(state is ProhibitedPeriodsState.Available)
+        state as ProhibitedPeriodsState.Available
+        assertEquals(3, state.periods.size)
+        // The convention travels with the windows so the screen can name the policy in force rather
+        // than implying the boundaries are confirmed.
+        assertEquals(ConfiguredProhibitedRuleSet.ID, state.convention.ruleSetId)
+        assertFalse(state.convention.isReviewed)
+        assertFalse(
+            "no reference for these minute values has been verified in this repository",
+            state.convention.hasVerifiedSources,
+        )
+        assertTrue(state.periods.all { it.ruleSetId == ConfiguredProhibitedRuleSet.ID })
+        assertTrue(state.periods.all { it.explanation.isNotBlank() })
+    }
+
+    @Test
+    fun `the shipped rule set is applied as a configured policy rather than a reviewed one`() {
+        val shipped = ConfiguredProhibitedRuleSet.DEFAULT
+
+        assertEquals(RuleVerificationStatus.CONFIGURED, shipped.verification)
+        assertTrue(shipped.isApplicable)
+        assertFalse(shipped.isReviewed)
+    }
+
+    @Test
+    fun `a reviewed rule set takes precedence over the configured one`() = runTest {
+        val book = ProhibitedRuleBook(
+            listOf(reviewedRuleSet(), ConfiguredProhibitedRuleSet.DEFAULT),
+        )
+
+        val state = repository(book).observePeriods(schedule).first()
+            as ProhibitedPeriodsState.Available
+
+        assertEquals("reviewed-for-test", state.convention.ruleSetId)
+        assertTrue(state.convention.isReviewed)
+    }
+
+    @Test
+    fun `a schedule missing an anchor is unavailable rather than a shorter list of windows`() = runTest {
+        // The calculator refuses when it cannot anchor a window; returning the two it could
+        // calculate would silently under-report a prohibition.
+        val withoutTransit = schedule.copy(
+            solarEvents = schedule.solarEvents.filterNot {
+                it.event == SolarEvent.SOLAR_NOON
+            },
+        )
+
+        val state = repository(ConfiguredProhibitedRuleSet.ruleBook())
+            .observePeriods(withoutTransit)
+            .first()
+
+        assertTrue(state is ProhibitedPeriodsState.NotAvailable)
+        assertEquals(
+            UnavailabilityReason.UNKNOWN,
+            (state as ProhibitedPeriodsState.NotAvailable).reason,
+        )
+    }
+
+    @Test
+    fun `an incomplete schedule is unavailable`() = runTest {
+        val partial = schedule.copy(prayers = schedule.prayers.take(2))
+
+        val state = repository(ConfiguredProhibitedRuleSet.ruleBook())
+            .observePeriods(partial)
+            .first()
+
+        assertTrue(state is ProhibitedPeriodsState.NotAvailable)
     }
 
     @Test

@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
@@ -18,7 +19,9 @@ import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificati
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPresenter
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerTimesProvider
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ConfiguredProhibitedRuleSet
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodCalculator
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassSensorSource
 import io.github.towkirahmedrony.salah.core.domain.qibla.GeomagneticDeclinationProvider
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionChecker
@@ -166,10 +169,14 @@ val salahModules = module {
             clock = get(),
         )
     }
-    // Prohibited prayer windows: the rule book is empty until a rule set is reviewed, so the UI
-    // reports the honest unavailability state. See docs/PRAYER_CALCULATION.md §7.
-    single { ProhibitedRuleBook() }
+    // Prohibited prayer windows. The rule book carries the application's own documented policy,
+    // whose boundaries are explicit parameters and whose verification state is CONFIGURED rather
+    // than REVIEWED — the screens disclose that. Swapping in a reviewed rule set is a data change
+    // here and does not touch the calculator, the view model or the UI.
+    // See docs/FORBIDDEN_PRAYER_TIMES.md.
+    single { ConfiguredProhibitedRuleSet.ruleBook() }
     single { ProhibitedPeriodCalculator() }
+    single { ProhibitedPeriodStatusResolver() }
     single<ProhibitedPeriodsRepository> {
         RuleBookProhibitedPeriodsRepository(ruleBook = get(), calculator = get())
     }
@@ -243,7 +250,14 @@ val salahModules = module {
 
     // Domain ------------------------------------------------------------------
     single { NextPrayerResolver() }
-    single { HomeUiStateFactory(nextPrayerResolver = get()) }
+    single { CurrentPrayerPeriodResolver() }
+    single {
+        HomeUiStateFactory(
+            nextPrayerResolver = get(),
+            currentPrayerResolver = get(),
+            prohibitedStatusResolver = get(),
+        )
+    }
 
     // Presentation ------------------------------------------------------------
     viewModel {

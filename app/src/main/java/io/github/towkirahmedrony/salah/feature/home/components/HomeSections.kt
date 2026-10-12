@@ -382,7 +382,7 @@ fun SolarEventsCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     }
 }
 
-/** Prohibited prayer times: explanation first, since no verified rules exist yet. */
+/** The prohibited windows as one plain row each; the explanation travels with the section. */
 @Composable
 fun ProhibitedTimesCard(state: ProhibitedSection, modifier: Modifier = Modifier) {
     SalahSectionCard(modifier = modifier) {
@@ -398,7 +398,11 @@ fun ProhibitedTimesCard(state: ProhibitedSection, modifier: Modifier = Modifier)
         } else {
             state.windows.forEach { window ->
                 Text(
-                    text = window,
+                    text = stringResource(
+                        R.string.prohibited_window_range,
+                        window.startsAt,
+                        window.endsAt,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

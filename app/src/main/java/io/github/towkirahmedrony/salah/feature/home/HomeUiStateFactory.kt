@@ -1,14 +1,19 @@
 package io.github.towkirahmedrony.salah.feature.home
 
 import io.github.towkirahmedrony.salah.core.domain.CountdownFormatter
+import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
+import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerStatus
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
+import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerName
+import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
@@ -28,10 +33,14 @@ import java.util.Locale
  * dependencies, which is what makes the anti-fabrication rules unit-testable:
  *
  *  - a countdown appears only when a complete schedule for *today* exists;
+ *  - the current prayer period is resolved from that same schedule, never from a second engine;
  *  - missing Bangla/Hijri conversion is reported as unavailable, never invented;
  *  - sunrise, solar noon and sunset are rendered as solar events, never as prayers;
  *  - a provider failure is surfaced as [HomeUiState.Ready.failureDetail], not swallowed;
  *  - the method that produced a timetable is always reported next to it.
+ *
+ * The moment being displayed is passed in, so the whole screen — including both countdowns — is a
+ * function of the schedule and the clock, and can be replayed in a test at any instant.
  *
  * Times are rendered in the prayer location's zone, using the user's time-format preference.
  * The device's own zone is used only as a last-resort fallback when neither a schedule nor a
@@ -39,6 +48,8 @@ import java.util.Locale
  */
 class HomeUiStateFactory(
     private val nextPrayerResolver: NextPrayerResolver,
+    private val currentPrayerResolver: CurrentPrayerPeriodResolver,
+    private val prohibitedStatusResolver: ProhibitedPeriodStatusResolver,
 ) {
 
     fun create(
@@ -48,6 +59,11 @@ class HomeUiStateFactory(
         scheduleState: PrayerScheduleState,
         prohibitedState: ProhibitedPeriodsState,
         now: ZonedDateTime,
+        /**
+         * The following local date's Fajr, when the caller has it. It closes Isha's period, which is
+         * the one period whose ending boundary is not on the day's own schedule.
+         */
+        nextDayFajr: ZonedDateTime? = null,
     ): HomeUiState {
         // `null` means the calendar snapshot has not been produced yet, which is a *pending* state,
         // not a failure: Home renders the prayer content and a placeholder date, and the calendar
@@ -71,6 +87,11 @@ class HomeUiStateFactory(
         // The resolver returns null rather than guessing when the schedule is for another day,
         // incomplete, or already finished, so the countdown can never be fabricated.
         val nextPrayer = nextPrayerResolver.resolve(schedule, now)
+        val nextPrayerSection = NextPrayerSection(
+            prayer = nextPrayer?.prayer,
+            time = nextPrayer?.let { timeFormatter.format(it.time) },
+            countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
+        )
 
         return HomeUiState.Ready(
             gregorianDate = gregorian?.formattedDate,
@@ -98,11 +119,15 @@ class HomeUiStateFactory(
                 timeFormat = settings.timeFormat,
             ),
             timetableNote = scheduleState.asTimetableNote(),
-            nextPrayer = NextPrayerSection(
-                prayer = nextPrayer?.prayer,
-                time = nextPrayer?.let { timeFormatter.format(it.time) },
-                countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
+            currentPrayer = currentPrayerSection(
+                schedule = schedule,
+                now = now,
+                nextDayFajr = nextDayFajr,
+                next = nextPrayerSection,
+                scheduleState = scheduleState,
+                timeFormatter = timeFormatter,
             ),
+            nextPrayer = nextPrayerSection,
             prayerRows = PrayerName.entries.map { prayer ->
                 val entry = schedule?.prayers?.firstOrNull { it.prayer == prayer }
                 PrayerRow(
@@ -118,7 +143,11 @@ class HomeUiStateFactory(
                     timeLabel = schedule?.timeOf(event)?.let(timeFormatter::format),
                 )
             },
-            prohibited = prohibitedState.toSection(timeFormatter),
+            prohibited = prohibitedState.toSection(
+                schedule = schedule,
+                now = now,
+                timeFormatter = timeFormatter,
+            ),
             provenance = ProvenanceSection(
                 source = scheduleState.originSource(),
                 providerId = scheduleState.providerId(),
@@ -126,6 +155,69 @@ class HomeUiStateFactory(
                 offlineReady = scheduleState.isAvailableOffline(),
             ),
             failureDetail = (scheduleState as? PrayerScheduleState.Failed)?.detail,
+        )
+    }
+
+    /**
+     * Resolves the period that is open now.
+     *
+     * The reason reported when nothing can be resolved prefers the schedule's own explanation —
+     * "no location configured" is more useful to a reader than a generic failure — and falls back to
+     * the resolver's reason when the schedule itself is fine but cannot describe this moment.
+     */
+    private fun currentPrayerSection(
+        schedule: PrayerSchedule?,
+        now: ZonedDateTime,
+        nextDayFajr: ZonedDateTime?,
+        next: NextPrayerSection,
+        scheduleState: PrayerScheduleState,
+        timeFormatter: DateTimeFormatter,
+    ): CurrentPrayerSection = when (
+        val status = currentPrayerResolver.resolve(schedule, now, nextDayFajr)
+    ) {
+        is CurrentPrayerStatus.Active -> {
+            val period = status.period
+            val boundary = period.endsWith
+            CurrentPrayerSection(
+                prayer = period.prayer,
+                isActive = true,
+                // A null start is the Isha period that began before today's schedule; the card says
+                // so rather than showing a start time from another day's timetable.
+                startTime = period.startsAt?.let(timeFormatter::format),
+                endTime = timeFormatter.format(period.endsAt),
+                endsWithPrayer = (boundary as? PeriodBoundary.Prayer)?.prayer,
+                endsNextDay = (boundary as? PeriodBoundary.Prayer)?.isNextDay == true,
+                endsWithSolarEvent = (boundary as? PeriodBoundary.Solar)?.event,
+                countdown = CountdownFormatter.format(period.remaining),
+                next = next,
+                unavailable = null,
+            )
+        }
+
+        is CurrentPrayerStatus.Between -> CurrentPrayerSection(
+            prayer = null,
+            isActive = false,
+            startTime = null,
+            endTime = timeFormatter.format(status.nextPrayerTime),
+            endsWithPrayer = status.nextPrayer,
+            endsNextDay = false,
+            endsWithSolarEvent = null,
+            countdown = CountdownFormatter.format(status.remaining),
+            next = next,
+            unavailable = null,
+        )
+
+        is CurrentPrayerStatus.Unavailable -> CurrentPrayerSection(
+            prayer = null,
+            isActive = false,
+            startTime = null,
+            endTime = null,
+            endsWithPrayer = null,
+            endsNextDay = false,
+            endsWithSolarEvent = null,
+            countdown = null,
+            next = next,
+            unavailable = scheduleState.asTimetableNote() ?: status.reason,
         )
     }
 
@@ -167,22 +259,47 @@ class HomeUiStateFactory(
         )
     }
 
-    private fun ProhibitedPeriodsState.toSection(timeFormatter: DateTimeFormatter): ProhibitedSection =
-        when (this) {
-            is ProhibitedPeriodsState.Available -> ProhibitedSection(
-                windows = periods.map { period ->
-                    "${timeFormatter.format(period.startsAt)} – ${timeFormatter.format(period.endsAt)}"
-                },
-                unavailable = null,
-            )
+    /**
+     * Classifies each prohibited window against the displayed moment and formats it for the card.
+     *
+     * The anchor solar event is looked up from the same schedule the windows were derived from, so
+     * the event time shown beside an interval is the very timestamp the interval was calculated
+     * from — including for the zenith window, whose anchor is the solar transit and not the
+     * displayed Dhuhr prayer time.
+     */
+    private fun ProhibitedPeriodsState.toSection(
+        schedule: PrayerSchedule?,
+        now: ZonedDateTime,
+        timeFormatter: DateTimeFormatter,
+    ): ProhibitedSection = when (this) {
+        is ProhibitedPeriodsState.Available -> ProhibitedSection(
+            windows = prohibitedStatusResolver.classify(periods, now).map { status ->
+                val period = status.period
+                ProhibitedWindowRow(
+                    kind = period.kind,
+                    event = period.kind.anchorEvent,
+                    startsAt = timeFormatter.format(period.startsAt),
+                    endsAt = timeFormatter.format(period.endsAt),
+                    eventTime = schedule?.timeOf(period.kind.anchorEvent)?.let(timeFormatter::format),
+                    phase = status.phase,
+                    // While a window is upcoming the useful reading is how long until it opens;
+                    // while it is active it is how long until it closes.
+                    countdown = (status.startsIn ?: status.endsIn)?.let(CountdownFormatter::format),
+                    explanation = period.explanation,
+                )
+            },
+            convention = convention,
+            unavailable = null,
+        )
 
-            is ProhibitedPeriodsState.NotAvailable -> ProhibitedSection(
-                windows = emptyList(),
-                // The reason travels with its detail so the screen can explain the exact gap
-                // instead of falling back to a generic sentence about verified rules.
-                unavailable = reason,
-            )
-        }
+        is ProhibitedPeriodsState.NotAvailable -> ProhibitedSection(
+            windows = emptyList(),
+            convention = null,
+            // The reason travels with its detail so the screen can explain the exact gap
+            // instead of falling back to a generic sentence about verified rules.
+            unavailable = reason,
+        )
+    }
 
     private fun PrayerScheduleState.asTimetableNote(): UnavailabilityReason? = when (this) {
         is PrayerScheduleState.Available -> null

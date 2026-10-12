@@ -1,7 +1,12 @@
 package io.github.towkirahmedrony.salah.feature.home
 
+import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ConfiguredProhibitedRuleSet
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
@@ -15,12 +20,15 @@ import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeEntry
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
+import io.github.towkirahmedrony.salah.core.model.ProhibitedConvention
+import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriod
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.SolarEventEntry
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -50,7 +58,11 @@ class HomeUiStateFactoryTest {
 
     private val date: LocalDate = now.toLocalDate()
 
-    private val factory = HomeUiStateFactory(nextPrayerResolver = NextPrayerResolver())
+    private val factory = HomeUiStateFactory(
+        nextPrayerResolver = NextPrayerResolver(),
+        currentPrayerResolver = CurrentPrayerPeriodResolver(),
+        prohibitedStatusResolver = ProhibitedPeriodStatusResolver(),
+    )
 
     private val location: LocationInfo = checkNotNull(
         LocationInfo.create("Dhaka", 23.8103, 90.4125, "Asia/Dhaka"),
@@ -127,19 +139,60 @@ class HomeUiStateFactoryTest {
         reason = UnavailabilityReason.RULES_NOT_VERIFIED,
     )
 
+    /**
+     * The windows the real calculator produces for this timetable under the shipped rule set:
+     * sunrise ascent [05:54, 06:09], zenith decline [11:40, 11:55], sunset setting [17:21, 17:36].
+     */
+    private fun prohibitedAvailable(): ProhibitedPeriodsState.Available =
+        ProhibitedPeriodsState.Available(
+            periods = listOf(
+                ProhibitedPeriod(
+                    startsAt = date.atTime(5, 54).atZone(zone),
+                    endsAt = date.atTime(6, 9).atZone(zone),
+                    ruleSetId = ConfiguredProhibitedRuleSet.ID,
+                    kind = ProhibitedWindowKind.SUNRISE_ASCENT,
+                    explanation = "From sunrise until the sun has risen clear of the horizon.",
+                ),
+                ProhibitedPeriod(
+                    startsAt = date.atTime(11, 40).atZone(zone),
+                    endsAt = date.atTime(11, 55).atZone(zone),
+                    ruleSetId = ConfiguredProhibitedRuleSet.ID,
+                    kind = ProhibitedWindowKind.ZENITH_DECLINE,
+                    explanation = "Around the sun's zenith, until it has begun to decline.",
+                ),
+                ProhibitedPeriod(
+                    startsAt = date.atTime(17, 21).atZone(zone),
+                    endsAt = date.atTime(17, 36).atZone(zone),
+                    ruleSetId = ConfiguredProhibitedRuleSet.ID,
+                    kind = ProhibitedWindowKind.SUNSET_SETTING,
+                    explanation = "From the point the sun begins to set until it has set.",
+                ),
+            ),
+            convention = ProhibitedConvention(
+                ruleSetId = ConfiguredProhibitedRuleSet.ID,
+                label = ConfiguredProhibitedRuleSet.DEFAULT.label,
+                isReviewed = false,
+                hasVerifiedSources = false,
+            ),
+        )
+
     private fun ready(
         location: LocationInfo?,
         scheduleState: PrayerScheduleState,
         settings: PrayerSettings = PrayerSettings.DEFAULT,
         calendar: CalendarSnapshot = this.calendar,
+        prohibitedState: ProhibitedPeriodsState = prohibitedNotAvailable,
+        now: ZonedDateTime = this.now,
+        nextDayFajr: ZonedDateTime? = null,
     ): HomeUiState.Ready {
         val state = factory.create(
             calendar = calendar,
             location = location,
             settings = settings,
             scheduleState = scheduleState,
-            prohibitedState = prohibitedNotAvailable,
+            prohibitedState = prohibitedState,
             now = now,
+            nextDayFajr = nextDayFajr,
         )
         assertTrue("expected Ready but was $state", state is HomeUiState.Ready)
         return state as HomeUiState.Ready
@@ -165,8 +218,16 @@ class HomeUiStateFactoryTest {
         assertNull(state.nextPrayer.prayer)
         assertNull(state.nextPrayer.countdown)
 
+        // No schedule means no period can be resolved, and the reason comes from the schedule state
+        // rather than being flattened into a generic one.
+        assertNull(state.currentPrayer.prayer)
+        assertFalse(state.currentPrayer.isActive)
+        assertNull(state.currentPrayer.countdown)
+        assertEquals(UnavailabilityReason.NO_LOCATION_CONFIGURED, state.currentPrayer.unavailable)
+
         assertTrue(state.prohibited.windows.isEmpty())
         assertEquals(UnavailabilityReason.RULES_NOT_VERIFIED, state.prohibited.unavailable)
+        assertNull(state.prohibited.convention)
         assertNull(state.failureDetail)
     }
 
@@ -218,6 +279,201 @@ class HomeUiStateFactoryTest {
         assertEquals("58:00", state.nextPrayer.countdown)
         assertEquals(PrayerName.ASR, state.prayerRows.firstOrNull { it.isNext }?.prayer)
         assertTrue(state.prayerRows.all { it.timeLabel != null })
+    }
+
+    @Test
+    fun `the current period leads and the next prayer is still reported`() {
+        // 15:00 in Dhaka: Dhuhr is open and Asr closes it, which is the case the feature is
+        // specified around.
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+        )
+
+        assertTrue(state.currentPrayer.isActive)
+        assertEquals(PrayerName.DHUHR, state.currentPrayer.prayer)
+        assertEquals("11:46", state.currentPrayer.startTime)
+        assertEquals("15:58", state.currentPrayer.endTime)
+        assertEquals(PrayerName.ASR, state.currentPrayer.endsWithPrayer)
+        assertFalse(state.currentPrayer.endsNextDay)
+        assertNull(state.currentPrayer.endsWithSolarEvent)
+        assertEquals("58:00", state.currentPrayer.countdown)
+        assertNull(state.currentPrayer.unavailable)
+
+        // The next prayer survives as secondary information, with its own countdown unchanged.
+        assertEquals(PrayerName.ASR, state.currentPrayer.next.prayer)
+        assertEquals(state.nextPrayer.countdown, state.currentPrayer.next.countdown)
+    }
+
+    @Test
+    fun `the Fajr period is closed by sunrise, which is not listed as a prayer`() {
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(5, 30).atZone(zone),
+        )
+
+        assertTrue(state.currentPrayer.isActive)
+        assertEquals(PrayerName.FAJR, state.currentPrayer.prayer)
+        assertEquals("05:54", state.currentPrayer.endTime)
+        assertNull("sunrise closes the period but is not a prayer", state.currentPrayer.endsWithPrayer)
+        assertEquals(SolarEvent.SUNRISE, state.currentPrayer.endsWithSolarEvent)
+        assertEquals("24:00", state.currentPrayer.countdown)
+    }
+
+    @Test
+    fun `between sunrise and Dhuhr no period is reported as active`() {
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(9, 0).atZone(zone),
+        )
+
+        assertFalse(state.currentPrayer.isActive)
+        assertNull(state.currentPrayer.prayer)
+        assertNull(state.currentPrayer.unavailable)
+        assertEquals("11:46", state.currentPrayer.endTime)
+        assertEquals(PrayerName.DHUHR, state.currentPrayer.endsWithPrayer)
+        assertEquals("2:46:00", state.currentPrayer.countdown)
+    }
+
+    @Test
+    fun `Isha is closed by the next day's Fajr when it is available`() {
+        val nextDayFajr = date.plusDays(1).atTime(4, 39).atZone(zone)
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(20, 0).atZone(zone),
+            nextDayFajr = nextDayFajr,
+        )
+
+        assertTrue(state.currentPrayer.isActive)
+        assertEquals(PrayerName.ISHA, state.currentPrayer.prayer)
+        assertEquals(PrayerName.FAJR, state.currentPrayer.endsWithPrayer)
+        assertTrue("the closing Fajr is on the following day", state.currentPrayer.endsNextDay)
+        assertEquals("8:39:00", state.currentPrayer.countdown)
+    }
+
+    @Test
+    fun `Isha is unresolved rather than invented when tomorrow's Fajr is missing`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(20, 0).atZone(zone),
+        )
+
+        assertFalse(state.currentPrayer.isActive)
+        assertNull(state.currentPrayer.countdown)
+        assertEquals(UnavailabilityReason.UNKNOWN, state.currentPrayer.unavailable)
+        // The next prayer is still knowable, so it is still shown.
+        assertEquals(PrayerName.ASR, state.nextPrayer.prayer)
+    }
+
+    @Test
+    fun `a pre-dawn moment reports Isha carried over without borrowing yesterday's start time`() {
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(2, 0).atZone(zone),
+        )
+
+        assertTrue(state.currentPrayer.isActive)
+        assertEquals(PrayerName.ISHA, state.currentPrayer.prayer)
+        assertNull("the start is not on today's schedule", state.currentPrayer.startTime)
+        assertEquals("04:39", state.currentPrayer.endTime)
+        assertEquals("2:39:00", state.currentPrayer.countdown)
+    }
+
+    @Test
+    fun `prohibited windows are classified against the displayed moment`() {
+        // 15:00: both morning intervals are past, the sunset interval has not opened.
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            prohibitedState = prohibitedAvailable(),
+        )
+
+        assertEquals(3, state.prohibited.windows.size)
+        assertNull(state.prohibited.unavailable)
+
+        val sunrise = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.SUNRISE_ASCENT }
+        assertEquals(ProhibitedPeriodPhase.PASSED, sunrise.phase)
+        assertEquals("05:54 – 06:09", "${sunrise.startsAt} – ${sunrise.endsAt}")
+        assertNull("a passed interval has no countdown", sunrise.countdown)
+
+        val sunset = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.SUNSET_SETTING }
+        assertEquals(ProhibitedPeriodPhase.UPCOMING, sunset.phase)
+        assertEquals("2:21:00", sunset.countdown)
+    }
+
+    @Test
+    fun `a prohibited interval shows its anchor event, not the prayer period around it`() {
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            prohibitedState = prohibitedAvailable(),
+        )
+
+        val zenith = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.ZENITH_DECLINE }
+        assertEquals(SolarEvent.SOLAR_NOON, zenith.event)
+        // The transit is 11:45; the displayed Dhuhr prayer time is 11:46. They are different
+        // instants and the interval is anchored to the first of them.
+        assertEquals("11:45", zenith.eventTime)
+        assertEquals("11:46", state.prayerRows.first { it.prayer == PrayerName.DHUHR }.timeLabel)
+
+        val sunrise = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.SUNRISE_ASCENT }
+        assertEquals("05:54", sunrise.eventTime)
+    }
+
+    @Test
+    fun `a prohibited interval active right now reports how long is left in it`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            prohibitedState = prohibitedAvailable(),
+            now = date.atTime(17, 30).atZone(zone),
+        )
+
+        val sunset = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.SUNSET_SETTING }
+        assertEquals(ProhibitedPeriodPhase.ACTIVE, sunset.phase)
+        assertEquals("06:00", sunset.countdown)
+
+        val sunrise = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.SUNRISE_ASCENT }
+        assertEquals(ProhibitedPeriodPhase.PASSED, sunrise.phase)
+
+        val zenith = state.prohibited.windows.first { it.kind == ProhibitedWindowKind.ZENITH_DECLINE }
+        assertEquals(ProhibitedPeriodPhase.PASSED, zenith.phase)
+    }
+
+    @Test
+    fun `the section names the convention the windows were calculated under`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            prohibitedState = prohibitedAvailable(),
+        )
+
+        val convention = state.prohibited.convention
+        assertNotNull(convention)
+        assertEquals(ConfiguredProhibitedRuleSet.ID, convention!!.ruleSetId)
+        assertFalse("the shipped boundaries are not presented as confirmed", convention.isReviewed)
+    }
+
+    @Test
+    fun `every prohibited window carries its configured boundaries`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            prohibitedState = prohibitedAvailable(),
+        )
+
+        assertTrue(state.prohibited.windows.all { it.explanation.isNotBlank() })
     }
 
     @Test

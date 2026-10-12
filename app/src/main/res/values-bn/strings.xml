@@ -68,6 +68,20 @@
     <string name="event_solar_noon">সৌর মধ্যাহ্ন</string>
     <string name="event_sunset">সূর্যাস্ত</string>
 
+    <!--
+      The active prayer period and the prohibited intervals. Only the short labels are translated
+      here; the sentences that state which convention is in force, and which parts are not
+      confirmed, stay in English until they can be reviewed (see app/lint.xml).
+    -->
+    <string name="home_current_prayer_title">বর্তমান ওয়াক্ত</string>
+    <string name="home_current_prayer_active">এখন চলছে</string>
+    <string name="prohibited_kind_sunrise_ascent">সূর্যোদয়ের পরের সময়</string>
+    <string name="prohibited_kind_zenith_decline">সৌর মধ্যাহ্ন (জাওয়াল)</string>
+    <string name="prohibited_kind_sunset_setting">সূর্যাস্তের আগের সময়</string>
+    <string name="prohibited_phase_active">এখন নিষিদ্ধ সময়</string>
+    <string name="prohibited_phase_upcoming">আসন্ন</string>
+    <string name="prohibited_phase_passed">আজ শেষ হয়েছে</string>
+
     <!-- Observances -->
     <string name="occasion_islamic_new_year">ইসলামি নববর্ষ (১ মুহাররম)</string>
     <string name="occasion_ashura">আশুরা (১০ মুহাররম)</string>

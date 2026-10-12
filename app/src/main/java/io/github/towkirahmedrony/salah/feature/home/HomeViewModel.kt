@@ -13,6 +13,7 @@ import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -51,13 +53,20 @@ import java.time.ZonedDateTime
  *
  *  - the **calendar snapshot** is a progressive input. The header shows a placeholder for the date
  *    until it lands instead of keeping the whole screen on the skeleton;
- *  - the **prohibited windows** are informational and the shipped rule book is empty, so they are
- *    seeded with an honest "not available" and merged in later.
+ *  - the **prohibited windows** are informational, so they are seeded with an honest "not available"
+ *    and merged in later;
+ *  - **tomorrow's schedule** is asked for only so Isha's period can be closed at the next day's Fajr;
+ *    until it arrives that one period is reported as unresolved rather than ended at a guessed
+ *    boundary, and nothing else on the screen waits for it.
  *
  * The schedule chain ([request] → [scheduleState]) is shared through a single [StateFlow], so the
  * repository is asked for one schedule per request rather than once per downstream consumer. That is
  * what keeps the clock tick from producing redundant calculations: the request is de-duplicated, and
  * a request that has not actually changed never reaches the repository again.
+ *
+ * Both countdowns — the remaining time in the current period and the time until the next prayer —
+ * are recomputed from the same tick, so a single [moment] drives every clock reading on the screen
+ * and the two can never disagree about what time it is.
  *
  * **Where the location and settings come from.** Both are read from the start-up
  * [StartupSnapshot], which has already read them into a [StateFlow] before Home is composed. That
@@ -177,6 +186,45 @@ class HomeViewModel(
             initialValue = PrayerScheduleState.Loading,
         )
 
+    /**
+     * Tomorrow's schedule, asked for through the same repository as today's.
+     *
+     * It exists for one reason: Isha's period closes at the next day's Fajr, and that boundary is
+     * not on today's schedule. Reusing the repository means the same engine, the same location and
+     * the same profile produce it — a separately calculated "next Fajr" would be a second prayer-time
+     * engine, and it would eventually disagree with the timetable shown underneath it.
+     *
+     * The repository caches by the full request, so this adds one calculation per day, not one per
+     * tick, and it is keyed the same way the notification reconciliation already keys the day it
+     * pre-schedules.
+     */
+    private val nextDayRequest: Flow<PrayerScheduleRequest?> =
+        combine(location, settings, moment) { configured, currentSettings, at ->
+            configured?.let { location ->
+                PrayerScheduleRequest(
+                    date = at.withZoneSameInstant(location.zoneId).toLocalDate().plusDays(1),
+                    location = location,
+                    profile = currentSettings.toProfile(),
+                )
+            }
+        }.distinctUntilChanged()
+
+    private val nextDayScheduleState: StateFlow<PrayerScheduleState> =
+        nextDayRequest.flatMapLatest { current -> prayerScheduleRepository.ensureSchedule(current) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),
+                // `Loading` carries no Fajr, which is the honest answer for the moment before
+                // tomorrow has been calculated: the period is reported as unresolved, not ended at
+                // an invented boundary.
+                initialValue = PrayerScheduleState.Loading,
+            )
+
+    /** Tomorrow's Fajr, or `null` while it is not available. */
+    private val nextDayFajr: Flow<ZonedDateTime?> = nextDayScheduleState
+        .map { state -> (state as? PrayerScheduleState.Available)?.schedule?.timeOf(PrayerName.FAJR) }
+        .distinctUntilChanged()
+
     private val prohibitedState: Flow<ProhibitedPeriodsState> =
         scheduleState.flatMapLatest { state ->
             prohibitedPeriodsRepository.observePeriods((state as? PrayerScheduleState.Available)?.schedule)
@@ -225,8 +273,9 @@ class HomeViewModel(
     /**
      * Prohibited windows, seeded with an honest "not available".
      *
-     * The shipped rule book is empty, so this section never carries real windows today; seeding it
-     * keeps an informational section from ever gating the prayer content.
+     * The windows are derived from the schedule, which is on the critical path anyway, but they stay
+     * off it: seeding a value keeps an informational section from ever gating the prayer content for
+     * a frame.
      */
     private val prohibitedFlow: Flow<ProhibitedPeriodsState> =
         prohibitedState.onStart {
@@ -237,7 +286,8 @@ class HomeViewModel(
         criticalInputs,
         calendarFlow,
         prohibitedFlow,
-    ) { critical, calendar, prohibited ->
+        nextDayFajr,
+    ) { critical, calendar, prohibited, tomorrowsFajr ->
         uiStateFactory.create(
             calendar = calendar,
             location = critical.location,
@@ -245,6 +295,7 @@ class HomeViewModel(
             scheduleState = critical.scheduleState,
             prohibitedState = prohibited,
             now = critical.now,
+            nextDayFajr = tomorrowsFajr,
         )
     }.onEach { state ->
         // The state becoming `Ready` is what makes Home renderable. The composable existing is not:

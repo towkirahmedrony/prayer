@@ -239,10 +239,10 @@ not been performed, so no such claim appears in the app or the docs.
 
 ---
 
-## 7. Prohibited prayer-time windows — status: **unconfigured pending review**
+## 7. Prohibited prayer-time windows — status: **configured as this application's policy**
 
-The prohibited-window feature is split deliberately into an **implemented, tested mechanism** and
-an **empty, unreviewed rule book**:
+The prohibited-window feature applies an explicit, documented rule set. Full detail is in
+`docs/FORBIDDEN_PRAYER_TIMES.md`; what matters for the calculation itself:
 
 - **Implemented and unit-tested:** `ProhibitedWindowKind` (`SUNRISE_ASCENT`, `ZENITH_DECLINE`,
   `SUNSET_SETTING`) as *distinct rules* rather than one generic "minutes around sunrise and
@@ -250,24 +250,28 @@ an **empty, unreviewed rule book**:
   `RuleVerificationStatus` and the sources a reviewer approved; and `ProhibitedPeriodCalculator`,
   which anchors each window to the correct solar event and **refuses to run at all** on an
   unreviewed rule set.
-- **Deliberately empty in production:** `ProhibitedRuleBook()` ships with **no** rule sets. The
-  repository therefore reports `UnavailabilityReason.RULES_NOT_VERIFIED`, and the Home screen
-  explains the gap. **No prohibited interval is displayed**, because none has been reviewed.
+- **In production:** `ConfiguredProhibitedRuleSet.ruleBook()` supplies one rule set marked
+  `RuleVerificationStatus.CONFIGURED` — sunrise +15 min, transit −5/+10 min, sunset −15 min. The Home
+  screen lists the three intervals with their status and countdown, and states that these boundaries
+  are the application's policy and have not been confirmed by a qualified reviewer.
+- **Not configured in production:** no `RuleVerificationStatus.REVIEWED` rule set and no recorded
+  source, so `ProhibitedRuleSet.sources` is empty and the screen says so.
 
 Consequences, stated plainly:
 
-- The exact durations are **not** hardcoded and are **not** claimed to be universally
-  authoritative. They can only come from a reviewed `ProhibitedRuleSet`.
+- The durations are **not** hardcoded in the calculation path and are **not** claimed to be
+  universally authoritative; they are parameters on one rule set. Windows are anchored to the raw
+  solar events, which carry no method offset, never to Fajr, Dhuhr or Maghrib.
 - Prohibited-time calculation is **kept separate** from ordinary prayer-time calculation: the
   calculator consumes an already-computed schedule and can never move a prayer time.
 - The synthetic rule set used in `ProhibitedPeriodCalculatorTest` exists only to exercise the
   arithmetic of anchors, ordering and zone handling. Its durations are **not** a religious source
   and it does not ship in the app.
 
-**Remaining review requirement.** Enabling the feature is a data change: supply one
+**Remaining review requirement.** Confirming the boundaries is a data change: supply a
 `ProhibitedRuleSet` with `RuleVerificationStatus.REVIEWED`, its boundaries, and the sources a
-qualified reviewer approved. Until a qualified reviewer confirms the boundaries and their sources,
-the feature stays unconfigured. Passing automated tests does not establish religious correctness.
+qualified reviewer approved, ahead of the configured one. Passing automated tests does not establish
+religious correctness, and nothing in the app claims it does.
 
 ---
 
@@ -303,7 +307,8 @@ the feature stays unconfigured. Passing automated tests does not establish relig
 ## 10. Known limitations
 
 - **Not verified against any published authority timetable.** See §6.
-- **Prohibited windows are unconfigured.** See §7.
+- **Prohibited windows use this application's configured policy**, which has not been verified
+  against a cited source. See §7 and `docs/FORBIDDEN_PRAYER_TIMES.md`.
 - **No Bangla or Hijri calendar conversion;** only the device Gregorian date is available.
 - **The schedule cache is in-memory.** Process death clears it and the day is recalculated (cheap),
   which is intended.
