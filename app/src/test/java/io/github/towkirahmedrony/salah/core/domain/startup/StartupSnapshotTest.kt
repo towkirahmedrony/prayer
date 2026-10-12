@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.core.domain.startup
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -30,6 +31,7 @@ import org.junit.Test
  * unstarted until something else suspended, which would make these assertions test the scheduler
  * rather than the snapshot.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class StartupSnapshotTest {
 
     @Test
@@ -162,4 +164,5 @@ class StartupSnapshotTest {
  * A scope for the snapshot under test whose collectors start immediately and resume inline, standing
  * in for the application-wide scope production resolves at start-up.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 private fun TestScope.startupScope(): CoroutineScope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
