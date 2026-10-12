@@ -24,12 +24,14 @@ android {
             isMinifyEnabled = false
         }
         release {
-            // Release signing and shrinking are intentionally not configured in this phase.
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Local testing only: signed with the debug key so the APK installs.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -75,6 +77,9 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Installs the baseline profiles that Compose and Material3 ship, so first frames are AOT-compiled.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     // Local astronomical prayer-time engine (Adhan Kotlin). Runs on-device, offline.
     implementation(libs.adhan.kotlin)
