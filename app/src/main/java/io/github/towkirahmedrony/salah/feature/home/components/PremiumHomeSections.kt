@@ -37,13 +37,13 @@ fun HomeTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CrescentGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(32.dp))
-            Spacer(modifier = Modifier.width(12.dp))
+            CrescentGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
                     text = "Salah",
@@ -58,26 +58,26 @@ fun HomeTopBar(
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .border(1.dp, ForestGreenPrimary.copy(alpha = 0.2f), CircleShape)
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center,
             ) {
-                BellGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(22.dp))
+                BellGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(20.dp))
             }
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .border(1.5.dp, ForestGreenPrimary, CircleShape)
                     .clickable(onClick = onOpenSettings),
                 contentAlignment = Alignment.Center,
             ) {
-                PersonGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(25.dp))
+                PersonGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -93,7 +93,7 @@ fun LocationAndDateHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 4.dp),
+            .padding(top = 4.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -102,19 +102,19 @@ fun LocationAndDateHeader(
                 modifier = Modifier.clickable(onClick = onOpenLocation),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LocationPinGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(24.dp))
+                LocationPinGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = state.location.label
                         ?: stringResource(state.location.unavailable?.messageRes() ?: R.string.home_location_none_title),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = "⌵", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = state.gregorianDate?.let { date -> state.weekday?.let { "$it, $date" } ?: date }
                     ?: stringResource(R.string.home_date_pending),
@@ -131,13 +131,13 @@ fun LocationAndDateHeader(
         }
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(32.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .border(1.dp, ForestGreenPrimary.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
                 .clickable(onClick = onOpenCalendar),
             contentAlignment = Alignment.Center,
         ) {
-            CalendarGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(20.dp))
+            CalendarGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -162,12 +162,12 @@ fun CurrentPrayerHeroCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(ForestGreenPrimary)
-            .padding(22.dp),
+            .padding(16.dp),
     ) {
         SunRaysArt(
             tint = GoldAccent.copy(alpha = 0.75f),
             modifier = Modifier
-                .size(160.dp)
+                .size(132.dp)
                 .align(Alignment.CenterEnd),
         )
 
@@ -190,11 +190,11 @@ fun CurrentPrayerHeroCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
             )
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             if (countdown != null) {
                 Text(
                     text = countdown,
-                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 38.sp, fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.displaySmall.copy(fontSize = 32.sp, fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
                 val countdownCaption = when {
@@ -214,7 +214,7 @@ fun CurrentPrayerHeroCard(
                     color = Color.White.copy(alpha = 0.9f),
                 )
             }
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -268,7 +268,7 @@ fun TodayPrayerTimesSection(
                 modifier = Modifier.clickable(onClick = onViewAll),
             )
         }
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -291,27 +291,27 @@ private fun TodayPrayerCard(row: PrayerRow, isSelected: Boolean, modifier: Modif
             .clip(RoundedCornerShape(16.dp))
             .background(bg)
             .border(1.dp, borderCol, RoundedCornerShape(16.dp))
-            .padding(vertical = 14.dp, horizontal = 4.dp),
+            .padding(vertical = 8.dp, horizontal = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when (row.prayer) {
-            PrayerName.FAJR -> SunrisePrayerGlyph(ForestGreenPrimary, modifier = Modifier.size(24.dp))
-            PrayerName.DHUHR -> OctagramGlyph(ForestGreenPrimary, modifier = Modifier.size(24.dp))
-            PrayerName.ASR -> Text("◷", fontSize = 20.sp, color = ForestGreenPrimary)
-            PrayerName.MAGHRIB -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(22.dp))
-            PrayerName.ISHA -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(22.dp))
+            PrayerName.FAJR -> SunrisePrayerGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+            PrayerName.DHUHR -> OctagramGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+            PrayerName.ASR -> Text("◷", fontSize = 18.sp, color = ForestGreenPrimary)
+            PrayerName.MAGHRIB -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+            PrayerName.ISHA -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = stringResource(row.prayer.labelRes()),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = row.timeLabel ?: "—",
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
@@ -330,7 +330,7 @@ fun ForbiddenTimesCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE8E6DE)),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -338,7 +338,7 @@ fun ForbiddenTimesCard(
             ) {
                 Text(
                     text = "Forbidden Prayer Times",
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -350,13 +350,13 @@ fun ForbiddenTimesCard(
                     modifier = Modifier.clickable(onClick = onViewDetails),
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
                     if (state.prohibited.windows.isEmpty()) {
                         Text(
                             text = stringResource(state.prohibited.unavailable?.messageRes() ?: R.string.reason_unknown),
@@ -367,7 +367,7 @@ fun ForbiddenTimesCard(
                         state.prohibited.windows.take(3).forEach { window ->
                             Text(
                                 text = "${stringResource(window.kind.labelRes())} — ${window.startsAt}–${window.endsAt}",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -375,7 +375,7 @@ fun ForbiddenTimesCard(
                         }
                     }
                 }
-                Text(text = "☼", fontSize = 42.sp, color = GoldAccent)
+                Text(text = "☼", fontSize = 26.sp, color = GoldAccent)
             }
         }
     }
@@ -389,14 +389,14 @@ fun DailyToolsSection(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Your Daily Tools",
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             DailyToolItem(title = "Qibla", icon = { QiblaGlyph(ForestGreenPrimary) }, onClick = { onNavigate("qibla") }, modifier = Modifier.weight(1f))
             DailyToolItem(title = "Calendar", icon = { CalendarGlyph(ForestGreenPrimary) }, onClick = { onNavigate("calendar") }, modifier = Modifier.weight(1f))
@@ -418,22 +418,22 @@ private fun DailyToolItem(
             .clip(RoundedCornerShape(18.dp))
             .background(Color(0xFFD4E8DC))
             .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(30.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.5f)),
             contentAlignment = Alignment.Center,
         ) {
             icon()
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = ForestGreenPrimary,
         )

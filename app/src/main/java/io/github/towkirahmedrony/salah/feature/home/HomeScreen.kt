@@ -80,8 +80,8 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "top-bar") {
             HomeTopBar(onOpenSettings = { onNavigate("settings") })
@@ -124,8 +124,5 @@ private fun HomeContent(
             DailyToolsSection(onNavigate = onNavigate)
         }
 
-        item(key = "spacer-bottom") {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
     }
 }
