@@ -19,12 +19,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * Salah's iconography, drawn directly with Compose.
- *
- * The glyphs are authored on a 24×24 unit grid and scaled to the requested size, so they stay
- * crisp at any density and add no third-party icon dependency to the build.
- */
 @Composable
 private fun Glyph(
     tint: Color,
@@ -39,7 +33,6 @@ private fun Glyph(
     }
 }
 
-/** A mosque dome with a base: the Home destination. */
 @Composable
 fun DomeGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
     val dome = Path().apply {
@@ -59,7 +52,6 @@ fun DomeGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier
     )
 }
 
-/** A crescent: the Prayer destination. */
 @Composable
 fun CrescentGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
     val crescent = Path().apply {
@@ -70,7 +62,6 @@ fun CrescentGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modi
     drawPath(crescent, tint)
 }
 
-/** A calendar page: the Calendar destination. */
 @Composable
 fun CalendarGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
     val stroke = Stroke(width = 1.7f)
@@ -84,11 +75,8 @@ fun CalendarGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modi
     drawLine(tint, Offset(3.4f, 9.8f), Offset(20.6f, 9.8f), strokeWidth = 1.7f)
     drawLine(tint, Offset(8.2f, 3f), Offset(8.2f, 6.6f), strokeWidth = 1.7f)
     drawLine(tint, Offset(15.8f, 3f), Offset(15.8f, 6.6f), strokeWidth = 1.7f)
-    drawCircle(tint, radius = 1.1f, center = Offset(8.6f, 14f))
-    drawCircle(tint, radius = 1.1f, center = Offset(12f, 14f))
 }
 
-/** A lantern: the Ramadan destination. */
 @Composable
 fun LanternGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
     val stroke = Stroke(width = 1.7f)
@@ -105,55 +93,66 @@ fun LanternGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modif
         lineTo(16f, 8.6f)
     }
     drawPath(roof, tint, style = stroke)
-    drawLine(tint, Offset(12f, 19f), Offset(12f, 21f), strokeWidth = 1.7f)
-    drawCircle(tint, radius = 1.2f, center = Offset(12f, 13.8f))
 }
 
-/** A compass needle: the Qibla shortcut. */
 @Composable
 fun QiblaGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
-    drawCircle(tint, radius = 8.6f, center = Offset(12f, 12f), style = Stroke(width = 1.6f))
+    drawCircle(tint, radius = 9f, center = Offset(12f, 12f), style = Stroke(width = 1.6f))
     val needle = Path().apply {
-        moveTo(12f, 4.6f)
-        lineTo(15.2f, 12f)
-        lineTo(12f, 19.4f)
-        lineTo(8.8f, 12f)
+        moveTo(12f, 5.5f)
+        lineTo(15.5f, 12f)
+        lineTo(12f, 18.5f)
+        lineTo(8.5f, 12f)
         close()
     }
-    drawPath(needle, tint)
+    drawPath(needle, tint, style = Stroke(width = 1.5f))
 }
 
-/** A gear: the Settings destination. */
+@Composable
+fun TasbihGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawCircle(tint, radius = 7.5f, center = Offset(12f, 11f), style = Stroke(width = 2.2f))
+    drawLine(tint, Offset(12f, 18.5f), Offset(12f, 22f), strokeWidth = 2.2f)
+}
+
 @Composable
 fun GearGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
-    drawCircle(tint, radius = 8.2f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))
-    drawCircle(tint, radius = 3.1f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))
-    repeat(8) { index ->
-        val radians = (index * 45.0) * PI / 180.0
-        val innerX = 12f + (8.2f * cos(radians)).toFloat()
-        val innerY = 12f + (8.2f * sin(radians)).toFloat()
-        val outerX = 12f + (10.4f * cos(radians)).toFloat()
-        val outerY = 12f + (10.4f * sin(radians)).toFloat()
-        drawLine(tint, Offset(innerX, innerY), Offset(outerX, outerY), strokeWidth = 1.7f)
+    drawCircle(tint, radius = 8f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))
+    drawCircle(tint, radius = 3.2f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))
+}
+
+@Composable
+fun SunrisePrayerGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawArc(tint, startAngle = 180f, sweepAngle = 180f, useCenter = false, topLeft = Offset(6f, 7f), size = Size(12f, 12f), style = Stroke(width = 1.8f))
+    drawLine(tint, Offset(3f, 19f), Offset(21f, 19f), strokeWidth = 1.8f)
+    drawLine(tint, Offset(12f, 3f), Offset(12f, 5.5f), strokeWidth = 1.8f)
+}
+
+@Composable
+fun OctagramGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawRect(tint, topLeft = Offset(6f, 6f), size = Size(12f, 12f), style = Stroke(width = 1.8f))
+    scale(scale = 1f, pivot = Offset(12f, 12f)) {
+        // Rotated square form
+        val path = Path().apply {
+            moveTo(12f, 3.5f); lineTo(20.5f, 12f); lineTo(12f, 20.5f); lineTo(3.5f, 12f); close()
+        }
+        drawPath(path, tint, style = Stroke(width = 1.8f))
     }
 }
 
-/** Four tiles: the Tools destination. */
 @Composable
-fun ToolsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
-    val stroke = Stroke(width = 1.7f)
-    listOf(
-        Offset(4f, 4f),
-        Offset(13.4f, 4f),
-        Offset(4f, 13.4f),
-        Offset(13.4f, 13.4f),
-    ).forEach { origin ->
-        drawRoundRect(
-            color = tint,
-            topLeft = origin,
-            size = Size(6.6f, 6.6f),
-            cornerRadius = CornerRadius(1.8f, 1.8f),
-            style = stroke,
-        )
+fun SunRaysArt(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width, size.height * 0.5f)
+        val radius = size.minDimension * 0.45f
+        drawCircle(color = tint, radius = radius, center = center, style = Stroke(width = 1.8f))
+        drawCircle(color = tint, radius = radius * 0.85f, center = center, style = Stroke(width = 1.2f))
+        repeat(16) { i ->
+            val angle = (i * 22.5 * PI / 180.0)
+            val startR = radius + 6f
+            val endR = radius + if (i % 2 == 0) 36f else 20f
+            val p1 = Offset(center.x - (startR * cos(angle)).toFloat(), center.y + (startR * sin(angle)).toFloat())
+            val p2 = Offset(center.x - (endR * cos(angle)).toFloat(), center.y + (endR * sin(angle)).toFloat())
+            drawLine(color = tint, start = p1, end = p2, strokeWidth = 1.6f)
+        }
     }
 }

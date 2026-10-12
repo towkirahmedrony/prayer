@@ -1,138 +1,99 @@
 package io.github.towkirahmedrony.salah.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.ToolsGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.*
+import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
-import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
-import io.github.towkirahmedrony.salah.feature.app.AppViewModel
-import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
-import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
-import org.koin.androidx.compose.koinViewModel
+import io.github.towkirahmedrony.salah.core.model.ThemeMode
 
-/**
- * Application shell.
- *
- * **The location gate.** Everything Salah shows is derived from a place, so the shell decides in one
- * spot whether a usable location exists: while none does, the location setup screen *is* the app —
- * no navigation graph, no bottom bar, and therefore no way to reach a screen that would have to
- * invent a time. Once a location exists the graph is shown, and if the location is later cleared the
- * gate closes again on that same recomposition.
- */
 @Composable
-fun SalahApp() {
-    val appViewModel: AppViewModel = koinViewModel()
-    val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
-    val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
+fun SalahApp(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+) {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     SalahTheme(themeMode = themeMode) {
-        when {
-            setupState is LocationSetupState.Complete -> AppShell()
-
-            setupState.requiresSetup -> Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-            ) { innerPadding ->
-                LocationSetupScreen(modifier = Modifier.padding(innerPadding))
-            }
-
-            // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:
-            // the gate is short-lived, and the Home layout arriving into a screen that already has
-            // its shape is a smaller change than a spinner being swapped out for a whole screen.
-            else -> Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
-                HomeSkeleton(modifier = Modifier.padding(innerPadding))
-            }
-        }
-    }
-}
-
-/** The navigation graph with the bottom bar, shown once a usable location exists. */
-@Composable
-private fun AppShell() {
-    val navController = rememberNavController()
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            SalahBottomBar(
-                currentRoute = currentRoute,
-                onSelect = { destination -> navController.navigateToTopLevel(destination) },
-            )
-        },
-    ) { innerPadding ->
-        SalahNavHost(
-            navController = navController,
-            modifier = Modifier.padding(innerPadding),
-        )
-    }
-}
-
-@Composable
-private fun SalahBottomBar(
-    currentRoute: String?,
-    onSelect: (SalahDestination) -> Unit,
-) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-        SalahDestination.bottomBarDestinations.forEach { destination ->
-            NavigationBarItem(
-                selected = currentRoute == destination.route,
-                onClick = { onSelect(destination) },
-                icon = {
-                    DestinationGlyph(
-                        destination = destination,
-                        tint = MaterialTheme.colorScheme.primary,
+        Scaffold(
+            bottomBar = {
+                NavigationBar(
+                    containerColor = ForestGreenPrimary,
+                    contentColor = Color.White,
+                    tonalElevation = 0.dp,
+                ) {
+                    val destinations = listOf(
+                        SalahDestination.Home,
+                        SalahDestination.Calendar,
+                        SalahDestination.Ramadan,
+                        SalahDestination.Settings,
                     )
-                },
-                label = { Text(text = stringResource(destination.labelRes)) },
-            )
-        }
-    }
-}
 
-@Composable
-private fun DestinationGlyph(destination: SalahDestination, tint: Color) {
-    when (destination) {
-        SalahDestination.HOME -> DomeGlyph(tint = tint)
-        SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
-        SalahDestination.TOOLS -> ToolsGlyph(tint = tint)
-        SalahDestination.SETTINGS -> GearGlyph(tint = tint)
-        // The destinations below are not in the bottom bar; the glyphs only keep this `when`
-        // exhaustive and match the section each one belongs to.
-        SalahDestination.CALENDAR_SETTINGS -> CalendarGlyph(tint = tint)
-        SalahDestination.PRAYER -> CrescentGlyph(tint = tint)
-        SalahDestination.RAMADAN -> LanternGlyph(tint = tint)
-        SalahDestination.QIBLA -> QiblaGlyph(tint = tint)
-        SalahDestination.NOTIFICATIONS -> CrescentGlyph(tint = tint)
-        SalahDestination.LOCATION -> DomeGlyph(tint = tint)
-    }
-}
-
-private fun NavHostController.navigateToTopLevel(destination: SalahDestination) {
-    navigate(destination.route) {
-        popUpTo(SalahDestination.HOME.route) {
-            saveState = true
+                    destinations.forEach { dest ->
+                        val selected = currentRoute == dest.route
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(dest.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = {
+                                val tint = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
+                                when (dest) {
+                                    SalahDestination.Home -> DomeGlyph(tint = tint)
+                                    SalahDestination.Calendar -> CrescentGlyph(tint = tint)
+                                    SalahDestination.Ramadan -> CalendarGlyph(tint = tint)
+                                    SalahDestination.Settings -> GearGlyph(tint = tint)
+                                    else -> DomeGlyph(tint = tint)
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = when (dest) {
+                                        SalahDestination.Home -> "Home"
+                                        SalahDestination.Calendar -> "Prayer"
+                                        SalahDestination.Ramadan -> "Calendar"
+                                        SalahDestination.Settings -> "Settings"
+                                        else -> dest.route
+                                    },
+                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.6f),
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = Color.White.copy(alpha = 0.15f),
+                            ),
+                        )
+                    }
+                }
+            },
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(MaterialTheme.colorScheme.background),
+            ) {
+                SalahNavHost(
+                    navController = navController,
+                )
+            }
         }
-        launchSingleTop = true
-        restoreState = true
     }
 }

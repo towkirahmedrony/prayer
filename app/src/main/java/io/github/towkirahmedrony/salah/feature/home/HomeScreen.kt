@@ -1,19 +1,9 @@
 package io.github.towkirahmedrony.salah.feature.home
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -21,26 +11,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
-import io.github.towkirahmedrony.salah.feature.home.components.CalculationCard
-import io.github.towkirahmedrony.salah.feature.home.components.CurrentPrayerHero
-import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
-import io.github.towkirahmedrony.salah.feature.home.components.HomeHeader
-import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
-import io.github.towkirahmedrony.salah.feature.home.components.LocationCard
-import io.github.towkirahmedrony.salah.feature.home.components.NextPrayerHero
-import io.github.towkirahmedrony.salah.feature.home.components.PrayerStrip
-import io.github.towkirahmedrony.salah.feature.home.components.ProhibitedPanel
-import io.github.towkirahmedrony.salah.feature.home.components.ProvenanceCard
-import io.github.towkirahmedrony.salah.feature.home.components.ShortcutsCard
-import io.github.towkirahmedrony.salah.feature.home.components.SolarStrip
+import io.github.towkirahmedrony.salah.feature.home.components.*
 import org.koin.androidx.compose.koinViewModel
 
-/**
- * The Salah Home screen.
- *
- * It renders [HomeUiState] and nothing else: no repository access, no date math and no
- * countdown logic live here. Every section with missing data explains itself.
- */
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit,
@@ -50,17 +23,12 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val state = uiState) {
-        // A skeleton of this screen's own layout, not a centred spinner. It carries no value: no
-        // prayer name, no time and no countdown can be read off it, so there is nothing here that
-        // could be mistaken for a calculated time while the schedule is still being produced.
         HomeUiState.Loading -> HomeSkeleton(modifier)
-
         is HomeUiState.Failed -> HomeFailure(
             detail = state.detail,
             onRetry = viewModel::onRetry,
             modifier = modifier,
         )
-
         is HomeUiState.Ready -> HomeContent(
             state = state,
             onNavigate = onNavigate,
@@ -112,13 +80,17 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item(key = "header") {
-            HomeHeader(
+        item(key = "top-bar") {
+            HomeTopBar(onOpenSettings = { onNavigate("settings") })
+        }
+
+        item(key = "location-header") {
+            LocationAndDateHeader(
                 state = state,
-                onOpenSettings = { onNavigate("settings") },
+                onOpenLocation = { onNavigate("settings") },
             )
         }
 
@@ -128,52 +100,29 @@ private fun HomeContent(
             }
         }
 
-        // The period that is open right now leads; the next prayer follows as the secondary
-        // reading. Both are driven by the same tick, so they cannot disagree about the clock.
-        item(key = "current-prayer") {
-            CurrentPrayerHero(state = state.currentPrayer)
+        item(key = "current-hero") {
+            CurrentPrayerHeroCard(state = state.currentPrayer)
         }
 
-        item(key = "next-prayer") {
-            NextPrayerHero(state = state.nextPrayer)
-        }
-
-        item(key = "prayer-strip") {
-            PrayerStrip(rows = state.prayerRows)
-        }
-
-        item(key = "solar") {
-            SolarStrip(rows = state.solarRows)
-        }
-
-        item(key = "prohibited") {
-            ProhibitedPanel(state = state.prohibited)
-        }
-
-        item(key = "shortcuts") {
-            ShortcutsCard(onNavigate = onNavigate)
-        }
-
-        item(key = "location") {
-            LocationCard(
-                location = state.location,
-                onOpenSettings = { onNavigate("settings") },
+        item(key = "prayer-times") {
+            TodayPrayerTimesSection(
+                rows = state.prayerRows,
+                onViewAll = { onNavigate("calendar") },
             )
         }
 
-        item(key = "calculation") {
-            CalculationCard(
-                state = state.calculation,
-                onOpenSettings = { onNavigate("settings") },
+        item(key = "forbidden-times") {
+            ForbiddenTimesCard(
+                onViewDetails = { onNavigate("calendar") },
             )
         }
 
-        item(key = "provenance") {
-            ProvenanceCard(state = state.provenance)
+        item(key = "daily-tools") {
+            DailyToolsSection(onNavigate = onNavigate)
         }
 
-        item(key = "footer-spacer") {
-            Spacer(modifier = Modifier.fillMaxWidth().height(8.dp))
+        item(key = "spacer-bottom") {
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
