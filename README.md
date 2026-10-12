@@ -48,7 +48,7 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Prayer, Calendar (with its settings), Ramadan, Settings, Notifications, Qibla | Implemented (every destination is a real screen; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate and the Qibla feature | Implemented (633 test methods) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate and the Qibla feature | Implemented (635 test methods) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |

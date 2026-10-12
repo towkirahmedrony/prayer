@@ -72,9 +72,22 @@ than a second drawing of it.
 **Device fix.** `LocationProvider` is a one-shot port. The Android implementation
 (`AndroidLocationProvider`) uses `LocationManagerCompat.getCurrentLocation` — the framework provider,
 not Google Play Services — with a bounded wait, and registers no listener after returning. A fix is
-never saved on sight: it is checked against the country policy, attributed to an area where possible,
-and shown as a *pending* fix the user confirms. Nothing replaces the stored location until the user
-taps **Use this location**.
+always checked against the country policy and attributed to an area where possible, and **when it is
+written depends on which screen asked for it**:
+
+- **First launch** stores it as soon as it passes the policy. Granting the permission and getting a
+  fix is the whole interaction, and the app opens on it: a fresh install has no location to compare
+  against, and a confirmation step there stands between the user and the app for a decision that is as
+  reversible in Settings as any other. The screen shows the progress indicator until the write has
+  landed, so a second tap cannot start a second request.
+- **The location screen**, reached later from Settings, holds it as a *pending* fix. That screen is
+  reviewing a location the user already has, and the area name is a nearest-match estimate worth a
+  look before it replaces something they chose. Nothing replaces the stored location until the user
+  taps **Use this location**.
+
+Either way a position outside Bangladesh is refused and nothing is written: saving without asking is
+not saving without checking. `useCurrentLocation(saveOnArrival = …)` is the whole of the difference,
+and the validation, the messages and the manual option are identical on both paths.
 
 **Manual selection.** Three levels, in order: the divisions, then the districts of the chosen division,
 then the upazilas/thanas of the chosen district. `AreaSelection` is the guard: choosing a level clears
@@ -299,9 +312,10 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   dataset read, and the answer moves in **both** directions as the stored location is saved and
   cleared (the property that rules out a `setup_complete` flag).
 - `LocationViewModelTest` — what a tap does, on virtual time with the real view model, resolvers and
-  coordinator: a fix is held rather than saved on sight and only stored on confirmation, a declined
-  permission and a timeout each leave their message and the manual option, a position outside
-  Bangladesh is refused and stores nothing, a second tap during a fix starts one request, the
+  coordinator: a fix asked for by the location screen is held rather than saved on sight and only
+  stored on confirmation, a fix asked for on first launch is stored on arrival, a fix outside
+  Bangladesh is refused and stores nothing on **either** path, a declined permission and a timeout
+  each leave their message and the manual option, a second tap during a fix starts one request, the
   cascade drops a child its new parent cannot keep, and a confirmed selection stores the chosen
   area's published centre with `AREA_SELECTION` provenance while a partial one is refused.
 - `DeviceFixAdoptionPolicyTest` — the Qibla write-path decision (adopted vs preserved, and why).

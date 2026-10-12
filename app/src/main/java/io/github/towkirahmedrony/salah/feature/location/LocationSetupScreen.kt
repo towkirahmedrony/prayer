@@ -90,6 +90,16 @@ import kotlin.math.sin
  * **Both options always work.** Neither the manual card nor its button depends on location
  * permission, so a user who declines GPS is not trapped: the card below the divider is the whole
  * screen's second answer, not a fallback.
+ *
+ * **A device fix is not confirmed here.** Granting the permission and a fix that passes the
+ * Bangladesh-only policy is the whole interaction: the location is stored where it lands and this
+ * screen is replaced by the app on the next recomposition. Nothing is skipped in the process — the
+ * position is still validated against the boundary, and a position outside Bangladesh is still
+ * refused with its own message — but there is no "is this the right area?" card standing between the
+ * user and the app on a fresh install, for a decision that is as reversible in Settings as any other
+ * location change. `LocationScreen`, reached later from Settings, keeps that confirmation: there the
+ * user is replacing a location they already have, and the nearest-match area name is worth a look
+ * before it replaces something they chose.
  */
 @Composable
 fun LocationSetupScreen(
@@ -111,9 +121,14 @@ fun LocationSetupScreen(
     // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
     // platform facts it needs. It is only ever invoked by the screen's own button, so displaying
     // this screen never prompts for anything.
+    //
+    // `saveOnArrival` is what makes this screen different from the location screen: granting the
+    // permission and a verified fix is the whole interaction, and the app opens on the next
+    // recomposition. There is no confirmation card here — see the class documentation.
     val onUseDeviceLocation = rememberDeviceLocationAction(
         viewModel = viewModel,
         permissionState = state.permissionState,
+        saveOnArrival = true,
     )
 
     SetupContent(
@@ -127,8 +142,6 @@ fun LocationSetupScreen(
         onSelectDistrict = viewModel::selectDistrict,
         onSelectUpazila = viewModel::selectUpazila,
         onSaveSelection = viewModel::saveSelectedArea,
-        onConfirmFix = viewModel::confirmPendingFix,
-        onDiscardFix = viewModel::discardPendingFix,
         onDismissMessage = viewModel::dismissMessage,
     )
 }
@@ -149,8 +162,6 @@ private fun SetupContent(
     onSelectDistrict: (String) -> Unit,
     onSelectUpazila: (String) -> Unit,
     onSaveSelection: () -> Unit,
-    onConfirmFix: () -> Unit,
-    onDiscardFix: () -> Unit,
     onDismissMessage: () -> Unit,
 ) {
     Column(
@@ -189,20 +200,6 @@ private fun SetupContent(
             state = state,
             onUseDeviceLocation = onUseDeviceLocation,
         )
-
-        // A fix is never saved on sight: it is held for confirmation, and that card carries the
-        // confirm and discard actions. Shown directly under the card whose button produced it.
-        state.pendingFix?.let { fix ->
-            Spacer(modifier = Modifier.height(14.dp))
-            PendingFixCard(
-                fix = fix,
-                onConfirm = onConfirmFix,
-                onDiscard = onDiscardFix,
-                // There is no separate picker to open here: the manual card is already on screen,
-                // so dismissing the fix is what puts the area dropdowns back in reach.
-                onChooseArea = onDiscardFix,
-            )
-        }
 
         state.message?.let { message ->
             Spacer(modifier = Modifier.height(14.dp))
@@ -320,35 +317,34 @@ private fun UseCurrentLocationCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        // One acquisition at a time: while a fix is in flight, or waiting to be confirmed in the
-        // card below, the button that would start another one is not offered.
-        if (state.pendingFix == null) {
-            Spacer(modifier = Modifier.height(14.dp))
-            if (state.isAcquiring) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.location_gps_acquiring),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Button(
-                    onClick = onUseDeviceLocation,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.isLoading,
-                ) {
-                    Text(text = stringResource(R.string.location_setup_gps_action))
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = stringResource(R.string.location_setup_gps_caption),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        // One acquisition at a time: while a fix is in flight the button that would start another one
+        // is not offered. There is no "waiting to be confirmed" state on this screen — a fix that
+        // passes the policy is stored where it lands.
+        Spacer(modifier = Modifier.height(14.dp))
+        if (state.isAcquiring) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.location_gps_acquiring),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Button(
+                onClick = onUseDeviceLocation,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading,
+            ) {
+                Text(text = stringResource(R.string.location_setup_gps_action))
             }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.location_setup_gps_caption),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

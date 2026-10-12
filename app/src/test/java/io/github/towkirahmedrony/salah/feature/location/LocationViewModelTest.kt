@@ -54,7 +54,9 @@ import kotlin.time.Duration
  * [LocationSetupScreen] and [LocationScreen] are two framings of this one view model, so the rules
  * that decide what a tap does are tested here rather than through either Compose tree:
  *
- *  - a device fix is checked and *held*, never saved on sight, and confirming it is what stores it;
+ *  - a device fix is checked against the Bangladesh-only policy on **both** paths, and what differs is
+ *    only when it is written: the location screen holds it for confirmation, the first-launch screen
+ *    stores it on arrival — so granting the permission is enough to reach the app;
  *  - a declined permission, a timeout and a position outside Bangladesh each produce their own
  *    message and leave the manual option usable — none of them stores anything;
  *  - a second tap while a fix is in flight starts one request, not two;
@@ -102,6 +104,7 @@ class LocationViewModelTest {
 
     // --- A device fix ----------------------------------------------------------
 
+    // The default, which is the location screen's behaviour: a fix is held, not written.
     @Test
     fun `a fix waits for confirmation and is not stored on sight`() = runTest(mainDispatcher) {
         val provider = FakeLocationProvider().apply { fixAt(KUSHTIA_CENTRE) }
@@ -130,6 +133,55 @@ class LocationViewModelTest {
         assertEquals(LocationOrigin.DEVICE_GPS, saved!!.origin)
         // A fix is stored in Bangladesh's zone, not whichever zone the phone is in.
         assertEquals(BangladeshLocationPolicy.TIME_ZONE_ID, saved.timeZoneId)
+    }
+
+    @Test
+    fun `a first-launch fix is stored on arrival without a confirmation step`() =
+        runTest(mainDispatcher) {
+            val provider = FakeLocationProvider().apply { fixAt(KUSHTIA_CENTRE) }
+            val viewModel = viewModel(provider = provider)
+            val states = observe(viewModel)
+            viewModel.start()
+            runCurrent()
+
+            // What the first-launch screen asks for: granting the permission and a fix that passes the
+            // policy is the whole interaction, and the app opens on it.
+            viewModel.useCurrentLocation(saveOnArrival = true)
+            runCurrent()
+
+            val state = states.settled()
+            assertNull("nothing may be left waiting for a confirmation", state.pendingFix)
+            assertEquals(LocationMessage.Saved, state.message)
+            assertFalse(state.isAcquiring)
+
+            val saved = locations.location.first()
+            assertNotNull("the fix must be stored", saved)
+            assertEquals(LocationOrigin.DEVICE_GPS, saved!!.origin)
+            assertEquals(23.90, saved.latitude, 0.000001)
+            assertEquals(89.12, saved.longitude, 0.000001)
+            assertEquals(BangladeshLocationPolicy.TIME_ZONE_ID, saved.timeZoneId)
+        }
+
+    @Test
+    fun `a first-launch fix outside Bangladesh is refused just the same`() = runTest(mainDispatcher) {
+        // Saving without asking is not saving without checking: the policy runs before the write on
+        // both paths, so an unsupported position is refused and nothing is stored.
+        val provider = FakeLocationProvider().apply { fixAt(GeoPoint(51.5074, -0.1278)) }
+        val viewModel = viewModel(provider = provider)
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.useCurrentLocation(saveOnArrival = true)
+        runCurrent()
+
+        val state = states.settled()
+        assertTrue(
+            "expected an outside-the-country message, was ${state.message}",
+            state.message is LocationMessage.OutsideSupportedCountry,
+        )
+        assertNull(state.pendingFix)
+        assertNull("an unsupported position must never be stored", locations.location.first())
     }
 
     @Test

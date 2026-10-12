@@ -125,12 +125,23 @@ class LocationViewModel(
     // Device location --------------------------------------------------------
 
     /**
-     * Asks the platform for one position.
+     * Asks the platform for one position, and stores it if it passes the Bangladesh-only policy.
      *
      * The screen requests the permission before calling this; a call without permission returns
      * [LocationAcquisitionResult.PermissionDenied] rather than throwing, so the same path reports it.
+     *
+     * @param saveOnArrival when true, a fix is stored as soon as it arrives instead of being held for
+     *   confirmation. The first-launch screen passes true: on a fresh install there is no existing
+     *   location to compare a position against, and a confirmation step there stands between the user
+     *   and the app for a decision they can reverse in Settings like any other location change. The
+     *   location screen leaves it false, where the confirmation is the point — the user is reviewing a
+     *   location they already have, and the area name is a nearest-match estimate worth a look before
+     *   it replaces something they chose.
+     *
+     * The policy check itself is the same either way, and a position outside Bangladesh is refused
+     * either way: saving without asking is not saving without checking.
      */
-    fun useCurrentLocation() {
+    fun useCurrentLocation(saveOnArrival: Boolean = false) {
         // One acquisition at a time. A second tap while a fix is already in flight is ignored rather
         // than starting a second request: the two would race to set `pendingFix`, and the loser could
         // replace the fix the user is looking at.
@@ -153,7 +164,7 @@ class LocationViewModel(
                     LocationAcquisitionResult.Failed(error.javaClass.simpleName)
                 }
                 when (result) {
-                    is LocationAcquisitionResult.Acquired -> onFixAcquired(result)
+                    is LocationAcquisitionResult.Acquired -> onFixAcquired(result, saveOnArrival)
                     LocationAcquisitionResult.TimedOut -> show(LocationMessage.TimedOut)
                     LocationAcquisitionResult.PermissionDenied -> show(LocationMessage.PermissionDenied)
                     LocationAcquisitionResult.ServicesDisabled -> show(LocationMessage.ServicesDisabled)
@@ -174,12 +185,16 @@ class LocationViewModel(
     }
 
     /**
-     * Applies the Bangladesh-only policy to a fix and, if it passes, holds it for confirmation.
+     * Applies the Bangladesh-only policy to a fix and, if it passes, either holds it for confirmation
+     * or stores it outright ([saveOnArrival]).
      *
      * The policy runs here rather than in the screen so there is exactly one place a position can
      * become a location, and so the "outside Bangladesh" decision is testable without a device.
      */
-    private fun onFixAcquired(fix: LocationAcquisitionResult.Acquired) {
+    private suspend fun onFixAcquired(
+        fix: LocationAcquisitionResult.Acquired,
+        saveOnArrival: Boolean,
+    ) {
         val point = GeoPoint(latitude = fix.latitude, longitude = fix.longitude)
         val dataset = datasetSlot.value.dataset
         val check = dataset?.let { BangladeshLocationPolicy.check(point, it.boundaryRings) }
@@ -225,55 +240,69 @@ class LocationViewModel(
             )
         }
 
-        transient.update {
-            it.copy(
-                pendingFix = PendingDeviceFix(
-                    point = point,
-                    accuracyMetres = fix.accuracyMetres,
-                    acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
-                    resolution = resolution,
-                    countryCode = if (verified) BangladeshLocationPolicy.COUNTRY_CODE else null,
-                    isCountryVerified = verified,
-                    isWithinBoundaryTolerance = withinTolerance,
-                ),
-                message = null,
-            )
+        val accepted = PendingDeviceFix(
+            point = point,
+            accuracyMetres = fix.accuracyMetres,
+            acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
+            resolution = resolution,
+            countryCode = if (verified) BangladeshLocationPolicy.COUNTRY_CODE else null,
+            isCountryVerified = verified,
+            isWithinBoundaryTolerance = withinTolerance,
+        )
+
+        if (saveOnArrival) {
+            // Stored inside this coroutine rather than launched alongside it, so `isAcquiring` stays
+            // true until the location exists: the screen cannot offer a second request while the
+            // first one is still being written, and the gate opens the moment the write lands.
+            saveDeviceFix(accepted)
+            return
         }
+
+        transient.update { it.copy(pendingFix = accepted, message = null) }
     }
 
     /** Saves the fix the user confirmed, then brings the notification schedule up to date. */
     fun confirmPendingFix() {
         val fix = transient.value.pendingFix ?: return
-        viewModelScope.launch {
-            val saved = locations.saveDeviceLocation(
-                label = fix.suggestedArea?.label ?: DEVICE_LABEL,
-                latitude = fix.point.latitude,
-                longitude = fix.point.longitude,
-                // The country is fixed and has one zone, so a device fix is stored in Bangladesh's zone
-                // rather than whichever zone the phone happens to be set to.
-                timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
-                accuracyMetres = fix.accuracyMetres,
-                acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
-                countryCode = fix.countryCode,
-                area = fix.suggestedArea,
-                datasetVersion = fix.suggestedArea?.let { datasetSlot.value.dataset?.version },
-            )
-            if (!saved) {
-                logger.warn(SalahDiagnosticEvents.LOCATION_SAVE_REJECTED, mapOf("origin" to "device_gps"))
-                show(LocationMessage.SaveRejected)
-                return@launch
-            }
-            logger.info(
-                SalahDiagnosticEvents.LOCATION_SAVED,
-                mapOf(
-                    "origin" to "device_gps",
-                    "hasArea" to (fix.suggestedArea != null),
-                    "verified" to fix.isCountryVerified,
-                ),
-            )
-            transient.update { it.copy(pendingFix = null, message = LocationMessage.Saved) }
-            reconcileNotifications()
+        viewModelScope.launch { saveDeviceFix(fix) }
+    }
+
+    /**
+     * Writes an accepted fix to the store and reconciles what depends on it.
+     *
+     * The last step before a position becomes the app's location, for both entry points: the first
+     * launch arrives here as soon as a fix passes the policy, the location screen only after the user
+     * has confirmed one.
+     */
+    private suspend fun saveDeviceFix(fix: PendingDeviceFix) {
+        val saved = locations.saveDeviceLocation(
+            label = fix.suggestedArea?.label ?: DEVICE_LABEL,
+            latitude = fix.point.latitude,
+            longitude = fix.point.longitude,
+            // The country is fixed and has one zone, so a device fix is stored in Bangladesh's zone
+            // rather than whichever zone the phone happens to be set to.
+            timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+            accuracyMetres = fix.accuracyMetres,
+            acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
+            countryCode = fix.countryCode,
+            area = fix.suggestedArea,
+            datasetVersion = fix.suggestedArea?.let { datasetSlot.value.dataset?.version },
+        )
+        if (!saved) {
+            logger.warn(SalahDiagnosticEvents.LOCATION_SAVE_REJECTED, mapOf("origin" to "device_gps"))
+            show(LocationMessage.SaveRejected)
+            return
         }
+        logger.info(
+            SalahDiagnosticEvents.LOCATION_SAVED,
+            mapOf(
+                "origin" to "device_gps",
+                "hasArea" to (fix.suggestedArea != null),
+                "verified" to fix.isCountryVerified,
+            ),
+        )
+        transient.update { it.copy(pendingFix = null, message = LocationMessage.Saved) }
+        reconcileNotifications()
     }
 
     /** Discards the fix without saving it, leaving the stored location untouched. */

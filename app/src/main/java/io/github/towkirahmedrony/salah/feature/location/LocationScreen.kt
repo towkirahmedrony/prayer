@@ -416,7 +416,7 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
 }
 
 @Composable
-internal fun PendingFixCard(
+private fun PendingFixCard(
     fix: PendingDeviceFix,
     onConfirm: () -> Unit,
     onDiscard: () -> Unit,
@@ -723,11 +723,17 @@ private fun freshnessRes(freshness: LocationFreshness): Int = when (freshness) {
  * permission handling is written once: the launcher, the decision from [LocationPermissionPolicy], and
  * the two settings paths. Manual area selection is unaffected by any of it and stays usable with the
  * permission denied.
+ *
+ * @param saveOnArrival passed straight through to [LocationViewModel.useCurrentLocation]: true on the
+ *   first-launch screen, where a verified fix is the answer and the app opens on it, and false on the
+ *   location screen, which holds a fix for confirmation. Only the moment of the write differs; asking
+ *   for the permission, and what happens when it is refused, are the same on both.
  */
 @Composable
 internal fun rememberDeviceLocationAction(
     viewModel: LocationViewModel,
     permissionState: LocationPermissionState,
+    saveOnArrival: Boolean = false,
 ): () -> Unit {
     val context = LocalContext.current
     val activity = context.findActivity()
@@ -738,7 +744,7 @@ internal fun rememberDeviceLocationAction(
     ) { grants ->
         if (grants.values.any { granted -> granted }) {
             viewModel.refreshPermissionState()
-            viewModel.useCurrentLocation()
+            viewModel.useCurrentLocation(saveOnArrival = saveOnArrival)
         } else {
             viewModel.onLocationPermissionDenied()
         }
@@ -764,7 +770,8 @@ internal fun rememberDeviceLocationAction(
                 shouldShowRationale = shouldShowRationale,
             )
         ) {
-            LocationPermissionAction.ALREADY_GRANTED -> viewModel.useCurrentLocation()
+            LocationPermissionAction.ALREADY_GRANTED ->
+                viewModel.useCurrentLocation(saveOnArrival = saveOnArrival)
             LocationPermissionAction.REQUEST -> {
                 hasRequestedDialog = true
                 permissionLauncher.launch(LOCATION_PERMISSIONS)
