@@ -103,7 +103,8 @@ class AssetBangladeshAreaCatalog(
          *
          * Not read from the file header: a value the app reads out of its own data could differ between
          * devices if a file were edited, and the point of the version is that it identifies the build's
-         * dataset. It matches the generator's `COD_VERSION_NOTE`.
+         * dataset. It names the same release as the generator's `COD_VERSION_NOTE`
+         * (`COD-AB BGD v03 (valid_on 2023-05-21)`), written for display rather than for a file header.
          */
         const val VERSION: String = "BGD-COD-AB v03 (2023-05-21)"
     }

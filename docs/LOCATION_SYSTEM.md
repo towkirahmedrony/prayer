@@ -107,10 +107,13 @@ derivation is auditable and repeatable:
 2. **`nuhil/bangladesh-geocode`** (MIT). Used **only** for the Bangla name of a unit, joined by name.
    Licence: MIT, https://github.com/nuhil/bangladesh-geocode.
 
-**Version.** The dataset identifies itself as `BGD-COD-AB v03 (2023-05-21)`
-(`AssetBangladeshAreaCatalog.VERSION`, matching the generator's `COD_VERSION_NOTE`). The version is a
-constant, not read from the file, so it identifies the build's dataset rather than whatever a
-particular copy of the file happens to contain.
+**Version.** The dataset identifies itself as `BGD-COD-AB v03 (2023-05-21)`, the value of
+`AssetBangladeshAreaCatalog.VERSION` shown in the UI and stored with a selected area. The generator
+labels the same release `COD_VERSION_NOTE = "COD-AB BGD v03 (valid_on 2023-05-21)"`; the two strings
+are not byte-identical (one is written for display, the other for the file header), but both name the
+same source release, COD-AB v03 with a validity date of 2023-05-21. The version is a constant, not read
+from the file, so it identifies the build's dataset rather than whatever a particular copy of the file
+happens to contain.
 
 **Format.** Tab-separated text with `#` comments, seven columns per data row
 (`level, id, parent_id, name, bn_name, latitude, longitude`) and three for the boundary
