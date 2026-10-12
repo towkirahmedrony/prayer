@@ -20,8 +20,13 @@ import kotlinx.coroutines.launch
 
 /**
  * App-level state shared above the navigation graph: the theme, and whether Salah has a location it
- * can work with. The gate reports [LocationSetupState.Checking] until both the dataset and the stored
- * location have arrived.
+ * can work with.
+ *
+ * **Optimistic gate.** A stored location is accepted as soon as it arrives, using only the coarse
+ * bounds check (which needs no dataset). The dataset then loads in the background and the full
+ * validation (boundary polygon, area still in the dataset) re-runs when it arrives, so a stored
+ * location that fails it still returns the app to setup. Without a stored location the gate still
+ * waits for the dataset, because the setup screen needs it.
  */
 class AppViewModel(
     userPreferencesRepository: UserPreferencesRepository,
@@ -43,10 +48,10 @@ class AppViewModel(
         dataset,
         datasetRead,
     ) { stored, loadedDataset, hasRead ->
-        if (!hasRead) {
-            LocationSetupState.Checking
-        } else {
-            LocationSetup.evaluate(stored = stored, dataset = loadedDataset)
+        when {
+            hasRead -> LocationSetup.evaluate(stored = stored, dataset = loadedDataset)
+            stored != null -> LocationSetup.evaluate(stored = stored, dataset = null)
+            else -> LocationSetupState.Checking
         }
     }.stateIn(
         scope = viewModelScope,
