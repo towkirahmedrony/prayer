@@ -168,7 +168,9 @@ class AppViewModelTest {
 
     @Test
     fun `the gate follows the stored location in both directions`() = runTest(mainDispatcher) {
-        val viewModel = viewModel(FakeBangladeshAreaCatalog(syntheticDataset()))
+        // The real dataset: this test moves `dhaka` in and out, and the synthetic square the other
+        // tests use stops at 90.0°E, which Dhaka is outside.
+        val viewModel = viewModel(FakeBangladeshAreaCatalog(BundledDataset.load()))
         runCurrent()
         assertEquals(LocationSetupReason.NO_LOCATION, viewModel.locationSetup.value.requiredReason())
 
