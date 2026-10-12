@@ -6,10 +6,11 @@ import io.github.towkirahmedrony.salah.StartupTrace
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
-import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
-import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.startup.PrayerSettingsState
+import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
+import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.ZoneId
@@ -57,6 +59,13 @@ import java.time.ZonedDateTime
  * what keeps the clock tick from producing redundant calculations: the request is de-duplicated, and
  * a request that has not actually changed never reaches the repository again.
  *
+ * **Where the location and settings come from.** Both are read from the start-up
+ * [StartupSnapshot], which has already read them into a [StateFlow] before Home is composed. That
+ * matters because Home's essential state is assembled during composition: reading them from the
+ * cold repositories here would make the prayer times wait on a dispatch onto a main thread that is
+ * busy with the frame being composed. The snapshot is kept current, so a location or settings change
+ * still recalculates exactly as before.
+ *
  * The tick runs only while the screen is subscribed ([SharingStarted.WhileSubscribed]), so nothing
  * keeps ticking in the background once the user leaves Home. No WorkManager job is involved: a
  * countdown is not a deferrable task, and a periodic job would be the wrong mechanism for it. Prayer
@@ -65,8 +74,7 @@ import java.time.ZonedDateTime
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
-    private val locationRepository: LocationRepository,
-    private val userPreferencesRepository: UserPreferencesRepository,
+    private val startup: StartupSnapshot,
     private val prayerScheduleRepository: PrayerScheduleRepository,
     private val calendarRepository: CalendarRepository,
     private val prohibitedPeriodsRepository: ProhibitedPeriodsRepository,
@@ -92,9 +100,13 @@ class HomeViewModel(
      *
      * `home_location_ready` measures the transition the header depends on, not the composition of the
      * screen: the location arriving into Home is the point from which a correct place name can be
-     * shown.
+     * shown. Nothing is emitted while the snapshot is still reading, so Home can never see an
+     * absence of location that is really an absence of an answer.
      */
-    private val location: Flow<LocationInfo?> = locationRepository.location
+    private val location: Flow<LocationInfo?> = startup.storedLocation
+        .transform { state ->
+            if (state is StoredLocationState.Loaded) emit(state.location)
+        }
         .onEach { configured ->
             if (configured != null && !homeLocationReadyMarked) {
                 homeLocationReadyMarked = true
@@ -102,7 +114,10 @@ class HomeViewModel(
             }
         }
 
-    private val settings: Flow<PrayerSettings> = userPreferencesRepository.prayerSettings
+    private val settings: Flow<PrayerSettings> = startup.prayerSettings
+        .transform { state ->
+            if (state is PrayerSettingsState.Loaded) emit(state.settings)
+        }
 
     /**
      * The current instant, re-read every second while the screen is visible.

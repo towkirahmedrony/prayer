@@ -8,9 +8,8 @@ import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
-import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
-import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationChannels
 import io.github.towkirahmedrony.salah.di.salahModules
@@ -36,7 +35,10 @@ import java.time.ZonedDateTime
  * correct prayer times is started and finished first, and everything else runs afterwards so it can
  * never hold Home on its skeleton.
  *
- *  1. The stored location — the one input both the location gate and Home wait for.
+ *  1. The stored location and the prayer settings, read once into [StartupSnapshot]. The snapshot is
+ *     created here rather than left to the first screen that needs it, because the gate and Home read
+ *     it during the first composition: the values have to be in place before that, not looked for
+ *     during it.
  *  2. Today's schedule for that location, calculated off the main thread. This overlaps the gate and
  *     Compose setup, so when Home opens its request is a cache hit rather than a fresh calculation.
  *  3. The bundled Bangladesh dataset and the notification reconciliation, in the background. Home does
@@ -71,20 +73,24 @@ class SalahApplication : Application() {
         val koin = GlobalContext.get()
         val scope = runCatching { koin.get<CoroutineScope>() }.getOrNull() ?: return
 
+        // Resolving the snapshot here is what starts the one shared read of the stored location and
+        // the prayer settings. Left to a lazy `get()` from a view model it would not start until the
+        // first screen asked for it — which is the first composition, the one moment it is too late
+        // to spare.
+        val snapshot = runCatching { koin.get<StartupSnapshot>() }.getOrNull()
+
         scope.launch {
-            // Started in parallel; only the location is awaited on the Home-critical path.
-            val location = async(Dispatchers.IO) {
-                runCatching { koin.get<LocationRepository>().location.first() }.getOrNull()
-            }
+            // Started in parallel; only the Home-critical values are awaited on this path.
             val dataset = async(Dispatchers.IO) {
                 runCatching { koin.get<BangladeshAreaCatalog>().dataset() }
             }
 
-            val storedLocation = location.await()
+            // `null` means no location is configured, which the gate handles; it is not a failure.
+            val storedLocation = runCatching { snapshot?.awaitStoredLocation() }.getOrNull()
             StartupTrace.mark("prefetch_location_done")
 
             // Home-critical: today's schedule, so it is already cached when Home opens.
-            warmHomeSchedule(koin, storedLocation)
+            warmHomeSchedule(koin, storedLocation, snapshot)
 
             // Non-Home work. The dataset is needed by the setup screen and later screens, never by
             // Home, so it is awaited here and not before the schedule warm-up.
@@ -121,17 +127,21 @@ class SalahApplication : Application() {
      * nothing would ever display those times. Non-fatal throughout — a failure here just means Home
      * calculates on open, exactly as it would without this warm-up.
      */
-    private suspend fun warmHomeSchedule(koin: Koin, location: LocationInfo?) {
-        if (location == null) return
+    private suspend fun warmHomeSchedule(
+        koin: Koin,
+        location: LocationInfo?,
+        snapshot: StartupSnapshot?,
+    ) {
+        if (location == null || snapshot == null) return
         val insideSupportedCountry = BangladeshLocationPolicy.isWithinCoarseBounds(
             GeoPoint(latitude = location.latitude, longitude = location.longitude),
         )
         if (!insideSupportedCountry) return
 
         val schedules = runCatching { koin.get<PrayerScheduleRepository>() }.getOrNull() ?: return
-        val settings = runCatching {
-            koin.get<UserPreferencesRepository>().prayerSettings.first()
-        }.getOrNull() ?: return
+        // From the snapshot, so this warm-up and Home calculate the profile the same way instead of
+        // reading the store twice and agreeing only by coincidence.
+        val settings = runCatching { snapshot.awaitPrayerSettings() }.getOrNull() ?: return
 
         val request = PrayerScheduleRequest(
             date = ZonedDateTime.ofInstant(koin.get<Clock>().instant(), location.zoneId).toLocalDate(),

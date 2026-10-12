@@ -32,6 +32,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotification
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
@@ -117,6 +118,18 @@ val salahModules = module {
     single<BangladeshAreaCatalog> { AssetBangladeshAreaCatalog(androidContext(), get()) }
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
+    }
+
+    // Start-up snapshot -------------------------------------------------------
+    // The two values the location gate and Home need before they can render anything correct, read
+    // once and published hot so the first composition can read them without waiting for a dispatch
+    // the first frame would queue behind. Resolved during application start-up; see StartupSnapshot.
+    single {
+        StartupSnapshot(
+            storedLocationSource = get<LocationRepository>().location,
+            prayerSettingsSource = get<UserPreferencesRepository>().prayerSettings,
+            scope = get(),
+        )
     }
 
     // Calendar ----------------------------------------------------------------
@@ -236,7 +249,7 @@ val salahModules = module {
     viewModel {
         AppViewModel(
             userPreferencesRepository = get(),
-            locationRepository = get(),
+            startup = get(),
             areaCatalog = get(),
         )
     }
@@ -256,8 +269,7 @@ val salahModules = module {
     }
     viewModel {
         HomeViewModel(
-            locationRepository = get(),
-            userPreferencesRepository = get(),
+            startup = get(),
             prayerScheduleRepository = get(),
             calendarRepository = get(),
             prohibitedPeriodsRepository = get(),
