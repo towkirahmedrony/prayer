@@ -162,7 +162,12 @@ class HomeViewModelTest {
             runCurrent()
 
             // Today's schedule, plus tomorrow's so Isha's period can be closed at the next Fajr.
-            assertEquals(listOf(date, date.plusDays(1)), repository.requestedDates())
+            // Which of the two the view model asks for first is not part of the contract — they are
+            // two independent shared flows, and either may reach the repository first — so the
+            // assertion is about what was asked for, not the order it was asked in.
+            val initialRequests = repository.requestedDates()
+            assertEquals(2, initialRequests.size)
+            assertEquals(setOf(date, date.plusDays(1)), initialRequests.toSet())
             assertNull("a real schedule means no unavailability note", latestReady(states).timetableNote)
 
             // Ten more ticks inside the same local day. The request has not changed, so the
@@ -170,17 +175,25 @@ class HomeViewModelTest {
             clock.set(instant.plusSeconds(10))
             tick(10_000)
 
-            assertEquals(listOf(date, date.plusDays(1)), repository.requestedDates())
+            assertEquals(
+                "a tick must not recalculate the schedule",
+                initialRequests,
+                repository.requestedDates(),
+            )
             assertEquals("57:50", latestReady(states).currentPrayer.countdown)
 
-            // The local day rolls over: the new day's schedule is asked for, and the following
-            // day's with it. That is the date change reaching the data source.
+            // The local day rolls over: the new day's schedule is asked for, and the day after it.
+            // That is the date change reaching the data source.
             clock.set(instant.plusSeconds(86_400))
             tick(1_000)
 
+            val afterRollover = repository.requestedDates()
+            assertEquals(4, afterRollover.size)
+            assertEquals(setOf(date, date.plusDays(1), date.plusDays(2)), afterRollover.toSet())
             assertEquals(
-                listOf(date, date.plusDays(1), date.plusDays(1), date.plusDays(2)),
-                repository.requestedDates(),
+                "the new day is asked for as today, having also been asked for as tomorrow",
+                2,
+                afterRollover.count { it == date.plusDays(1) },
             )
         }
 
