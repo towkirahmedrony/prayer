@@ -152,6 +152,7 @@ fun CalendarSettingsScreen(
                 text = stringResource(
                     R.string.calendar_hijri_adjustment_range,
                     CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
+                    CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

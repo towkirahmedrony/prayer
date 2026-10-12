@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Salah ships a deliberately **partial** Bangla translation
+  (`app/src/main/res/values-bn/strings.xml`), and this file is where that decision is recorded.
+
+  The strings the Bangla file defines are the ones whose meaning is unambiguous: the names of the
+  calendars, months, prayers and observances, and the short navigation and calendar labels. The
+  explanatory strings — the ones that state what is an estimate, what Salah cannot verify, and which
+  authority it does not claim to match — stay in English until they can be reviewed by someone
+  competent to review that wording. Translating them loosely would change an accuracy claim, which is
+  exactly the kind of change this app must not make silently.
+
+  Android's resource resolution falls back to `values/` for anything a locale does not define, so the
+  app is complete in either case; this is a supported configuration rather than a defect.
+  `MissingTranslation` is a *translation policy* check rather than a correctness one, so this is the
+  answer Salah gives it.
+
+  The ignore is scoped to Bangla by message, so adding any other locale without translating it is
+  still an error. Every other lint check keeps the severity configured in `app/build.gradle.kts`
+  (`abortOnError = true`, `warningsAsErrors = false`).
+-->
+<lint>
+    <issue id="MissingTranslation">
+        <ignore regexp="is not translated in &quot;bn&quot;" />
+    </issue>
+</lint>
