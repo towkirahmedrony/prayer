@@ -10,9 +10,11 @@ import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
+import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -20,10 +22,13 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -37,19 +42,26 @@ import java.time.ZonedDateTime
  * assembles flows — the location and the prayer settings, the device clock, the schedule
  * repository and the prohibited-period repository.
  *
- * The request the schedule is calculated for is derived from the location, the settings and the
- * current moment, then de-duplicated. That single [distinctUntilChanged] is what prevents
- * recalculation loops: the clock ticks every second, but a request that has not actually changed
- * never reaches the repository again. Changing the location, the calculation method, the Asr
- * method, the high-latitude rule, a manual adjustment, the device time zone or the calendar date
- * all produce a genuinely new request, which the repository answers by recalculating.
+ * **Home-first, progressive loading.** Home is gated only by the data it actually needs to render
+ * correct prayer information: the configured location, the prayer settings, the moment, and today's
+ * schedule for that location. Everything else is folded in as it arrives and can never hold the
+ * screen at [HomeUiState.Loading]:
  *
- * The tick runs only while the screen is subscribed ([SharingStarted.WhileSubscribed]), so
- * nothing keeps ticking in the background once the user leaves Home. No WorkManager job is
- * involved: a countdown is not a deferrable task, and a periodic job would be the wrong
- * mechanism for it. Prayer *notifications* are a later phase, and their extension point is
- * [PrayerScheduleRepository]: a scheduler can depend on that interface directly and never needs
- * the Home screen to be visible.
+ *  - the **calendar snapshot** is a progressive input. The header shows a placeholder for the date
+ *    until it lands instead of keeping the whole screen on the skeleton;
+ *  - the **prohibited windows** are informational and the shipped rule book is empty, so they are
+ *    seeded with an honest "not available" and merged in later.
+ *
+ * The schedule chain ([request] → [scheduleState]) is shared through a single [StateFlow], so the
+ * repository is asked for one schedule per request rather than once per downstream consumer. That is
+ * what keeps the clock tick from producing redundant calculations: the request is de-duplicated, and
+ * a request that has not actually changed never reaches the repository again.
+ *
+ * The tick runs only while the screen is subscribed ([SharingStarted.WhileSubscribed]), so nothing
+ * keeps ticking in the background once the user leaves Home. No WorkManager job is involved: a
+ * countdown is not a deferrable task, and a periodic job would be the wrong mechanism for it. Prayer
+ * *notifications* are a later phase, and their extension point is [PrayerScheduleRepository]: a
+ * scheduler can depend on that interface directly and never needs the Home screen to be visible.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
@@ -62,7 +74,33 @@ class HomeViewModel(
     private val clock: Clock,
 ) : ViewModel() {
 
+    /**
+     * One-shot guards for the startup trace.
+     *
+     * The tick re-emits [uiState] once a second, so without these the ready marks would be recorded
+     * once a second for as long as Home is on screen and the first one — the measurement — could not
+     * be picked out of the log. All of them are written from the main thread (the flows are collected
+     * on `viewModelScope`), so a plain flag is sufficient.
+     */
+    private var homeLocationReadyMarked = false
+    private var homeCriticalDataReadyMarked = false
+    private var homeReadyMarked = false
+    private var homeScheduleReadyMarked = false
+
+    /**
+     * The configured location, marked the first time Home has one.
+     *
+     * `home_location_ready` measures the transition the header depends on, not the composition of the
+     * screen: the location arriving into Home is the point from which a correct place name can be
+     * shown.
+     */
     private val location: Flow<LocationInfo?> = locationRepository.location
+        .onEach { configured ->
+            if (configured != null && !homeLocationReadyMarked) {
+                homeLocationReadyMarked = true
+                StartupTrace.mark("home_location_ready")
+            }
+        }
 
     private val settings: Flow<PrayerSettings> = userPreferencesRepository.prayerSettings
 
@@ -98,8 +136,31 @@ class HomeViewModel(
         }
     }.distinctUntilChanged()
 
-    private val scheduleState: Flow<PrayerScheduleState> =
-        request.flatMapLatest { current -> prayerScheduleRepository.ensureSchedule(current) }
+    /**
+     * Today's schedule, shared.
+     *
+     * A single [StateFlow] rather than a cold flow: the schedule is read by the schedule part and by
+     * the prohibited windows, and a cold flow would ask the repository once per consumer — two
+     * calculations for one request. [PrayerScheduleState.Loading] is only ever the initial value; the
+     * repository always answers with a real state.
+     */
+    private val scheduleState: StateFlow<PrayerScheduleState> =
+        request.flatMapLatest { current ->
+            flow {
+                // Brackets resolving the schedule for this request. A cache hit resolves immediately;
+                // a cache miss includes the engine calculation, which the repository runs on
+                // `Dispatchers.Default` so it never touches the main thread. Marked here rather than
+                // inside the repository because the repository is unit-tested on the JVM, where the
+                // Android-only trace cannot run.
+                StartupTrace.mark("home_calculation_start")
+                emitAll(prayerScheduleRepository.ensureSchedule(current))
+                StartupTrace.mark("home_calculation_done")
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),
+            initialValue = PrayerScheduleState.Loading,
+        )
 
     private val prohibitedState: Flow<ProhibitedPeriodsState> =
         scheduleState.flatMapLatest { state ->
@@ -110,29 +171,65 @@ class HomeViewModel(
         combine(settings, scheduleState) { currentSettings, state -> SchedulePart(currentSettings, state) }
 
     /**
-     * One-shot guards for the startup trace.
+     * The Home-critical inputs, together.
      *
-     * The tick above re-emits [uiState] once a second, so without these the ready marks would be
-     * recorded once a second for as long as Home is on screen and the first one — the measurement —
-     * could not be picked out of the log.
+     * Everything here is required to render correct prayer information, and nothing else is: the
+     * location, the settings the times were calculated with, the current moment, and a schedule that
+     * has actually been resolved. While the schedule is still [PrayerScheduleState.Loading] this does
+     * not emit, so Home stays on its skeleton until real times exist rather than flashing a screen
+     * with none.
      */
-    private var homeReadyMarked = false
-    private var homeScheduleReadyMarked = false
+    private val criticalInputs: Flow<CriticalInputs> =
+        combine(location, schedulePart, moment) { configuredLocation, part, currentMoment ->
+            CriticalInputs(
+                location = configuredLocation,
+                settings = part.settings,
+                scheduleState = part.state,
+                now = currentMoment,
+            )
+        }.filter { it.scheduleState != PrayerScheduleState.Loading }
+            .onEach {
+                if (!homeCriticalDataReadyMarked) {
+                    homeCriticalDataReadyMarked = true
+                    StartupTrace.mark("home_critical_data_ready")
+                }
+            }
+
+    /**
+     * The calendar snapshot, or `null` until the repository has produced one.
+     *
+     * Seeded with `null` so a calendar that has not arrived cannot keep Home at
+     * [HomeUiState.Loading]. The header then shows a placeholder for the date, which is the same
+     * latency the skeleton would have had, without holding the prayer times behind it.
+     */
+    private val calendarFlow: Flow<CalendarSnapshot?> = flow {
+        emit(null)
+        emitAll(calendarRepository.observeToday())
+    }
+
+    /**
+     * Prohibited windows, seeded with an honest "not available".
+     *
+     * The shipped rule book is empty, so this section never carries real windows today; seeding it
+     * keeps an informational section from ever gating the prayer content.
+     */
+    private val prohibitedFlow: Flow<ProhibitedPeriodsState> =
+        prohibitedState.onStart {
+            emit(ProhibitedPeriodsState.NotAvailable(reason = UnavailabilityReason.UNKNOWN))
+        }
 
     val uiState: StateFlow<HomeUiState> = combine(
-        calendarRepository.observeToday(),
-        location,
-        schedulePart,
-        prohibitedState,
-        moment,
-    ) { calendar, configuredLocation, part, prohibited, currentMoment ->
+        criticalInputs,
+        calendarFlow,
+        prohibitedFlow,
+    ) { critical, calendar, prohibited ->
         uiStateFactory.create(
             calendar = calendar,
-            location = configuredLocation,
-            settings = part.settings,
-            scheduleState = part.state,
+            location = critical.location,
+            settings = critical.settings,
+            scheduleState = critical.scheduleState,
             prohibitedState = prohibited,
-            now = currentMoment,
+            now = critical.now,
         )
     }.onEach { state ->
         // The state becoming `Ready` is what makes Home renderable. The composable existing is not:
@@ -167,6 +264,14 @@ class HomeViewModel(
     private data class SchedulePart(
         val settings: PrayerSettings,
         val state: PrayerScheduleState,
+    )
+
+    /** The minimum inputs needed to render correct prayer information on Home. */
+    private data class CriticalInputs(
+        val location: LocationInfo?,
+        val settings: PrayerSettings,
+        val scheduleState: PrayerScheduleState,
+        val now: ZonedDateTime,
     )
 
     private companion object {

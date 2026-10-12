@@ -10,7 +10,6 @@ import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import java.time.Clock
 import java.time.Instant
@@ -30,6 +29,12 @@ import kotlin.coroutines.cancellation.CancellationException
  * calendar date therefore invalidates the entry automatically, because `equals` on those value
  * types is what performs the comparison. There is no separate "invalidate" call to forget.
  *
+ * **Bounded, per-request entries.** The cache holds a small map keyed by the full request rather
+ * than a single day. Home and the notification reconciliation are two consumers of this repository
+ * with different date windows — Home wants today, the reconciliation wants today and tomorrow — and
+ * a single-entry cache would let them evict each other, recalculating the same day on every read.
+ * The map is bounded so a long-running process cannot accumulate one entry per day or per location.
+ *
  * **Why there is no database here.** A daily schedule is pure arithmetic over a date and a
  * coordinate pair: it is recomputed in microseconds, offline, with no input Salah does not
  * already store. Persisting derived schedules would add a schema, a migration path and a new
@@ -41,7 +46,11 @@ class ProviderBackedPrayerScheduleRepository(
     private val clock: Clock,
 ) : PrayerScheduleRepository {
 
-    private val cachedSchedule = MutableStateFlow<PrayerSchedule?>(null)
+    /** Guarded by [cacheLock]; read from the main thread and written from background calculations. */
+    private val cacheLock = Any()
+
+    /** Insertion-ordered, so the oldest entry is the one evicted when [MAX_CACHED_REQUESTS] is reached. */
+    private val cache = LinkedHashMap<PrayerScheduleRequest, PrayerSchedule>()
 
     override fun ensureSchedule(request: PrayerScheduleRequest?): Flow<PrayerScheduleState> = flow {
         if (request == null) {
@@ -49,7 +58,7 @@ class ProviderBackedPrayerScheduleRepository(
             return@flow
         }
 
-        val cached = cachedSchedule.value?.takeIf { it.matches(request) }
+        val cached = cachedFor(request)
         emit(if (cached == null) refresh(request) else available(cached))
     }
 
@@ -88,9 +97,9 @@ class ProviderBackedPrayerScheduleRepository(
                         origin = origin(),
                     )
                 }
-                // Only ever replace the entry with a schedule for the exact request that
-                // produced it, so a slow response for an old request cannot overwrite a newer one.
-                if (produced.matches(request)) cachedSchedule.value = produced
+                // Only ever store a schedule under the exact request that produced it, so a slow
+                // response for an old request cannot overwrite a newer one.
+                remember(produced, request)
                 available(produced)
             }
 
@@ -115,6 +124,23 @@ class ProviderBackedPrayerScheduleRepository(
     private fun PrayerSchedule.matches(request: PrayerScheduleRequest): Boolean =
         belongsTo(request) && profile == request.profile
 
+    /** The cached schedule for [request], or `null` when the entry is absent or no longer matches. */
+    private fun cachedFor(request: PrayerScheduleRequest): PrayerSchedule? = synchronized(cacheLock) {
+        cache[request]?.takeIf { it.matches(request) }
+    }
+
+    /** Stores [schedule] under [request], evicting the oldest entry once the cache is full. */
+    private fun remember(schedule: PrayerSchedule, request: PrayerScheduleRequest) {
+        synchronized(cacheLock) {
+            if (!schedule.matches(request)) return
+            cache[request] = schedule
+            while (cache.size > MAX_CACHED_REQUESTS) {
+                val oldest = cache.keys.firstOrNull() ?: break
+                cache.remove(oldest)
+            }
+        }
+    }
+
     private fun available(schedule: PrayerSchedule): PrayerScheduleState.Available =
         PrayerScheduleState.Available(
             schedule = schedule,
@@ -136,6 +162,15 @@ class ProviderBackedPrayerScheduleRepository(
     )
 
     private companion object {
+        /**
+         * How many request-keyed schedules are kept.
+         *
+         * Small on purpose: today and tomorrow are all the notification reconciliation and Home ever
+         * ask for together, and a location or settings change simply produces a new key. The bound is
+         * only there so a process that runs for a long time cannot retain one entry per day.
+         */
+        const val MAX_CACHED_REQUESTS = 4
+
         const val NO_LOCATION_DETAIL =
             "No location has been configured yet, so no calculation input exists."
 

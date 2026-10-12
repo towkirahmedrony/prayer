@@ -1,10 +1,17 @@
 package io.github.towkirahmedrony.salah
 
 import android.app.Application
+import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
+import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationChannels
 import io.github.towkirahmedrony.salah.di.salahModules
 import kotlinx.coroutines.CoroutineScope
@@ -12,19 +19,31 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
+import org.koin.core.Koin
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
+import java.time.Clock
+import java.time.ZonedDateTime
 
 /**
  * Application entry point.
  *
- * Startup work off the main thread: the bundled dataset and the stored location are read straight
- * away, in parallel with the Activity and Compose setup, because the first screen waits for them.
- * The alarm reconciliation runs only after both have finished, so it does not compete with them
- * for CPU. Everything here is non-fatal.
+ * Startup work is staged **Home-first**: the data the Home screen must have before it can show
+ * correct prayer times is started and finished first, and everything else runs afterwards so it can
+ * never hold Home on its skeleton.
+ *
+ *  1. The stored location — the one input both the location gate and Home wait for.
+ *  2. Today's schedule for that location, calculated off the main thread. This overlaps the gate and
+ *     Compose setup, so when Home opens its request is a cache hit rather than a fresh calculation.
+ *  3. The bundled Bangladesh dataset and the notification reconciliation, in the background. Home does
+ *     not depend on either, so neither is awaited before the phases above.
+ *
+ * Everything here is non-fatal: a failure in any phase just means the corresponding screen does its
+ * own work when it appears.
  */
 class SalahApplication : Application() {
 
@@ -53,23 +72,76 @@ class SalahApplication : Application() {
         val scope = runCatching { koin.get<CoroutineScope>() }.getOrNull() ?: return
 
         scope.launch {
+            // Started in parallel; only the location is awaited on the Home-critical path.
+            val location = async(Dispatchers.IO) {
+                runCatching { koin.get<LocationRepository>().location.first() }.getOrNull()
+            }
             val dataset = async(Dispatchers.IO) {
                 runCatching { koin.get<BangladeshAreaCatalog>().dataset() }
             }
-            val location = async(Dispatchers.IO) {
-                runCatching { koin.get<LocationRepository>().location.first() }
-            }
-            dataset.await()
-            StartupTrace.mark("prefetch_dataset_done")
-            location.await()
+
+            val storedLocation = location.await()
             StartupTrace.mark("prefetch_location_done")
+
+            // Home-critical: today's schedule, so it is already cached when Home opens.
+            warmHomeSchedule(koin, storedLocation)
+
+            // Non-Home work. The dataset is needed by the setup screen and later screens, never by
+            // Home, so it is awaited here and not before the schedule warm-up.
+            StartupTrace.mark("background_dataset_start")
+            dataset.await()
+            StartupTrace.mark("background_dataset_done")
 
             val coordinator = runCatching { koin.get<PrayerNotificationCoordinator>() }.getOrNull()
             if (coordinator != null) {
                 StartupTrace.mark("reconcile_start")
-                runCatching { coordinator.reconcile(ReconcileReason.APP_START) }
+                // On Dispatchers.IO rather than the CPU pool: the reconciliation is dominated by
+                // blocking platform calls (AlarmManager, NotificationManager) and DataStore I/O, which
+                // is what IO is for. Running it off Dispatchers.Default leaves that pool free for the
+                // prayer-time calculation Home and the warm-up share.
+                withContext(Dispatchers.IO) {
+                    runCatching { coordinator.reconcile(ReconcileReason.APP_START) }
+                }
                 StartupTrace.mark("reconcile_done")
             }
+        }
+    }
+
+    /**
+     * Calculates today's schedule for the stored location, ahead of the Home screen.
+     *
+     * With a valid location but no cached schedule, the schedule is produced off the main thread as
+     * soon as the location is known, so the calculation overlaps the location gate and Compose setup
+     * instead of starting after the gate opens. It uses the same repository and the same request key
+     * the Home screen will use — the date in the location's own zone, the location, and the persisted
+     * calculation profile — so Home only receives the entry when it genuinely matches the location and
+     * settings in force.
+     *
+     * A location outside the supported country is skipped: the gate will send the user to setup and
+     * nothing would ever display those times. Non-fatal throughout — a failure here just means Home
+     * calculates on open, exactly as it would without this warm-up.
+     */
+    private suspend fun warmHomeSchedule(koin: Koin, location: LocationInfo?) {
+        if (location == null) return
+        val insideSupportedCountry = BangladeshLocationPolicy.isWithinCoarseBounds(
+            GeoPoint(latitude = location.latitude, longitude = location.longitude),
+        )
+        if (!insideSupportedCountry) return
+
+        val schedules = runCatching { koin.get<PrayerScheduleRepository>() }.getOrNull() ?: return
+        val settings = runCatching {
+            koin.get<UserPreferencesRepository>().prayerSettings.first()
+        }.getOrNull() ?: return
+
+        val request = PrayerScheduleRequest(
+            date = ZonedDateTime.ofInstant(koin.get<Clock>().instant(), location.zoneId).toLocalDate(),
+            location = location,
+            profile = settings.toProfile(),
+        )
+
+        val state = runCatching { schedules.ensureSchedule(request).first() }.getOrNull()
+        if (state is PrayerScheduleState.Available) {
+            StartupTrace.mark("home_cached_schedule_ready")
         }
     }
 }

@@ -14,6 +14,7 @@
     <!-- Home: header and dates -->
     <string name="home_prayer_times_arabic" translatable="false">مواقيت الصلاة</string>
     <string name="home_weekday_unknown">Weekday unavailable</string>
+    <string name="home_date_pending" translatable="false">…</string>
     <string name="home_bangla_date_title">বাংলা তারিখ</string>
     <string name="home_hijri_date_title">হিজরি তারিখ</string>
     <string name="home_gregorian_label">Gregorian</string>

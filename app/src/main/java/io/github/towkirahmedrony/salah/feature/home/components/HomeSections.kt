@@ -154,7 +154,8 @@ fun CalendarCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = state.gregorianDate,
+            // A placeholder while the calendar snapshot is still being produced; never a made-up date.
+            text = state.gregorianDate ?: stringResource(R.string.home_date_pending),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )

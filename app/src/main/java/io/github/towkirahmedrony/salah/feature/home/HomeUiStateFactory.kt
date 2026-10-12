@@ -6,6 +6,7 @@ import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
@@ -48,12 +49,14 @@ class HomeUiStateFactory(
         prohibitedState: ProhibitedPeriodsState,
         now: ZonedDateTime,
     ): HomeUiState {
-        if (calendar == null) {
-            return HomeUiState.Failed(detail = "The device date could not be read.")
+        // `null` means the calendar snapshot has not been produced yet, which is a *pending* state,
+        // not a failure: Home renders the prayer content and a placeholder date, and the calendar
+        // arrives a moment later. A snapshot that exists but carries no usable Gregorian date is a
+        // genuine failure, because the device date could not be read.
+        val gregorian = calendar?.gregorian as? CalendarDateState.Available
+        if (calendar != null && gregorian == null) {
+            return HomeUiState.Failed(detail = "The Gregorian date is unavailable.")
         }
-
-        val gregorian = calendar.gregorian as? CalendarDateState.Available
-            ?: return HomeUiState.Failed(detail = "The Gregorian date is unavailable.")
 
         val schedule = (scheduleState as? PrayerScheduleState.Available)?.schedule
         val zone = schedule?.zoneId ?: location?.zoneId ?: ZoneId.systemDefault()
@@ -70,11 +73,11 @@ class HomeUiStateFactory(
         val nextPrayer = nextPrayerResolver.resolve(schedule, now)
 
         return HomeUiState.Ready(
-            gregorianDate = gregorian.formattedDate,
-            weekday = calendar.weekdayLabel,
-            gregorianSection = calendar.gregorian.toSection(),
-            banglaSection = calendar.bangla.toSection(),
-            hijriSection = calendar.hijri.toSection(),
+            gregorianDate = gregorian?.formattedDate,
+            weekday = calendar?.weekdayLabel,
+            gregorianSection = calendar?.gregorian?.toSection() ?: pendingSection(CalendarSystem.GREGORIAN),
+            banglaSection = calendar?.bangla?.toSection() ?: pendingSection(CalendarSystem.BANGLA),
+            hijriSection = calendar?.hijri?.toSection() ?: pendingSection(CalendarSystem.HIJRI),
             location = LocationSection(
                 label = location?.label,
                 latitude = location?.latitude,
@@ -137,6 +140,18 @@ class HomeUiStateFactory(
         locale: Locale,
         preference: TimeFormatPreference,
     ): DateTimeFormatter = timeFormatterFor(zone = zone, locale = locale, preference = preference)
+
+    /**
+     * A calendar section that is still being produced.
+     *
+     * Reported as unavailable with [UnavailabilityReason.UNKNOWN] rather than left blank, so the
+     * section explains itself for the moment before the real date lands. No date is invented.
+     */
+    private fun pendingSection(system: CalendarSystem): CalendarSection = CalendarSection(
+        system = system,
+        value = null,
+        unavailable = UnavailabilityReason.UNKNOWN,
+    )
 
     private fun CalendarDateState.toSection(): CalendarSection = when (this) {
         is CalendarDateState.Available -> CalendarSection(

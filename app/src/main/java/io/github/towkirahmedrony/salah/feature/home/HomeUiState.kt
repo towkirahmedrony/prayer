@@ -30,8 +30,15 @@ sealed interface HomeUiState {
     data class Failed(val detail: String) : HomeUiState
 
     data class Ready(
-        /** Localised Gregorian date for today, from the device clock. */
-        val gregorianDate: String,
+        /**
+         * Localised Gregorian date for today, from the device clock, or `null` while the calendar
+         * snapshot has not been produced yet.
+         *
+         * The calendar is a **progressive** input, not a Home-critical one: prayer times must not
+         * wait for it. When it is late the header renders the placeholder for this field and the
+         * date appears a moment later, instead of the whole screen staying on the skeleton.
+         */
+        val gregorianDate: String?,
         /** Localised weekday name for today. */
         val weekday: String?,
         val gregorianSection: CalendarSection,

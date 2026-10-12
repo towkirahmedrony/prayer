@@ -57,6 +57,9 @@ fun HomeHeader(
     val place = state.location.label?.takeIf { state.location.unavailable == null }
         ?: stringResource(R.string.home_location_none_title)
     val weekday = state.weekday ?: stringResource(R.string.home_weekday_unknown)
+    // The calendar is a progressive input: before it lands, this is a placeholder, never a
+    // fabricated date. It is the smallest stand-in for the one value that is missing.
+    val dateLine = state.gregorianDate ?: stringResource(R.string.home_date_pending)
     val otherDates = listOfNotNull(state.hijriSection.value, state.banglaSection.value)
         .joinToString(" \u00B7 ")
 
@@ -89,7 +92,7 @@ fun HomeHeader(
             }
             Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = "$weekday, ${state.gregorianDate}",
+                text = "$weekday, $dateLine",
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
