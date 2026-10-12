@@ -50,6 +50,15 @@ enum class SalahDestination(
      */
     NOTIFICATIONS("notifications", R.string.nav_notifications, inBottomBar = false),
 
+    /**
+     * Location setup and management.
+     *
+     * A destination as well as a gate: the same screen is what the shell renders while no usable
+     * location exists, and what Settings opens later to inspect or change it. One route rather than
+     * two, so the first launch and every later change cannot diverge.
+     */
+    LOCATION("location", R.string.nav_location, inBottomBar = false),
+
     QIBLA("qibla", R.string.shortcut_qibla, inBottomBar = false),
     ;
 

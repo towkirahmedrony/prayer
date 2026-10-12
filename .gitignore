@@ -40,3 +40,16 @@ Thumbs.db
 
 # Logs
 *.log
+local.properties
+*.apk
+*.aab
+build
+!build.gradle.kts
+!gradle/libs.versions.toml
+!gradle.properties
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat
+!settings.gradle.kts
+!app/build.gradle.kts
+!tools/generate_bd_location_dataset.py

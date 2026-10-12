@@ -12,6 +12,7 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarScreen
 import io.github.towkirahmedrony.salah.feature.calendar.CalendarSettingsScreen
 import io.github.towkirahmedrony.salah.feature.common.PlannedFeatureScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
+import io.github.towkirahmedrony.salah.feature.location.LocationScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
@@ -86,7 +87,14 @@ fun SalahNavHost(
                 onOpenNotifications = {
                     navController.navigate(SalahDestination.NOTIFICATIONS.route)
                 },
+                onOpenLocation = {
+                    navController.navigate(SalahDestination.LOCATION.route)
+                },
             )
+        }
+
+        composable(SalahDestination.LOCATION.route) {
+            LocationScreen()
         }
 
         composable(SalahDestination.NOTIFICATIONS.route) {

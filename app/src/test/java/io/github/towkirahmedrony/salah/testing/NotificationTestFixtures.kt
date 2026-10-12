@@ -16,7 +16,9 @@ import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
+import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
@@ -225,6 +227,9 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
         timeZoneId: String,
         accuracyMetres: Double?,
         acquiredAtEpochMillis: Long,
+        countryCode: String?,
+        area: BangladeshAreaRef?,
+        datasetVersion: String?,
     ): Boolean {
         val created = LocationInfo.create(
             label = label,
@@ -234,6 +239,30 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
             origin = LocationOrigin.DEVICE_GPS,
             accuracyMetres = accuracyMetres,
             acquiredAt = Instant.ofEpochMilli(acquiredAtEpochMillis),
+            countryCode = countryCode,
+            area = area,
+            datasetVersion = datasetVersion,
+        ) ?: return false
+        state.value = created
+        return true
+    }
+
+    override suspend fun saveAreaLocation(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        reference: BangladeshAreaRef,
+        datasetVersion: String,
+    ): Boolean {
+        val created = LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+            origin = LocationOrigin.AREA_SELECTION,
+            countryCode = BangladeshLocationPolicy.COUNTRY_CODE,
+            area = reference,
+            datasetVersion = datasetVersion,
         ) ?: return false
         state.value = created
         return true

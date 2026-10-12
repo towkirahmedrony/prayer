@@ -369,7 +369,8 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
   empty set produces no Ramadan reminder — never an invented one. Because the input is a *set of dates*,
   a Hijri-offset change or the end of Ramadan simply produces a different set, and the coordinator's
   derived cancellation removes the days that are no longer in it. No stale alarm can survive a Ramadan
-  end.
+  end. That is asserted against the alarm registry itself, not against a plan, in
+  `RamadanReminderCoordinatorTest`.
 - **Sound, vibration and channels are inherited** from the prayer each derives from (Fajr for Sehri,
   Maghrib for Iftar), so the Ramadan reminders reuse the existing channels and the user's existing choices
   instead of adding new ones.
@@ -436,6 +437,7 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 | `CalendarUiStateFactoryTest` | today vs the selection vs both; three resolved date lines and the Hijri source; out-of-range stated rather than blanked; no window → no range; weekday headers; the adjustment moving the Hijri date and the Ramadan day number together |
 | `RamadanUiStateFactoryTest` | one row per day with day numbers; Sehri/Iftar columns equal to Fajr/Maghrib; a missing Fajr; missing schedules counted once and shown per row; provenance; no window → no rows; the Hijri adjustment; today marked by date; the location's zone |
 | `RamadanReminderPlanTest` | Sehri planned as a lead-in only; Iftar at Maghrib plus an optional lead-in; nothing outside Ramadan; switches and master switch; unique slots and request codes; a Ramadan end leaving nothing behind; inherited sound/vibration; a passed Fajr; lead-time clamping |
+| `RamadanReminderCoordinatorTest` | what the coordinator actually registers: the Sehri lead-in at the calculated Fajr and Iftar at the calculated Maghrib for both window days and nothing else; the Hijri offset moving which days are in Ramadan, in both directions, and the day that leaves Ramadan being cancelled; the last day of Ramadan keeping its reminders while the day after schedules none, and those reminders going on the next day; one switch cancelling only its own alarms; the master switch and a missing location leaving nothing; repeating a reconciliation not duplicating an alarm |
 | `DataStoreUserPreferencesRepositoryTest` | calendar preferences persisted and restored; the adjustment clamped on write and read; unknown names falling back; calendar, prayer and theme preferences not overwriting each other |
 | `DataStorePrayerNotificationPreferencesRepositoryTest` | the Ramadan switches and lead times persisted and restored; values outside the offered set clamped on write and read; "off" stored as off; the prayer preferences untouched |
 | `HomeUiStateFactoryTest` | the Home screen carrying the real Bangla and Hijri values, and explaining an out-of-range date |

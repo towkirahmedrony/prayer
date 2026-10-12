@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import kotlinx.coroutines.flow.Flow
@@ -32,6 +34,12 @@ import java.time.Instant
  * here is optional. A store written by an earlier build simply lacks [Keys.ORIGIN] and the
  * acquisition keys, and reads as a manual entry with unknown freshness — which is exactly what such
  * a store contains. Existing locations are therefore preserved rather than migrated or discarded.
+ *
+ * The same applies to the keys added for the Bangladesh area system (country, the division/district/
+ * upazila ids and names, and the dataset version): an older store has none of them, reads as a
+ * location whose area is unknown, and is validated from its coordinates instead. That is why the
+ * location screen can be opened on a device that has been running Salah since before areas existed,
+ * and why nothing is migrated destructively.
  */
 class DataStoreLocationRepository(
     private val dataStore: DataStore<Preferences>,
@@ -66,6 +74,9 @@ class DataStoreLocationRepository(
         timeZoneId: String,
         accuracyMetres: Double?,
         acquiredAtEpochMillis: Long,
+        countryCode: String?,
+        area: BangladeshAreaRef?,
+        datasetVersion: String?,
     ): Boolean = store(
         validated = LocationInfo.create(
             label = label,
@@ -75,6 +86,30 @@ class DataStoreLocationRepository(
             origin = LocationOrigin.DEVICE_GPS,
             accuracyMetres = accuracyMetres,
             acquiredAt = Instant.ofEpochMilli(acquiredAtEpochMillis),
+            countryCode = countryCode,
+            area = area,
+            datasetVersion = datasetVersion,
+        ),
+    )
+
+    override suspend fun saveAreaLocation(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        reference: BangladeshAreaRef,
+        datasetVersion: String,
+    ): Boolean = store(
+        validated = LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            // Not a parameter: every area the bundled dataset defines is in Bangladesh, and Bangladesh
+            // has a single zone. See LocationRepository.saveAreaLocation.
+            timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+            origin = LocationOrigin.AREA_SELECTION,
+            countryCode = BangladeshLocationPolicy.COUNTRY_CODE,
+            area = reference,
+            datasetVersion = datasetVersion,
         ),
     )
 
@@ -88,6 +123,14 @@ class DataStoreLocationRepository(
             preferences.remove(Keys.ORIGIN)
             preferences.remove(Keys.ACCURACY_METRES)
             preferences.remove(Keys.ACQUIRED_AT_EPOCH_MILLIS)
+            preferences.remove(Keys.COUNTRY_CODE)
+            preferences.remove(Keys.DATASET_VERSION)
+            preferences.remove(Keys.DIVISION_ID)
+            preferences.remove(Keys.DIVISION_NAME)
+            preferences.remove(Keys.DISTRICT_ID)
+            preferences.remove(Keys.DISTRICT_NAME)
+            preferences.remove(Keys.UPAZILA_ID)
+            preferences.remove(Keys.UPAZILA_NAME)
         }
     }
 
@@ -107,6 +150,34 @@ class DataStoreLocationRepository(
                 ?: preferences.remove(Keys.ACCURACY_METRES)
             validated.acquiredAt?.let { preferences[Keys.ACQUIRED_AT_EPOCH_MILLIS] = it.toEpochMilli() }
                 ?: preferences.remove(Keys.ACQUIRED_AT_EPOCH_MILLIS)
+            validated.countryCode?.let { preferences[Keys.COUNTRY_CODE] = it }
+                ?: preferences.remove(Keys.COUNTRY_CODE)
+
+            // Written as a set or removed as a set. A location either belongs to the hierarchy that was
+            // saved with it or has no hierarchy at all: leaving a division behind while replacing the
+            // upazila would attach one area's name to another area's coordinate, which is worse than
+            // having no area recorded.
+            val area = validated.area
+            if (area == null) {
+                preferences.remove(Keys.DIVISION_ID)
+                preferences.remove(Keys.DIVISION_NAME)
+                preferences.remove(Keys.DISTRICT_ID)
+                preferences.remove(Keys.DISTRICT_NAME)
+                preferences.remove(Keys.UPAZILA_ID)
+                preferences.remove(Keys.UPAZILA_NAME)
+                preferences.remove(Keys.DATASET_VERSION)
+            } else {
+                preferences[Keys.DIVISION_ID] = area.divisionId
+                preferences[Keys.DIVISION_NAME] = area.divisionName
+                preferences[Keys.DISTRICT_ID] = area.districtId
+                preferences[Keys.DISTRICT_NAME] = area.districtName
+                area.upazilaId?.let { preferences[Keys.UPAZILA_ID] = it }
+                    ?: preferences.remove(Keys.UPAZILA_ID)
+                area.upazilaName?.let { preferences[Keys.UPAZILA_NAME] = it }
+                    ?: preferences.remove(Keys.UPAZILA_NAME)
+                validated.datasetVersion?.let { preferences[Keys.DATASET_VERSION] = it }
+                    ?: preferences.remove(Keys.DATASET_VERSION)
+            }
         }
         return true
     }
@@ -131,6 +202,31 @@ class DataStoreLocationRepository(
             origin = origin,
             accuracyMetres = this[Keys.ACCURACY_METRES],
             acquiredAt = this[Keys.ACQUIRED_AT_EPOCH_MILLIS]?.let { Instant.ofEpochMilli(it) },
+            countryCode = this[Keys.COUNTRY_CODE],
+            area = readArea(),
+            datasetVersion = this[Keys.DATASET_VERSION],
+        )
+    }
+
+    /**
+     * Rebuilds the stored hierarchy, or `null` when the store holds no complete one.
+     *
+     * A partial hierarchy (a division with no district, say) is reported as no area rather than as an
+     * area with blanks: half a hierarchy is not a hierarchy, and the screens treat a missing area as
+     * "unknown, validate from the coordinates" rather than rendering empty names.
+     */
+    private fun Preferences.readArea(): BangladeshAreaRef? {
+        val divisionId = this[Keys.DIVISION_ID] ?: return null
+        val divisionName = this[Keys.DIVISION_NAME] ?: return null
+        val districtId = this[Keys.DISTRICT_ID] ?: return null
+        val districtName = this[Keys.DISTRICT_NAME] ?: return null
+        return BangladeshAreaRef(
+            divisionId = divisionId,
+            divisionName = divisionName,
+            districtId = districtId,
+            districtName = districtName,
+            upazilaId = this[Keys.UPAZILA_ID],
+            upazilaName = this[Keys.UPAZILA_NAME],
         )
     }
 
@@ -142,5 +238,13 @@ class DataStoreLocationRepository(
         val ORIGIN = stringPreferencesKey("location_origin")
         val ACCURACY_METRES = doublePreferencesKey("location_accuracy_metres")
         val ACQUIRED_AT_EPOCH_MILLIS = longPreferencesKey("location_acquired_at_epoch_millis")
+        val COUNTRY_CODE = stringPreferencesKey("location_country_code")
+        val DATASET_VERSION = stringPreferencesKey("location_dataset_version")
+        val DIVISION_ID = stringPreferencesKey("location_division_id")
+        val DIVISION_NAME = stringPreferencesKey("location_division_name")
+        val DISTRICT_ID = stringPreferencesKey("location_district_id")
+        val DISTRICT_NAME = stringPreferencesKey("location_district_name")
+        val UPAZILA_ID = stringPreferencesKey("location_upazila_id")
+        val UPAZILA_NAME = stringPreferencesKey("location_upazila_name")
     }
 }

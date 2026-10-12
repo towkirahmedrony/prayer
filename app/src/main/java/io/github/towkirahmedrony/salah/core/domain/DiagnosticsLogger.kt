@@ -127,4 +127,33 @@ object SalahDiagnosticEvents {
 
     /** A bearing could not be calculated, and why. */
     const val QIBLA_BEARING_FAILED = "qibla_bearing_failed"
+
+    // Location system ---------------------------------------------------------
+    // Coordinates are never logged here either: the events record counts, levels, distances in metres
+    // and outcome codes, which is enough to diagnose a failed reverse look-up without recording where
+    // the user was standing.
+
+    /** The bundled Bangladesh dataset was parsed. Logged with its size and how much of it was refused. */
+    const val LOCATION_DATASET_LOADED = "location_dataset_loaded"
+
+    /** The bundled Bangladesh dataset could not be read at all. */
+    const val LOCATION_DATASET_UNAVAILABLE = "location_dataset_unavailable"
+
+    /** The first-launch location requirement was (re)evaluated. */
+    const val LOCATION_SETUP_EVALUATED = "location_setup_evaluated"
+
+    /** A location was saved. Logged with its origin and whether an area was attached. */
+    const val LOCATION_SAVED = "location_saved"
+
+    /** A location save was rejected by validation. */
+    const val LOCATION_SAVE_REJECTED = "location_save_rejected"
+
+    /** A device position was rejected because it is outside Bangladesh. Logged with the distance. */
+    const val LOCATION_OUTSIDE_SUPPORTED_COUNTRY = "location_outside_supported_country"
+
+    /** A device position could not be attributed to an administrative area. */
+    const val LOCATION_AREA_UNRESOLVED = "location_area_unresolved"
+
+    /** A device position was attributed to an administrative area. */
+    const val LOCATION_AREA_RESOLVED = "location_area_resolved"
 }

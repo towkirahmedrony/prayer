@@ -45,7 +45,7 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Prayer, Calendar (with its settings), Ramadan, Settings, Notifications, Qibla | Implemented (Qibla, Calendar and Ramadan are real screens; only Prayer remains a labelled boundary) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (418 tests) |
+| Unit tests for engine, domain, data, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (427 tests) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |

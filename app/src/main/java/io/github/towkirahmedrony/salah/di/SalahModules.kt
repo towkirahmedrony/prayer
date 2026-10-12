@@ -25,6 +25,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionCheck
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaCalculator
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleBook
+import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
@@ -32,6 +33,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepo
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
+import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.data.notification.AndroidDiagnosticsLogger
@@ -59,6 +61,7 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarUiStateFactory
 import io.github.towkirahmedrony.salah.feature.calendar.CalendarViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
+import io.github.towkirahmedrony.salah.feature.location.LocationViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanUiStateFactory
@@ -108,6 +111,10 @@ val salahModules = module {
     single<DataStore<Preferences>> { androidContext().salahPreferencesDataStore }
     single<UserPreferencesRepository> { DataStoreUserPreferencesRepository(get()) }
     single<LocationRepository> { DataStoreLocationRepository(get()) }
+    // The Bangladesh geography bundled with the app: divisions, districts, upazilas and thanas with
+    // their published reference coordinates, plus the national boundary the country policy checks
+    // against. Read from assets and parsed once; see docs/LOCATION_SYSTEM.md section 5.
+    single<BangladeshAreaCatalog> { AssetBangladeshAreaCatalog(androidContext(), get()) }
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
     }
@@ -226,7 +233,27 @@ val salahModules = module {
     single { HomeUiStateFactory(nextPrayerResolver = get()) }
 
     // Presentation ------------------------------------------------------------
-    viewModel { AppViewModel(userPreferencesRepository = get()) }
+    viewModel {
+        AppViewModel(
+            userPreferencesRepository = get(),
+            locationRepository = get(),
+            areaCatalog = get(),
+        )
+    }
+    // One view model for the first-launch location setup and the location screen: they differ in what
+    // they say, not in what they do, so both use the same policy, the same repository write and the
+    // same notification reconciliation.
+    viewModel {
+        LocationViewModel(
+            locations = get(),
+            catalog = get(),
+            locationProvider = get(),
+            permissionChecker = get(),
+            coordinator = get(),
+            logger = get(),
+            clock = get(),
+        )
+    }
     viewModel {
         HomeViewModel(
             locationRepository = get(),

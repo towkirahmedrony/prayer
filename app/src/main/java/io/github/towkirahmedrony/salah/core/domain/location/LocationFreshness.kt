@@ -15,11 +15,11 @@ import java.time.Instant
 enum class LocationFreshness {
 
     /**
-     * The user entered these coordinates by hand.
+     * The user chose this place — by typing coordinates, or by selecting an administrative area.
      *
      * Not "stale" and not "fresh": the user asserted a place, and that assertion does not decay with
-     * time. A manually entered location for a city the user lives in is as valid a year later as the
-     * day it was typed, which is exactly why manual entry is the offline fallback.
+     * time. A location chosen for the area the user lives in is as valid a year later as the day it
+     * was chosen, which is exactly why a declared location is the offline fallback.
      */
     DECLARED,
 
@@ -56,7 +56,10 @@ enum class LocationFreshness {
          * cosmetic reason.
          */
         fun of(location: LocationInfo, now: Instant): LocationFreshness {
-            if (location.origin == LocationOrigin.MANUAL_ENTRY) return DECLARED
+            // Everything that is not an observation is a declaration: a typed coordinate and a selected
+            // area are both statements about where the user is, and neither decays. Only a device fix
+            // can go out of date.
+            if (location.origin != LocationOrigin.DEVICE_GPS) return DECLARED
             val acquiredAt = location.acquiredAt ?: return UNKNOWN
             val age = Duration.between(acquiredAt, now)
             return when {

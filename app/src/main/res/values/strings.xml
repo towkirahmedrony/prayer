@@ -226,8 +226,8 @@
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_location_title">Manual location</string>
-    <string name="settings_location_body">Device location access is not requested in this phase. Salah stores the location you enter here on this device only.</string>
+    <string name="settings_location_title">Manual coordinates</string>
+    <string name="settings_location_body">An advanced alternative to the area picker: type a position and an IANA time zone directly. Salah validates the input and stores it on this device only. Coordinates are stored as entered — no country check is applied here.</string>
     <string name="settings_location_label">Location name</string>
     <string name="settings_latitude">Latitude (-90 to 90)</string>
     <string name="settings_longitude">Longitude (-180 to 180)</string>
@@ -459,4 +459,103 @@
 
     <string name="qibla_limits_body">The bearing is exact spherical trigonometry over the stored coordinates. What the dial shows depends on the device: magnetometer quality, nearby magnets and metal, how flat the device is held, and the accuracy of the magnetic-declination model. Salah corrects the heading to true north exactly once and never presents an uncorrected heading as aligned. Treat the dial as good to a few degrees outdoors, and less near large metal objects.</string>
     <string name="qibla_kaaba_source">Kaaba reference: %1$s</string>
+
+    <!-- Location: setup, management and the division / district / upazila picker -->
+    <string name="nav_location">Location</string>
+    <string name="location_title">Location</string>
+    <string name="location_setup_title">Choose your location</string>
+    <string name="location_setup_body">Salah calculates prayer times, the Qibla direction, the Ramadan calendar and the Sehri and Iftar reminders from your coordinates, and everything is computed on this device.</string>
+    <string name="location_bangladesh_only">This version of Salah supports locations in Bangladesh only. The bundled area dataset, the calculation settings and the Hijri and Bangla calendars are all Bangladesh-specific.</string>
+    <string name="location_why_title">Why a location is needed</string>
+    <string name="location_why_body">Prayer times depend on where you are to within a minute, so Salah cannot calculate anything location-dependent until it knows the place and its time zone. Nothing is uploaded: the coordinates stay on this device.</string>
+    <string name="location_loading">Reading the Bangladesh location dataset…</string>
+    <string name="location_offline_note">Both options work without a network connection. A device fix needs location permission; choosing an area by hand needs none.</string>
+
+    <string name="location_action_use_gps">Use My Current Location</string>
+    <string name="location_action_select_manually">Select Location Manually</string>
+    <string name="location_action_retry_gps">Try again</string>
+    <string name="location_action_open_location_settings">Open location settings</string>
+    <string name="location_action_cancel">Cancel</string>
+    <string name="location_action_save">Save this location</string>
+    <string name="location_action_confirm_location">Use this location</string>
+    <string name="location_action_discard">Discard</string>
+    <string name="location_action_change_area">Choose another area</string>
+    <string name="location_action_refresh_gps">Refresh from GPS</string>
+    <string name="location_action_clear">Remove location</string>
+
+    <string name="location_section_current_title">Current location</string>
+    <string name="location_section_change_title">Change location</string>
+    <string name="location_country_label">Country</string>
+    <string name="location_country_value">Bangladesh (BD)</string>
+    <string name="location_country_not_established">Not established</string>
+    <string name="location_source_label">Source</string>
+    <string name="location_source_gps">GPS location</string>
+    <string name="location_source_area">Selected area</string>
+    <string name="location_source_manual">Entered by hand</string>
+    <string name="location_division_label">Division</string>
+    <string name="location_district_label">District</string>
+    <string name="location_upazila_label">Upazila / Thana</string>
+    <string name="location_area_unknown">Not resolved</string>
+    <string name="location_time_zone_label">Time zone</string>
+    <string name="location_accuracy_label">Accuracy</string>
+    <string name="location_advanced_title">Advanced details</string>
+    <string name="location_advanced_coordinates">Stored coordinates: %1$s</string>
+    <string name="location_advanced_dataset">Area dataset: %1$s</string>
+    <string name="location_advanced_dataset_selected">Chosen from: %1$s</string>
+    <string name="location_advanced_bangladesh_verified">Verified against the bundled Bangladesh boundary.</string>
+    <string name="location_advanced_bangladesh_unverified">Not verified against a boundary; only the country's bounding box was checked.</string>
+    <string name="location_freshness_declared">Chosen by you. It does not expire.</string>
+    <string name="location_freshness_fresh">Obtained just now.</string>
+    <string name="location_freshness_recent">Obtained earlier; not a live position.</string>
+    <string name="location_freshness_stale">Obtained more than a day ago. Refresh it if you have moved.</string>
+    <string name="location_freshness_unknown">Obtained at an unknown time.</string>
+    <string name="location_area_reference_note">A selected area stores the published reference coordinates of that area — its administrative centre — not your exact position. Prayer times are calculated for that point, so they may differ by a minute or two from your own house.</string>
+    <string name="location_unsupported_title">This location is outside Bangladesh</string>
+    <string name="location_unsupported_body">Salah currently supports locations in Bangladesh only, so this stored position cannot be used. Select a location manually to continue.</string>
+
+    <string name="location_dataset_label">Bangladesh dataset: %1$s</string>
+    <string name="location_dataset_counts">%1$d divisions, %2$d districts and %3$d upazilas and thanas, bundled with the app.</string>
+    <string name="location_dataset_unavailable_title">The location dataset could not be read</string>
+    <string name="location_dataset_unavailable_body">Salah reads its list of Bangladeshi divisions, districts and upazilas from files bundled inside the app, and those files could not be read in this build. Without them a location cannot be chosen and prayer times cannot be calculated. This is a build problem rather than a setting: reinstalling a complete build should fix it.</string>
+    <string name="location_dataset_incomplete">The bundled dataset is incomplete: %1$s</string>
+
+    <string name="location_picker_title">Select location manually</string>
+    <string name="location_picker_step_division">Division</string>
+    <string name="location_picker_step_district">District</string>
+    <string name="location_picker_step_upazila">Upazila / Thana</string>
+    <string name="location_picker_choose_division">Choose a division</string>
+    <string name="location_picker_choose_district">Choose a district</string>
+    <string name="location_picker_choose_upazila">Choose an upazila or thana</string>
+    <string name="location_picker_needs_division">Choose a division first; its districts are listed next.</string>
+    <string name="location_picker_needs_district">Choose a district first; its upazilas and thanas are listed next.</string>
+    <string name="location_picker_reference">This will save the reference coordinates %1$s of the chosen area.</string>
+    <string name="location_picker_incomplete">Choose a division, a district and an upazila or thana to save a location.</string>
+
+    <string name="location_gps_title">Location found</string>
+    <string name="location_gps_acquiring">Getting your position…</string>
+    <string name="location_gps_coordinates">Coordinates: %1$s</string>
+    <string name="location_gps_accuracy">Reported accuracy: %1$s</string>
+    <string name="location_gps_matched">Nearest match: %1$s — about %2$s from this position.</string>
+    <string name="location_gps_matched_approximate">The area is matched by the nearest reference point in the bundled dataset, so this area name is approximate. Choose the area yourself if it is wrong.</string>
+    <string name="location_gps_unmatched">This position could not be matched to an administrative area%1$s. The coordinates are still real and will be used for prayer times; the area is simply left unresolved.</string>
+    <string name="location_gps_unmatched_distance"> (the nearest area centre is about %1$s away)</string>
+    <string name="location_gps_verified">Confirmed inside Bangladesh using the bundled national boundary.</string>
+    <string name="location_gps_unverified">The bundled boundary was unavailable, so this position could not be verified against Bangladesh's border.</string>
+    <string name="location_gps_bangladesh_only">Salah only saves locations inside Bangladesh.</string>
+
+    <string name="location_message_saved">Location saved. Prayer times and reminders have been recalculated for it.</string>
+    <string name="location_message_rejected">That location was not accepted and nothing was changed.</string>
+    <string name="location_message_permission_denied">Location permission was declined. You can select a location manually instead — no permission is needed for that.</string>
+    <string name="location_message_services_disabled">Location is switched off for this device. Turn it on in system settings, or select a location manually.</string>
+    <string name="location_message_timeout">No position arrived in time. Try again near a window or outdoors, or select a location manually.</string>
+    <string name="location_message_provider_failed">The device could not provide a position. Select a location manually instead.</string>
+    <string name="location_message_outside_country">This position is outside Bangladesh, so it was not saved. Salah currently supports locations in Bangladesh only.</string>
+    <string name="location_message_outside_country_distance">This position is about %1$s outside Bangladesh, so it was not saved. Salah currently supports locations in Bangladesh only.</string>
+    <string name="location_message_cleared">Location removed. Salah will ask for a location again before calculating times.</string>
+    <string name="location_message_dataset_unavailable">The bundled location dataset could not be read, so an area cannot be chosen.</string>
+    <string name="location_message_dismiss">Dismiss</string>
+
+    <string name="settings_location_system_title">Location in Bangladesh</string>
+    <string name="settings_location_system_body">Your location decides prayer times, the Qibla direction and the Sehri and Iftar times. Choose it by division, district and upazila or thana, or read it from this device. Salah currently supports locations in Bangladesh only.</string>
+    <string name="settings_location_system_open">Choose location</string>
 </resources>

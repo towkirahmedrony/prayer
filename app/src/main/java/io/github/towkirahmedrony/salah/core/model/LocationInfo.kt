@@ -9,6 +9,17 @@ enum class LocationOrigin {
     MANUAL_ENTRY,
 
     /**
+     * Chosen as an administrative area — a division, district and upazila/thana — in the location
+     * setup or the location screen.
+     *
+     * **Distinct from [MANUAL_ENTRY] on purpose.** A typed coordinate is a point the user asserted;
+     * this is an area the user selected, and the coordinate stored with it is that area's published
+     * centre. The two differ in what the app may claim: an area selection must never be presented as
+     * the user's exact position (`docs/LOCATION_SYSTEM.md` section 7).
+     */
+    AREA_SELECTION,
+
+    /**
      * Read from the device's location provider, then stored locally.
      *
      * Stored rather than held in memory: it is what lets the Qibla bearing keep working offline and
@@ -45,6 +56,36 @@ data class LocationInfo(
 
     /** When a device fix was obtained, or `null` when unknown or not applicable. */
     val acquiredAt: Instant? = null,
+
+    /**
+     * ISO 3166-1 alpha-2 code of the country this location was accepted as being in, or `null` when
+     * it was never checked.
+     *
+     * Set to `BD` only after
+     * [io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy] has accepted the
+     * coordinate, so a stored `BD` is a statement that the check ran and passed — not an assumption
+     * about where the app is used. A location typed by hand or read on the Qibla screen before this
+     * policy existed carries `null`, which is the honest value for "not established".
+     */
+    val countryCode: String? = null,
+
+    /**
+     * The administrative areas this location belongs to, when they are known.
+     *
+     * Kept alongside the coordinates rather than derived from them, because for a selected area the
+     * hierarchy *is* the user's input and the coordinate is derived from it — the reverse of the GPS
+     * case, where the coordinate is the observation and the area is an approximate label.
+     */
+    val area: BangladeshAreaRef? = null,
+
+    /**
+     * The dataset version the [area] ids were chosen from, or `null` when no dataset was involved.
+     *
+     * Stored so a later build can tell that the bundled geography has changed since the user made
+     * their choice and revalidate it, instead of silently displaying an area the current dataset may
+     * no longer define.
+     */
+    val datasetVersion: String? = null,
 ) {
     /** The zone this location's times are expressed in. */
     val zoneId: ZoneId get() = ZoneId.of(timeZoneId)
@@ -74,6 +115,9 @@ data class LocationInfo(
             origin: LocationOrigin = LocationOrigin.MANUAL_ENTRY,
             accuracyMetres: Double? = null,
             acquiredAt: Instant? = null,
+            countryCode: String? = null,
+            area: BangladeshAreaRef? = null,
+            datasetVersion: String? = null,
         ): LocationInfo? {
             val cleanLabel = label.trim()
             if (cleanLabel.isEmpty()) return null
@@ -89,6 +133,11 @@ data class LocationInfo(
                 origin = origin,
                 accuracyMetres = usableAccuracy,
                 acquiredAt = acquiredAt,
+                // Trimmed and upper-cased so a stored code is comparable, and reduced to null when
+                // blank: an empty string would read as "a country was recorded" without recording one.
+                countryCode = countryCode?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(),
+                area = area,
+                datasetVersion = datasetVersion,
             )
         }
     }

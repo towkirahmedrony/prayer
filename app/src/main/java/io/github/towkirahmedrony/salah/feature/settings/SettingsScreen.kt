@@ -61,6 +61,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun SettingsScreen(
     onOpenNotifications: () -> Unit,
+    onOpenLocation: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
@@ -124,6 +125,29 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedButton(onClick = onOpenNotifications) {
                 Text(text = stringResource(R.string.settings_notifications_open))
+            }
+        }
+
+        // Location -----------------------------------------------------------
+        // The primary way to set a location: the area picker and a device fix, both validated the
+        // same way as on first launch, because it is the same screen. Kept separate from the manual
+        // coordinate form below rather than replacing it — the form is the escape hatch for a
+        // position the area dataset cannot express, and removing it would take a capability away.
+        SalahSectionCard {
+            Text(
+                text = stringResource(R.string.settings_location_system_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_location_system_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(onClick = onOpenLocation) {
+                Text(text = stringResource(R.string.settings_location_system_open))
             }
         }
 

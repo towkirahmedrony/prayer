@@ -81,4 +81,38 @@
     <string name="state_loading">লোড হচ্ছে…</string>
     <string name="state_error_title">কিছু একটা ভুল হয়েছে</string>
     <string name="action_retry">আবার চেষ্টা করুন</string>
+
+    <!-- Location: the labels whose meaning is unambiguous. The explanatory paragraphs that state
+         which authority Salah does not claim to match, and what a selected area does not mean,
+         stay in English until they can be reviewed (see app/lint.xml). -->
+    <string name="nav_location">অবস্থান</string>
+    <string name="location_title">অবস্থান</string>
+    <string name="location_setup_title">আপনার অবস্থান নির্বাচন করুন</string>
+    <string name="location_action_use_gps">আমার বর্তমান অবস্থান নিন</string>
+    <string name="location_action_select_manually">নিজে এলাকা নির্বাচন করুন</string>
+    <string name="location_action_save">এই অবস্থান সংরক্ষণ করুন</string>
+    <string name="location_action_confirm_location">এই অবস্থান ব্যবহার করুন</string>
+    <string name="location_action_refresh_gps">জিপিএস থেকে নবায়ন করুন</string>
+    <string name="location_picker_title">নিজে এলাকা নির্বাচন করুন</string>
+    <string name="location_picker_step_division">বিভাগ</string>
+    <string name="location_picker_step_district">জেলা</string>
+    <string name="location_picker_step_upazila">উপজেলা / থানা</string>
+    <string name="location_picker_choose_division">বিভাগ নির্বাচন করুন</string>
+    <string name="location_picker_choose_district">জেলা নির্বাচন করুন</string>
+    <string name="location_picker_choose_upazila">উপজেলা বা থানা নির্বাচন করুন</string>
+    <string name="location_gps_title">অবস্থান পাওয়া গেছে</string>
+    <string name="location_gps_acquiring">আপনার অবস্থান নেওয়া হচ্ছে…</string>
+    <string name="location_section_current_title">বর্তমান অবস্থান</string>
+    <string name="location_section_change_title">অবস্থান পরিবর্তন করুন</string>
+    <string name="location_country_label">দেশ</string>
+    <string name="location_country_value">বাংলাদেশ (BD)</string>
+    <string name="location_source_label">সূত্র</string>
+    <string name="location_source_gps">জিপিএস অবস্থান</string>
+    <string name="location_source_area">নির্বাচিত এলাকা</string>
+    <string name="location_source_manual">নিজে লেখা</string>
+    <string name="location_division_label">বিভাগ</string>
+    <string name="location_district_label">জেলা</string>
+    <string name="location_upazila_label">উপজেলা / থানা</string>
+    <string name="location_time_zone_label">সময় অঞ্চল</string>
+    <string name="location_accuracy_label">নির্ভুলতা</string>
 </resources>
