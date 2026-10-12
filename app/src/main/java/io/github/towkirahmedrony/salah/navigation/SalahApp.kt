@@ -1,12 +1,6 @@
 package io.github.towkirahmedrony.salah.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -14,16 +8,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
@@ -34,6 +25,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.ToolsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
+import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
 import org.koin.androidx.compose.koinViewModel
 
@@ -62,28 +54,13 @@ fun SalahApp() {
                 LocationSetupScreen(modifier = Modifier.padding(innerPadding))
             }
 
+            // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:
+            // the gate is short-lived, and the Home layout arriving into a screen that already has
+            // its shape is a smaller change than a spinner being swapped out for a whole screen.
             else -> Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
-                LoadingGate(modifier = Modifier.padding(innerPadding))
+                HomeSkeleton(modifier = Modifier.padding(innerPadding))
             }
         }
-    }
-}
-
-/** Shown while the stored location and the bundled dataset are still being read. */
-@Composable
-private fun LoadingGate(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CircularProgressIndicator()
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.state_loading),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
     }
 }
 

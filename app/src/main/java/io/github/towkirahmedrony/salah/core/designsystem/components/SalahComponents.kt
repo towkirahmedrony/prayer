@@ -18,8 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** A bordered surface used for every Home section, so the screen reads as one system. */
@@ -123,4 +125,30 @@ fun SalahShortcutTile(
             )
         }
     }
+}
+
+/**
+ * A static placeholder for one piece of content that has not arrived yet.
+ *
+ * **Deliberately not animated.** The waits it covers are short, and a pulsing or shimmering block
+ * draws more attention to the gap than the spinner it replaced — which is the opposite of the point.
+ * It uses the same `surfaceVariant` as [SalahUnavailableNote], so a screen that is still loading
+ * still reads as part of the same design system.
+ *
+ * Only the height, the corner radius and the colour are decided here. Callers supply the width and
+ * the position, which is what lets one block stand in for a date line, a prayer chip or a whole
+ * card, and lets each caller keep the geometry of the real content it is standing in for.
+ */
+@Composable
+fun SalahSkeletonBlock(
+    height: Dp,
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(8.dp),
+) {
+    Box(
+        modifier = modifier
+            .height(height)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
 }

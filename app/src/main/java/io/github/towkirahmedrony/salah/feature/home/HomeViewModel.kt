@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.StartupTrace
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Clock
@@ -107,6 +109,16 @@ class HomeViewModel(
     private val schedulePart: Flow<SchedulePart> =
         combine(settings, scheduleState) { currentSettings, state -> SchedulePart(currentSettings, state) }
 
+    /**
+     * One-shot guards for the startup trace.
+     *
+     * The tick above re-emits [uiState] once a second, so without these the ready marks would be
+     * recorded once a second for as long as Home is on screen and the first one — the measurement —
+     * could not be picked out of the log.
+     */
+    private var homeReadyMarked = false
+    private var homeScheduleReadyMarked = false
+
     val uiState: StateFlow<HomeUiState> = combine(
         calendarRepository.observeToday(),
         location,
@@ -122,6 +134,23 @@ class HomeViewModel(
             prohibitedState = prohibited,
             now = currentMoment,
         )
+    }.onEach { state ->
+        // The state becoming `Ready` is what makes Home renderable. The composable existing is not:
+        // HomeScreen is only composed after the location gate has already opened, so a mark at
+        // composition time would measure the gate, not Home.
+        if (state is HomeUiState.Ready) {
+            if (!homeReadyMarked) {
+                homeReadyMarked = true
+                StartupTrace.mark("home_ready")
+            }
+            // `timetableNote` is null exactly when a real schedule is being displayed. This is the
+            // later and the stricter of the two: the first Home that carries prayer times, rather
+            // than a note explaining why it has none.
+            if (!homeScheduleReadyMarked && state.timetableNote == null) {
+                homeScheduleReadyMarked = true
+                StartupTrace.mark("home_schedule_ready")
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),

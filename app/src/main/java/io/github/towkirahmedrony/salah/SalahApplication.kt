@@ -39,6 +39,7 @@ class SalahApplication : Application() {
         StartupTrace.mark("koin_started")
 
         createNotificationChannels()
+        StartupTrace.mark("channels_created")
         warmUpThenReconcile()
         StartupTrace.mark("app_onCreate_end")
     }
@@ -65,7 +66,9 @@ class SalahApplication : Application() {
 
             val coordinator = runCatching { koin.get<PrayerNotificationCoordinator>() }.getOrNull()
             if (coordinator != null) {
+                StartupTrace.mark("reconcile_start")
                 runCatching { coordinator.reconcile(ReconcileReason.APP_START) }
+                StartupTrace.mark("reconcile_done")
             }
         }
     }

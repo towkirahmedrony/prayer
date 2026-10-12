@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.domain.location.AreaResolution
@@ -236,11 +237,13 @@ private fun LocationContent(
 
         // Dataset status -----------------------------------------------------
         if (state.isLoading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text(
-                text = stringResource(R.string.location_loading),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // A stand-in for the dataset version line that replaces it, rather than a progress bar.
+            // The read is a local file parse that finishes in milliseconds, and both ways of choosing
+            // a location below stay disabled until it finishes, so there is nothing here a user could
+            // act on early and nothing to wait behind a moving bar.
+            SalahSkeletonBlock(
+                height = 14.dp,
+                modifier = Modifier.fillMaxWidth(0.55f),
             )
         } else if (!state.isDatasetUsable) {
             SalahSectionCard {

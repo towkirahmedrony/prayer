@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +24,7 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.feature.home.components.CalculationCard
 import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
 import io.github.towkirahmedrony.salah.feature.home.components.HomeHeader
+import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.home.components.LocationCard
 import io.github.towkirahmedrony.salah.feature.home.components.NextPrayerHero
 import io.github.towkirahmedrony.salah.feature.home.components.PrayerStrip
@@ -49,7 +49,10 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val state = uiState) {
-        HomeUiState.Loading -> HomeLoading(modifier)
+        // A skeleton of this screen's own layout, not a centred spinner. It carries no value: no
+        // prayer name, no time and no countdown can be read off it, so there is nothing here that
+        // could be mistaken for a calculated time while the schedule is still being produced.
+        HomeUiState.Loading -> HomeSkeleton(modifier)
 
         is HomeUiState.Failed -> HomeFailure(
             detail = state.detail,
@@ -62,25 +65,6 @@ fun HomeScreen(
             onNavigate = onNavigate,
             onRetry = viewModel::onRetry,
             modifier = modifier,
-        )
-    }
-}
-
-@Composable
-private fun HomeLoading(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CircularProgressIndicator()
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.state_loading),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
