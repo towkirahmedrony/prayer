@@ -1,6 +1,5 @@
 package io.github.towkirahmedrony.salah
 
-import android.app.AlertDialog
 import android.os.Bundle
 import android.view.Choreographer
 import androidx.activity.ComponentActivity
@@ -39,7 +38,8 @@ class MainActivity : ComponentActivity() {
             StartupTrace.mark("first_frame_callback")
         }
 
-        // Temporary: show the full startup timeline once the location gate opens.
+        // Temporary: record when the location gate stops being undecided. It is written to Logcat
+        // (`adb logcat -s SalahStartup`) with every other mark, not to a dialog.
         lifecycleScope.launch {
             val setup = appViewModel.locationSetup.first { it !is LocationSetupState.Checking }
             StartupTrace.mark("gate_open")
@@ -49,11 +49,6 @@ class MainActivity : ComponentActivity() {
             StartupTrace.mark(
                 if (setup is LocationSetupState.Complete) "gate_complete" else "gate_requires_setup",
             )
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle("Startup (ms since process start)")
-                .setMessage(StartupTrace.summary())
-                .setPositiveButton("OK", null)
-                .show()
         }
     }
 }
