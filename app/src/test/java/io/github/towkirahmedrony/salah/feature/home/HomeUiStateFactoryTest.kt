@@ -368,8 +368,13 @@ class HomeUiStateFactoryTest {
         assertFalse(state.currentPrayer.isActive)
         assertNull(state.currentPrayer.countdown)
         assertEquals(UnavailabilityReason.UNKNOWN, state.currentPrayer.unavailable)
-        // The next prayer is still knowable, so it is still shown.
-        assertEquals(PrayerName.ASR, state.nextPrayer.prayer)
+        // 20:00 is after Isha, and `NextPrayerResolver` resolves only within the day it was given:
+        // once the last prayer has begun it reports nothing rather than guessing at tomorrow's Fajr.
+        // That is the same absence that leaves Isha's period unresolved above, so the two cards are
+        // consistent with each other instead of one inventing a boundary for the other.
+        assertNull(state.nextPrayer.prayer)
+        assertNull(state.nextPrayer.countdown)
+        assertNull(state.currentPrayer.next.prayer)
     }
 
     @Test

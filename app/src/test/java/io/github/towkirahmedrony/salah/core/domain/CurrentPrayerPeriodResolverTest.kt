@@ -425,7 +425,7 @@ class CurrentPrayerPeriodResolverTest {
     }
 
     @Test
-    fun `a valid Bangladesh location in another zone is still read in its own zone`() {
+    fun `a location in another zone is read in its own zone, not the board's`() {
         // The Bangladesh policy keeps every stored location in Asia/Dhaka, but the resolver must not
         // assume that: the schedule's own zone is what the times mean.
         val elsewhere = checkNotNull(
@@ -450,13 +450,16 @@ class CurrentPrayerPeriodResolverTest {
             generatedAt = Instant.parse("2026-10-11T00:00:00Z"),
         )
 
-        // 14:00 UTC is 15:00 in London: inside Asr there.
+        // 11 October is inside British Summer Time (UTC+1), so 15:00 UTC is 16:00 in London: inside
+        // the Asr period, which runs 15:30 to 18:05 local. Read as UTC the same instant would land
+        // in Dhuhr, which is exactly the mistake this test guards against.
         val period = active(
-            resolver.resolve(londonSchedule, date.atTime(14, 0).atZone(ZoneId.of("UTC"))),
+            resolver.resolve(londonSchedule, date.atTime(15, 0).atZone(ZoneId.of("UTC"))),
         )
 
         assertEquals(PrayerName.ASR, period.prayer)
         assertEquals(ZoneId.of("Europe/London"), period.endsAt.zone)
+        assertEquals(date.atTime(18, 5).atZone(ZoneId.of("Europe/London")), period.endsAt)
     }
 
     // --------------------------------------------------------------------------- period inventory

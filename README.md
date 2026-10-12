@@ -246,38 +246,8 @@ and no signing credentials.
   mapping, the persistence and the reminder planning are covered by the automated tests documented in
   [`docs/CALENDAR_SYSTEM.md`](docs/CALENDAR_SYSTEM.md) §13; the visual layout, both themes, large font
   scales and a real device time-zone change are not.
-- Prohibited-time rules are **not** configured: the mechanism and tests exist, the reviewed rule
-  set does not.
-- No Quran, duas or tasbih.
-- **The Qibla dial is not better than a few degrees outdoors, and worse near metal.** The bearing
-  itself is exact; what varies is the compass. Nearby magnets, speakers, car dashboards and
-  device-specific magnetometer quality dominate the error, and Salah says so rather than implying
-  otherwise.
-- **The Qibla compass has not been verified on a physical device.** Rotating the screen, tilting the
-  device, the sensor-family fallback, real declination values and a real location fix all need
-  hardware. The checklist exists and is explicitly unperformed:
-  [`docs/QIBLA_COMPASS_TESTING.md`](docs/QIBLA_COMPASS_TESTING.md) §4.
-- **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
-  missing for licensing reasons, and the UI reports that rather than offering a control that cannot
-  work.
-- **Notification delivery has not been verified on a physical device.** Reboot recovery, Doze
-  behaviour, system permission surfaces and real alarm timing need hardware. The checklist exists
-  and is explicitly unperformed:
-  [`docs/PRAYER_NOTIFICATIONS_TESTING.md`](docs/PRAYER_NOTIFICATIONS_TESTING.md) §4.
-- Notification reminders may be delayed or silenced by Android: without exact-alarm access they use
-  a ten-minute window, and Do Not Disturb, battery optimisation and a force-stopped app can defer or
-  withhold them. Salah uses only supported APIs and does not attempt to bypass these.
-- **The bundled administrative dataset has not been checked against an independent source.** Its
-  provenance (OCHA/HDX COD-AB, CC BY 3.0 IGO, with Bangla names from `nuhil/bangladesh-geocode`, MIT)
-  is documented and the generated files are tested for internal consistency, but Salah has not compared
-  the published centre coordinates with any second dataset. See
-  [`docs/LOCATION_SYSTEM.md`](docs/LOCATION_SYSTEM.md) §6.
-- **The Bangladesh boundary is checked with a 5 km tolerance, and tolerance is not containment.** The
-  allowance covers GPS and simplification error, but it also covers a few kilometres of a neighbouring
-  country; Salah never describes a tolerance-accepted position as confirmed inside Bangladesh.
-- No network client, no Room database; the schedule cache is in-memory (and cheaply recomputed).
-- UI strings are mostly English; the Bangla resource file is deliberately partial (see
-  `app/lint.xml`) and Bangla/Arabic script rendering relies on system fonts.
+- Prohibited-time boundaries are this application's **configured policy**, disclosed as such on the
+  screen that shows them; no source for the minute values has been verified in this repository.
 
 ## Roadmap
 

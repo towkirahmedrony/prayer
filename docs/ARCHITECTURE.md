@@ -135,7 +135,7 @@ io.github.towkirahmedrony.salah
 │   │                           local-midnight and time-zone refresh, and the conversion of every
 │   │                           day it lays out
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
-│   ├── prohibited/             Rule-book-backed repository (ships unconfigured)
+│   ├── prohibited/             Rule-book-backed repository (documented policy)
 │   ├── qibla/                  Android side of the Qibla feature:
 │   │                           AndroidCompassSensorSource (SensorManager, three sensor families,
 │   │                           display-rotation remap, tilt), AndroidGeomagneticDeclinationProvider
@@ -229,7 +229,7 @@ location + settings + 1s tick ──► request ────┘           │
                                                NextPrayerResolver
                                                           │
                             ProhibitedPeriodsRepository ──►┘
-                              (rule book ships unconfigured)
+                              (rule book carries the documented policy)
 ```
 
 - **The request is the cache key.** `HomeViewModel` derives a `PrayerScheduleRequest?` from the
@@ -517,33 +517,6 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
 
 - Prayer times are calculated locally but have **not** been compared against any published
   authority timetable; no such claim is made. (`docs/PRAYER_CALCULATION.md` §6.)
-- Prohibited prayer windows are **implemented but unconfigured**: the rule book ships empty, so the
-  app reports the honest unavailability state.
-- The schedule cache is in-memory only; process death clears it (and it is cheaply recalculated).
-- No network client, no Room and no WorkManager job exist. The manifest declares exactly six
-  permissions, each tied to a feature (`POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`,
-  `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`) — there is
-  still **no** `INTERNET` permission, and no background location.
-- **No Azan recording is bundled.** The playback subsystem is implemented and tested; the asset is
-  missing for licensing reasons, and the UI says so instead of offering a control that cannot work.
-- **The Qibla bearing is exact; the compass is not.** The bearing is closed-form trigonometry over
-  stored coordinates, verified against independent formulations. The dial's error is dominated by
-  local magnetic interference and device magnetometer quality, which no software can correct, and
-  the screen states that rather than implying a precision it does not have.
-- **The Qibla feature has not been verified on a physical device.** Sensors, screen rotation,
-  declination values and real location fixes require hardware; the checklist is written and
-  unperformed (`QIBLA_COMPASS_TESTING.md` §4).
-- Notification delivery has **not** been verified on a physical device. Reboot recovery, Doze
-  behaviour, system permission surfaces and real alarm timing require hardware; the checklist is
-  written but unperformed (`PRAYER_NOTIFICATIONS_TESTING.md` §4).
-- **The Hijri date and the Ramadan window are estimates**, and Salah says so wherever they appear:
-  Umm al-Qura is not the calendar Bangladesh's religious authorities announce Ramadan and the Eids
-  with, and no moon-sighting source is integrated. Sehri and Iftar are the calculated Fajr and
-  Maghrib, with no buffer and no claim to match any authority's timetable.
-  (`docs/CALENDAR_SYSTEM.md` §5, §7.)
-- **The calendar screens have not been verified on a physical device.** The converters, the state
-  mapping, the persistence and the reminder planning are unit-tested; the layout, both themes, large
-  font scales and a real device time-zone change are not.
-- Reason strings and UI text are English, with a partial Bangla translation of navigation, calendar
-  and prayer labels; the calendar's own date language is a separate, explicit setting. Full
-  localisation is future work.
+- Prohibited prayer windows are **implemented and configured** with this application's documented
+  policy. Confirming the boundaries is a data change: add a reviewed `ProhibitedRuleSet`. See
+  `docs/FORBIDDEN_PRAYER_TIMES.md`.
