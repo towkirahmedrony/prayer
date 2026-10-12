@@ -9,9 +9,10 @@ Implemented:
 
 - Gradle project with a version catalog, Kotlin DSL and wrapper `9.8.1`.
 - Design system: emerald/ivory Material 3 theme, typography, shapes, hand-drawn glyphs.
-- Salah Home screen: branding, date header, location, calculation indicator, next-prayer card,
-  daily timetable, solar events, prohibited-times section, shortcuts, data-source status, plus
-  loading/error/empty states and light/dark themes.
+- Salah Home screen: top bar, location and date header, the **live current-prayer hero** (the period
+  that is open now, with its countdown), today's prayer-time strip, the prohibited-times card and the
+  daily tools, plus loading/error/empty states and light/dark themes. Every value on it is bound to
+  application state — see §7a for the exact source of each field.
 - **Prayer calculation:** a real, offline local engine (Adhan Kotlin) producing the five prayers
   plus true sunrise, solar noon and sunset, with selectable calculation method, Asr method,
   high-latitude rule and per-prayer minute adjustments.
@@ -405,17 +406,49 @@ Only one provider is bound at a time in `di/SalahModules.kt`; the UI never learn
 
 | Situation | Representation | Rendering |
 |---|---|---|
-| Sources not emitted yet | `HomeUiState.Loading` | Spinner + “Loading…” |
+| Sources not emitted yet | `HomeUiState.Loading` | `HomeSkeleton`: Home's own geometry with no value in it |
 | Device date unreadable | `HomeUiState.Failed` | Error text + Retry |
-| No location | `LocationSection.unavailable = NO_LOCATION_CONFIGURED` | Card explains it and links to Settings |
+| No location | `LocationSection.unavailable = NO_LOCATION_CONFIGURED` | The location label states it and opens the `location` destination; no times and no countdown are shown |
 | No location for the schedule | `timetableNote = NO_LOCATION_CONFIGURED` | Note in the timetable; no times, no countdown |
 | Twilight not reached (polar) | `timetableNote = CALCULATION_NOT_POSSIBLE` | Note explains it; no times, no countdown |
 | Provider failed | `failureDetail` | Error banner with Retry; other sections remain |
 | Nothing applicable in the rule book | `prohibited.unavailable = RULES_NOT_VERIFIED` | Explanation instead of intervals |
 | Bangla/Hijri missing | `CALENDAR_NOT_IMPLEMENTED` | Explanation instead of a fabricated date |
 
-An `Available` schedule also drives the calculation card (method, Asr method, high-latitude rule
-when pinned, adjustment disclosure) so a time is never presented without the settings behind it.
+### 7a. Where each Home field comes from
+
+`HomeScreen` renders `HomeUiState` and nothing else: it never reads a repository, never formats a
+date and never computes a countdown. Every displayed value is bound to application state.
+
+| Home field | Source | Kind |
+|---|---|---|
+| Current prayer name, its start time, the boundary that closes its period, and the countdown | `CurrentPrayerPeriodResolver` over today's `PrayerSchedule` | local calculation |
+| Today's five times, and the highlight on the one that is next | `PrayerSchedule` from `PrayerScheduleRepository.ensureSchedule` | local calculation, stored locally |
+| Tomorrow's Fajr (so Isha's period can be closed at it) | the same repository, for the following local date | local calculation |
+| Location label, coordinates, zone and origin | the persisted location, read at start-up into `StartupSnapshot` | persisted state |
+| Calculation method, Asr method, high-latitude rule, manual adjustments, time format | persisted `PrayerSettings` | persisted state |
+| Gregorian date, weekday, Bangla and Hijri dates | `CalendarRepository.observeToday()` (device clock plus the local converters) | local calculation, progressive |
+| Prohibited intervals, their anchor events, phase and countdown | `ProhibitedPeriodsRepository` over the same schedule | local calculation, under the shipped (unreviewed) rule set |
+| Failure detail and retry | `PrayerScheduleState.Failed` | derived |
+
+**There is no remote source in this repository.** `AdhanPrayerTimesProvider` is the only bound
+provider and it calculates on the device, so every field above works offline. The `REMOTE_API` and
+`USER_ENTERED_TIMETABLE` sources exist in the model but have no implementation (§6).
+
+**The countdown.** `HomeViewModel` holds one `StateFlow<ZonedDateTime>` that re-reads the clock once
+per second while Home is subscribed. Both countdowns — the remaining time in the open period and
+the time until the next prayer — are derived from that single tick and the same schedule, so they
+cannot disagree about what time it is. The *schedule* is recalculated only when the request changes
+(the local date at the saved location, the location, or the calculation profile), and the request is
+exactly the repository's cache key. A tick therefore never recalculates a timetable. The tick is
+started with `SharingStarted.WhileSubscribed` — the subscription that `collectAsStateWithLifecycle`
+in `HomeScreen` owns — so it suspends when the screen is not visible.
+
+**What Home does not show.** The Home layout renders no calculation card, no data-source card and
+no per-prayer manual-adjustment disclosure. `HomeUiState.Ready.calculation`, `.provenance` and
+`PrayerRow.adjustmentMinutes` all carry those values, and the timetable on the `prayer` destination
+does disclose adjustments; whether Home should surface them too is a design question, not a missing
+data source.
 
 ## 8. Design system and navigation
 
@@ -424,14 +457,18 @@ when pinned, adjustment disclosure) so a time is never presented without the set
   explicit light/dark overrides.
 - `core/designsystem/SalahGlyphs.kt`: icons drawn with Compose `Canvas`, so no icon library
   dependency exists.
-- `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla`,
-  `calendar_settings` and `notifications`. Only the `prayer` destination still renders
-  `PlannedFeatureScreen`, explicitly labelled “Not implemented yet”; Calendar and Ramadan are real
-  screens. `notifications` is a real destination reached from Settings and is not in the bottom bar,
-  because it is configuration rather than a place the user works. `calendar_settings` is reached
-  from the Calendar screen and holds the one place a date can be affected from. `qibla` is a real
-  screen reached from the Home screen's Islamic tools, and is not in the bottom bar because it is a
-  tool rather than a place the user dwells.
+- `navigation/SalahDestination`: the four bottom-bar destinations — `home`, `prayer`, `calendar`,
+  `settings` — plus `qibla`, `tools`, `ramadan`, `location`, `calendar_settings` and
+  `notifications`. Every route has a real screen behind it in `SalahNavHost`, and
+  `feature/common/PlannedFeatureScreen` is now unreferenced. `prayer` is the live prayer-period and
+  timetable screen: it is in the bottom bar and is also where Home's “View all” and “View details”
+  lead, and it renders from the same `HomeViewModel` and the same schedule as Home's prayer
+  content. `tools` and `ramadan` are reached from Home's daily tools; `location` is reached from
+  Home's location label and from Settings; `notifications` is reached from Settings and is not in
+  the bottom bar, because it is configuration rather than a place the user works.
+  `calendar_settings` is reached from the Calendar screen and holds the one place a date can be
+  affected from. `qibla` is a real screen reached from the Home screen's Islamic tools, and is not
+  in the bottom bar because it is a tool rather than a place the user dwells.
 - Navigation state is saved/restored per destination (`saveState`/`restoreState`,
   `launchSingleTop`), so returning to Home keeps its state.
 
@@ -448,6 +485,7 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 | Offline-first repository | `ProviderBackedPrayerScheduleRepositoryTest` | No location, engine not configured, cache reuse without re-calling the provider, recalculation on date/location/profile change, stale or wrong-place response rejection, exception → visible failure |
 | Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting including the calendar preferences, transactional updates, the Hijri offset clamped on write and read, safe fallback on unknown values, and calendar/prayer/theme preferences not overwriting one another |
 | Home mapping rules | `HomeUiStateFactoryTest` | No fabricated data, countdown only for a real schedule, sunrise not a prayer, failure surfaced, time-format preference |
+| Home data contract | `HomeViewModelTest` | Real resolvers and factory, faked repositories: the active period and countdown come from the repository's schedule for the saved location; the schedule is calculated once per request and not once per tick; a new local day and a new saved location each re-request; Home waits for a real schedule before showing times, but not for the calendar; no location is reported as such rather than fabricated. Runs on virtual time via `Dispatchers.setMain` — see §9.1 |
 | Calendar rollover and day resolution | `DeviceClockCalendarRepositoryTest` | Local-midnight re-emission, no polling, DST-length local day, the Hijri month boundary at midnight, the date language, out-of-range reporting for both converters, a month laid out with real Bangla/Hijri dates and Ramadan day numbers, the Ramadan window and its movement with the Hijri offset |
 | Bangladesh Bangla calendar | `BanglaCalendarTest` | Published 2019 rules (six 31-day months, Falgun 29/30, Chaitra 30) against reference dates, every month start, the 14 April New Year, leap years, a whole supported year round-tripped, refusal before 2019 and after 2399 |
 | Hijri calendar | `HijriCalendarTest` | Umm al-Qura reference conversions, month boundaries on both sides, the user offset and its source label, 29/30-day Ramadan windows, the window search, observances, and the platform table's bounds |
@@ -476,6 +514,23 @@ scenarios for both features are listed, unperformed, in
 [`PRAYER_NOTIFICATIONS_TESTING.md`](PRAYER_NOTIFICATIONS_TESTING.md) §4 and
 [`QIBLA_COMPASS_TESTING.md`](QIBLA_COMPASS_TESTING.md) §4. The engine's reference values are regression values from the pinned engine version through
 Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATION.md` §6.
+
+### 9.1 Testing the view models on the JVM
+
+View models reach `android.os` indirectly: `HomeViewModel` records start-up timing through
+`StartupTrace`, which reads `Process.getStartElapsedRealtime()`, `SystemClock.elapsedRealtime()` and
+`Log`. Those are stubs in a JVM unit test and throw `Method … not mocked` unless the unit-test
+variant returns default values, so `app/build.gradle.kts` sets
+`testOptions.unitTests.isReturnDefaultValues = true`. With that, the trace is inert in tests — a `0`
+elapsed time and a no-op log line — and the view model's flow assembly is testable without an
+emulator or Robolectric.
+
+Nothing else in the test source set imports `android.*`, so no existing test relied on a stub
+throwing and the flag cannot hide a real "not mocked" failure elsewhere. `HomeViewModelTest`
+installs a `StandardTestDispatcher` as `Dispatchers.Main` (the dispatcher behind `viewModelScope`)
+and passes the same dispatcher to `runTest`, so the view model and the test share one scheduler and
+one virtual clock. The clock itself is a hand-moved `Clock`, so no test depends on the wall clock or
+on the machine's time zone.
 
 ## 10. Extension points
 

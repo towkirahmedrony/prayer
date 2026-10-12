@@ -109,14 +109,23 @@ private fun HomeContent(
             TodayPrayerTimesSection(
                 rows = state.prayerRows,
                 currentPrayer = state.currentPrayer.prayer,
-                onViewAll = { onNavigate("calendar") },
+                // `View all` opens the prayer timetable this strip is a summary of: the `prayer`
+                // destination renders the same live period and the day's full timetable for the
+                // saved location. It used to open Calendar, which shows months of dates and no
+                // prayer times at all.
+                onViewAll = { onNavigate("prayer") },
             )
         }
 
         item(key = "forbidden-times") {
             ForbiddenTimesCard(
                 state = state,
-                onViewDetails = { onNavigate("calendar") },
+                // The prohibited windows are anchored to the day's solar events, so `View details`
+                // opens the same prayer-day destination rather than Calendar. There is no
+                // dedicated prohibited-times screen: the card lists every configured interval for
+                // today, and inventing a screen for the rest would be a design decision, not a
+                // data binding.
+                onViewDetails = { onNavigate("prayer") },
             )
         }
 

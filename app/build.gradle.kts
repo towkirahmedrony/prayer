@@ -52,6 +52,22 @@ android {
         checkReleaseBuilds = false
     }
 
+    testOptions {
+        unitTests {
+            // `HomeViewModel` records start-up timing through `StartupTrace`, which reads
+            // `android.os.Process`, `android.os.SystemClock` and `android.util.Log`. Those are
+            // stubs in a JVM unit test and throw `Method ... not mocked` by default, which would
+            // make the view model untestable outside an emulator. Returning the default value
+            // instead makes the trace inert (a `0` elapsed time and a no-op log line) and lets the
+            // flow assembly be tested on the JVM.
+            //
+            // Every other test in this source set is pure JVM code — none of them imports
+            // `android.*` — so no existing test relied on a stub throwing, and this cannot mask a
+            // real "not mocked" failure anywhere else.
+            isReturnDefaultValues = true
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
