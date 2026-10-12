@@ -146,6 +146,53 @@ class PrayerNotificationSettingsViewModel(
         current.copy(sunriseReminderEnabled = enabled)
     }
 
+    // --- Ramadan ---------------------------------------------------------------
+
+    /**
+     * Turns the Sehri reminder on or off.
+     *
+     * The write is followed by the same reconciliation every other change goes through, so enabling it
+     * schedules the Sehri reminders for the Ramadan days already in the rolling window and disabling it
+     * cancels them — with no separate code path for Ramadan.
+     */
+    fun setSehriReminderEnabled(enabled: Boolean) = updateSettings(message = null) { current ->
+        current.withSehriReminder(enabled)
+    }
+
+    /** Moves the Sehri lead-in to the next offered value. */
+    fun shiftSehriLead(forward: Boolean) = updateSettings(message = null) { current ->
+        current.withSehriReminder(
+            enabled = current.sehriReminderEnabled,
+            leadMinutes = nextChoice(
+                current.sehriLeadMinutes,
+                PrayerNotificationSettings.SEHRI_LEAD_MINUTE_CHOICES,
+                forward,
+            ),
+        )
+    }
+
+    /** Turns the Iftar reminder on or off. */
+    fun setIftarReminderEnabled(enabled: Boolean) = updateSettings(message = null) { current ->
+        current.withIftarReminder(enabled)
+    }
+
+    /** Moves the Iftar lead-in to the next offered value; `0` means "at Iftar only". */
+    fun shiftIftarLead(forward: Boolean) = updateSettings(message = null) { current ->
+        current.withIftarReminder(
+            enabled = current.iftarReminderEnabled,
+            leadMinutes = nextChoice(
+                current.iftarLeadMinutes,
+                PrayerNotificationSettings.IFTAR_LEAD_MINUTE_CHOICES,
+                forward,
+            ),
+        )
+    }
+
+    private fun nextChoice(current: Int, choices: List<Int>, forward: Boolean): Int {
+        val index = choices.indexOf(current).let { if (it >= 0) it else 0 }
+        return choices[(index + if (forward) 1 else -1).coerceIn(0, choices.lastIndex)]
+    }
+
     // --- Actions --------------------------------------------------------------
 
     /**

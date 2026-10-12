@@ -25,6 +25,15 @@ enum class SalahDestination(
 
     CALENDAR("calendar", R.string.nav_calendar),
 
+    /**
+     * Calendar preferences: default view, Hijri offset and date language.
+     *
+     * Reached from the Calendar screen, and not in the bottom bar because it is configuration rather
+     * than a place the user reads dates. Kept off the general Settings screen so everything a date can
+     * be affected by sits next to the dates themselves.
+     */
+    CALENDAR_SETTINGS("calendar_settings", R.string.calendar_settings_title, inBottomBar = false),
+
     /** Entry point to Qibla and Ramadan. */
     TOOLS("tools", R.string.nav_tools),
 

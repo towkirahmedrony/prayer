@@ -5,10 +5,11 @@ tooling and Islamic utilities designed to keep working without an internet conne
 without an account.
 
 > **Current status:** the project foundation, the **local prayer-time calculation engine**,
-> **prayer notifications** and the **Qibla compass** are implemented and covered by tests. Several
-> long-term features described below are *planned*. This README states exactly which is which, and
-> the app itself labels unimplemented sections as “Not implemented yet” instead of showing
-> placeholder data.
+> **prayer notifications**, the **Qibla compass** and the **calendar system** (Gregorian, Bangladesh
+> Bangla, Hijri, and a Ramadan calendar with Sehri/Iftar times and reminders) are implemented and
+> covered by tests. Several long-term features described below are *planned*. This README states
+> exactly which is which, and the app itself labels unimplemented sections as “Not implemented yet”
+> instead of showing placeholder data.
 
 ---
 
@@ -22,7 +23,7 @@ without an account.
 | Prayer settings screen (method, Asr, high-latitude rule, time format, manual adjustments) | Implemented, persisted locally |
 | Manual location (validated coordinates + IANA zone), stored on device | Implemented |
 | Next prayer + countdown resolved from the real schedule | Implemented |
-| Home screen: branding, date header, location, calculation indicator, timetable, solar events, next-prayer card, prohibited-times section, shortcuts, data-source status | Implemented |
+| Home screen: branding, Gregorian/Bangla/Hijri date header, location, calculation indicator, timetable, solar events, next-prayer card, prohibited-times section, shortcuts, data-source status | Implemented |
 | **Prayer notifications** — reminders at the calculated prayer times, scheduled with `AlarmManager` from the same offline schedule the Home screen shows | **Implemented, offline** |
 | **Qibla bearing** — initial great-circle direction to the Kaaba, in degrees from true north, plus the great-circle distance | **Implemented, offline** |
 | **Qibla compass** — real sensor-driven dial with heading, signed turn and alignment, built on the fused rotation vector with two documented fallbacks | **Implemented** |
@@ -36,22 +37,40 @@ without an account.
 | Global master switch, separate sunrise (solar event) reminder, sound preview, schedule status | Implemented |
 | Reboot, clock, time-zone, date and app-update recovery; duplicate-alarm prevention; exact-alarm fallback | Implemented |
 | Prayer notification settings screen, reached from Settings | Implemented |
-| Navigation: Home, Prayer, Calendar, Ramadan, Settings, Notifications, Qibla | Implemented (Qibla is a real screen; Prayer, Calendar and Ramadan remain labelled boundaries) |
+| **Gregorian calendar** — device date, navigable month grid, today distinguished from the selection, selected-day details, locale week order | **Implemented, offline** |
+| **Bangladesh Bangla calendar** — conversion under the 2019 rules, with the verified range stated and refused outside it | **Implemented, offline** |
+| **Hijri calendar** — Umm al-Qura conversion from the platform's own `java.time` table, a user day offset, and observances derived from the lunar date | **Implemented, offline, always labelled as an estimate** |
+| **Ramadan calendar** — estimated window, daily table with Ramadan day number, Gregorian, Bangla and Hijri dates, Sehri end, Fajr, Iftar and Maghrib, and the provenance of the times | **Implemented, offline** |
+| **Sehri and Iftar reminders** — scheduled from the same calculated Fajr and Maghrib through the existing notification subsystem, only on the days the calendar places inside Ramadan | **Implemented, offline** |
+| Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
+| Navigation: Home, Prayer, Calendar (with its settings), Ramadan, Settings, Notifications, Qibla | Implemented (Qibla, Calendar and Ramadan are real screens; only Prayer remains a labelled boundary) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, Home mapping, the notification subsystem and the Qibla feature | Implemented (303 tests) |
+| Unit tests for engine, domain, data, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (418 tests) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |
-| Bangladesh Bangla and Hijri calendar conversion | **Not implemented** — honestly reported as unavailable |
-| Ramadan, Quran, widgets, networking, Room | Not implemented |
+| A moon-sighting or authority-confirmed Hijri date, and an integrated authority Sehri/Iftar timetable | **Not implemented** — so no date or time is ever labelled as confirmed |
+| Quran, widgets, networking, Room | Not implemented |
 
 ## Why it looks the way it does
 
 Salah only shows values it actually has:
 
 - The **Gregorian date** comes from the device clock — a real value.
-- **Bangla and Hijri dates** are not estimated; those sections explain that conversion is not
-  implemented yet.
+- The **Bangla date** is converted on device from the Bangladesh civil rules revised in 2019, and is
+  offered only for the years those rules are verified for. Where a date is outside that range the
+  screen says so instead of approximating.
+- The **Hijri date is an estimate and says so.** It comes from the Umm al-Qura table built into the
+  platform, is labelled as an estimate wherever it appears, and is never presented as confirmed by
+  any authority — because Salah has no moon-sighting source integrated. A day offset lets the user
+  align it with their community; the result is still reported as an estimate.
+- **Ramadan is derived, never hard-coded.** The estimated window comes from that same Hijri
+  calculation, and when no reliable window can be derived the screen shows none rather than a
+  guessed date.
+- **Sehri and Iftar are the existing prayer times.** Sehri ends at the calculated Fajr and Iftar is
+  the calculated Maghrib, read from the same schedule the Home screen and the reminders use. Salah
+  adds no buffer to either and does not claim to reproduce any authority's timetable. See
+  [`docs/CALENDAR_SYSTEM.md`](docs/CALENDAR_SYSTEM.md).
 - **Prayer times** are calculated on the device by a local astronomical engine from the configured
   coordinates, the date and the selected method. They appear only when a **complete** schedule
   exists for **today at the configured location**; otherwise the screen explains why (no location,
@@ -95,7 +114,9 @@ requires an actual comparison for the same location and date, which has not been
 | UI | Jetpack Compose, Material 3 (Compose BOM `2026.09.00`) |
 | Architecture | MVVM with Clean Architecture boundaries, unidirectional data flow |
 | Async | Kotlin Coroutines + Flow |
-| Persistence | DataStore (prayer settings, theme, manual location) |
+| Persistence | DataStore (prayer settings, theme, manual location, calendar preferences, notification preferences) |
+| Calendar | `java.time` only — `LocalDate`/`YearMonth` arithmetic for Gregorian and the Bangladesh Bangla calendar, and `java.time.chrono.HijrahChronology` (the platform's Umm al-Qura table) for Hijri. No calendar dependency was added |
+| Bangla date language | Explicit setting selecting Bangla script and numerals (০–৯) or Latin script, independent of the device locale |
 | Prayer engine | Adhan Kotlin `com.batoulapps.adhan:adhan2:0.0.5` (pinned; local, offline) |
 | Dependency injection | Koin `4.2.2` |
 | Navigation | Navigation Compose `2.10.2` |
@@ -130,6 +151,11 @@ The calculation engine and its pinned version are explained in
 8. The Qibla bearing is computed locally from a locally stored position, and magnetic declination
    is evaluated on device from the platform's own geomagnetic model. Automatic location uses the
    device's own provider, and manual coordinates work with neither network nor permission.
+9. The whole calendar system is computed locally: the Gregorian date from the device clock, the
+   Bangla date from published civil rules, the Hijri date from the table inside the platform's
+   `java.time`, and the Ramadan window from that Hijri calculation. The one thing Salah cannot do
+   offline is show a confirmed date or an authority timetable — so it never claims to, and says so
+   where a user would look for it.
 
 ## Repository structure
 
@@ -139,17 +165,19 @@ The calculation engine and its pinned version are explained in
 ├── app/
 │   └── src/main/java/io/github/towkirahmedrony/salah/
 │       ├── core/{model,domain,designsystem}   pure logic, ports, calculator, theme
+│       │   ├── domain/calendar/               Gregorian grid, Bangladesh Bangla, Hijri, Ramadan, formatting
 │       │   ├── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
 │       │   ├── domain/qibla/                  bearing, heading maths, frames, state reducer
 │       │   └── domain/location/               location freshness
 │       ├── data/{preferences,location,calendar,prayer,prohibited}
 │       │   ├── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
 │       │   └── qibla/                         SensorManager, GeomagneticField, LocationManagerCompat
-│       ├── feature/{app,home,settings,notifications,qibla,common}
+│       ├── feature/{app,home,calendar,ramadan,settings,notifications,qibla,common}
 │       ├── navigation/                        destinations, nav host, app shell
 │       └── di/                                Koin container
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
+├── docs/CALENDAR_SYSTEM.md                    Gregorian, Bangladesh Bangla, Hijri, Ramadan, Sehri/Iftar
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
 ├── docs/PRAYER_NOTIFICATIONS.md               scheduler, permissions, channels, Azan, limitations
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
@@ -191,10 +219,24 @@ and no signing credentials.
 
 - Prayer times are calculated locally but have **not** been compared against any published
   authority timetable; no such comparison is claimed.
+- **The Hijri date and the Ramadan window are estimates.** Umm al-Qura is not the calendar
+  Bangladesh's religious authorities announce Ramadan and the Eids with, so Salah labels both as
+  estimates everywhere and never as confirmed. Local moon sighting may move an observance by a day;
+  the Hijri adjustment exists so the user can align Salah with their own community.
+- **Sehri and Iftar are calculated references**, not an authority's timetable, and Salah adds no
+  buffer to either. A user who follows a published timetable should follow it.
+- **The Bangladesh Bangla calendar is implemented only from 14 April 2019 onwards**, and only for
+  Bangladesh's rules — not for West Bengal's, which differ in month lengths and in the New Year date.
+- **Hijri conversion is limited to the platform's table** (roughly AH 1300–1600), and the Bangla
+  calendar to 14 April 2019 – 31 December 2399. Outside those ranges the screens state the limit
+  rather than converting anyway.
+- **The calendar screens have not been verified on a physical device.** The converters, the state
+  mapping, the persistence and the reminder planning are covered by the automated tests documented in
+  [`docs/CALENDAR_SYSTEM.md`](docs/CALENDAR_SYSTEM.md) §13; the visual layout, both themes, large font
+  scales and a real device time-zone change are not.
 - Prohibited-time rules are **not** configured: the mechanism and tests exist, the reviewed rule
   set does not.
-- No Bangla or Hijri conversion; only the device Gregorian date is available.
-- No Ramadan schedule, Quran, duas or tasbih.
+- No Quran, duas or tasbih.
 - **The Qibla dial is not better than a few degrees outdoors, and worse near metal.** The bearing
   itself is exact; what varies is the compass. Nearby magnets, speakers, car dashboards and
   device-specific magnetometer quality dominate the error, and Salah says so rather than implying
@@ -219,10 +261,10 @@ and no signing credentials.
 
 ## Roadmap
 
-1. **Calendars** — Bangladesh Bangla and Hijri conversion with confirmed-date overrides, keeping
-   conversion logic independent of the UI.
-2. **Prohibited periods and Ramadan** — add a reviewed `ProhibitedRuleSet` (the calculator is
-   ready) and derive Sehri/Iftar from the same prayer schedule.
+1. **Prohibited periods** — add a reviewed `ProhibitedRuleSet`; the calculator is ready and tested.
+2. **A verified authority source** — if a published, redistributable Sehri/Iftar timetable or a
+   moon-sighting announcement feed is ever integrated, it must be linked to its source, labelled as
+   such, and must leave the local calculation working when it cannot be reached.
 3. **Licensed Azan audio** — source a recording whose redistribution rights are established, add it
    to `res/raw`, and return it from `BundledAzanAudioSource`. Decide deliberately whether
    unattended long-form playback warrants a foreground service.

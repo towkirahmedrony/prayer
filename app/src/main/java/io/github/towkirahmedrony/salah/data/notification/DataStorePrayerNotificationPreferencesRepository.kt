@@ -50,6 +50,18 @@ class DataStorePrayerNotificationPreferencesRepository(
             preferences[Keys.MASTER_ENABLED] = updated.masterEnabled
             preferences[Keys.SUNRISE_ENABLED] = updated.sunriseReminderEnabled
 
+            // Ramadan reminders. Stored unconditionally, like the master and sunrise switches: they
+            // are two flags and two lead times, and a sparse representation would buy nothing while
+            // making "is Sehri on?" require a default to be looked up somewhere else.
+            preferences[Keys.SEHRI_ENABLED] = updated.sehriReminderEnabled
+            preferences[Keys.SEHRI_LEAD_MINUTES] = PrayerNotificationSettings.clampSehriLead(
+                updated.sehriLeadMinutes,
+            )
+            preferences[Keys.IFTAR_ENABLED] = updated.iftarReminderEnabled
+            preferences[Keys.IFTAR_LEAD_MINUTES] = PrayerNotificationSettings.clampIftarLead(
+                updated.iftarLeadMinutes,
+            )
+
             PrayerName.entries.forEach { prayer ->
                 val preference = updated.preferenceFor(prayer).withBoundedAdvanceMinutes()
                 if (preference.isDefault) {
@@ -75,6 +87,18 @@ class DataStorePrayerNotificationPreferencesRepository(
                 ?: PrayerNotificationSettings.DEFAULT.masterEnabled,
             sunriseReminderEnabled = this[Keys.SUNRISE_ENABLED]
                 ?: PrayerNotificationSettings.DEFAULT.sunriseReminderEnabled,
+            // A lead time read from the store is normalised to one of the offered choices, so a
+            // hand-edited or downgraded value cannot put the screen into a state it cannot render.
+            sehriReminderEnabled = this[Keys.SEHRI_ENABLED]
+                ?: PrayerNotificationSettings.DEFAULT.sehriReminderEnabled,
+            sehriLeadMinutes = PrayerNotificationSettings.clampSehriLead(
+                this[Keys.SEHRI_LEAD_MINUTES] ?: PrayerNotificationSettings.DEFAULT.sehriLeadMinutes,
+            ),
+            iftarReminderEnabled = this[Keys.IFTAR_ENABLED]
+                ?: PrayerNotificationSettings.DEFAULT.iftarReminderEnabled,
+            iftarLeadMinutes = PrayerNotificationSettings.clampIftarLead(
+                this[Keys.IFTAR_LEAD_MINUTES] ?: PrayerNotificationSettings.DEFAULT.iftarLeadMinutes,
+            ),
             prayers = PrayerName.entries
                 .mapNotNull { prayer ->
                     val preference = PrayerNotificationPreference(
@@ -97,6 +121,10 @@ class DataStorePrayerNotificationPreferencesRepository(
     private object Keys {
         val MASTER_ENABLED = booleanPreferencesKey("notification_master_enabled")
         val SUNRISE_ENABLED = booleanPreferencesKey("notification_sunrise_reminder_enabled")
+        val SEHRI_ENABLED = booleanPreferencesKey("notification_sehri_reminder_enabled")
+        val SEHRI_LEAD_MINUTES = intPreferencesKey("notification_sehri_reminder_lead_minutes")
+        val IFTAR_ENABLED = booleanPreferencesKey("notification_iftar_reminder_enabled")
+        val IFTAR_LEAD_MINUTES = intPreferencesKey("notification_iftar_reminder_lead_minutes")
 
         fun prayerEnabled(prayer: PrayerName) = booleanPreferencesKey("notification_${prayer.name}_enabled")
         fun prayerSound(prayer: PrayerName) = stringPreferencesKey("notification_${prayer.name}_sound")

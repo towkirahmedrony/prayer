@@ -48,6 +48,7 @@ import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificati
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationPreference
+import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
 import io.github.towkirahmedrony.salah.feature.common.hintRes
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import org.koin.androidx.compose.koinViewModel
@@ -166,6 +167,14 @@ fun PrayerNotificationSettingsScreen(
         SolarEventCard(
             enabled = uiState.settings.sunriseReminderEnabled,
             onEnabledChange = viewModel::setSunriseReminderEnabled,
+        )
+
+        RamadanReminderCard(
+            settings = uiState.settings,
+            onSehriEnabledChange = viewModel::setSehriReminderEnabled,
+            onSehriLeadShift = viewModel::shiftSehriLead,
+            onIftarEnabledChange = viewModel::setIftarReminderEnabled,
+            onIftarLeadShift = viewModel::shiftIftarLead,
         )
 
         AzanCard(uiState = uiState)
@@ -529,6 +538,154 @@ private fun SolarEventCard(enabled: Boolean, onEnabledChange: (Boolean) -> Unit)
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Ramadan reminders.
+ *
+ * Two independent switches rather than one, because Sehri and Iftar are wanted at different times of
+ * day and one of them may be redundant for a given user. Both are backed by real scheduling: they use
+ * the same planner, the same channels and the same reconciliation as the prayer reminders, and they are
+ * only ever scheduled for the dates the calendar places inside Ramadan.
+ */
+@Composable
+private fun RamadanReminderCard(
+    settings: PrayerNotificationSettings,
+    onSehriEnabledChange: (Boolean) -> Unit,
+    onSehriLeadShift: (Boolean) -> Unit,
+    onIftarEnabledChange: (Boolean) -> Unit,
+    onIftarLeadShift: (Boolean) -> Unit,
+) {
+    SalahSectionCard {
+        Text(
+            text = stringResource(R.string.notifications_ramadan_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.notifications_ramadan_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (!settings.masterEnabled) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.notifications_prayer_master_off),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SalahSectionCard
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        RamadanReminderRow(
+            title = stringResource(R.string.notifications_ramadan_sehri),
+            body = stringResource(R.string.notifications_ramadan_sehri_body),
+            enabled = settings.sehriReminderEnabled,
+            onEnabledChange = onSehriEnabledChange,
+            leadLabel = stringResource(R.string.notifications_prayer_advance),
+            leadValue = stringResource(
+                R.string.notifications_prayer_advance_value,
+                settings.sehriLeadMinutes,
+            ),
+            onLeadShift = onSehriLeadShift,
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        RamadanReminderRow(
+            title = stringResource(R.string.notifications_ramadan_iftar),
+            body = stringResource(R.string.notifications_ramadan_iftar_body),
+            enabled = settings.iftarReminderEnabled,
+            onEnabledChange = onIftarEnabledChange,
+            leadLabel = stringResource(R.string.notifications_ramadan_iftar_lead),
+            leadValue = if (settings.iftarLeadMinutes == 0) {
+                stringResource(R.string.notifications_ramadan_iftar_lead_at_time)
+            } else {
+                stringResource(R.string.notifications_prayer_advance_value, settings.iftarLeadMinutes)
+            },
+            onLeadShift = onIftarLeadShift,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.notifications_ramadan_source_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun RamadanReminderRow(
+    title: String,
+    body: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    leadLabel: String,
+    leadValue: String,
+    onLeadShift: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = leadLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(
+                onClick = { onLeadShift(false) },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                enabled = enabled,
+            ) {
+                Text(text = "−", style = MaterialTheme.typography.titleMedium)
+            }
+            Text(
+                text = leadValue,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(min = 96.dp),
+            )
+            TextButton(
+                onClick = { onLeadShift(true) },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                enabled = enabled,
+            ) {
+                Text(text = "+", style = MaterialTheme.typography.titleMedium)
+            }
+        }
     }
 }
 

@@ -88,6 +88,7 @@ private fun DestinationGlyph(destination: SalahDestination, tint: Color) {
         SalahDestination.SETTINGS -> GearGlyph(tint = tint)
         // The destinations below are not in the bottom bar; the glyphs only keep this `when`
         // exhaustive and match the section each one belongs to.
+        SalahDestination.CALENDAR_SETTINGS -> CalendarGlyph(tint = tint)
         SalahDestination.PRAYER -> CrescentGlyph(tint = tint)
         SalahDestination.RAMADAN -> LanternGlyph(tint = tint)
         SalahDestination.QIBLA -> QiblaGlyph(tint = tint)

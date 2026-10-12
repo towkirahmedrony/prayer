@@ -88,6 +88,25 @@ class AndroidPrayerNotificationPresenter(
     }
 
     private fun title(delivery: PrayerReminderDelivery): String {
+        when (delivery.slot.target) {
+            // Sehri is always a lead-in, so its title never claims to be the moment itself.
+            ReminderTarget.SEHRI -> return context.getString(
+                R.string.notification_title_sehri_advance,
+                minutesLabel(delivery.advanceMinutes),
+            )
+
+            ReminderTarget.IFTAR -> return if (delivery.isAtEventTime) {
+                context.getString(R.string.notification_title_iftar_time)
+            } else {
+                context.getString(
+                    R.string.notification_title_iftar_advance,
+                    minutesLabel(delivery.advanceMinutes),
+                )
+            }
+
+            else -> Unit
+        }
+
         val name = targetName(delivery)
 
         if (delivery.isAtEventTime) {
@@ -101,13 +120,13 @@ class AndroidPrayerNotificationPresenter(
         return context.getString(
             R.string.notification_title_prayer_advance,
             name,
-            context.resources.getQuantityString(
-                R.plurals.notification_minutes,
-                delivery.advanceMinutes,
-                delivery.advanceMinutes,
-            ),
+            minutesLabel(delivery.advanceMinutes),
         )
     }
+
+    /** `10 minutes` as a plural resource, so a locale with different plural rules gets the right form. */
+    private fun minutesLabel(minutes: Int): String =
+        context.resources.getQuantityString(R.plurals.notification_minutes, minutes, minutes)
 
     private fun body(delivery: PrayerReminderDelivery): String {
         val time = timeFormatterFor(
@@ -115,6 +134,22 @@ class AndroidPrayerNotificationPresenter(
             locale = Locale.getDefault(),
             preference = delivery.timeFormat,
         ).format(delivery.eventAt)
+
+        when (delivery.slot.target) {
+            // Every Ramadan body names the prayer time Sehri or Iftar is derived from, so the user can
+            // see that Salah did not invent a separate Sehri or Iftar timetable.
+            ReminderTarget.SEHRI -> return context.getString(R.string.notification_body_sehri_advance, time)
+            ReminderTarget.IFTAR -> return context.getString(
+                if (delivery.isAtEventTime) {
+                    R.string.notification_body_iftar_time
+                } else {
+                    R.string.notification_body_iftar_advance
+                },
+                time,
+            )
+
+            else -> Unit
+        }
 
         return if (delivery.slot.target == ReminderTarget.SOLAR) {
             // Sunrise is stated as a solar event so a reminder can never read as a call to an
@@ -129,10 +164,11 @@ class AndroidPrayerNotificationPresenter(
 
     private fun targetName(delivery: PrayerReminderDelivery): String {
         val prayer: PrayerName? = delivery.slot.target.prayer
-        return if (prayer == null) {
-            context.getString(R.string.notification_title_sunrise)
-        } else {
-            context.getString(prayerNameRes(prayer))
+        return when {
+            prayer != null -> context.getString(prayerNameRes(prayer))
+            delivery.slot.target == ReminderTarget.SEHRI -> context.getString(R.string.calendar_sehri_end)
+            delivery.slot.target == ReminderTarget.IFTAR -> context.getString(R.string.calendar_iftar)
+            else -> context.getString(R.string.notification_title_sunrise)
         }
     }
 

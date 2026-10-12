@@ -85,21 +85,42 @@ class HomeUiStateFactoryTest {
         generatedAt = clock.instant(),
     )
 
+    /**
+     * The calendar snapshot the app now produces for a supported date: all three calendars resolved.
+     *
+     * The strings are fixtures — this class tests the *mapping* — but they are the real values for
+     * 11 October 2026 (Boishakh 1 = 14 April, so it is the 26th of Ashwin; 30 Rabi' al-Thani 1448 in
+     * the platform's Umm al-Qura table), so they could not be mistaken for invented dates.
+     */
     private val calendar = CalendarSnapshot(
         gregorian = CalendarDateState.Available(
             system = CalendarSystem.GREGORIAN,
             formattedDate = "11 October 2026",
             isVerifiedSource = true,
         ),
+        bangla = CalendarDateState.Available(
+            system = CalendarSystem.BANGLA,
+            formattedDate = "26 Ashwin 1433",
+            isVerifiedSource = true,
+        ),
+        hijri = CalendarDateState.Available(
+            system = CalendarSystem.HIJRI,
+            formattedDate = "30 Rabi' al-Thani 1448 AH",
+            isVerifiedSource = false,
+        ),
+        weekdayLabel = "Sunday",
+    )
+
+    /** The shape a converter reports when the requested date is outside the range it is verified for. */
+    private val calendarOutsideSupportedRange = calendar.copy(
         bangla = CalendarDateState.NotAvailable(
             system = CalendarSystem.BANGLA,
-            reason = UnavailabilityReason.CALENDAR_NOT_IMPLEMENTED,
+            reason = UnavailabilityReason.OUT_OF_SUPPORTED_RANGE,
         ),
         hijri = CalendarDateState.NotAvailable(
             system = CalendarSystem.HIJRI,
-            reason = UnavailabilityReason.CALENDAR_NOT_IMPLEMENTED,
+            reason = UnavailabilityReason.OUT_OF_SUPPORTED_RANGE,
         ),
-        weekdayLabel = "Sunday",
     )
 
     private val prohibitedNotAvailable = ProhibitedPeriodsState.NotAvailable(
@@ -110,6 +131,7 @@ class HomeUiStateFactoryTest {
         location: LocationInfo?,
         scheduleState: PrayerScheduleState,
         settings: PrayerSettings = PrayerSettings.DEFAULT,
+        calendar: CalendarSnapshot = this.calendar,
     ): HomeUiState.Ready {
         val state = factory.create(
             calendar = calendar,
@@ -134,11 +156,6 @@ class HomeUiStateFactoryTest {
         )
 
         assertEquals("11 October 2026", state.gregorianDate)
-        assertEquals(UnavailabilityReason.CALENDAR_NOT_IMPLEMENTED, state.banglaSection.unavailable)
-        assertEquals(UnavailabilityReason.CALENDAR_NOT_IMPLEMENTED, state.hijriSection.unavailable)
-        assertNull(state.banglaSection.value)
-        assertNull(state.hijriSection.value)
-
         assertEquals(UnavailabilityReason.NO_LOCATION_CONFIGURED, state.location.unavailable)
         assertNull(state.location.label)
 
@@ -151,6 +168,41 @@ class HomeUiStateFactoryTest {
         assertTrue(state.prohibited.windows.isEmpty())
         assertEquals(UnavailabilityReason.RULES_NOT_VERIFIED, state.prohibited.unavailable)
         assertNull(state.failureDetail)
+    }
+
+    @Test
+    fun `shows the Bangla and Hijri dates the device can actually produce`() {
+        val state = ready(
+            location = null,
+            scheduleState = PrayerScheduleState.Unavailable(
+                reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+                origin = origin,
+            ),
+        )
+
+        // The Home screen now carries a real conversion for both, rather than an explanation that
+        // conversion is missing.
+        assertEquals("26 Ashwin 1433", state.banglaSection.value)
+        assertNull(state.banglaSection.unavailable)
+        assertEquals("30 Rabi' al-Thani 1448 AH", state.hijriSection.value)
+        assertNull(state.hijriSection.unavailable)
+    }
+
+    @Test
+    fun `explains a date outside the verified range instead of showing one`() {
+        val state = ready(
+            location = null,
+            scheduleState = PrayerScheduleState.Unavailable(
+                reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+                origin = origin,
+            ),
+            calendar = calendarOutsideSupportedRange,
+        )
+
+        assertEquals(UnavailabilityReason.OUT_OF_SUPPORTED_RANGE, state.banglaSection.unavailable)
+        assertEquals(UnavailabilityReason.OUT_OF_SUPPORTED_RANGE, state.hijriSection.unavailable)
+        assertNull(state.banglaSection.value)
+        assertNull(state.hijriSection.value)
     }
 
     @Test

@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.core.domain.notification
 
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
@@ -85,6 +86,15 @@ class PrayerNotificationCoordinator(
     private val permissions: NotificationPermissionStatusProvider,
     private val logger: DiagnosticsLogger,
     private val clock: Clock,
+    /**
+     * Decides which of the planned dates are in Ramadan.
+     *
+     * Pure, and defaulted so an existing construction stays valid. The coordinator asks it once per
+     * reconciliation with the user's stored Hijri offset, and hands the resulting set to the planner:
+     * the calendar question is answered in exactly one place, and moving the Hijri offset moves the
+     * Ramadan reminders with it on the very next reconciliation.
+     */
+    private val ramadanCalendar: RamadanCalendar = RamadanCalendar(),
 ) {
 
     /**
@@ -96,6 +106,7 @@ class PrayerNotificationCoordinator(
 
         return try {
             val settings = notificationSettings.settings.first()
+            val calendarSettings = userPreferences.calendarSettings.first()
             val location = locations.location.first()
             val zone = location?.zoneId ?: ZoneId.systemDefault()
             val today = todayIn(zone)
@@ -128,10 +139,17 @@ class PrayerNotificationCoordinator(
             val available = resolved.mapNotNull { it.value }
             val unavailableDates = resolved.filterValues { it == null }.keys.toList()
 
+            // Ramadan is a calendar fact, not a notification-settings fact, so it is derived here
+            // from the same stored Hijri offset the Calendar and Ramadan screens use.
+            val ramadanDates = plannedDates.filterTo(mutableSetOf()) { date ->
+                ramadanCalendar.isRamadan(date, calendarSettings.hijriAdjustmentDays)
+            }
+
             val planned = planner.plan(
                 settings = settings,
                 schedules = available,
                 now = ZonedDateTime.ofInstant(clock.instant(), zone),
+                ramadanDates = ramadanDates,
             )
 
             // A date may be reconciled only when we know what belongs there:

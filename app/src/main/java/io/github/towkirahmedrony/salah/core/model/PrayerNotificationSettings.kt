@@ -78,6 +78,43 @@ data class PrayerNotificationSettings(
      * appears. It is off by default because it is not an obligation.
      */
     val sunriseReminderEnabled: Boolean = false,
+
+    /**
+     * Ramadan: remind before Sehri ends.
+     *
+     * Sehri ends at the calculated Fajr, which already has its own prayer reminder, so a Sehri
+     * reminder is **always a lead-in** and never a second reminder at the same instant. It is only
+     * ever scheduled for dates inside Ramadan; see [RAMADAN_LEAD_MINUTE_CHOICES] for the offered
+     * lead times.
+     *
+     * Off by default: it applies to one month of the year, and a fresh install should not schedule
+     * anything the user did not ask for.
+     */
+    val sehriReminderEnabled: Boolean = false,
+
+    /**
+     * Minutes before Fajr at which the Sehri reminder runs.
+     *
+     * Never `0`: a Sehri reminder at Fajr itself would duplicate the Fajr prayer reminder.
+     */
+    val sehriLeadMinutes: Int = DEFAULT_SEHRI_LEAD_MINUTES,
+
+    /**
+     * Ramadan: remind at Iftar, and optionally before it.
+     *
+     * Iftar is the calculated Maghrib time. Unlike Sehri this has a meaningful at-time reminder, so
+     * it is scheduled at Maghrib, plus a lead-in when [iftarLeadMinutes] is greater than zero. Off by
+     * default for the same reason as [sehriReminderEnabled].
+     */
+    val iftarReminderEnabled: Boolean = false,
+
+    /**
+     * Minutes before Maghrib at which an additional Iftar reminder runs.
+     *
+     * `0` (the default) means "at Iftar only", which is a real setting rather than a disabled one:
+     * the at-time reminder is still scheduled.
+     */
+    val iftarLeadMinutes: Int = DEFAULT_IFTAR_LEAD_MINUTES,
 ) {
 
     /** The stored preference for [prayer], or the documented default when none was stored. */
@@ -106,7 +143,23 @@ data class PrayerNotificationSettings(
 
     /** True when anything at all is enabled. */
     val hasAnyEnabledTarget: Boolean
-        get() = hasAnyEnabledPrayer || (masterEnabled && sunriseReminderEnabled)
+        get() = hasAnyEnabledPrayer ||
+            (masterEnabled && sunriseReminderEnabled) ||
+            (masterEnabled && (sehriReminderEnabled || iftarReminderEnabled))
+
+    /** A copy with the Sehri reminder configured, clamping the lead time. */
+    fun withSehriReminder(enabled: Boolean, leadMinutes: Int = sehriLeadMinutes): PrayerNotificationSettings =
+        copy(
+            sehriReminderEnabled = enabled,
+            sehriLeadMinutes = clampSehriLead(leadMinutes),
+        )
+
+    /** A copy with the Iftar reminder configured, clamping the lead time. */
+    fun withIftarReminder(enabled: Boolean, leadMinutes: Int = iftarLeadMinutes): PrayerNotificationSettings =
+        copy(
+            iftarReminderEnabled = enabled,
+            iftarLeadMinutes = clampIftarLead(leadMinutes),
+        )
 
     companion object {
         /** Largest advance reminder Salah accepts, in minutes. */
@@ -114,6 +167,30 @@ data class PrayerNotificationSettings(
 
         /** The advance values the settings screen offers, in minutes. `0` means "off". */
         val ADVANCE_MINUTE_CHOICES: List<Int> = listOf(0, 5, 10, 15, 20, 30)
+
+        /** Sehri lead times offered, in minutes. A Sehri reminder is always a lead-in. */
+        val SEHRI_LEAD_MINUTE_CHOICES: List<Int> = listOf(5, 10, 15, 20, 30)
+
+        /**
+         * Iftar lead times offered, in minutes. `0` is "at Iftar only", so it is a real choice
+         * rather than the absence of one.
+         */
+        val IFTAR_LEAD_MINUTE_CHOICES: List<Int> = listOf(0, 5, 10, 15, 20, 30)
+
+        /** Default Sehri lead-in, in minutes. */
+        const val DEFAULT_SEHRI_LEAD_MINUTES: Int = 10
+
+        /** Default Iftar lead-in: none, so only the at-Iftar reminder runs. */
+        const val DEFAULT_IFTAR_LEAD_MINUTES: Int = 0
+
+        /** Fixes a stored Sehri lead so the settings screen can always represent it. */
+        fun clampSehriLead(minutes: Int): Int = nearestChoice(minutes, SEHRI_LEAD_MINUTE_CHOICES)
+
+        /** Fixes a stored Iftar lead so the settings screen can always represent it. */
+        fun clampIftarLead(minutes: Int): Int = nearestChoice(minutes, IFTAR_LEAD_MINUTE_CHOICES)
+
+        private fun nearestChoice(minutes: Int, choices: List<Int>): Int =
+            choices.minByOrNull { candidate -> kotlin.math.abs(candidate - minutes) } ?: choices.first()
 
         /** The configuration a fresh install starts from. */
         val DEFAULT: PrayerNotificationSettings = PrayerNotificationSettings()

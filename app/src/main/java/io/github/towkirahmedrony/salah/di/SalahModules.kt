@@ -4,6 +4,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
+import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
+import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
+import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
+import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
 import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEngine
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanPlaybackManager
@@ -49,10 +54,15 @@ import io.github.towkirahmedrony.salah.data.qibla.AndroidGeomagneticDeclinationP
 import io.github.towkirahmedrony.salah.data.qibla.AndroidLocationPermissionChecker
 import io.github.towkirahmedrony.salah.data.qibla.AndroidLocationProvider
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
+import io.github.towkirahmedrony.salah.feature.calendar.CalendarSettingsViewModel
+import io.github.towkirahmedrony.salah.feature.calendar.CalendarUiStateFactory
+import io.github.towkirahmedrony.salah.feature.calendar.CalendarViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
+import io.github.towkirahmedrony.salah.feature.ramadan.RamadanUiStateFactory
+import io.github.towkirahmedrony.salah.feature.ramadan.RamadanViewModel
 import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,7 +113,29 @@ val salahModules = module {
     }
 
     // Calendar ----------------------------------------------------------------
-    single<CalendarRepository> { DeviceClockCalendarRepository(get()) }
+    // The four converters are pure, stateless and cheap, so they are singletons: two instances could
+    // only ever produce the same answer, and sharing them keeps the repository, the coordinator and the
+    // Ramadan screen on exactly the same rules.
+    single { BanglaCalendar() }
+    single { HijriCalendar() }
+    single { RamadanCalendar(hijriCalendar = get()) }
+    single { GregorianCalendarGrid() }
+    single { CalendarFormatting() }
+    single<CalendarRepository> {
+        DeviceClockCalendarRepository(
+            clock = get(),
+            // The repository's *inputs* are the stored calendar settings, so moving the Hijri offset or
+            // the date language re-emits today and the displayed month instead of waiting for a restart.
+            settings = get<UserPreferencesRepository>().calendarSettings,
+            banglaCalendar = get(),
+            hijriCalendar = get(),
+            ramadanCalendar = get(),
+            grid = get(),
+            formatting = get(),
+        )
+    }
+    single { CalendarUiStateFactory(formatting = get()) }
+    single { RamadanUiStateFactory(formatting = get()) }
 
     // Prayer data -------------------------------------------------------------
     // The local astronomical engine. Offline, no account, no permission.
@@ -171,6 +203,9 @@ val salahModules = module {
             permissions = get(),
             logger = get(),
             clock = get(),
+            // Which dates are in Ramadan, from the same converter the calendar screens use. Moving the
+            // Hijri offset therefore moves the Sehri and Iftar reminders on the next reconciliation.
+            ramadanCalendar = get(),
         )
     }
 
@@ -207,6 +242,26 @@ val salahModules = module {
         SettingsViewModel(
             userPreferencesRepository = get(),
             locationRepository = get(),
+        )
+    }
+    viewModel {
+        CalendarViewModel(
+            calendarRepository = get(),
+            userPreferencesRepository = get(),
+            uiStateFactory = get(),
+            clock = get(),
+        )
+    }
+    viewModel { CalendarSettingsViewModel(userPreferencesRepository = get()) }
+    viewModel {
+        RamadanViewModel(
+            calendarRepository = get(),
+            userPreferencesRepository = get(),
+            locationRepository = get(),
+            prayerScheduleRepository = get(),
+            notificationPreferences = get(),
+            coordinator = get(),
+            uiStateFactory = get(),
         )
     }
     viewModel {

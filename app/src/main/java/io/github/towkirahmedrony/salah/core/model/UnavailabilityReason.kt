@@ -29,6 +29,16 @@ enum class UnavailabilityReason {
     /** The calendar conversion for this system is not implemented yet. */
     CALENDAR_NOT_IMPLEMENTED,
 
+    /**
+     * The requested date is outside the range the selected conversion is verified or published for.
+     *
+     * Distinct from [CALENDAR_NOT_IMPLEMENTED]: the conversion exists and works, but it must not be
+     * applied to this date. Salah's Bangladesh Bangla calendar begins with the 2019 Bangla Academy
+     * rules, and the platform's Hijri table covers a bounded span of years; outside those ranges the
+     * screens say so instead of converting a date anyway.
+     */
+    OUT_OF_SUPPORTED_RANGE,
+
     /** A remote provider could not be reached; local data, if any, is still shown. */
     NETWORK_UNAVAILABLE,
 

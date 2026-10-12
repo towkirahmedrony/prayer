@@ -32,15 +32,40 @@ enum class ReminderTarget(
      * it says "sunrise", never "prayer".
      */
     SUNRISE(null),
+
+    /**
+     * The end of Sehri, during Ramadan.
+     *
+     * Its time is the **calculated Fajr** of the same schedule, and it has no [prayer] of its own: Fajr
+     * already has a target, and giving Sehri the Fajr prayer would make two reminders for one prayer
+     * indistinguishable. It is scheduled as an advance reminder only, so it never lands on top of the
+     * Fajr reminder; see [io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar].
+     */
+    SEHRI(null),
+
+    /**
+     * Iftar, during Ramadan.
+     *
+     * Its time is the **calculated Maghrib** of the same schedule, exposed as its own target so the
+     * reminder can say "Iftar" rather than duplicating the Maghrib prayer reminder, and so the user can
+     * switch Iftar reminders on or off independently of the Maghrib reminder.
+     */
+    IFTAR(null),
     ;
 
     /** True when this target is one of the five obligatory prayers. */
     val isObligatoryPrayer: Boolean get() = prayer != null
 
+    /** True for the two Ramadan reminders, which are only ever scheduled inside Ramadan. */
+    val isRamadanReminder: Boolean get() = this == SEHRI || this == IFTAR
+
     companion object {
 
         /** The five obligatory prayers, in declaration order. */
         val obligatoryPrayers: List<ReminderTarget> = entries.filter { it.isObligatoryPrayer }
+
+        /** The Ramadan reminders, in declaration order. */
+        val ramadanReminders: List<ReminderTarget> = entries.filter { it.isRamadanReminder }
 
         /** The single solar target. */
         val SOLAR: ReminderTarget = SUNRISE

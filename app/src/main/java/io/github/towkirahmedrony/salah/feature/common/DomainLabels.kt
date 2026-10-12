@@ -5,6 +5,9 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
+import io.github.towkirahmedrony.salah.core.model.HijriDateSource
+import io.github.towkirahmedrony.salah.core.model.IslamicOccasion
+import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -127,6 +130,54 @@ fun NotificationSound.hintRes(): Int = when (this) {
     NotificationSound.SILENT -> R.string.notification_sound_silent_hint
 }
 
+/**
+ * Labels the provenance of a Hijri date.
+ *
+ * Both branches say "estimated". That is not hedging: Salah has no authority data source integrated,
+ * so there is no state in which it could honestly present a Hijri date as confirmed, and the wording
+ * is the same everywhere the date appears.
+ */
+@StringRes
+fun HijriDateSource.labelRes(): Int = when (this) {
+    HijriDateSource.ESTIMATED_UMM_AL_QURA -> R.string.calendar_hijri_source_calculated
+    HijriDateSource.ESTIMATED_USER_ADJUSTED -> R.string.calendar_hijri_source_adjusted
+}
+
+/** Names of the observances Salah derives from the Hijri calendar. */
+@StringRes
+fun IslamicOccasion.labelRes(): Int = when (this) {
+    IslamicOccasion.ISLAMIC_NEW_YEAR -> R.string.occasion_islamic_new_year
+    IslamicOccasion.ASHURA -> R.string.occasion_ashura
+    IslamicOccasion.MAWLID -> R.string.occasion_mawlid
+    IslamicOccasion.RAMADAN_BEGINS -> R.string.occasion_ramadan_begins
+    IslamicOccasion.ARAFAH -> R.string.occasion_arafah
+    IslamicOccasion.EID_AL_ADHA -> R.string.occasion_eid_al_adha
+    IslamicOccasion.EID_AL_FITR -> R.string.occasion_eid_al_fitr
+}
+
+/** Names of the calendar views and of the date-language choices. */
+@StringRes
+fun CalendarSystem.displayNameRes(): Int = when (this) {
+    CalendarSystem.GREGORIAN -> R.string.calendar_view_gregorian
+    CalendarSystem.BANGLA -> R.string.calendar_view_bangla
+    CalendarSystem.HIJRI -> R.string.calendar_view_hijri
+}
+
+/** One-line statement of what each calendar view actually is. */
+@StringRes
+fun CalendarSystem.hintRes(): Int = when (this) {
+    CalendarSystem.GREGORIAN -> R.string.calendar_view_gregorian_hint
+    CalendarSystem.BANGLA -> R.string.calendar_view_bangla_hint
+    CalendarSystem.HIJRI -> R.string.calendar_view_hijri_hint
+}
+
+@StringRes
+fun DateLanguagePreference.labelRes(): Int = when (this) {
+    DateLanguagePreference.SYSTEM -> R.string.calendar_language_system
+    DateLanguagePreference.BANGLA -> R.string.calendar_language_bangla
+    DateLanguagePreference.ENGLISH -> R.string.calendar_language_english
+}
+
 @StringRes
 fun UnavailabilityReason.messageRes(): Int = when (this) {
     UnavailabilityReason.NO_LOCATION_CONFIGURED -> R.string.reason_no_location
@@ -134,6 +185,7 @@ fun UnavailabilityReason.messageRes(): Int = when (this) {
     UnavailabilityReason.CALCULATION_NOT_POSSIBLE -> R.string.reason_calculation_not_possible
     UnavailabilityReason.RULES_NOT_VERIFIED -> R.string.reason_rules_not_verified
     UnavailabilityReason.CALENDAR_NOT_IMPLEMENTED -> R.string.reason_calendar_not_implemented
+    UnavailabilityReason.OUT_OF_SUPPORTED_RANGE -> R.string.reason_calendar_out_of_range
     UnavailabilityReason.NETWORK_UNAVAILABLE -> R.string.reason_network_unavailable
     UnavailabilityReason.UNKNOWN -> R.string.reason_unknown
 }

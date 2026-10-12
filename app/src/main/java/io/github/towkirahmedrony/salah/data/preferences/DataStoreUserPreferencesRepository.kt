@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.CalendarSettings
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -69,6 +72,44 @@ class DataStoreUserPreferencesRepository(
         }
     }
 
+    // --- Calendar ---------------------------------------------------------------
+
+    override val calendarSettings: Flow<CalendarSettings> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences -> preferences.toCalendarSettings() }
+
+    override suspend fun updateCalendarSettings(transform: (CalendarSettings) -> CalendarSettings) {
+        dataStore.edit { preferences ->
+            val updated = transform(preferences.toCalendarSettings())
+            preferences[Keys.PREFERRED_CALENDAR] = updated.preferredSystem.name
+            preferences[Keys.DATE_LANGUAGE] = updated.dateLanguage.name
+            // The offset is clamped on write as well as on read, so no caller can store a value the
+            // calendar screen cannot represent.
+            preferences[Keys.HIJRI_ADJUSTMENT_DAYS] = CalendarSettings.clampHijriAdjustment(
+                updated.hijriAdjustmentDays,
+            )
+        }
+    }
+
+    /**
+     * Reads the calendar preferences, falling back to the documented defaults.
+     *
+     * An unknown calendar system or language name, or an out-of-range offset, is replaced by the
+     * default instead of throwing: a store written by another version of Salah must never make the
+     * calendar screens unusable.
+     */
+    private fun Preferences.toCalendarSettings(): CalendarSettings = CalendarSettings(
+        preferredSystem = CalendarSystem.entries
+            .firstOrNull { it.name == this[Keys.PREFERRED_CALENDAR] }
+            ?: CalendarSettings.DEFAULT.preferredSystem,
+        hijriAdjustmentDays = CalendarSettings.clampHijriAdjustment(
+            this[Keys.HIJRI_ADJUSTMENT_DAYS] ?: CalendarSettings.DEFAULT.hijriAdjustmentDays,
+        ),
+        dateLanguage = DateLanguagePreference.entries
+            .firstOrNull { it.name == this[Keys.DATE_LANGUAGE] }
+            ?: CalendarSettings.DEFAULT.dateLanguage,
+    )
+
     private fun Preferences.toPrayerSettings(): PrayerSettings = PrayerSettings(
         method = PrayerCalculationMethod.entries
             .firstOrNull { it.name == this[Keys.CALCULATION_METHOD] }
@@ -99,6 +140,9 @@ class DataStoreUserPreferencesRepository(
         val ASR_METHOD = stringPreferencesKey("prayer_asr_method")
         val HIGH_LATITUDE_RULE = stringPreferencesKey("prayer_high_latitude_rule")
         val TIME_FORMAT = stringPreferencesKey("time_format")
+        val PREFERRED_CALENDAR = stringPreferencesKey("calendar_preferred_system")
+        val HIJRI_ADJUSTMENT_DAYS = intPreferencesKey("calendar_hijri_adjustment_days")
+        val DATE_LANGUAGE = stringPreferencesKey("calendar_date_language")
 
         fun adjustment(prayer: PrayerName) = intPreferencesKey("prayer_adjustment_${prayer.name}")
     }

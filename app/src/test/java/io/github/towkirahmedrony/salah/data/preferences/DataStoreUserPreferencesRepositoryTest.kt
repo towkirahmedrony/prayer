@@ -7,6 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.CalendarSettings
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -143,5 +146,90 @@ class DataStoreUserPreferencesRepositoryTest {
         }
 
         assertEquals(ThemeMode.SYSTEM, repository.themeMode.first())
+    }
+
+    // --- Calendar -----------------------------------------------------------------
+
+    @Test
+    fun `calendar preferences default to the documented values`() = runTest {
+        val settings = repository.calendarSettings.first()
+
+        assertEquals(CalendarSettings.DEFAULT, settings)
+        assertEquals(CalendarSystem.GREGORIAN, settings.preferredSystem)
+        assertEquals(DateLanguagePreference.SYSTEM, settings.dateLanguage)
+        // No offset: Salah shows its own unconverted estimate until the user asks otherwise.
+        assertEquals(0, settings.hijriAdjustmentDays)
+    }
+
+    @Test
+    fun `calendar preferences survive a repository recreation`() = runTest {
+        repository.updateCalendarSettings { current ->
+            current.copy(
+                preferredSystem = CalendarSystem.HIJRI,
+                dateLanguage = DateLanguagePreference.BANGLA,
+                hijriAdjustmentDays = -1,
+            )
+        }
+
+        // A second repository over the same file, as after a process restart.
+        val reopened = DataStoreUserPreferencesRepository(dataStore).calendarSettings.first()
+
+        assertEquals(CalendarSystem.HIJRI, reopened.preferredSystem)
+        assertEquals(DateLanguagePreference.BANGLA, reopened.dateLanguage)
+        assertEquals(-1, reopened.hijriAdjustmentDays)
+    }
+
+    @Test
+    fun `an update applies to the stored value rather than to a stale copy`() = runTest {
+        // Two taps in quick succession: the second must see the first one's write.
+        repository.updateCalendarSettings { it.shiftHijriAdjustment(1) }
+        repository.updateCalendarSettings { it.shiftHijriAdjustment(1) }
+
+        assertEquals(2, repository.calendarSettings.first().hijriAdjustmentDays)
+    }
+
+    @Test
+    fun `a Hijri adjustment is clamped on write and on read`() = runTest {
+        repository.updateCalendarSettings { it.copy(hijriAdjustmentDays = 99) }
+        assertEquals(
+            CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
+            repository.calendarSettings.first().hijriAdjustmentDays,
+        )
+
+        // And a value written by something else is normalised on read, so the screen can always
+        // represent what it is asked to show.
+        dataStore.edit { preferences ->
+            preferences[intPreferencesKey("calendar_hijri_adjustment_days")] = -50
+        }
+        assertEquals(
+            -CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
+            repository.calendarSettings.first().hijriAdjustmentDays,
+        )
+    }
+
+    @Test
+    fun `an unknown calendar or language name falls back instead of failing`() = runTest {
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("calendar_preferred_system")] = "MAYAN"
+            preferences[stringPreferencesKey("calendar_date_language")] = "KLINGON"
+        }
+
+        val settings = repository.calendarSettings.first()
+
+        assertEquals(CalendarSystem.GREGORIAN, settings.preferredSystem)
+        assertEquals(DateLanguagePreference.SYSTEM, settings.dateLanguage)
+    }
+
+    @Test
+    fun `calendar and prayer preferences do not overwrite each other`() = runTest {
+        repository.updatePrayerSettings { it.copy(method = PrayerCalculationMethod.EGYPTIAN) }
+        repository.updateCalendarSettings { it.copy(preferredSystem = CalendarSystem.BANGLA) }
+
+        assertEquals(PrayerCalculationMethod.EGYPTIAN, repository.prayerSettings.first().method)
+        assertEquals(CalendarSystem.BANGLA, repository.calendarSettings.first().preferredSystem)
+        // The theme is a third, independent value in the same store.
+        repository.setThemeMode(ThemeMode.DARK)
+        assertEquals(ThemeMode.DARK, repository.themeMode.first())
+        assertEquals(CalendarSystem.BANGLA, repository.calendarSettings.first().preferredSystem)
     }
 }

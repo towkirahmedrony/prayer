@@ -32,14 +32,27 @@ Implemented:
   correction from the platform's geomagnetic model, request-based device location alongside manual
   coordinates, location provenance and freshness, compass calibration guidance, and ten explicit UI
   states. Fully offline.
+- **Calendars:** a Gregorian month grid, conversion to the **Bangladesh Bangla** calendar under the
+  2019 rules, and **Hijri** dates from the platform's own Umm al-Qura table, all rendered over one
+  Gregorian grid with the user's choice of date language. Calendar preferences (default view, Hijri
+  day offset, date language) are persisted; a date outside a converter's supported range is reported
+  rather than approximated. Fully offline.
+- **Ramadan:** the estimated window derived from the Hijri calculation, a daily table carrying the
+  Ramadan day number, Gregorian, Bangla and Hijri dates, Sehri end, Fajr, Iftar and Maghrib, and the
+  provenance of the times. **Sehri and Iftar reminders** are planned by the existing notification
+  subsystem for the days the calendar places inside Ramadan, with their own switches and lead times.
+  Fully offline.
 - Repository/provider boundaries for prayer schedules, prohibited periods, calendars, location,
   preferences and notification settings.
 - Unit tests for domain, data and presentation-mapping logic.
 - GitHub Actions workflow that runs tests, lint and builds the debug APK.
 
-Deliberately **not** implemented (see §11): Bangla/Hijri conversion, prohibited-time rules, bundled
-Azan audio, network providers, Room, widgets, Qibla compass, device location, foreground-service
-playback.
+Deliberately **not** implemented (see §11): an authority-confirmed Hijri date or Sehri/Iftar
+ timetable, prohibited-time rules, bundled Azan audio, network providers, Room, widgets,
+ foreground-service playback.
+
+Detailed calendar documentation, including the Bangladesh rules and their source, the supported
+ranges and the accuracy limits, lives in [`CALENDAR_SYSTEM.md`](CALENDAR_SYSTEM.md).
 
 Detailed notification documentation lives in
 [`PRAYER_NOTIFICATIONS.md`](PRAYER_NOTIFICATIONS.md); its tests and the manual device checklist are
@@ -100,12 +113,16 @@ io.github.towkirahmedrony.salah
 │   │   ├── DiagnosticsLogger   Structured diagnostics port + SalahDiagnosticEvents
 │   │   ├── NextPrayerResolver  Pure next-prayer resolution
 │   │   ├── TimeFormatting      Shared clock-format helper (Home + notifications)
+│   │   ├── calendar/           Pure, Android-free converters: GregorianCalendarGrid, BanglaCalendar,
+│   │   │                       HijriCalendar, RamadanCalendar, CalendarFormatting
 │   │   └── CountdownFormatter  Pure countdown formatting
 │   └── designsystem/           theme/, glyphs, shared components
 ├── data/
 │   ├── preferences/            DataStore-backed preferences (theme + prayer settings)
 │   ├── location/               DataStore-backed manual location
-│   ├── calendar/               Gregorian from the device clock, re-emitted at local midnight
+│   ├── calendar/               DeviceClockCalendarRepository: which Gregorian day is meant, the
+│   │                           local-midnight and time-zone refresh, and the conversion of every
+│   │                           day it lays out
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
 │   ├── prohibited/             Rule-book-backed repository (ships unconfigured)
 │   ├── qibla/                  Android side of the Qibla feature:
@@ -125,6 +142,8 @@ io.github.towkirahmedrony.salah
 │   ├── app/                    AppViewModel (theme)
 │   ├── home/                   HomeUiState, HomeUiStateFactory, HomeViewModel, HomeScreen
 │   ├── home/components/        Section composables (incl. CalculationCard)
+│   ├── calendar/               Calendar state, view model, screen, calendar settings screen
+│   ├── ramadan/                Ramadan state, view model, screen, reminder controls
 │   ├── settings/               Settings state, view model, screen
 │   ├── notifications/          Prayer notification settings state, view model, screen
 │   ├── qibla/                  Qibla state, view model, screen, labels, compass dial
@@ -387,10 +406,12 @@ when pinned, adjustment disclosure) so a time is never presented without the set
   explicit light/dark overrides.
 - `core/designsystem/SalahGlyphs.kt`: icons drawn with Compose `Canvas`, so no icon library
   dependency exists.
-- `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla` and
-  `notifications`. Unimplemented destinations render `PlannedFeatureScreen`, explicitly labelled
-  “Not implemented yet”. `notifications` is a real destination reached from Settings and is not in
-  the bottom bar, because it is configuration rather than a place the user works. `qibla` is a real
+- `navigation/SalahDestination`: the five bottom-bar destinations plus `qibla`,
+  `calendar_settings` and `notifications`. Only the `prayer` destination still renders
+  `PlannedFeatureScreen`, explicitly labelled “Not implemented yet”; Calendar and Ramadan are real
+  screens. `notifications` is a real destination reached from Settings and is not in the bottom bar,
+  because it is configuration rather than a place the user works. `calendar_settings` is reached
+  from the Calendar screen and holds the one place a date can be affected from. `qibla` is a real
   screen reached from the Home screen's Islamic tools, and is not in the bottom bar because it is a
   tool rather than a place the user dwells.
 - Navigation state is saved/restored per destination (`saveState`/`restoreState`,
@@ -407,9 +428,16 @@ when pinned, adjustment disclosure) so a time is never presented without the set
 | Prohibited repository wiring | `RuleBookProhibitedPeriodsRepositoryTest` | Shipped rule book is empty → `RULES_NOT_VERIFIED`; a reviewed set produces windows |
 | Location validation | `LocationInfoTest` | Ranges, IANA zone, blank label, NaN |
 | Offline-first repository | `ProviderBackedPrayerScheduleRepositoryTest` | No location, engine not configured, cache reuse without re-calling the provider, recalculation on date/location/profile change, stale or wrong-place response rejection, exception → visible failure |
-| Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting, transactional updates, safe fallback on unknown values |
+| Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting including the calendar preferences, transactional updates, the Hijri offset clamped on write and read, safe fallback on unknown values, and calendar/prayer/theme preferences not overwriting one another |
 | Home mapping rules | `HomeUiStateFactoryTest` | No fabricated data, countdown only for a real schedule, sunrise not a prayer, failure surfaced, time-format preference |
-| Calendar rollover | `DeviceClockCalendarRepositoryTest` | Local-midnight re-emission, no polling, DST-length local day |
+| Calendar rollover and day resolution | `DeviceClockCalendarRepositoryTest` | Local-midnight re-emission, no polling, DST-length local day, the Hijri month boundary at midnight, the date language, out-of-range reporting for both converters, a month laid out with real Bangla/Hijri dates and Ramadan day numbers, the Ramadan window and its movement with the Hijri offset |
+| Bangladesh Bangla calendar | `BanglaCalendarTest` | Published 2019 rules (six 31-day months, Falgun 29/30, Chaitra 30) against reference dates, every month start, the 14 April New Year, leap years, a whole supported year round-tripped, refusal before 2019 and after 2399 |
+| Hijri calendar | `HijriCalendarTest` | Umm al-Qura reference conversions, month boundaries on both sides, the user offset and its source label, 29/30-day Ramadan windows, the window search, observances, and the platform table's bounds |
+| Ramadan and Sehri/Iftar rules | `RamadanCalendarTest`, `RamadanUiStateFactoryTest` | Sehri = Fajr and Iftar = Maghrib read from the real schedule, a manual Fajr adjustment moving Sehri with it, missing times producing no value, day numbering, phase boundaries, the daily table, provenance, and rendering in the location's zone |
+| Month layout | `GregorianCalendarGridTest` | Seven cells per row, day order, padding, four different week starts, leap and century years, year transitions, extreme months |
+| Date rendering | `CalendarFormattingTest` | Bangla numerals, the language preference choosing the locale, composed Bangla/Hijri strings that cannot mix scripts, the platform formatter for Gregorian dates |
+| Calendar screen state | `CalendarUiStateFactoryTest` | Today vs selection vs both, three resolved date lines with the Hijri source, out-of-range stated rather than blanked, no window → no range, the adjustment moving the Hijri date and Ramadan number together |
+| Ramadan reminders | `RamadanReminderPlanTest` | Sehri as a lead-in only, Iftar at Maghrib plus an optional lead-in, nothing outside Ramadan, switches and master switch, unique slots and request codes, a Ramadan end leaving nothing behind, inherited sound/vibration, lead-time clamping |
 | Notification planning | `PrayerNotificationPlannerTest` | Enabled/disabled, master switch, past events, advance reminders, sunrise separated from prayers, missing schedule, duplicates, deterministic order, cancellation set |
 | Notification identity | `PrayerNotificationIdsTest`, `PrayerNotificationRequestTest`, `PrayerNotificationChannelIdTest` | Request-code uniqueness across 400 days × 6 targets × 2 kinds, URI round trip, malformed-input rejection, bounded and stable channel ids |
 | Notification settings | `PrayerNotificationSettingsTest`, `DataStorePrayerNotificationPreferencesRepositoryTest` | Defaults, clamping, sparseness, real persistence across recreation, safe fallback on bad stored data, coexistence with the other preferences in one store |
@@ -436,8 +464,13 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
   `di/SalahModules.kt`. No UI change is required; the schedule populates the existing sections.
 - **Persist schedules**: add Room beside the in-memory cache inside
   `ProviderBackedPrayerScheduleRepository`. The repository interface does not change.
-- **Bangla/Hijri dates**: implement a conversion in `data/calendar` returning
-  `CalendarDateState.Available`; the Home screen already renders that shape.
+- **A different Hijri source (for example a moon-sighting feed):** add a `HijriDateSource` constant
+  and a converter beside `HijriCalendar` that can set it, then bind it where the screens read the
+  calendar. Only that source may report a confirmed date; the current constants are both estimates by
+  construction, and `docs/CALENDAR_SYSTEM.md` §5.2 records why.
+- **A different Bangla or Hijri rule set**: the converters are pure and take no device state, so a
+  variant is a new class behind `CalendarRepository` plus its own tests. `BanglaCalendar` documents
+  the range it is verified for, which any replacement must do too.
 - **Prohibited periods**: add one reviewed `ProhibitedRuleSet` to `ProhibitedRuleBook`; the
   calculator, repository and state types already exist and are tested.
 - **Notifications**: implemented. `PrayerNotificationPlanner` is the only place that decides what
@@ -484,6 +517,14 @@ Salah's mapping, not an independent verification — see `docs/PRAYER_CALCULATIO
 - Notification delivery has **not** been verified on a physical device. Reboot recovery, Doze
   behaviour, system permission surfaces and real alarm timing require hardware; the checklist is
   written but unperformed (`PRAYER_NOTIFICATIONS_TESTING.md` §4).
-- Bangla and Hijri conversion are not implemented; only the device Gregorian date is available.
-- Reason strings and UI text are English; full localisation and Bangla translations are future
-  work.
+- **The Hijri date and the Ramadan window are estimates**, and Salah says so wherever they appear:
+  Umm al-Qura is not the calendar Bangladesh's religious authorities announce Ramadan and the Eids
+  with, and no moon-sighting source is integrated. Sehri and Iftar are the calculated Fajr and
+  Maghrib, with no buffer and no claim to match any authority's timetable.
+  (`docs/CALENDAR_SYSTEM.md` §5, §7.)
+- **The calendar screens have not been verified on a physical device.** The converters, the state
+  mapping, the persistence and the reminder planning are unit-tested; the layout, both themes, large
+  font scales and a real device time-zone change are not.
+- Reason strings and UI text are English, with a partial Bangla translation of navigation, calendar
+  and prayer labels; the calendar's own date language is a separate, explicit setting. Full
+  localisation is future work.

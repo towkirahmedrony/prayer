@@ -17,6 +17,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
@@ -266,14 +267,19 @@ class FakePrayerNotificationPreferencesRepository(
     }
 }
 
-/** Calculation preferences; the notification path only reads the profile and the time format. */
+/**
+ * Calculation preferences; the notification path reads the profile, the time format and the stored
+ * Hijri offset, because the Hijri offset is what decides which dates are in Ramadan.
+ */
 class FakeUserPreferencesRepository(
     initialSettings: PrayerSettings = PrayerSettings.DEFAULT,
     initialTheme: ThemeMode = ThemeMode.SYSTEM,
+    initialCalendarSettings: CalendarSettings = CalendarSettings.DEFAULT,
 ) : UserPreferencesRepository {
 
     private val settingsState = MutableStateFlow(initialSettings)
     private val themeState = MutableStateFlow(initialTheme)
+    private val calendarState = MutableStateFlow(initialCalendarSettings)
 
     override val themeMode: Flow<ThemeMode> = themeState
 
@@ -285,6 +291,19 @@ class FakeUserPreferencesRepository(
 
     override suspend fun updatePrayerSettings(transform: (PrayerSettings) -> PrayerSettings) {
         settingsState.value = transform(settingsState.value)
+    }
+
+    override val calendarSettings: Flow<CalendarSettings> = calendarState
+
+    override suspend fun updateCalendarSettings(transform: (CalendarSettings) -> CalendarSettings) {
+        calendarState.value = transform(calendarState.value)
+    }
+
+    /** Moves the stored Hijri offset, for a scenario where the user realigns the calendar. */
+    fun setHijriAdjustment(days: Int) {
+        calendarState.value = calendarState.value.copy(
+            hijriAdjustmentDays = CalendarSettings.clampHijriAdjustment(days),
+        )
     }
 }
 

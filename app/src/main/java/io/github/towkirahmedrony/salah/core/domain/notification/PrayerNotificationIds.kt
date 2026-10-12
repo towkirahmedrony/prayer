@@ -30,9 +30,11 @@ import java.time.LocalDate
  * **Why the request code is collision-free.** The code is
  * `floorMod(epochDay, 1_000_000) * 16 + target.ordinal * 2 + kind.ordinal`. Within any window of
  * `1_000_000` days (about 2 700 years) every `(target, kind)` pair gets a distinct 4-bit block,
- * and the planner only ever plans a window of a few days. `ReminderTarget` has 6 constants and
- * `PrayerReminderKind` has 2, so the block size of 16 leaves headroom for future targets without
- * changing the scheme. The whole value stays far below `Int.MAX_VALUE`.
+ * and the planner only ever plans a window of a few days. `ReminderTarget` now has 8 constants
+ * (the five prayers, sunrise, Sehri and Iftar) and `PrayerReminderKind` has 2, which is exactly the
+ * block size of 16 — every combination still gets its own code, and the scheme is unchanged, so
+ * alarms scheduled by an earlier build keep their identity. The whole value stays far below
+ * `Int.MAX_VALUE`.
  */
 object PrayerNotificationIds {
 

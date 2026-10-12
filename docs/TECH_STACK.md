@@ -141,13 +141,30 @@ stored with DataStore (no code generation), and the schedule cache is in-memory.
 database now would be a dependency without a consumer. Room is expected in the same change that
 introduces the first persisted schedule entity.
 
-### 3.8 No networking stack yet
+### 3.8 Calendar and Hijri conversion: no library added
+
+The calendar feature adds **no dependency**. The Gregorian month arithmetic uses `LocalDate` and
+`YearMonth`; the Bangladesh Bangla calendar is a small, fully documented conversion over published
+civil rules (see `docs/CALENDAR_SYSTEM.md` §4); and Hijri conversion uses
+`java.time.chrono.HijrahChronology`, the **`islamic-umalqura`** table that ships inside `java.base`.
+
+That was a deliberate evaluation rather than a default: a third-party Hijri library would add a
+licence to review, a maintenance dependency, and the same JVM-target risk that pins Adhan (§3.9) —
+while `java.time` gives a fixed, published table that produces the same value on every device.
+`minSdk 26` (§3.5) is what makes this possible without desugaring.
+
+The one thing the platform does not provide is the Bangladesh-specific Bangla calendar, which no
+maintained Android library implements for Bangladesh's 2019 rules; so it is implemented here, with
+its algorithmic source, its supported range and its one documented ambiguity stated in code and in
+`docs/CALENDAR_SYSTEM.md` §4.4.
+
+### 3.9 No networking stack yet
 
 No HTTP client (Retrofit or Ktor) is declared. The first phase performs no network call at all,
 and offline-first means local state is the read source. A client is introduced with the first
 remote provider, together with its validation and caching rules.
 
-### 3.9 Prayer calculation engine: Adhan Kotlin, pinned to `0.0.5`
+### 3.10 Prayer calculation engine: Adhan Kotlin, pinned to `0.0.5`
 
 `PrayerTimesProvider` is the port and `AdhanPrayerTimesProvider` is the wired implementation; the
 local engine is integrated and prayer times are calculated on the device. The library is
@@ -159,7 +176,7 @@ of 21 (class-file major version 65) and cannot be loaded by this project's JDK 1
 release published for a JVM target the project can run. Upgrading it requires moving the toolchain
 to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
 
-### 3.10 Build and release configuration
+### 3.11 Build and release configuration
 
 - Debug APK only; release signing and shrinking are not configured and no keystore material
   exists in the repository.

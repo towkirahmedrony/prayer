@@ -32,6 +32,12 @@ import java.time.ZonedDateTime
  *  - **The window is a fixed cross-product.** [windowSlots] enumerates every slot a date could
  *    possibly use, independently of the current settings. That is what lets the coordinator cancel
  *    a *superset* of what it is about to schedule and know it has missed nothing.
+ *  - **Ramadan reminders are produced from the caller's own Ramadan dates.** The planner does not
+ *    decide when Ramadan is — that is a calendar question, answered once by
+ *    [io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar] and passed in. Because
+ *    the input is a set of dates, a Ramadan end (or a Hijri offset change) simply produces a
+ *    different set, and the coordinator's derived cancellation removes the days that are no longer
+ *    in it. No stale alarm can survive a Ramadan start or end.
  */
 class PrayerNotificationPlanner {
 
@@ -68,18 +74,22 @@ class PrayerNotificationPlanner {
      *   [PrayerAlarmSlot.date] is taken from the schedule's own date.
      * @param now the current instant. Converted into each schedule's own zone before comparison,
      *   so a device in a different zone from the location still gets the correct answer.
+     * @param ramadanDates the dates the calendar places inside Ramadan, taken in the same zone the
+     *   schedule's date is. Empty means "no Ramadan reminders", which is what a date outside Ramadan
+     *   produces — never an invented Ramadan reminder.
      */
     fun plan(
         settings: PrayerNotificationSettings,
         schedules: List<PrayerSchedule>,
         now: ZonedDateTime,
+        ramadanDates: Set<LocalDate> = emptySet(),
     ): List<PlannedPrayerNotification> {
         if (!settings.masterEnabled) return emptyList()
 
         val planned = schedules
             .asSequence()
             .filter { it.isComplete }
-            .flatMap { schedule -> planForSchedule(settings, schedule, now) }
+            .flatMap { schedule -> planForSchedule(settings, schedule, now, ramadanDates) }
             .distinctBy { it.slot }
             .sortedWith(compareBy({ it.triggerAt.toInstant() }, { it.slot.identity }))
             .toList()
@@ -107,6 +117,7 @@ class PrayerNotificationPlanner {
         settings: PrayerNotificationSettings,
         schedule: PrayerSchedule,
         now: ZonedDateTime,
+        ramadanDates: Set<LocalDate>,
     ): List<PlannedPrayerNotification> {
         val nowAtLocation = now.withZoneSameInstant(schedule.zoneId)
         val build = mutableListOf<PlannedPrayerNotification>()
@@ -129,6 +140,13 @@ class PrayerNotificationPlanner {
             )
         }
 
+        // Ramadan reminders, only for dates the calendar places inside Ramadan. Sehri ends at Fajr,
+        // so its reminder is an advance one — an at-time Sehri reminder would collide with Fajr's.
+        // Iftar is Maghrib, so it gets both an at-time reminder and, when configured, a lead-in.
+        if (schedule.date in ramadanDates) {
+            build += ramadanReminders(schedule, settings, nowAtLocation)
+        }
+
         // Sunrise is a solar event: it is only ever offered through its own switch, it is never
         // given an advance reminder, and it is never treated as one of the five prayers.
         if (settings.sunriseReminderEnabled) {
@@ -139,6 +157,63 @@ class PrayerNotificationPlanner {
                     eventAt = sunriseAt,
                     sound = NotificationSound.SYSTEM_DEFAULT,
                     vibration = true,
+                    nowAtLocation = nowAtLocation,
+                )
+            }
+        }
+
+        return build
+    }
+
+    /**
+     * Sehri and Iftar reminders for one day of Ramadan.
+     *
+     * Both take their sound and vibration from the prayer they are derived from — Fajr for Sehri,
+     * Maghrib for Iftar — because that is the preference the user configured for that time of day, and
+     * it means the Ramadan reminders reuse the existing notification channels rather than adding
+     * channels of their own. A `null` time (a polar day with no Fajr or Maghrib) simply produces no
+     * reminder.
+     */
+    private fun ramadanReminders(
+        schedule: PrayerSchedule,
+        settings: PrayerNotificationSettings,
+        nowAtLocation: ZonedDateTime,
+    ): List<PlannedPrayerNotification> {
+        val build = mutableListOf<PlannedPrayerNotification>()
+
+        if (settings.sehriReminderEnabled) {
+            val fajrPreference = settings.preferenceFor(PrayerName.FAJR)
+            schedule.timeOf(PrayerName.FAJR)?.let { fajr ->
+                build += advance(
+                    schedule = schedule,
+                    target = ReminderTarget.SEHRI,
+                    eventAt = fajr,
+                    advanceMinutes = settings.sehriLeadMinutes,
+                    sound = fajrPreference.sound,
+                    vibration = fajrPreference.vibration,
+                    nowAtLocation = nowAtLocation,
+                )
+            }
+        }
+
+        if (settings.iftarReminderEnabled) {
+            val maghribPreference = settings.preferenceFor(PrayerName.MAGHRIB)
+            schedule.timeOf(PrayerName.MAGHRIB)?.let { maghrib ->
+                build += atTime(
+                    schedule = schedule,
+                    target = ReminderTarget.IFTAR,
+                    eventAt = maghrib,
+                    sound = maghribPreference.sound,
+                    vibration = maghribPreference.vibration,
+                    nowAtLocation = nowAtLocation,
+                )
+                build += advance(
+                    schedule = schedule,
+                    target = ReminderTarget.IFTAR,
+                    eventAt = maghrib,
+                    advanceMinutes = settings.iftarLeadMinutes,
+                    sound = maghribPreference.sound,
+                    vibration = maghribPreference.vibration,
                     nowAtLocation = nowAtLocation,
                 )
             }

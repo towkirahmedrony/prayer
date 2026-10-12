@@ -7,22 +7,23 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.towkirahmedrony.salah.R
-import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
+import io.github.towkirahmedrony.salah.feature.calendar.CalendarScreen
+import io.github.towkirahmedrony.salah.feature.calendar.CalendarSettingsScreen
 import io.github.towkirahmedrony.salah.feature.common.PlannedFeatureScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
+import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
 import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
 
 /**
  * The navigation graph.
  *
- * Home, Tools, Settings, prayer-notification settings and the Qibla compass
- * are implemented. Prayer, Calendar and Ramadan render explicit
- * "not implemented yet" screens.
+ * Home, Calendar (with its settings), Ramadan, Tools, Settings, prayer-notification settings and the
+ * Qibla compass are implemented. Only the Prayer destination still renders an explicit "not
+ * implemented yet" screen, and it says so rather than showing placeholder data.
  */
 @Composable
 fun SalahNavHost(
@@ -47,10 +48,19 @@ fun SalahNavHost(
         }
 
         composable(SalahDestination.CALENDAR.route) {
-            PlannedFeatureScreen(
-                title = stringResource(R.string.feature_calendar_title),
-                body = stringResource(R.string.feature_calendar_body),
-                glyph = { tint -> CalendarGlyph(tint = tint) },
+            CalendarScreen(
+                onOpenSettings = {
+                    navController.navigate(SalahDestination.CALENDAR_SETTINGS.route)
+                },
+                onOpenRamadan = { navController.navigate(SalahDestination.RAMADAN.route) },
+            )
+        }
+
+        composable(SalahDestination.CALENDAR_SETTINGS.route) {
+            CalendarSettingsScreen(
+                onOpenNotifications = {
+                    navController.navigate(SalahDestination.NOTIFICATIONS.route)
+                },
             )
         }
 
@@ -59,10 +69,11 @@ fun SalahNavHost(
         }
 
         composable(SalahDestination.RAMADAN.route) {
-            PlannedFeatureScreen(
-                title = stringResource(R.string.feature_ramadan_title),
-                body = stringResource(R.string.feature_ramadan_body),
-                glyph = { tint -> LanternGlyph(tint = tint) },
+            RamadanScreen(
+                onOpenNotifications = {
+                    navController.navigate(SalahDestination.NOTIFICATIONS.route)
+                },
+                onOpenCalendar = { navController.navigate(SalahDestination.CALENDAR.route) },
             )
         }
 

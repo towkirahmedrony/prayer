@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bangla translations of the user-facing labels Salah's calendar, Ramadan and navigation surfaces use.
+
+  This is a partial translation on purpose. Android falls back to values/strings.xml for anything not
+  listed here, and Salah's English wording makes specific claims about sources and limits that must not
+  be translated loosely — so the strings translated here are the ones whose meaning is unambiguous
+  (names of calendars, months, prayers and observance, and short navigation labels). The explanatory
+  paragraphs that state what is estimated and what is not stay in English until they can be reviewed.
+
+  Salah does not switch language from inside the app; these are selected by the device locale, and the
+  calendar's own date language is a separate, explicit setting (see Calendar settings).
+-->
+<resources>
+    <!-- Navigation -->
+    <string name="nav_home">হোম</string>
+    <string name="nav_prayer">নামাজ</string>
+    <string name="nav_calendar">ক্যালেন্ডার</string>
+    <string name="nav_ramadan">রমজান</string>
+    <string name="nav_settings">সেটিংস</string>
+    <string name="nav_tools">টুলস</string>
+    <string name="nav_notifications">বিজ্ঞপ্তি</string>
+
+    <!-- Calendar views and dates -->
+    <string name="home_gregorian_label">গ্রেগরিয়ান</string>
+    <string name="home_bangla_date_title">বাংলা তারিখ</string>
+    <string name="home_hijri_date_title">হিজরি তারিখ</string>
+    <string name="calendar_view_gregorian">গ্রেগরিয়ান</string>
+    <string name="calendar_view_bangla">বাংলা</string>
+    <string name="calendar_view_hijri">হিজরি</string>
+    <string name="calendar_today_label">আজ</string>
+    <string name="calendar_selected_day">নির্বাচিত দিন</string>
+    <string name="calendar_previous_month">আগের মাস</string>
+    <string name="calendar_next_month">পরের মাস</string>
+    <string name="calendar_go_to_today">আজকের তারিখে যান</string>
+    <string name="calendar_estimated_badge">আনুমানিক</string>
+
+    <!-- Ramadan -->
+    <string name="calendar_ramadan_title">রমজান ক্যালেন্ডার</string>
+    <string name="calendar_ramadan_day">রমজানের %1$d নম্বর দিন</string>
+    <string name="ramadan_window_title">রমজানের সময়কাল</string>
+    <string name="ramadan_schedule_title">দৈনিক সেহরি ও ইফতার</string>
+    <string name="ramadan_column_day">দিন</string>
+    <string name="calendar_sehri_end">সেহরির শেষ সময়</string>
+    <string name="calendar_iftar">ইফতারের সময়</string>
+    <string name="notifications_ramadan_sehri">সেহরির রিমাইন্ডার</string>
+    <string name="notifications_ramadan_iftar">ইফতারের রিমাইন্ডার</string>
+    <string name="notifications_ramadan_iftar_lead_at_time">শুধু ইফতারের সময়</string>
+
+    <!-- Calendar settings -->
+    <string name="calendar_settings_title">ক্যালেন্ডার সেটিংস</string>
+    <string name="calendar_default_view_title">ডিফল্ট ক্যালেন্ডার</string>
+    <string name="calendar_hijri_adjustment_title">হিজরি তারিখ সমন্বয়</string>
+    <string name="calendar_hijri_adjustment_reset">শূন্যে ফেরান</string>
+    <string name="calendar_language_title">তারিখের ভাষা</string>
+    <string name="calendar_language_system">ডিভাইস অনুযায়ী</string>
+    <string name="calendar_language_bangla">বাংলা</string>
+    <string name="calendar_language_english">English</string>
+
+    <!-- Prayers and solar events -->
+    <string name="prayer_fajr">ফজর</string>
+    <string name="prayer_dhuhr">যোহর</string>
+    <string name="prayer_asr">আসর</string>
+    <string name="prayer_maghrib">মাগরিব</string>
+    <string name="prayer_isha">এশা</string>
+    <string name="prayer_sunrise">সূর্যোদয়</string>
+    <string name="event_sunrise">সূর্যোদয়</string>
+    <string name="event_solar_noon">সৌর মধ্যাহ্ন</string>
+    <string name="event_sunset">সূর্যাস্ত</string>
+
+    <!-- Observances -->
+    <string name="occasion_islamic_new_year">ইসলামি নববর্ষ (১ মুহাররম)</string>
+    <string name="occasion_ashura">আশুরা (১০ মুহাররম)</string>
+    <string name="occasion_mawlid">মিলাদুন্নবী (১২ রবিউল আউয়াল)</string>
+    <string name="occasion_ramadan_begins">রমজান শুরু (১ রমজান)</string>
+    <string name="occasion_arafah">আরাফার দিন (৯ জিলহজ)</string>
+    <string name="occasion_eid_al_adha">ঈদুল আজহা (১০ জিলহজ)</string>
+    <string name="occasion_eid_al_fitr">ঈদুল ফিতর (১ শাওয়াল)</string>
+
+    <!-- Shared states -->
+    <string name="state_loading">লোড হচ্ছে…</string>
+    <string name="state_error_title">কিছু একটা ভুল হয়েছে</string>
+    <string name="action_retry">আবার চেষ্টা করুন</string>
+</resources>

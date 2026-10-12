@@ -179,4 +179,77 @@ class DataStorePrayerNotificationPreferencesRepositoryTest {
         assertEquals(3, raw[intPreferencesKey("prayer_adjustment_FAJR")])
         assertFalse(repository.settings.first().masterEnabled)
     }
+
+    // --- Ramadan ------------------------------------------------------------------
+
+    @Test
+    fun `Ramadan reminders are off until the user asks for them`() = runTest {
+        val settings = repository.settings.first()
+
+        // They cover one month of the year, so a fresh install must not schedule anything.
+        assertFalse(settings.sehriReminderEnabled)
+        assertFalse(settings.iftarReminderEnabled)
+        assertEquals(PrayerNotificationSettings.DEFAULT_SEHRI_LEAD_MINUTES, settings.sehriLeadMinutes)
+        // Zero Iftar lead means "at Iftar only", which is a real choice rather than an absent one.
+        assertEquals(0, settings.iftarLeadMinutes)
+    }
+
+    @Test
+    fun `Ramadan switches and lead times survive a repository recreation`() = runTest {
+        repository.update { current ->
+            current
+                .withSehriReminder(enabled = true, leadMinutes = 15)
+                .withIftarReminder(enabled = true, leadMinutes = 20)
+        }
+
+        val reopened = DataStorePrayerNotificationPreferencesRepository(dataStore).settings.first()
+
+        assertTrue(reopened.sehriReminderEnabled)
+        assertEquals(15, reopened.sehriLeadMinutes)
+        assertTrue(reopened.iftarReminderEnabled)
+        assertEquals(20, reopened.iftarLeadMinutes)
+    }
+
+    @Test
+    fun `a Ramadan lead time that is not an offered value is clamped on write and on read`() = runTest {
+        repository.update { it.withSehriReminder(enabled = true, leadMinutes = 7) }
+        assertEquals(5, repository.settings.first().sehriLeadMinutes)
+
+        dataStore.edit { preferences ->
+            preferences[intPreferencesKey("notification_sehri_reminder_lead_minutes")] = 1000
+            preferences[intPreferencesKey("notification_iftar_reminder_lead_minutes")] = -5
+        }
+
+        val settings = repository.settings.first()
+        assertEquals(PrayerNotificationSettings.SEHRI_LEAD_MINUTE_CHOICES.last(), settings.sehriLeadMinutes)
+        assertEquals(0, settings.iftarLeadMinutes)
+    }
+
+    @Test
+    fun `turning a Ramadan reminder off is stored as off rather than forgotten`() = runTest {
+        repository.update { it.withSehriReminder(enabled = true) }
+        repository.update { it.withSehriReminder(enabled = false) }
+
+        // The switch has an explicit stored value in both directions, so "off" cannot be confused
+        // with "never configured".
+        val raw = dataStore.data.first()
+        assertEquals(false, raw[booleanPreferencesKey("notification_sehri_reminder_enabled")])
+        assertFalse(DataStorePrayerNotificationPreferencesRepository(dataStore).settings.first().sehriReminderEnabled)
+    }
+
+    @Test
+    fun `the Ramadan reminders do not disturb the prayer preferences`() = runTest {
+        repository.update { current ->
+            current.withSehriReminder(enabled = true).withIftarReminder(enabled = true)
+        }
+
+        val settings = repository.settings.first()
+        // Every prayer keeps the preference it had, including sound and vibration.
+        PrayerName.entries.forEach { prayer ->
+            assertEquals(
+                PrayerNotificationPreference.DEFAULT,
+                settings.preferenceFor(prayer),
+            )
+        }
+    }
 }

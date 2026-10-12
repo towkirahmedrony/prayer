@@ -5,7 +5,9 @@ import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
-import io.github.towkirahmedrony.salah.core.model.NotificationSound
+import io.github.towkirahmedrony.salah.core.model.PrayerName
+import io.github.towkirahmedrony.salah.core.model.PrayerNotificationPreference
+import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
 import kotlinx.coroutines.flow.first
 import java.time.Clock
 import java.time.Instant
@@ -23,7 +25,7 @@ import java.time.ZoneId
  * The checks, in order:
  *
  *  1. **Master switch** — off means nothing is shown, whatever the alarm says.
- *  2. **Target enabled** — a disabled prayer or the sunrise reminder does not appear.
+ *  2. **Target enabled** — a disabled prayer, sunrise reminder or Ramadan reminder does not appear.
  *  3. **Notifications permitted** — without `POST_NOTIFICATIONS` (or with app notifications turned
  *     off) the reminder is suppressed and logged rather than posted into the void.
  *  4. **Not stale** — an alarm that fires more than
@@ -67,12 +69,7 @@ class PrayerNotificationDeliverer(
         }
 
         val prayer = slot.target.prayer
-        val enabled = if (prayer == null) {
-            settings.sunriseReminderEnabled
-        } else {
-            settings.preferenceFor(prayer).enabled
-        }
-        if (!enabled) {
+        if (!settings.isEnabled(slot.target)) {
             return suppress(
                 slot.identity,
                 SuppressionReason.TARGET_DISABLED,
@@ -102,15 +99,18 @@ class PrayerNotificationDeliverer(
         // The zone the reminder is rendered in: the prayer location's, so it matches the
         // timetable the user sees. Falls back to the device zone only when no location is stored.
         val zone = locations.location.first()?.zoneId ?: ZoneId.systemDefault()
-        val preference = prayer?.let { settings.preferenceFor(it) }
+        // Read at delivery time, for the same reason the sound is: a Ramadan reminder announces itself
+        // with the preference the user has *now* for that time of day (Fajr for Sehri, Maghrib for
+        // Iftar), and reuses that prayer's notification channel rather than inventing one.
+        val preference = settings.announcementPreferenceFor(slot.target)
         val timeFormat = userPreferences.prayerSettings.first().timeFormat
 
         val delivery = PrayerReminderDelivery(
             slot = slot,
             eventAt = Instant.ofEpochMilli(request.eventAtEpochMillis).atZone(zone),
             advanceMinutes = request.advanceMinutes,
-            sound = preference?.sound ?: NotificationSound.SYSTEM_DEFAULT,
-            vibration = preference?.vibration ?: true,
+            sound = preference.sound,
+            vibration = preference.vibration,
             timeFormat = timeFormat,
         )
 
@@ -139,11 +139,41 @@ class PrayerNotificationDeliverer(
             ),
         )
 
-        // Azan playback is attempted only for the prayer's own time: a lead-in reminder is a
-        // notification, not a call to prayer.
+        // Azan playback is attempted only for an at-time *prayer* reminder: a lead-in reminder is a
+        // notification rather than a call to prayer, and the Iftar reminder is not a prayer — playing
+        // the Azan for it would double the call already made at Maghrib.
         val azan = if (delivery.isAtEventTime && prayer != null) azanPlayback.play() else null
 
         return DeliveryOutcome.Posted(channelId = delivery.channelId, azan = azan)
+    }
+
+    /**
+     * Whether [target] is enabled in [settings].
+     *
+     * Deliberately exhaustive over the target enum: adding a reminder type without deciding how it is
+     * switched on is a compile error here rather than a reminder that can never be silenced.
+     */
+    private fun PrayerNotificationSettings.isEnabled(target: ReminderTarget): Boolean = when (target) {
+        ReminderTarget.FAJR -> preferenceFor(PrayerName.FAJR).enabled
+        ReminderTarget.DHUHR -> preferenceFor(PrayerName.DHUHR).enabled
+        ReminderTarget.ASR -> preferenceFor(PrayerName.ASR).enabled
+        ReminderTarget.MAGHRIB -> preferenceFor(PrayerName.MAGHRIB).enabled
+        ReminderTarget.ISHA -> preferenceFor(PrayerName.ISHA).enabled
+        ReminderTarget.SUNRISE -> sunriseReminderEnabled
+        ReminderTarget.SEHRI -> sehriReminderEnabled
+        ReminderTarget.IFTAR -> iftarReminderEnabled
+    }
+
+    /** Sound and vibration for [target]; Ramadan reminders inherit their prayer's preference. */
+    private fun PrayerNotificationSettings.announcementPreferenceFor(
+        target: ReminderTarget,
+    ): PrayerNotificationPreference = when (target) {
+        ReminderTarget.FAJR, ReminderTarget.SEHRI -> preferenceFor(PrayerName.FAJR)
+        ReminderTarget.MAGHRIB, ReminderTarget.IFTAR -> preferenceFor(PrayerName.MAGHRIB)
+        ReminderTarget.DHUHR -> preferenceFor(PrayerName.DHUHR)
+        ReminderTarget.ASR -> preferenceFor(PrayerName.ASR)
+        ReminderTarget.ISHA -> preferenceFor(PrayerName.ISHA)
+        ReminderTarget.SUNRISE -> PrayerNotificationPreference.DEFAULT
     }
 
     private fun suppress(slotIdentity: String, reason: SuppressionReason, detail: String): DeliveryOutcome {
