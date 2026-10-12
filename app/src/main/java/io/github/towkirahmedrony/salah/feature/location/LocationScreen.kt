@@ -58,6 +58,7 @@ import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionAction
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionPolicy
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
+import io.github.towkirahmedrony.salah.feature.common.sourceLabelRes
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -395,7 +396,7 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
                 fontWeight = FontWeight.SemiBold,
             )
             SalahStatusPill(
-                text = stringResource(sourceLabelRes(stored.origin)),
+                text = stringResource(stored.origin.sourceLabelRes()),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -785,12 +786,6 @@ private fun LocationMessageRow(message: LocationMessage, onDismiss: () -> Unit) 
             Text(text = stringResource(R.string.location_message_dismiss))
         }
     }
-}
-
-private fun sourceLabelRes(origin: LocationOrigin): Int = when (origin) {
-    LocationOrigin.DEVICE_GPS -> R.string.location_source_gps
-    LocationOrigin.AREA_SELECTION -> R.string.location_source_area
-    LocationOrigin.MANUAL_ENTRY -> R.string.location_source_manual
 }
 
 private fun freshnessRes(freshness: LocationFreshness): Int = when (freshness) {

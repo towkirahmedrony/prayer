@@ -44,7 +44,9 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaBearing
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaLocationState
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaPhase
+import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
+import io.github.towkirahmedrony.salah.feature.common.sourceLabelRes
 import io.github.towkirahmedrony.salah.feature.qibla.components.QiblaCompassDial
 import org.koin.androidx.compose.koinViewModel
 import java.time.Instant
@@ -225,6 +227,7 @@ private fun CompassCard(state: QiblaUiState) {
             qiblaDegrees = bearingDegrees,
             isAligned = isAligned,
             isLive = state.isDialLive,
+            accessibilityLabel = dialDescription(bearingDegrees = bearingDegrees, heading = heading),
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -402,6 +405,21 @@ private fun LocationCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
+                // How the position was obtained, stated explicitly. A GPS observation, a typed
+                // coordinate and an administrative area's published centre make three different
+                // claims about what Salah knows, so they are never collapsed into one word. The same
+                // mapping names the source on the location screen, so the two cannot disagree.
+                MetricRow(
+                    label = stringResource(R.string.qibla_location_source_label),
+                    value = stringResource(location.location.origin.sourceLabelRes()),
+                )
+
+                if (location.location.origin == LocationOrigin.AREA_SELECTION) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    SalahUnavailableNote(text = stringResource(R.string.qibla_location_area_note))
+                }
+
                 if (location.freshness.shouldOfferRefresh) {
                     Spacer(modifier = Modifier.height(6.dp))
                     SalahUnavailableNote(text = stringResource(R.string.qibla_location_not_current))
@@ -638,6 +656,37 @@ private fun MetricRow(label: String, value: String) {
 
 /** Tolerance within which the device is treated as facing the Qibla. */
 private const val ALIGNMENT_TOLERANCE_DEGREES = 5.0
+
+/**
+ * What a screen reader should say for the dial.
+ *
+ * The dial is a `Canvas` and carries no text of its own, so without this it is invisible to
+ * accessibility services — a user relying on TalkBack would hear the turn summary but never the bearing
+ * and heading the dial is drawing. The summary is built from the same two values the dial renders, and
+ * it names them rather than describing the picture, because "a green wedge" would be a description of
+ * the drawing rather than of the reading.
+ *
+ * The cases are separate rather than one sentence with blanks, so the announcement never claims a
+ * heading that is not being measured.
+ */
+@Composable
+private fun dialDescription(bearingDegrees: Double?, heading: QiblaHeadingUi?): String {
+    val trueHeading = heading?.trueDegrees
+    return when {
+        bearingDegrees == null -> stringResource(R.string.qibla_dial_description_no_bearing)
+
+        trueHeading == null -> stringResource(
+            R.string.qibla_dial_description_no_heading,
+            formatTenths(bearingDegrees),
+        )
+
+        else -> stringResource(
+            R.string.qibla_dial_description,
+            formatTenths(bearingDegrees),
+            formatTenths(trueHeading),
+        )
+    }
+}
 
 /**
  * Renders how the position was obtained, when it was taken and how accurate it was.

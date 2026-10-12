@@ -396,6 +396,11 @@
     <string name="qibla_distance_label">Distance to the Kaaba</string>
     <string name="qibla_distance_value">%1$s km</string>
 
+    <!-- Spoken description of the dial, for a screen reader: a Canvas has no text of its own. -->
+    <string name="qibla_dial_description">Qibla dial. Bearing %1$s° from true north; device heading %2$s° from true north.</string>
+    <string name="qibla_dial_description_no_heading">Qibla dial. Bearing %1$s° from true north. No device heading yet.</string>
+    <string name="qibla_dial_description_no_bearing">Qibla dial. No bearing calculated yet.</string>
+
     <string name="qibla_error_invalid_coordinates">The stored coordinates are not valid, so no bearing can be calculated.</string>
     <string name="qibla_error_at_kaaba">You are at the Kaaba reference point itself, where the direction to it is undefined.</string>
     <string name="qibla_error_antipodal">You are at the point furthest from the Kaaba on Earth, where every direction towards it is the same distance and no single bearing exists.</string>
@@ -423,13 +428,21 @@
     <string name="qibla_location_permission_denied">Location access is not allowed. Enter coordinates below instead: the Qibla bearing needs a position, not a permission.</string>
     <string name="qibla_location_unavailable_body">No position could be obtained. Enter coordinates below, or try again.</string>
     <string name="qibla_location_not_current">This is a saved position, not a current reading.</string>
-    <string name="qibla_location_declared">Entered by hand</string>
+    <!--
+      Neutral on purpose. A declared location is either a typed coordinate or a selected
+      administrative area, and which one is now said separately by qibla_location_source_label, so
+      this line must not claim either. It read "Entered by hand", which was wrong for an area
+      selection — that coordinate is the area's published centre, not something the user typed.
+    -->
+    <string name="qibla_location_declared">Chosen by you</string>
     <string name="qibla_location_fresh">Updated just now</string>
     <string name="qibla_location_saved">Saved position</string>
     <string name="qibla_location_unknown_time">Saved position, time not recorded</string>
     <string name="qibla_location_updated">%1$s</string>
     <string name="qibla_location_accuracy">±%1$s m</string>
     <string name="qibla_coordinates">%1$s°, %2$s°</string>
+    <string name="qibla_location_source_label">Source</string>
+    <string name="qibla_location_area_note">This location is the published reference point of the administrative area you selected, not an exact position. The bearing is calculated from that point, and the difference it makes to a Qibla bearing is far smaller than a compass can show.</string>
     <string name="qibla_location_allow">Allow location access</string>
     <string name="qibla_location_refresh">Refresh location</string>
     <string name="qibla_location_requesting">Getting your location…</string>

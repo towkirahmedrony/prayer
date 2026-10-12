@@ -110,4 +110,73 @@
     <string name="location_upazila_label">উপজেলা / থানা</string>
     <string name="location_time_zone_label">সময় অঞ্চল</string>
     <string name="location_accuracy_label">নির্ভুলতা</string>
+
+    <!--
+      Qibla compass — short, unambiguous labels only.
+
+      This follows the policy recorded at the top of this file and in app/lint.xml: the strings
+      translated here name things (sections, readings, sensors, accuracy levels, buttons and fields),
+      and the ones that state what an estimate means, what a reading does not prove, or what Salah
+      cannot verify stay in English until they can be reviewed. The Qibla screen's explanatory
+      paragraphs, its error explanations and its accuracy-claim wording are therefore untranslated on
+      purpose rather than by omission.
+
+      shortcut_qibla is deliberately absent: it is the Qibla screen's own title and the Home and Tools
+      tile, and no shortcut_* tile in Salah is translated yet, so translating only this one would make
+      one screen's heading the odd one out.
+    -->
+    <string name="qibla_section_compass">কম্পাস</string>
+    <string name="qibla_section_location">অবস্থান</string>
+    <string name="qibla_section_sensor">কম্পাস সেন্সর</string>
+    <string name="qibla_section_limits">নির্ভুলতা ও সীমাবদ্ধতা</string>
+
+    <string name="qibla_status_initial">এখনও অবস্থান নেই</string>
+    <string name="qibla_status_requesting_location">আপনার অবস্থান নেওয়া হচ্ছে…</string>
+    <string name="qibla_status_permission_denied">অবস্থানের অনুমতি নেই</string>
+    <string name="qibla_status_location_unavailable">অবস্থান পাওয়া যাচ্ছে না</string>
+    <string name="qibla_status_calculation_error">দিক পাওয়া যায়নি</string>
+    <string name="qibla_status_sensor_unavailable">কম্পাস সেন্সর নেই</string>
+    <string name="qibla_status_awaiting_heading">কম্পাসের অপেক্ষায়</string>
+    <string name="qibla_status_calibration_recommended">ক্যালিব্রেশন প্রয়োজন</string>
+    <string name="qibla_status_operational">কম্পাস চালু</string>
+
+    <string name="qibla_bearing_label">কিবলার দিক</string>
+    <string name="qibla_heading_label">ডিভাইসের দিক</string>
+    <string name="qibla_distance_label">কাবার দূরত্ব</string>
+    <string name="qibla_sensor_detected">সেন্সর</string>
+    <string name="qibla_sensor_magnetic_accuracy">চৌম্বকীয় নির্ভুলতা</string>
+    <string name="qibla_sensor_rotation_vector">রোটেশন ভেক্টর (ফিউজড)</string>
+    <string name="qibla_sensor_geomagnetic">জিওম্যাগনেটিক রোটেশন ভেক্টর</string>
+    <string name="qibla_sensor_accelerometer_magnetic">অ্যাক্সিলেরোমিটার ও চৌম্বক ক্ষেত্র</string>
+    <string name="qibla_accuracy_unknown">অজানা</string>
+    <string name="qibla_accuracy_unreliable">অনির্ভরযোগ্য</string>
+    <string name="qibla_accuracy_low">কম</string>
+    <string name="qibla_accuracy_medium">মাঝারি</string>
+    <string name="qibla_accuracy_high">উচ্চ</string>
+
+    <string name="qibla_location_source_label">উৎস</string>
+    <string name="qibla_location_declared">আপনার নির্বাচিত</string>
+    <string name="qibla_location_fresh">এইমাত্র হালনাগাদ</string>
+    <string name="qibla_location_saved">সংরক্ষিত অবস্থান</string>
+    <string name="qibla_location_unknown_time">সংরক্ষিত অবস্থান, সময় লেখা নেই</string>
+    <string name="qibla_location_allow">অবস্থান ব্যবহারের অনুমতি দিন</string>
+    <string name="qibla_location_refresh">অবস্থান হালনাগাদ করুন</string>
+    <string name="qibla_location_requesting">অবস্থান নেওয়া হচ্ছে…</string>
+    <string name="qibla_location_settings">অবস্থান সেটিংস</string>
+
+    <string name="qibla_manual_title">স্থানাঙ্ক লিখুন</string>
+    <string name="qibla_manual_label">নাম</string>
+    <string name="qibla_manual_latitude">অক্ষাংশ</string>
+    <string name="qibla_manual_longitude">দ্রাঘিমাংশ</string>
+    <string name="qibla_manual_time_zone">সময় অঞ্চল</string>
+    <string name="qibla_manual_save">অবস্থান সংরক্ষণ করুন</string>
+    <string name="qibla_manual_clear">অবস্থান মুছুন</string>
+
+    <string name="qibla_msg_location_saved">অবস্থান সংরক্ষিত হয়েছে।</string>
+    <string name="qibla_msg_location_rejected">অবস্থানটি গ্রহণ করা হয়নি।</string>
+    <string name="qibla_msg_location_cleared">অবস্থান মুছে ফেলা হয়েছে।</string>
+    <string name="qibla_msg_device_acquired">এই ডিভাইস থেকে অবস্থান হালনাগাদ হয়েছে।</string>
+
+    <string name="qibla_calibration_dismiss">আপাতত বন্ধ করুন</string>
+    <string name="qibla_message_dismiss">বন্ধ করুন</string>
 </resources>

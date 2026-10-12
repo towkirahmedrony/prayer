@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -41,6 +43,12 @@ import kotlin.math.sin
  * **What it refuses to do.** When [isLive] is false the dial is drawn without rotation and the
  * marker is hidden, rather than animated from a heading that is not being measured. A dial that
  * moved on its own would be the most convincing kind of wrong.
+ *
+ * **Accessibility.** A `Canvas` draws pixels, not text, so nothing here reaches an accessibility
+ * service on its own. [accessibilityLabel] is what a screen reader announces in its place; it is
+ * required rather than optional because a dial nobody can read is worse than no dial, and it is
+ * supplied by the caller because only the caller knows the bearing and heading in the same terms the
+ * rest of the screen uses.
  */
 @Composable
 fun QiblaCompassDial(
@@ -48,6 +56,7 @@ fun QiblaCompassDial(
     qiblaDegrees: Double?,
     isAligned: Boolean,
     isLive: Boolean,
+    accessibilityLabel: String,
     modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
@@ -62,7 +71,8 @@ fun QiblaCompassDial(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(percent = 50)),
+            .clip(RoundedCornerShape(percent = 50))
+            .semantics { contentDescription = accessibilityLabel },
     ) {
         val centre = Offset(size.width / 2f, size.height / 2f)
         val radius = minOf(size.width, size.height) / 2f
