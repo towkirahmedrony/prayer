@@ -60,11 +60,16 @@ class FakeLocationProvider(
         return result
     }
 
-    /** A successful fix at [point], with the given accuracy and acquisition time. */
+    /**
+     * A successful fix at [point], with the given accuracy and acquisition time.
+     *
+     * [acquiredAtEpochMillis] may be `null` to model a provider that reported no time, which the app
+     * must treat as unknown freshness rather than as a fresh reading.
+     */
     fun fixAt(
         point: GeoPoint,
         accuracyMetres: Double? = 12.0,
-        acquiredAtEpochMillis: Long = FIX_TIMESTAMP,
+        acquiredAtEpochMillis: Long? = FIX_TIMESTAMP,
     ) {
         result = LocationAcquisitionResult.Acquired(
             latitude = point.latitude,

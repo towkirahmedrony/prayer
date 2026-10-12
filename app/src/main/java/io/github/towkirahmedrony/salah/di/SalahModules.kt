@@ -294,6 +294,7 @@ val salahModules = module {
     viewModel {
         QiblaViewModel(
             locations = get(),
+            areaCatalog = get(),
             compassSensor = get(),
             locationProvider = get(),
             permissionChecker = get(),

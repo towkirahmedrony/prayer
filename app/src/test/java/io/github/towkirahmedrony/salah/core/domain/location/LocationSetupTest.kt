@@ -1,153 +1,168 @@
 package io.github.towkirahmedrony.salah.core.domain.location
 
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.DISTRICT_CUTOFF
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.GEO_RADIUS_M
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.GPS_LAT
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.GPS_LON
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.INCLUDE_DENY
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.NEARBY_CUTOFF
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.NEARBY_GPS
-import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy.Companion.RADIUS_DEG
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.LocationOrigin
+import io.github.towkirahmedrony.salah.testing.syntheticDataset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
-import java.time.ZoneId
 
+/**
+ * The derived setup gate: whether Salah can use the stored location, and if not, why.
+ *
+ * "Derived" is the point — the answer comes from the location itself rather than a stored flag, so a
+ * usable location and a completed setup can never disagree.
+ */
 class LocationSetupTest {
 
+    private val dataset = syntheticDataset()
+
     @Test
-    fun `first launch has no saved location and starts at the setup gate`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        assertEquals("New installation is not set up", LocationSetupState.NOT_SETUP, e.state)
-        assertEquals("New installation has no location", LocationInfo(), e.location)
-        assertEquals("New installation is not revalidated", false, e.revalidated)
-        assertEquals("Eternal last-used timestamp", 0L, e.lastUsedAt)
+    fun `no stored location with a usable dataset requires setup`() {
+        val state = LocationSetup.evaluate(stored = null, dataset = dataset)
+
+        assertEquals(LocationSetupState.Required(reason = LocationSetupReason.NO_LOCATION), state)
+        assertTrue(state.requiresSetup)
     }
 
     @Test
-    fun `manual completion without GPS permission survives`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val chosen = LocationInfo(
-            locationSource = LocationSource.MANUAL,
-            locationAccuracyMeters = null,
-            lastGpsFixAt = null,
-            locationMetadata = LocationMetadata.STALE,
-        )
-        val result = e.tryCompleteManual(chosen, instant(1_700_000_000))
-        assertEquals("Manual completion is complete but not valid yet", LocationSetupState.MANUAL_COMPLETE, result.state)
-        assertEquals("Manual completion is not revalidated", false, result.revalidated)
-        assertEquals("Manual completion keeps the chosen location", chosen, result.location)
-        assertTrue("Manual completion updates last used timestamp", result.lastUsedAt > 0L)
+    fun `no stored location and no dataset reports the dataset as unavailable`() {
+        val state = LocationSetup.evaluate(stored = null, dataset = null)
+
+        assertTrue(state is LocationSetupState.DatasetUnavailable)
+        assertTrue(state.requiresSetup)
     }
 
     @Test
-    fun `GPS completion validates the fix and completes setup`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val g = LocationGpsFix(
-            latitudeDegrees = 23.8103,
-            longitudeDegrees = 90.4125,
-            accuracyMeters = 12.0,
-            timestamp = instant(1_700_000_000),
+    fun `no stored location and an unusable dataset reports the dataset as unavailable`() {
+        val unusable = BangladeshLocationDataset.parse(
+            version = "test-unusable",
+            areasText = "DIVISION\tBD10\tBD\tKhulna\t\t22.80\t89.30",
+            boundaryText = "",
         )
-        val location = LocationInfo(
-            locationSource = LocationSource.GPS,
-            locationAccuracyMeters = 12.0,
-            lastGpsFixAt = g.timestamp,
-            locationMetadata = LocationMetadata.FRESH,
-        )
-        val result = e.tryGpsComplete(g, location, instant(1_700_000_000))
-        assertEquals("Valid GPS fix completes setup", LocationSetupState.SETUP_COMPLETE, result.state)
-        assertEquals("GPS state sets the location", location, result.location)
-        assertTrue("GPS state revalidates", result.revalidated)
-        assertEquals("GPS state updates last used", result.lastUsedAt, g.timestamp.toEpochMilli())
+
+        assertFalse(unusable.isUsable)
+        assertTrue(LocationSetup.evaluate(stored = null, dataset = unusable) is LocationSetupState.DatasetUnavailable)
     }
 
     @Test
-    fun `GPS outside Bangladesh is rejected and the user can retry`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val g = LocationGpsFix(
-            latitudeDegrees = 22.5726,
-            longitudeDegrees = 88.3639,
-            accuracyMeters = 20.0,
-            timestamp = instant(1_700_000_000),
+    fun `a stored location outside the coarse bounds is rejected as unsupported`() {
+        val london = location("London", 51.5074, -0.1278)
+
+        val state = LocationSetup.evaluate(stored = london, dataset = dataset)
+
+        assertEquals(
+            LocationSetupState.Required(reason = LocationSetupReason.OUTSIDE_SUPPORTED_COUNTRY, stored = london),
+            state,
         )
-        val location = LocationInfo(
-            locationSource = LocationSource.GPS,
-            locationAccuracyMeters = 20.0,
-            lastGpsFixAt = g.timestamp,
-            locationMetadata = LocationMetadata.OUT_OF_COUNTRY,
-        )
-        val result = e.tryGpsComplete(g, location, instant(1_700_000_000))
-        assertEquals("Out-of-country GPS is not setup", LocationSetupState.NOT_SETUP, result.state)
-        assertEquals("Out-of-country GPS keeps the stale pseudo-location", LocationInfo(), result.location)
+        assertTrue(state.requiresSetup)
     }
 
     @Test
-    fun `denied permissions do not block manual completion`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val t = LocationDeniedState(INCLUDE_DENY, Clock.REAL)
-        val result = e.tryDenied(t)
-        assertEquals("Denied permission keeps the existing state", LocationSetupState.NOT_SETUP, result.state)
-        assertTrue("Denied permission is revalidated", result.revalidated)
-        assertEquals("Denied permission clears cached GPS fix", 0L, result.lastUsedAt)
-        assertTrue("Denied permission clears cached last used", result.lastUsedAt > 0L)
+    fun `a stored location inside the boundary is complete`() {
+        val kumarkhali = location("Kumarkhali", 23.86, 89.24)
+
+        val state = LocationSetup.evaluate(stored = kumarkhali, dataset = dataset)
+
+        assertEquals(LocationSetupState.Complete(kumarkhali), state)
+        assertFalse(state.requiresSetup)
     }
 
     @Test
-    fun `manual completion clears the cached GPS fix`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val g = LocationGpsFix(23.8103, 90.4125, 12.0, instant(1_000))
-        e.tryGpsComplete(g, LocationInfo(), instant(1_000))
-        val result = e.tryCompleteManual(LocationInfo(), instant(1_000))
-        assertEquals("Manual completion clears the cached GPS fix", 0L, result.lastUsedAt)
+    fun `a stored location inside the coarse bounds but well outside the boundary is rejected`() {
+        // Inside the country's bounding rectangle, but far outside the bundled boundary polygon.
+        val bad = location("Elsewhere", 26.0, 92.0)
+
+        val state = LocationSetup.evaluate(stored = bad, dataset = dataset)
+
+        assertEquals(
+            LocationSetupState.Required(reason = LocationSetupReason.OUTSIDE_SUPPORTED_COUNTRY, stored = bad),
+            state,
+        )
     }
 
     @Test
-    fun `revalidation detects a stale location after a dataset version change`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val g = LocationGpsFix(23.8103, 90.4125, 12.0, instant(1_000))
-        e.tryGpsComplete(g, LocationInfo(), instant(1_000))
-        val v1 = LocationSetupState.SETUP_COMPLETE
-        val v2 = LocationSetupState.SETUP_COMPLETE
-        val stale = LocationSetupEntity(
-            state = v1,
-            location = LocationInfo(),
-            revalidated = true,
-            lastUsedAt = 1700000000L,
-            datasetVersion = "0.0.9",
-        )
-        val fresh = LocationSetupEntity(
-            state = v1,
-            location = LocationInfo(),
-            revalidated = false,
-            lastUsedAt = 1700000000L,
-            datasetVersion = "0.1.0",
-        )
-        assertTrue("Revalidation treats the stale dataset as invalid", stale.revalidate("0.1.0").state is LocationSetupState.SETUP_COMPLETE)
-        assertTrue("Revalidation treats the current dataset as valid", fresh.revalidate("0.1.0").state is LocationSetupState.SETUP_COMPLETE)
+    fun `a stored location within the boundary tolerance is kept`() {
+        // ~2 km east of the synthetic boundary's eastern edge: outside the polygon, inside the
+        // tolerance. The legitimate border-adjacent case must not be thrown away.
+        val nearBorder = location("Near the border", 23.5, 90.02)
+
+        val state = LocationSetup.evaluate(stored = nearBorder, dataset = dataset)
+
+        assertEquals(LocationSetupState.Complete(nearBorder), state)
     }
 
     @Test
-    fun `revalidation restores the saved location when geography changed`() {
-        val e = LocationSetupEntity.empty(CLOCK, ZoneId.systemDefault())
-        val g = LocationGpsFix(23.8103, 90.4125, 12.0, instant(1_000))
-        e.tryGpsComplete(g, LocationInfo(), instant(1_000))
-        val stale = LocationSetupEntity(
-            state = LocationSetupState.SETUP_COMPLETE,
-            location = LocationInfo(),
-            revalidated = true,
-            lastUsedAt = 1700000000L,
-            datasetVersion = "0.0.9",
+    fun `a stored location whose area the dataset no longer recognises is reported`() {
+        val missingArea = location(
+            label = "Kushtia",
+            latitude = 23.86,
+            longitude = 89.24,
+            area = BangladeshAreaRef(
+                divisionId = "BD10",
+                divisionName = "Khulna",
+                districtId = "BD1001",
+                districtName = "Kushtia",
+                upazilaId = "BD9999999",
+                upazilaName = "Ghost",
+            ),
         )
-        val recovered = stale.revalidate("0.1.0")
-        assertEquals("Revalidation restores the saved location", recovered.state, LocationSetupState.SETUP_COMPLETE)
-        assertEquals("Revalidation restores the saved location", recovered.location, LocationInfo())
-        assertTrue("Revalidation clears the stale flag", recovered.revalidated)
+
+        val state = LocationSetup.evaluate(stored = missingArea, dataset = dataset)
+
+        assertEquals(
+            LocationSetupState.Required(reason = LocationSetupReason.AREA_NOT_IN_DATASET, stored = missingArea),
+            state,
+        )
     }
+
+    @Test
+    fun `a stored location whose area the dataset recognises is complete`() {
+        val division = requireNotNull(dataset.area("BD10"))
+        val district = requireNotNull(dataset.area("BD1001"))
+        val upazila = requireNotNull(dataset.area("BD1001001"))
+        val withArea = location(
+            label = "Kumarkhali",
+            latitude = 23.86,
+            longitude = 89.24,
+            area = BangladeshAreaRef.of(division, district, upazila),
+        )
+
+        assertEquals(LocationSetupState.Complete(withArea), LocationSetup.evaluate(withArea, dataset))
+    }
+
+    @Test
+    fun `a usable location survives an unreadable dataset`() {
+        // A dataset that failed to load must not lock out a user whose coordinates are already valid.
+        val dhaka = location("Inside the bounds", 23.5, 89.0)
+
+        assertEquals(LocationSetupState.Complete(dhaka), LocationSetup.evaluate(stored = dhaka, dataset = null))
+    }
+
+    @Test
+    fun `an area-less location inside the bounds is complete without an area check`() {
+        val plain = location("Manual", 23.5, 89.0)
+
+        assertNull(plain.area)
+        assertEquals(LocationSetupState.Complete(plain), LocationSetup.evaluate(stored = plain, dataset = dataset))
+    }
+
+    private fun location(
+        label: String,
+        latitude: Double,
+        longitude: Double,
+        area: BangladeshAreaRef? = null,
+    ): LocationInfo = requireNotNull(
+        LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            timeZoneId = "Asia/Dhaka",
+            origin = LocationOrigin.MANUAL_ENTRY,
+            area = area,
+        ),
+    )
 }
-
-private fun instant(millisSinceEpoch: Long): Instant = Instant.ofEpochMilli(millisSinceEpoch)

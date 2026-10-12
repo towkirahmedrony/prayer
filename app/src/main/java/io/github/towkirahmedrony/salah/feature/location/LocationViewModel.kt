@@ -22,6 +22,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -130,23 +131,39 @@ class LocationViewModel(
      * [LocationAcquisitionResult.PermissionDenied] rather than throwing, so the same path reports it.
      */
     fun useCurrentLocation() {
+        // One acquisition at a time. A second tap while a fix is already in flight is ignored rather
+        // than starting a second request: the two would race to set `pendingFix`, and the loser could
+        // replace the fix the user is looking at.
+        if (transient.value.isAcquiring) return
         transient.update { it.copy(isAcquiring = true, message = null) }
         viewModelScope.launch {
-            refreshPermissionState()
-            logger.info(
-                SalahDiagnosticEvents.LOCATION_SETUP_EVALUATED,
-                mapOf("action" to "device_location_requested"),
-            )
-            val result = runCatching { locationProvider.currentLocation(GPS_TIMEOUT) }
-                .getOrElse { error -> LocationAcquisitionResult.Failed(error.javaClass.simpleName) }
-            when (result) {
-                is LocationAcquisitionResult.Acquired -> onFixAcquired(result)
-                LocationAcquisitionResult.TimedOut -> show(LocationMessage.TimedOut)
-                LocationAcquisitionResult.PermissionDenied -> show(LocationMessage.PermissionDenied)
-                LocationAcquisitionResult.ServicesDisabled -> show(LocationMessage.ServicesDisabled)
-                is LocationAcquisitionResult.Failed -> show(LocationMessage.ProviderFailed)
+            try {
+                refreshPermissionState()
+                logger.info(
+                    SalahDiagnosticEvents.LOCATION_SETUP_EVALUATED,
+                    mapOf("action" to "device_location_requested"),
+                )
+                val result = try {
+                    locationProvider.currentLocation(GPS_TIMEOUT)
+                } catch (cancellation: CancellationException) {
+                    // Cancellation is not a provider failure: rethrow so the coroutine is genuinely
+                    // cancelled instead of being reported as a failed fix.
+                    throw cancellation
+                } catch (error: Exception) {
+                    LocationAcquisitionResult.Failed(error.javaClass.simpleName)
+                }
+                when (result) {
+                    is LocationAcquisitionResult.Acquired -> onFixAcquired(result)
+                    LocationAcquisitionResult.TimedOut -> show(LocationMessage.TimedOut)
+                    LocationAcquisitionResult.PermissionDenied -> show(LocationMessage.PermissionDenied)
+                    LocationAcquisitionResult.ServicesDisabled -> show(LocationMessage.ServicesDisabled)
+                    is LocationAcquisitionResult.Failed -> show(LocationMessage.ProviderFailed)
+                }
+            } finally {
+                // Cleared on every outcome — success, failure, timeout and cancellation — so the
+                // acquiring state can never get stuck and block the next tap.
+                transient.update { it.copy(isAcquiring = false) }
             }
-            transient.update { it.copy(isAcquiring = false) }
         }
     }
 
@@ -171,7 +188,8 @@ class LocationViewModel(
         // Coarse bounds are consulted when the boundary file is missing: they can reject with
         // certainty, and rejecting a position 3 000 km away needs no boundary. They never establish
         // that a position is inside Bangladesh, so such a fix is stored without a country code.
-        val verified = check is BangladeshCheck.Supported
+        val verified = check is BangladeshCheck.Inside
+        val withinTolerance = check is BangladeshCheck.WithinBoundaryTolerance
         val insideCoarseBounds = BangladeshLocationPolicy.isWithinCoarseBounds(point)
         val rejectionDistance = (check as? BangladeshCheck.Outside)?.distanceMetres
 
@@ -216,6 +234,7 @@ class LocationViewModel(
                     resolution = resolution,
                     countryCode = if (verified) BangladeshLocationPolicy.COUNTRY_CODE else null,
                     isCountryVerified = verified,
+                    isWithinBoundaryTolerance = withinTolerance,
                 ),
                 message = null,
             )
@@ -417,7 +436,8 @@ class LocationViewModel(
             accuracyText = LocationFormatting.accuracy(location.accuracyMetres),
             coordinateText = LocationFormatting.coordinates(point),
             freshness = LocationFreshness.of(location, clock.instant()),
-            isVerifiedInSupportedCountry = check is BangladeshCheck.Supported,
+            isVerifiedInSupportedCountry = check is BangladeshCheck.Inside,
+            isWithinBoundaryTolerance = check is BangladeshCheck.WithinBoundaryTolerance,
             isKnownOutsideSupportedCountry = outsideCoarseBounds || check is BangladeshCheck.Outside,
         )
     }

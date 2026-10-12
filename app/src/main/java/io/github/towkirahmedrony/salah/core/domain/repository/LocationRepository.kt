@@ -37,8 +37,9 @@ interface LocationRepository {
      * `acquiredAt` exist precisely so it survives storage.
      *
      * @param accuracyMetres reported horizontal accuracy, or `null` when the provider gave none.
-     * @param acquiredAtEpochMillis when the fix was obtained. Required rather than optional: a
-     *   device fix with no time cannot be aged, so the UI would have to present it as current.
+     * @param acquiredAtEpochMillis when the fix was obtained, or `null` (or a non-positive value)
+     *   when the platform did not record one. A fix with no time is stored with no acquisition time,
+     *   so it ages as unknown rather than being silently presented as a current reading.
      * @return `true` when the input was valid and stored, `false` when it was rejected.
      */
     suspend fun saveDeviceLocation(
@@ -47,7 +48,7 @@ interface LocationRepository {
         longitude: Double,
         timeZoneId: String,
         accuracyMetres: Double?,
-        acquiredAtEpochMillis: Long,
+        acquiredAtEpochMillis: Long?,
         /**
          * The country the coordinates were accepted as being in, or `null` when no check ran.
          *

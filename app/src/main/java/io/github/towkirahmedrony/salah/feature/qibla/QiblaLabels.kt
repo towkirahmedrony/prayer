@@ -70,6 +70,8 @@ fun QiblaMessage.textRes(): Int = when (this) {
     QiblaMessage.LocationRejected -> R.string.qibla_msg_location_rejected
     QiblaMessage.LocationCleared -> R.string.qibla_msg_location_cleared
     QiblaMessage.DeviceLocationAcquired -> R.string.qibla_msg_device_acquired
+    QiblaMessage.OutsideSupportedCountry -> R.string.qibla_msg_outside_country
+    QiblaMessage.AreaNotAttributed -> R.string.qibla_msg_not_attributed
     QiblaMessage.PermissionDenied -> R.string.qibla_msg_permission_denied
     QiblaMessage.ServicesDisabled -> R.string.qibla_msg_services_disabled
     QiblaMessage.LocationTimedOut -> R.string.qibla_msg_timed_out

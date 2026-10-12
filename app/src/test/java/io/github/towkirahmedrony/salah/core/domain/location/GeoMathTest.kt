@@ -2,184 +2,189 @@ package io.github.towkirahmedrony.salah.core.domain.location
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.roundToInt
+import kotlin.math.acos
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
 
-/** Spherical earth used by the tests and the production code (WGS-84 mean radius). */
-private const val EARTH_RADIUS_M = 6371008.8
-
-private fun haversineM(latitudeDegrees: Double, longitudeDegrees: Double, otherLatitudeDegrees: Double, otherLongitudeDegrees: Double): Double {
-    val phi1 = Math.toRadians(latitudeDegrees)
-    val phi2 = Math.toRadians(otherLatitudeDegrees)
-    val deltaPhi = Math.toRadians(otherLatitudeDegrees - latitudeDegrees)
-    val deltaLambda = Math.toRadians(otherLongitudeDegrees - longitudeDegrees)
-    val a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-            Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2)
-    return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a))
-}
-
-private fun greatCircleM(latitudeDegrees: Double, longitudeDegrees: Double, otherLatitudeDegrees: Double, otherLongitudeDegrees: Double): Double {
-    val phi1 = Math.toRadians(latitudeDegrees)
-    val phi2 = Math.toRadians(otherLatitudeDegrees)
-    val deltaLambda = Math.toRadians(otherLongitudeDegrees - longitudeDegrees)
-    return EARTH_RADIUS_M * Math.acos(
-        Math.max(-1.0, Math.min(1.0, Math.sin(phi1) * Math.sin(phi2) + Math.cos(phi1) * Math.cos(phi2) * Math.cos(deltaLambda)))
-    )
-}
-
+/**
+ * The geometry the location system is built on, tested as pure functions.
+ *
+ * Two of the distance checks compare against a second, independently written formula (the
+ * spherical law of cosines) so a mistake in the haversine implementation alone would be caught rather
+ * than agreeing with itself.
+ */
 class GeoMathTest {
 
     @Test
-    fun `distance between two points is positive and symmetric`() {
-        val d = GeoMath.distanceM(23.8103, 90.4125, 22.3569, 91.7832)
-        assertTrue("Dhaka -> Chattogram distance must be positive", d > 0)
-        assertEquals("Distance must be symmetric", d, haversineM(23.8103, 90.4125, 22.3569, 91.7832), 1.0)
-        assertEquals("Distance must match an independent great-circle computation", d, greatCircleM(23.8103, 90.4125, 22.3569, 91.7832), 1.0)
+    fun `the distance from a point to itself is zero`() {
+        val dhaka = GeoPoint(23.8103, 90.4125)
+
+        assertEquals(0.0, GeoMath.distanceMetres(dhaka, dhaka), 0.0)
     }
 
     @Test
-    fun `two identical points have zero distance`() {
-        assertEquals(0.0, GeoMath.distanceM(23.8, 90.4, 23.8, 90.4), 0.0)
+    fun `distance is symmetric and matches an independent haversine`() {
+        val dhaka = GeoPoint(23.8103, 90.4125)
+        val chattogram = GeoPoint(22.3569, 91.7832)
+
+        val distance = GeoMath.distanceMetres(dhaka, chattogram)
+
+        assertTrue("distance must be positive, got $distance", distance > 0.0)
+        assertEquals(distance, GeoMath.distanceMetres(chattogram, dhaka), 1e-6)
+        assertEquals(referenceHaversine(dhaka, chattogram), distance, 0.001)
+        assertEquals(referenceLawOfCosines(dhaka, chattogram), distance, 5.0)
     }
 
     @Test
-    fun `one degree of latitude is about 111 km at the equator`() {
-        val d = GeoMath.distanceM(0.0, 0.0, 1.0, 0.0)
-        val km = d / 1000.0
-        assertTrue("One degree of latitude should be near 111 km, got $km km", abs(km - 111.0) < 5.0)
+    fun `a short hop between two nearby points is a few kilometres`() {
+        // Gulshan to Banani, both inside Dhaka.
+        val metres = GeoMath.distanceMetres(GeoPoint(23.8103, 90.4125), GeoPoint(23.8053, 90.4042))
+
+        assertTrue("expected a sub-kilometre hop, got $metres m", metres in 900.0..2_000.0)
     }
 
     @Test
-    fun `distance to the Kaaba is approximately 5172 km from Dhaka`() {
-        val d = GeoMath.distanceM(23.8103, 90.4125, 21.4225, 39.8262) / 1000.0
-        assertTrue("Boston Masjid to Dhaka is ~5172 km according to the app's own calibration data", abs(d - 5172.0) < 40.0)
+    fun `one degree of latitude is about 111 km`() {
+        val metres = GeoMath.distanceMetres(GeoPoint(0.0, 0.0), GeoPoint(1.0, 0.0))
+
+        // A meridian degree is R * pi / 180 = 111 194.9 m on the sphere GeoMath uses.
+        assertTrue("one degree of latitude was $metres m", abs(metres - 111_194.9) < 200.0)
     }
 
     @Test
-    fun `distance to an adjacent upazila is a few kilometres`() {
-        val d = GeoMath.distanceM(23.8103, 90.4125, 23.9053, 90.3883) / 1000.0
-        assertTrue("Gulshan->Banani is a short hop", d > 4.0 && d < 9.0)
-    }
-}
+    fun `isInside accepts an interior point and rejects points outside the ring`() {
+        val square = square()
 
-class PointInAreaTest {
-
-    @Test
-    fun `a point inside Bangladesh is accepted`() {
-        val b = BangladeshLocationPolicy()
-        assertTrue("Center of Bangladesh should be inside", b.isPointInBangladesh(23.8, 90.4))
+        assertTrue(GeoMath.isInside(GeoPoint(23.5, 89.0), square))
+        assertFalse(GeoMath.isInside(GeoPoint(19.0, 89.0), square))
+        assertFalse(GeoMath.isInside(GeoPoint(23.5, 95.0), square))
     }
 
     @Test
-    fun `points near the border inside are accepted`() {
-        val b = BangladeshLocationPolicy()
-        assertTrue("Dhaka airport area is inside", b.isPointInBangladesh(23.9, 90.4))
-    }
-}
+    fun `isInside refuses a ring that cannot enclose an area`() {
+        val degenerate = listOf(GeoPoint(0.0, 0.0), GeoPoint(1.0, 1.0))
 
-class DistanceToBoundaryTest {
-
-    @Test
-    fun `a point inside is within the bounding box`() {
-        val b = BangladeshLocationPolicy()
-        assertTrue("Dhaka should be inside the country bounding box", b.distanceToBangladeshM(23.8, 90.4) >= 0.0)
+        assertFalse(GeoMath.isInside(GeoPoint(0.5, 0.5), degenerate))
+        assertFalse(GeoMath.isInside(GeoPoint(23.5, 89.0), emptyList()))
     }
 
     @Test
-    fun `points outside the bounding box are outside the country`() {
-        val b = BangladeshLocationPolicy()
-        assertTrue("West of Bangladesh should be outside", b.distanceToBangladeshM(23.8, 87.0) > 0.0)
-        assertTrue("North of Bangladesh should be outside", b.distanceToBangladeshM(26.5, 90.4) > 0.0)
-        assertTrue("East of Bangladesh should be outside", b.distanceToBangladeshM(23.8, 93.0) > 0.0)
-        assertTrue("South of Bangladesh should be outside", b.distanceToBangladeshM(20.5, 90.4) > 0.0)
+    fun `isInsideAny is true when any ring contains the point`() {
+        val rings = listOf(square(), farAwaySquare())
+
+        assertTrue(GeoMath.isInsideAny(GeoPoint(23.5, 89.0), rings))
+        assertTrue(GeoMath.isInsideAny(GeoPoint(10.5, 10.5), rings))
+        assertFalse(GeoMath.isInsideAny(GeoPoint(0.0, 0.0), rings))
     }
 
     @Test
-    fun `a point in the ocean just off the coast is just outside`() {
-        // Marquette point (South Khulna district coast) is ~5 km offshore from the exclusive economic zone.
-        val b = BangladeshLocationPolicy()
-        val offCoast = b.distanceToBangladeshM(21.8, 89.4)
-        assertTrue("A target 5-15 km off the coast is outside the accuracy band", offCoast > 1000.0 || offCoast < -1000.0)
-    }
-}
+    fun `distanceToBoundaryMetres is zero on an edge and grows with the offset`() {
+        val square = square()
 
-class BangladeshLocationPolicyTest {
+        assertEquals(0.0, GeoMath.distanceToBoundaryMetres(GeoPoint(22.0, 89.0), listOf(square)), 1.0)
 
-    private val policy = BangladeshLocationPolicy()
+        // About 2 km east of the lon = 90.0 edge, at latitude 23.5.
+        val near = GeoMath.distanceToBoundaryMetres(GeoPoint(23.5, 90.02), listOf(square))
+        assertTrue("expected roughly 2 km, got $near m", near in 1_000.0..3_000.0)
 
-    @Test
-    fun `Dhaka city coordinates are inside Bangladesh`() {
-        assertTrue("Dhaka road coordinates are inside Bangladesh", policy.isPointInBangladesh(23.8103, 90.4125))
+        // About 20 km east of the same edge.
+        val far = GeoMath.distanceToBoundaryMetres(GeoPoint(23.5, 90.20), listOf(square))
+        assertTrue("expected more than 15 km, got $far m", far > 15_000.0)
     }
 
     @Test
-    fun `Chattogram coordinates are inside Bangladesh`() {
-        assertTrue("Chattogram hill tracts coordinates are inside Bangladesh", policy.isPointInBangladesh(22.3569, 91.7832))
+    fun `distanceToBoundaryMetres is effectively unbounded when there are no rings`() {
+        assertEquals(
+            Double.MAX_VALUE,
+            GeoMath.distanceToBoundaryMetres(GeoPoint(0.0, 0.0), emptyList()),
+            0.0,
+        )
     }
 
     @Test
-    fun `Sylhet coordinates are inside Bangladesh`() {
-        assertTrue("Sylhet coordinates are inside Bangladesh", policy.isPointInBangladesh(24.8949, 91.8687))
+    fun `boundsOf covers every vertex and contains interior points`() {
+        val bounds = requireNotNull(GeoMath.boundsOf(listOf(square())))
+
+        assertEquals(22.0, bounds.minLatitude, 1e-9)
+        assertEquals(25.0, bounds.maxLatitude, 1e-9)
+        assertEquals(88.5, bounds.minLongitude, 1e-9)
+        assertEquals(90.0, bounds.maxLongitude, 1e-9)
+
+        assertTrue(bounds.contains(GeoPoint(23.5, 89.0)))
+        assertFalse(bounds.contains(GeoPoint(19.0, 89.0)))
+
+        // A margin widens the rectangle; without one, a point beyond the edge is excluded.
+        assertTrue(bounds.contains(GeoPoint(21.8, 89.0), marginDegrees = 0.3))
+        assertFalse(bounds.contains(GeoPoint(21.8, 89.0)))
     }
 
     @Test
-    fun `Cox's Bazar coordinates are inside Bangladesh`() {
-        assertTrue("Cox's Bazar coordinates are inside Bangladesh", policy.isPointInBangladesh(21.4397, 92.0058))
+    fun `boundsOf is null without any points`() {
+        assertNull(GeoMath.boundsOf(emptyList()))
     }
 
     @Test
-    fun `mainland India is outside Bangladesh`() {
-        assertFalse("Kolkata is outside Bangladesh", policy.isPointInBangladesh(22.5726, 88.3639))
+    fun `a point's finiteness requires both coordinates to be in range`() {
+        assertTrue(GeoPoint(23.5, 89.0).isFinite)
+        assertFalse(GeoPoint(91.0, 89.0).isFinite)
+        assertFalse(GeoPoint(23.5, 181.0).isFinite)
+        assertFalse(GeoPoint(Double.NaN, 89.0).isFinite)
+        assertFalse(GeoPoint(23.5, Double.POSITIVE_INFINITY).isFinite)
     }
 
-    @Test
-    fun `Nepal is outside Bangladesh`() {
-        assertFalse("Kathmandu is outside Bangladesh", policy.isPointInBangladesh(27.7172, 85.3240))
+    private fun square(): List<GeoPoint> = listOf(
+        GeoPoint(22.0, 88.5),
+        GeoPoint(22.0, 90.0),
+        GeoPoint(25.0, 90.0),
+        GeoPoint(25.0, 88.5),
+    )
+
+    private fun farAwaySquare(): List<GeoPoint> = listOf(
+        GeoPoint(10.0, 10.0),
+        GeoPoint(10.0, 11.0),
+        GeoPoint(11.0, 11.0),
+        GeoPoint(11.0, 10.0),
+    )
+
+    private fun referenceHaversine(from: GeoPoint, to: GeoPoint): Double {
+        val lat1 = from.latitude.toRadians()
+        val lat2 = to.latitude.toRadians()
+        val deltaLat = (to.latitude - from.latitude).toRadians()
+        val deltaLon = (to.longitude - from.longitude).toRadians()
+        val a = sin(deltaLat / 2).let { it * it } +
+            cos(lat1) * cos(lat2) * sin(deltaLon / 2).let { it * it }
+        return 2 * EARTH_RADIUS_METRES * asin(min(1.0, sqrt(a)))
     }
 
-    @Test
-    fun `Sri Lanka is outside Bangladesh`() {
-        assertFalse("Colombo is outside Bangladesh", policy.isPointInBangladesh(6.9271, 79.8612))
+    private fun referenceLawOfCosines(from: GeoPoint, to: GeoPoint): Double {
+        val lat1 = from.latitude.toRadians()
+        val lat2 = to.latitude.toRadians()
+        val deltaLon = (to.longitude - from.longitude).toRadians()
+        val centralAngle = acos(
+            max(
+                -1.0,
+                min(
+                    1.0,
+                    sin(lat1) * sin(lat2) + cos(lat1) * cos(lat2) * cos(deltaLon),
+                ),
+            ),
+        )
+        return EARTH_RADIUS_METRES * centralAngle
     }
 
-    @Test
-    fun `overlapping coordinates are treated as inside by the tolerance band`() {
-        // The tolerance band pulls overlapping COOARSE coordinates inside so a conservative fix
-        // (e.g. the Bangkok airport FCC fix at 13.6972, 100.6552) does not silently turn into Dhaka.
-        assertTrue("Tolerance should make overlapping coarse positions acceptable", policy.isPointInBangladesh(13.6972, 100.6552))
-    }
+    private fun Double.toRadians(): Double = this * PI / 180.0
 
-    @Test
-    fun `the independent reference coordinate set covers known Bangladesh locations`() {
-        val own = Kahnha_TestCoordinates.reference
-        assertTrue("Reference dataset must include Dhaka", own.inside(23.8103, 90.4125))
-        assertTrue("Reference dataset must include Chattogram", own.inside(22.3569, 91.7832))
-        assertTrue("Reference dataset must include Sylhet", own.inside(24.8949, 91.8687))
-        assertTrue("Reference dataset must include Cox's Bazar", own.inside(21.4397, 92.0058))
-        assertTrue("Reference dataset must include Khulna", own.inside(22.8409, 89.5621))
-        assertTrue("Reference dataset must include Rajshahi", own.inside(24.2870, 88.6467))
-        assertTrue("Reference dataset must include Rangpur", own.inside(25.7447, 89.2716))
-        assertTrue("Reference dataset must include Mymensingh", own.inside(24.7534, 90.4171))
-        assertTrue("Reference dataset must include Barisal", own.inside(22.7019, 89.3847))
-        assertTrue("Reference dataset must include Sylhet division excluding Dhaka", own.inside(24.5563, 91.8687))
-        assertTrue("Reference dataset must include Dhaka division excluding Chattogram", own.inside(23.7432, 90.4024))
-        assertTrue("Reference dataset must include Chattogram division excluding Sylhet", own.inside(22.3569, 91.7124))
-    }
-
-    @Test
-    fun `outside coordinates are rejected even when near the border`() {
-        // The tolerance band is narrow enough that a real Kolkata fix is not Bangladesh.
-        assertFalse("Kolkata is not inside Bangladesh despite the tolerance band", policy.isPointInBangladesh(22.5726, 88.3639))
-        assertFalse("Alipur is not inside Bangladesh despite the tolerance band", policy.isPointInBangladesh(24.9053, 88.5466))
-    }
-}
-
-class KhanhaTestCoordinates {
-
-    companion object {
-        val reference = BangladeshLocationPolicy()
+    private companion object {
+        /** IUGG mean earth radius in metres, matching `GeoMath.EARTH_RADIUS_METRES`. */
+        const val EARTH_RADIUS_METRES: Double = 6_371_008.8
     }
 }

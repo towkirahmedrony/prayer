@@ -59,6 +59,17 @@ sealed interface QiblaMessage {
     /** A device fix was obtained and stored. */
     data object DeviceLocationAcquired : QiblaMessage
 
+    /**
+     * A device fix was outside Bangladesh, so the stored location was kept instead of replaced.
+     *
+     * A distinct message from [DeviceLocationAcquired]: the user asked for a fix and none was saved,
+     * and saying "location updated" here would be false.
+     */
+    data object OutsideSupportedCountry : QiblaMessage
+
+    /** A device fix was inside Bangladesh but could not be attributed to an area, so nothing changed. */
+    data object AreaNotAttributed : QiblaMessage
+
     /** A device fix was requested without permission. */
     data object PermissionDenied : QiblaMessage
 

@@ -133,16 +133,18 @@ class AndroidLocationProvider(
     /**
      * Converts a platform fix.
      *
-     * `Location.time` is the UTC instant of the fix and is `0` when the provider did not set one;
-     * substituting the current time keeps the reading ageable instead of making it unusable, and the
-     * value is only ever used to decide whether to call a position current.
+     * `Location.time` is the UTC instant of the fix and is `0` when the provider did not set one. That
+     * `0` is preserved as "no recorded time" rather than being replaced with the current clock: a fix
+     * that may have been cached by the platform is then aged as unknown and offered a refresh, instead
+     * of being relabelled as a reading taken just now. The platform's own, valid time is passed through
+     * unchanged.
      */
     private fun Location.toAcquisitionResult(): LocationAcquisitionResult =
         LocationAcquisitionResult.Acquired(
             latitude = latitude,
             longitude = longitude,
             accuracyMetres = if (hasAccuracy()) accuracy.toDouble() else null,
-            acquiredAtEpochMillis = time.takeIf { it > 0L } ?: System.currentTimeMillis(),
+            acquiredAtEpochMillis = time.takeIf { it > 0L },
         )
 
     private fun LocationSource.toAndroidProvider(): String = when (this) {

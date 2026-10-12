@@ -104,6 +104,12 @@ object SalahDiagnosticEvents {
     /** A position could not be obtained. */
     const val QIBLA_LOCATION_FAILED = "qibla_location_failed"
 
+    /**
+     * A position was obtained but not adopted, so the stored location was kept. Logged with the
+     * rejection reason and distance, never the coordinates.
+     */
+    const val QIBLA_LOCATION_NOT_ADOPTED = "qibla_location_not_adopted"
+
     /** The location the bearing is currently calculated from changed. */
     const val QIBLA_LOCATION_SOURCE_CHANGED = "qibla_location_source_changed"
 

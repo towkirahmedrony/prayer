@@ -3,14 +3,32 @@ package io.github.towkirahmedrony.salah.core.domain.location
 /**
  * The result of asking whether a coordinate is a location Salah supports.
  *
- * Three outcomes, and the difference between the last two matters: "we checked and it is elsewhere"
- * is a different answer from "we could not check", and only one of them justifies telling the user
- * their location is unsupported.
+ * Four outcomes, and the differences between them matter: a point *inside* the boundary is a different
+ * claim from a point *within the tolerance* of it, and both are a different answer from "we checked"
+ * (outside) and "we could not check" (unavailable). Only [Outside] justifies telling the user their
+ * location is unsupported, and only [Inside] is reported as confirmed containment.
  */
 sealed interface BangladeshCheck {
 
-    /** The coordinate is inside Bangladesh, within the stated tolerance. */
-    data object Supported : BangladeshCheck
+    /**
+     * The coordinate is **strictly inside** the national boundary polygon.
+     *
+     * This is the only outcome that establishes Bangladesh, so it is the only one that may be reported
+     * to the user as a confirmed position inside the country.
+     */
+    data object Inside : BangladeshCheck
+
+    /**
+     * The coordinate is outside the boundary polygon but within [BOUNDARY_TOLERANCE_METRES] of it.
+     *
+     * The tolerance exists for GPS and boundary-simplification error, and it cuts both ways: a genuine
+     * Bangladeshi position a few hundred metres outside the simplified line lands here, and so does a
+     * position a few kilometres *inside* a neighbouring country. It is therefore deliberately a
+     * distinct outcome from [Inside] — accepted so that a border-adjacent fix is not thrown away, but
+     * never described as a verified position inside Bangladesh. [distanceMetres] is how far beyond the
+     * boundary the coordinate lies.
+     */
+    data class WithinBoundaryTolerance(val distanceMetres: Double) : BangladeshCheck
 
     /**
      * The coordinate is outside Bangladesh, [distanceMetres] beyond the boundary.
@@ -47,6 +65,15 @@ sealed interface BangladeshCheck {
  * tolerance is wider than the simplification error and far narrower than the distance at which a
  * wrong answer would matter, and the GPS screen additionally reports which area the position resolved
  * to so the user can see and correct the result.
+ *
+ * **Why tolerance-acceptance is not the same as containment.** Because the tolerance cuts both ways, a
+ * point within it may be a real Bangladeshi position just outside the simplified line *or* a point
+ * just over the border in another country — the tolerance cannot tell them apart. Reporting both as
+ * "inside Bangladesh" would make a false claim about the second. So the two are distinct outcomes:
+ * [BangladeshCheck.Inside] is strict containment, and [BangladeshCheck.WithinBoundaryTolerance] is the
+ * uncertainty allowance, which callers accept for *keeping* a position but never present as verified
+ * containment. The alternative — tightening the tolerance away — would reject genuine border villages
+ * instead, and would not fix the ambiguity, only move it.
  */
 object BangladeshLocationPolicy {
 
@@ -70,9 +97,13 @@ object BangladeshLocationPolicy {
      *
      * Five kilometres, chosen against two errors: the simplification itself moves the line by at most
      * a few hundred metres, and a GPS fix is uncertain by tens of metres; both are far below it. The
-     * tolerance is not a licence to accept a neighbouring country's territory — at 5 km it cannot
-     * reach any Bangladeshi city or district centre outside the border — it is the margin that keeps a
-     * border-adjacent village from being told it is abroad.
+     * tolerance is the margin that keeps a border-adjacent village from being told it is abroad.
+     *
+     * It is **not** a claim of containment, and it cannot be: the tolerance is symmetric, so territory
+     * a few kilometres inside a neighbouring country falls within it too. The bundled data confirms
+     * this — the Indian city of Agartala is about 3.4 km from the simplified line and so is inside the
+     * tolerance. That is exactly why [BangladeshCheck.WithinBoundaryTolerance] is kept distinct from
+     * [BangladeshCheck.Inside] and is never reported as a verified position inside Bangladesh.
      */
     const val BOUNDARY_TOLERANCE_METRES: Double = 5_000.0
 
@@ -80,16 +111,21 @@ object BangladeshLocationPolicy {
      * Checks [point] against [boundaryRings].
      *
      * The polygon test comes first and the distance test only decides the answer when the polygon says
-     * "outside", so the common cases cost one traversal.
+     * "outside", so the common cases cost one traversal. Strict containment returns
+     * [BangladeshCheck.Inside]; an outside point within the tolerance returns
+     * [BangladeshCheck.WithinBoundaryTolerance]; anything further out returns
+     * [BangladeshCheck.Outside].
      */
     fun check(point: GeoPoint, boundaryRings: List<List<GeoPoint>>): BangladeshCheck {
         if (!point.isFinite) return BangladeshCheck.BoundaryUnavailable
         if (boundaryRings.isEmpty()) return BangladeshCheck.BoundaryUnavailable
 
-        if (GeoMath.isInsideAny(point, boundaryRings)) return BangladeshCheck.Supported
+        if (GeoMath.isInsideAny(point, boundaryRings)) return BangladeshCheck.Inside
 
         val distance = GeoMath.distanceToBoundaryMetres(point, boundaryRings)
-        if (distance <= BOUNDARY_TOLERANCE_METRES) return BangladeshCheck.Supported
+        if (distance <= BOUNDARY_TOLERANCE_METRES) {
+            return BangladeshCheck.WithinBoundaryTolerance(distanceMetres = distance)
+        }
         return BangladeshCheck.Outside(distanceMetres = distance)
     }
 

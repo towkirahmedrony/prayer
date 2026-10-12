@@ -97,16 +97,11 @@
     <string name="location_picker_step_division">বিভাগ</string>
     <string name="location_picker_step_district">জেলা</string>
     <string name="location_picker_step_upazila">উপজেলা / থানা</string>
-    <string name="location_picker_choose_division">বিভাগ নির্বাচন করুন</string>
-    <string name="location_picker_choose_district">জেলা নির্বাচন করুন</string>
-    <string name="location_picker_choose_upazila">উপজেলা বা থানা নির্বাচন করুন</string>
     <string name="location_gps_title">অবস্থান পাওয়া গেছে</string>
     <string name="location_gps_acquiring">আপনার অবস্থান নেওয়া হচ্ছে…</string>
     <string name="location_section_current_title">বর্তমান অবস্থান</string>
-    <string name="location_section_change_title">অবস্থান পরিবর্তন করুন</string>
     <string name="location_country_label">দেশ</string>
     <string name="location_country_value">বাংলাদেশ (BD)</string>
-    <string name="location_source_label">সূত্র</string>
     <string name="location_source_gps">জিপিএস অবস্থান</string>
     <string name="location_source_area">নির্বাচিত এলাকা</string>
     <string name="location_source_manual">নিজে লেখা</string>

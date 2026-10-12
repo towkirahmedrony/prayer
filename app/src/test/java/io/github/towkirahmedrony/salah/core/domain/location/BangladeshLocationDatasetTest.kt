@@ -1,266 +1,250 @@
 package io.github.towkirahmedrony.salah.core.domain.location
 
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaLevel
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.URL
-import java.nio.charset.StandardCharsets
 
-class BangladeshLocationDatasetParserTest {
+/**
+ * The bundled-format parser: what it accepts, what it refuses, and what it does with a refusal.
+ *
+ * The parser is deliberately lenient at runtime — a bad line is recorded rather than thrown — so
+ * `BangladeshLocationDatasetTest` pins exactly which lines are refused, and the separate
+ * `BundledDatasetIntegrityTest` pins that the real shipped files contain none.
+ */
+class BangladeshLocationDatasetTest {
 
     @Test
-    fun `the bundled source files are complete and immediately usable offline`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
-        )
+    fun `a well-formed file parses into the three levels with their parents`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
 
-        val divisions = src.divisions.toSet()
-        val districts = src.districts.toSet()
-        val upazilas = src.upazilas.toSet()
+        assertEquals("test", dataset.version)
+        assertEquals(1, dataset.divisions.size)
+        assertEquals(1, dataset.districts.size)
+        assertEquals(2, dataset.upazilas.size)
+        assertTrue(dataset.isUsable)
+        assertTrue(dataset.rejectedLines.isEmpty())
 
-        assertEquals("Sundarbans divisions", setOf("dhaka", "ricohi", "chittagong", "barisal", "sylhet", "rangpur", "kishoreganj", "madaripur"), divisions.map { it.id }.toSet())
-        assertEquals("Six rural divisions must be present", 8, divisions.size)
-        assertEquals("Every district must list a valid division", districts.all { it.divisionId in divisions.map { it.id } }, true)
-        assertEquals("Every upazila must list a valid district", upazilas.all { it.districtId in districts.map { it.id } }, true)
+        val kushtia = requireNotNull(dataset.area("BD1001"))
+        assertEquals(BangladeshAreaLevel.DISTRICT, kushtia.level)
+        assertEquals("BD10", kushtia.parentId)
+        assertEquals("Kushtia", kushtia.name)
+        assertEquals("কুষ্টিয়া", kushtia.banglaName)
 
-        assertEquals("Four divisions map to four rural areas", setOf("dhaka", "ricohi", "chittagong", "sylhet"), src.ruralAreaDivisionIds.toSet())
-        assertEquals("One division owns the urban area of the country code", setOf("dhaka"), src.urbanAreaDivisionIds.toSet())
-
-        assertEquals("Eight divisions: Dhaka, Rajshahi, Chattogram, Barisal, Sylhet, Rangpur, Khulna and Mymensingh", 8, src.divisions.size)
-        assertEquals("Sixty-four districts in the dataset", 64, src.districts.size)
-        assertEquals("Five hundred and seven upazilas in the dataset", 507, src.upazilas.size)
-        assertEquals("One hundred and ninety out of five hundred and seven upazilas are unnamed (labelled 'Untitled')", 190, src.unnamedUpazilas.size)
-
-        assertTrue("At least two areas must have coordinate coverage", src.areas.any { it.coordinates != null })
-        assertTrue("Every named area must carry a division", src.areas.all { it.divisionId in divisions.map { it.id } })
-        assertTrue("Every named area must carry a district", src.areas.all { it.districtId in districts.map { it.id } })
-        assertTrue("Every area must be inside Bangladesh by its reference coordinates", src.areas.all { it.inside() })
-        assertTrue("Every area must have a valid representative point", src.areas.all { it.validCoordinates() })
-
-        val dhaka = src.findDivision("dhaka")
-        val chattogram = src.findDivision("chittagong")
-        assertEquals("Dhaka and Chattogram are separate divisions", dhaka, null || !dhaka.equals(chattogram))
-        assertTrue("Dhaka has districts", dhaka != null && dhaka.districts.isNotEmpty())
-        assertTrue("Chattogram has districts", chattogram != null && chattogram.districts.isNotEmpty())
-        assertEquals("Bangladesh-only policy enforced at parse time", 1, src.districts.count { it.divisionId == "bd" })
-        assertEquals("Bangladesh-only policy enforced at parse time (upazilas)", 1, src.upazilas.count { it.divisionId == "bd" })
+        assertEquals(listOf("BD1001"), dataset.districtsOf("BD10").map { it.id })
+        assertEquals(listOf("BD1001002", "BD1001001"), dataset.upazilasOf("BD1001").map { it.id })
+        assertEquals(listOf("BD1001"), dataset.childrenOf("BD10").map { it.id })
     }
 
     @Test
-    fun `dataset loader handles missing files gracefully`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "does-not-exist.txt",
-            districtFileName = "does-not-exist-2.txt",
-            upazilaFileName = "does-not-exist-3.txt",
-        )
-        assertTrue("Missing files must not crash the loader", src.divisions.isEmpty())
-        assertTrue("Missing files must not crash the loader", src.districts.isEmpty())
-        assertTrue("Missing files must not crash the loader", src.upazilas.isEmpty())
+    fun `a blank Bangla name is kept as null rather than invented`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
+
+        val bheramara = requireNotNull(dataset.area("BD1001002"))
+        assertNull(bheramara.banglaName)
+        assertEquals("Bheramara", bheramara.labelledName)
     }
 
     @Test
-    fun `dataset parser captures the source identity and version`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `a row with the wrong number of columns is rejected and recorded`() {
+        // The real defect this format once shipped with: an extra tab producing eight fields.
+        val dataset = parse(
+            areas = row("DIVISION", "BD10", "BD", "Khulna", "খুলনা", "22.80", "89.30") + "\n" +
+                "DISTRICT\tBD1001\tBD10\tKushtia\tকুষ্টিয়া\t\t23.90\t89.12",
+            boundary = SQUARE_BOUNDARY,
         )
-        assertEquals("Dataset source identity is authoritative", "khanha-test", src.dataSourceId)
-        assertEquals("Dataset version is authoritative", "0.1.0-test", src.datasetVersion)
-        assertEquals("Dataset source label is authoritative", "Kahnha Test Coordinates", src.dataSourceName)
-        assertEquals("Canonical admin region codes are authoritative", listOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), src.adminRegionCodes)
-        assertEquals("Administrative hierarchy is authoritative", 3, src.hierarchyDepth)
-        assertEquals("No managed areas are present in the test data", 0, src.managedAreaIds.size)
-        assertEquals("No settlements are present in the test data", 0, src.settlementIds.size)
-        assertEquals("No sub-areas are present in the test data", 0, src.subAreaIds.size)
-    }
-}
 
-class BangladeshLocationDatasetMetadataTest {
-
-    @Test
-    fun `dataset loader reports the origin and coverage`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
-        )
-        val coverage = src.coverage
-        assertEquals("Dataset source identity", "khanha-test", coverage.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", coverage.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", coverage.dataSourceName)
-        assertEquals("True administrative region code coverage", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), coverage.adminRegionCodes.toSet())
-        assertEquals("Dataset version is authoritative", "0.1.0-test", coverage.datasetVersion)
-        assertEquals("Dataset source name is authoritative", "Kahnha Test Coordinates", coverage.dataSourceName)
-        assertEquals("Dataset source identity is authoritative", "khanha-test", coverage.dataSourceId)
-        assertEquals("Admin region codes are the authoritative set", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), coverage.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth is authoritative", 3, coverage.hierarchyDepth)
+        assertNull(dataset.area("BD1001"))
+        assertEquals(1, dataset.rejectedLines.size)
+        assertTrue(dataset.rejectedLines.single().contains("BD1001"))
+        assertEquals(1, dataset.divisions.size)
     }
 
     @Test
-    fun `dataset loader exposes exact coverage for the administrative hierarchy`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `a row with a non-numeric coordinate is rejected`() {
+        val dataset = parse(
+            areas = row("DIVISION", "BD10", "BD", "Khulna", "", "not-a-number", "89.30"),
+            boundary = SQUARE_BOUNDARY,
         )
-        val coverage = src.coverage
-        assertEquals("Dataset source identity", "khanha-test", coverage.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", coverage.datasetVersion)
-        assertEquals("Dataset source name", "Kahnha Test Coordinates", coverage.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), coverage.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, coverage.hierarchyDepth)
+
+        assertTrue(dataset.divisions.isEmpty())
+        assertEquals(1, dataset.rejectedLines.size)
     }
 
     @Test
-    fun `dataset loader exposes the precise coverage facts`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `a row with an out-of-range coordinate is rejected`() {
+        val dataset = parse(
+            areas = row("DIVISION", "BD10", "BD", "Khulna", "", "91.0", "89.30"),
+            boundary = SQUARE_BOUNDARY,
         )
-        val coverage = src.coverage
-        assertEquals("Dataset source identity", "khanha-test", coverage.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", coverage.datasetVersion)
-        assertEquals("Dataset source name", "Kahnha Test Coordinates", coverage.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), coverage.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, coverage.hierarchyDepth)
+
+        assertTrue(dataset.divisions.isEmpty())
+        assertEquals(1, dataset.rejectedLines.size)
     }
 
     @Test
-    fun `dataset loader exposes mandatory dataset metadata`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `a row with an unknown level is rejected`() {
+        val dataset = parse(
+            areas = row("WARD", "BD10", "BD", "Something", "", "22.80", "89.30"),
+            boundary = SQUARE_BOUNDARY,
         )
-        val metadata = src.metadata
-        assertEquals("Dataset source identity", "khanha-test", metadata.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", metadata.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", metadata.dataSourceName)
-        assertEquals("Admin region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), metadata.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, metadata.hierarchyDepth)
-    }
-}
 
-class BangladeshLocationDatasetCoverageTest {
+        assertTrue(dataset.areas.isEmpty())
+        assertEquals(1, dataset.rejectedLines.size)
+    }
 
     @Test
-    fun `dataset loader exposes the coverage summary`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
-        )
-        val coverage = src.coverage
-        assertEquals("Dataset source identity", "khanha-test", coverage.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", coverage.datasetVersion)
-        assertEquals("Dataset source name", "Kahnha Test Coordinates", coverage.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), coverage.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, coverage.hierarchyDepth)
-    }
-}
+    fun `comments and blank lines are ignored`() {
+        val dataset = parse(areas = "# a comment\n\n" + SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
 
-class BangladeshLocationDatasetContentTest {
+        assertEquals(4, dataset.areas.size)
+        assertTrue(dataset.rejectedLines.isEmpty())
+    }
 
     @Test
-    fun `dataset loader exposes the exact fields the policy tests assert against`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `duplicate ids are collapsed, not silently multiplied`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS + "\n" + row("UPAZILA", "BD1001001", "BD1001", "Kumarkhali again", "", "23.86", "89.24"),
+            boundary = SQUARE_BOUNDARY,
         )
-        val fields = src.content
-        assertEquals("Dataset source identity", "khanha-test", fields.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", fields.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", fields.dataSourceName)
-        assertEquals("Admin region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), fields.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, fields.hierarchyDepth)
-        assertEquals("Coverage summary", "khanha-test", fields.coverageId)
-        assertEquals("Dataset version", "0.1.0-test", fields.datasetVersion)
-        assertEquals("Dataset source name", "Kahnha Test Coordinates", fields.dataSourceName)
-        assertEquals("Admin region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), fields.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, fields.hierarchyDepth)
-    }
-}
 
-class BangladeshLocationDatasetResolutionTest {
+        assertEquals(1, dataset.upazilas.count { it.id == "BD1001001" })
+        assertEquals(4, dataset.areas.size)
+    }
 
     @Test
-    fun `dataset loader resolves dataset identity and coverage facts`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
-        )
-        val resolution = src.resolution
-        assertEquals("Dataset source identity", "khanha-test", resolution.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", resolution.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", resolution.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), resolution.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, resolution.hierarchyDepth)
-    }
-}
+    fun `an empty area file yields an unusable dataset rather than an empty picker`() {
+        val dataset = parse(areas = "", boundary = SQUARE_BOUNDARY)
 
-class BangladeshLocationDatasetDslTest {
+        assertTrue(dataset.areas.isEmpty())
+        assertFalse(dataset.isUsable)
+    }
 
     @Test
-    fun `dataset loader exposes the canonical dataset DSL fields`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
-        )
-        val dsl = src.dsl
-        assertEquals("Dataset source identity", "khanha-test", dsl.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", dsl.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", dsl.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), dsl.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, dsl.hierarchyDepth)
-    }
-}
+    fun `a dataset without a boundary is not usable`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = "")
 
-class BangladeshLocationDatasetBundleTest {
+        assertTrue(dataset.divisions.isNotEmpty())
+        assertTrue(dataset.boundaryRings.isEmpty())
+        assertFalse("a dataset that cannot enforce the country policy is unusable", dataset.isUsable)
+    }
 
     @Test
-    fun `dataset loader exposes the on-device bundle identity and coverage`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `boundary rings are grouped by index and a ring too small to enclose is dropped`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = listOf(
+                "0\t22.0\t88.5",
+                "0\t22.0\t95.0",
+                "0\t26.0\t95.0",
+                "0\t26.0\t88.5",
+                "1\t24.0\t89.0",
+                "1\t24.1\t89.1",
+                "2\t10.0\t10.0",
+                "2\t10.0\t11.0",
+                "2\t11.0\t11.0",
+            ).joinToString("\n"),
         )
-        val bundle = src.bundle
-        assertEquals("Dataset source identity", "khanha-test", bundle.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", bundle.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", bundle.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), bundle.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, bundle.hierarchyDepth)
-    }
-}
 
-class BangladeshLocationDatasetReadinessTest {
+        assertEquals(2, dataset.boundaryRings.size)
+        assertEquals(4, dataset.boundaryRings[0].size)
+        assertEquals(3, dataset.boundaryRings[1].size)
+    }
 
     @Test
-    fun `dataset loader exposes the on-device load readiness record`() {
-        val src = BangladeshLocationDataset(
-            divisionFileName = "bd_divisions.txt",
-            districtFileName = "bd_districts.txt",
-            upazilaFileName = "bd_upazilas.txt",
+    fun `a malformed boundary line is rejected and recorded`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = "0\t22.0\t88.5\n0\tnot-a-number\t90.0\n0\t22.0\t90.0\n0\t25.0\t90.0\n0\t25.0\t88.5",
         )
-        val ready = src.ready
-        assertEquals("Dataset source identity", "khanha-test", ready.dataSourceId)
-        assertEquals("Dataset version", "0.1.0-test", ready.datasetVersion)
-        assertEquals("Dataset source label", "Kahnha Test Coordinates", ready.dataSourceName)
-        assertEquals("Administrative region codes", setOf("BD", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"), ready.adminRegionCodes)
-        assertEquals("Administrative hierarchy depth", 3, ready.hierarchyDepth)
+
+        assertEquals(1, dataset.rejectedLines.size)
+        // The four well-formed points are still a ring, so the boundary survives a single bad line.
+        assertEquals(1, dataset.boundaryRings.size)
+        assertEquals(4, dataset.boundaryRings.single().size)
+    }
+
+    @Test
+    fun `referenceOf builds the full chain from the ids`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
+
+        val reference = requireNotNull(dataset.referenceOf("BD1001001"))
+        assertEquals("BD10", reference.divisionId)
+        assertEquals("Khulna", reference.divisionName)
+        assertEquals("BD1001", reference.districtId)
+        assertEquals("Kushtia", reference.districtName)
+        assertEquals("BD1001001", reference.upazilaId)
+        assertEquals("Kumarkhali", reference.upazilaName)
+
+        assertNull("an unknown id has no reference", dataset.referenceOf("missing"))
+    }
+
+    @Test
+    fun `referenceOf returns null when a level is missing from the chain`() {
+        val dataset = parse(
+            areas = row("UPAZILA", "BD1001001", "BD1001", "Orphan", "", "23.86", "89.24"),
+            boundary = SQUARE_BOUNDARY,
+        )
+
+        assertNull(dataset.referenceOf("BD1001001"))
+    }
+
+    @Test
+    fun `recognises checks the level of every id`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
+
+        val valid = BangladeshAreaRef(
+            divisionId = "BD10",
+            divisionName = "Khulna",
+            districtId = "BD1001",
+            districtName = "Kushtia",
+            upazilaId = "BD1001001",
+            upazilaName = "Kumarkhali",
+        )
+        assertTrue(dataset.recognises(valid))
+
+        // A district id used as a division: present, but at the wrong level.
+        val wrongLevel = valid.copy(divisionId = "BD1001", upazilaId = null)
+        assertFalse(dataset.recognises(wrongLevel))
+
+        val absentUpazila = valid.copy(upazilaId = "BD9999999")
+        assertFalse(dataset.recognises(absentUpazila))
+
+        // An area resolved only as far as a district is still recognised.
+        assertTrue(dataset.recognises(valid.copy(upazilaId = null, upazilaName = null)))
+    }
+
+    @Test
+    fun `an area that is present but at the wrong level is not returned by a level-specific lookup`() {
+        val dataset = parse(areas = SAMPLE_AREAS, boundary = SQUARE_BOUNDARY)
+
+        assertNotNull(dataset.area("BD1001"))
+        assertTrue(dataset.upazilasOf("BD10").isEmpty())
+        assertTrue(dataset.districtsOf("BD1001").isEmpty())
+    }
+
+    private fun parse(areas: String, boundary: String): BangladeshLocationDataset =
+        BangladeshLocationDataset.parse(version = "test", areasText = areas, boundaryText = boundary)
+
+    private fun row(vararg fields: String): String = fields.joinToString("\t")
+
+    private companion object {
+        val SQUARE_BOUNDARY: String = listOf(
+            "0\t22.0\t88.5",
+            "0\t22.0\t90.5",
+            "0\t26.0\t90.5",
+            "0\t26.0\t88.5",
+        ).joinToString("\n")
+
+        val SAMPLE_AREAS: String = listOf(
+            "DIVISION\tBD10\tBD\tKhulna\tখুলনা\t22.80\t89.30",
+            "DISTRICT\tBD1001\tBD10\tKushtia\tকুষ্টিয়া\t23.90\t89.12",
+            "UPAZILA\tBD1001001\tBD1001\tKumarkhali\tকুমারখালী\t23.86\t89.24",
+            "UPAZILA\tBD1001002\tBD1001\tBheramara\t\t23.99\t88.97",
+        ).joinToString("\n")
     }
 }
-
-private fun List<BangladeshLocationDataset.Division>.all { }
-private fun List<BangladeshLocationDataset.District>.all { }
-private fun List<BangladeshLocationDataset.Upazila>.all { }

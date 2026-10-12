@@ -4,6 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
+import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
+import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixAdoption
+import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixAdoptionPolicy
+import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixRejectionReason
+import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.qibla.CalibrationAdvice
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassAccuracyGate
@@ -24,6 +29,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaBearing
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaCalculator
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaLocationState
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaStateReducer
+import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
@@ -62,6 +68,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class QiblaViewModel(
     private val locations: LocationRepository,
+    /** The bundled geography, so a device fix is validated and attributed before it replaces anything. */
+    private val areaCatalog: BangladeshAreaCatalog,
     private val compassSensor: CompassSensorSource,
     private val locationProvider: LocationProvider,
     private val permissionChecker: LocationPermissionChecker,
@@ -283,22 +291,60 @@ class QiblaViewModel(
         }
     }
 
+    /**
+     * Adopts a device fix only when the shared policy accepts it, otherwise leaves the stored location
+     * untouched.
+     *
+     * The Qibla screen has no confirmation step, so the fix replaces the stored location outright —
+     * which is exactly why it must pass the same Bangladesh policy and area resolution the location
+     * screen applies before offering one. A fix that is outside Bangladesh or that cannot be attributed
+     * to an area keeps the location the user already has; see [DeviceFixAdoptionPolicy].
+     */
     private suspend fun storeDeviceLocation(acquired: LocationAcquisitionResult.Acquired) {
-        val saved = locations.saveDeviceLocation(
-            label = DEVICE_LOCATION_LABEL,
-            latitude = acquired.latitude,
-            longitude = acquired.longitude,
-            // The device's own zone is the right one for the device's own position.
-            timeZoneId = ZoneId.systemDefault().id,
-            accuracyMetres = acquired.accuracyMetres,
-            acquiredAtEpochMillis = acquired.acquiredAtEpochMillis,
-        )
+        val point = GeoPoint(latitude = acquired.latitude, longitude = acquired.longitude)
+        val dataset = runCatching { areaCatalog.dataset() }.getOrNull()
 
-        update {
-            it.copy(
-                locationFailure = null,
-                message = if (saved) QiblaMessage.DeviceLocationAcquired else QiblaMessage.LocationFailed,
-            )
+        when (val adoption = DeviceFixAdoptionPolicy.decide(point, dataset)) {
+            is DeviceFixAdoption.Accepted -> {
+                val saved = locations.saveDeviceLocation(
+                    label = adoption.reference.label,
+                    latitude = point.latitude,
+                    longitude = point.longitude,
+                    // A fix adopted as a Bangladeshi area is stored in Bangladesh's single zone, the same
+                    // zone the location screen stores one in — not the device's current one, which would
+                    // mis-time a user who selected a location while travelling.
+                    timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+                    accuracyMetres = acquired.accuracyMetres,
+                    acquiredAtEpochMillis = acquired.acquiredAtEpochMillis,
+                    countryCode = adoption.countryCode,
+                    area = adoption.reference,
+                    datasetVersion = adoption.datasetVersion,
+                )
+
+                update {
+                    it.copy(
+                        locationFailure = null,
+                        message = if (saved) QiblaMessage.DeviceLocationAcquired else QiblaMessage.LocationFailed,
+                    )
+                }
+            }
+
+            is DeviceFixAdoption.Rejected -> {
+                logger.warn(
+                    SalahDiagnosticEvents.QIBLA_LOCATION_NOT_ADOPTED,
+                    mapOf(
+                        "reason" to adoption.reason.name,
+                        "distanceMetres" to adoption.distanceMetres?.toInt(),
+                        // Coordinates are intentionally absent.
+                    ),
+                )
+                val message = when (adoption.reason) {
+                    DeviceFixRejectionReason.OUTSIDE_BANGLADESH -> QiblaMessage.OutsideSupportedCountry
+                    DeviceFixRejectionReason.AREA_UNRESOLVED -> QiblaMessage.AreaNotAttributed
+                    DeviceFixRejectionReason.DATASET_UNAVAILABLE -> QiblaMessage.LocationFailed
+                }
+                update { it.copy(message = message) }
+            }
         }
     }
 
@@ -521,14 +567,5 @@ class QiblaViewModel(
          * exceeding it produces an explanation rather than an endless spinner.
          */
         val ACQUISITION_TIMEOUT = 15.seconds
-
-        /**
-         * Label stored for a device fix.
-         *
-         * Stored as data, not shown as chrome: it is the location's name in the same field a
-         * manually entered location uses, and the user can rename it by re-entering the location in
-         * Settings. `LocationOrigin` is what the UI actually uses to tell the two apart.
-         */
-        const val DEVICE_LOCATION_LABEL = "Current location"
     }
 }

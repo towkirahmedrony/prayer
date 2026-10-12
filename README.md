@@ -30,6 +30,9 @@ without an account.
 | Magnetic declination from the platform's World Magnetic Model, applied to the heading exactly once | Implemented |
 | Location from the device on request (approximate or precise) with timeouts, permission and service states | Implemented |
 | Manual coordinates that need no permission and no network, stored in the existing location repository | Implemented |
+| **Bundled Bangladesh administrative dataset** — 8 divisions, 64 districts and 507 upazilas/thanas with published reference coordinates, plus the simplified national boundary | **Implemented, offline** |
+| **Division → district → upazila picker** for choosing a location by area, with no permission and no network | **Implemented** |
+| **Bangladesh-only location policy** with an explicit boundary tolerance, and a location the policy cannot place reported as unsupported rather than converted | **Implemented** |
 | Location provenance and freshness, so a saved position is never presented as a current one | Implemented |
 | Compass calibration guidance from the platform's own accuracy signal, with a warm-up gate; no invented accuracy score | Implemented |
 | Qibla screen states for permission denied, services off, timeout, no sensor, tilted device and undefined direction | Implemented |
@@ -45,7 +48,7 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Prayer, Calendar (with its settings), Ramadan, Settings, Notifications, Qibla | Implemented (Qibla, Calendar and Ramadan are real screens; only Prayer remains a labelled boundary) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (427 tests) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping and the Qibla feature | Implemented (516 test methods) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | **Calculator implemented and tested, but unconfigured** — no rule set has been reviewed, so no intervals are shown |
@@ -91,6 +94,11 @@ Salah only shows values it actually has:
 - **Android's limits are stated, not glossed over.** If exact alarms are not permitted, if
   notification permission is denied, or if a channel has been silenced by the user, the app says
   what that means instead of implying a guarantee Android does not offer.
+- **A location is a place Salah can name, not only a coordinate.** The bundled dataset supplies the
+  divisions, districts and upazilas, and a device fix is attributed to the nearest published centre
+  within a stated threshold or honestly left unresolved. The country policy and its 5 km boundary
+  tolerance are documented, and a tolerance-accepted position is never described as confirmed inside
+  Bangladesh. See [`docs/LOCATION_SYSTEM.md`](docs/LOCATION_SYSTEM.md).
 - **The Qibla bearing is geography, so it needs nothing.** It is calculated from the stored
   coordinates in closed form, so a device with no magnetometer, or a user who has declined location
   access, still gets an exact direction; only the live dial is withheld, and with a stated reason.
@@ -168,16 +176,19 @@ The calculation engine and its pinned version are explained in
 │       │   ├── domain/calendar/               Gregorian grid, Bangladesh Bangla, Hijri, Ramadan, formatting
 │       │   ├── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
 │       │   ├── domain/qibla/                  bearing, heading maths, frames, state reducer
-│       │   └── domain/location/               location freshness
+│       │   └── domain/location/               dataset parser, area resolution/selection, country policy, freshness
 │       ├── data/{preferences,location,calendar,prayer,prohibited}
+│       │   ├── location/                      DataStore location + bundled-asset area catalog
 │       │   ├── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
 │       │   └── qibla/                         SensorManager, GeomagneticField, LocationManagerCompat
-│       ├── feature/{app,home,calendar,ramadan,settings,notifications,qibla,common}
+│       ├── feature/{app,home,location,calendar,ramadan,settings,notifications,qibla,common}
 │       ├── navigation/                        destinations, nav host, app shell
 │       └── di/                                Koin container
+│   ├── src/main/assets/location/              generated bd_areas.tsv + bd_boundary.tsv
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
 ├── docs/CALENDAR_SYSTEM.md                    Gregorian, Bangladesh Bangla, Hijri, Ramadan, Sehri/Iftar
+├── docs/LOCATION_SYSTEM.md                    setup flow, GPS/manual selection, country policy, dataset, limits
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
 ├── docs/PRAYER_NOTIFICATIONS.md               scheduler, permissions, channels, Azan, limitations
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
@@ -186,6 +197,7 @@ The calculation engine and its pinned version are explained in
 ├── docs/TECH_STACK.md                         real versions + compatibility decisions
 ├── docs/ARCHITECTURE.md                       structure, rules, extension points
 ├── gradle/libs.versions.toml                  version catalog
+├── tools/generate_bd_location_dataset.py      dataset generator (documents the sources and the join)
 ├── build.gradle.kts  settings.gradle.kts  gradle.properties
 └── gradlew  gradle/wrapper/
 ```
@@ -255,9 +267,17 @@ and no signing credentials.
 - Notification reminders may be delayed or silenced by Android: without exact-alarm access they use
   a ten-minute window, and Do Not Disturb, battery optimisation and a force-stopped app can defer or
   withhold them. Salah uses only supported APIs and does not attempt to bypass these.
+- **The bundled administrative dataset has not been checked against an independent source.** Its
+  provenance (OCHA/HDX COD-AB, CC BY 3.0 IGO, with Bangla names from `nuhil/bangladesh-geocode`, MIT)
+  is documented and the generated files are tested for internal consistency, but Salah has not compared
+  the published centre coordinates with any second dataset. See
+  [`docs/LOCATION_SYSTEM.md`](docs/LOCATION_SYSTEM.md) §6.
+- **The Bangladesh boundary is checked with a 5 km tolerance, and tolerance is not containment.** The
+  allowance covers GPS and simplification error, but it also covers a few kilometres of a neighbouring
+  country; Salah never describes a tolerance-accepted position as confirmed inside Bangladesh.
 - No network client, no Room database; the schedule cache is in-memory (and cheaply recomputed).
-- No device-location provider: location is entered manually. No location permission is requested.
-- UI strings are English only; Bangla/Arabic script rendering relies on system fonts.
+- UI strings are mostly English; the Bangla resource file is deliberately partial (see
+  `app/lint.xml`) and Bangla/Arabic script rendering relies on system fonts.
 
 ## Roadmap
 

@@ -108,6 +108,11 @@ object LocationSetup {
         if (dataset == null || !dataset.isUsable) return LocationSetupState.Complete(stored)
 
         val check = BangladeshLocationPolicy.check(stored.point, dataset.boundaryRings)
+        // Both Inside and WithinBoundaryTolerance are accepted here. The tolerance exists for GPS and
+        // boundary-simplification error at the border, so refusing it would strand a user standing on a
+        // boundary; only a point beyond the tolerance is refused. The two outcomes are not the same
+        // claim, and the location screen is careful never to describe tolerance-acceptance as verified
+        // containment (see BangladeshLocationPolicy's doc).
         if (check is BangladeshCheck.Outside) {
             return LocationSetupState.Required(
                 reason = LocationSetupReason.OUTSIDE_SUPPORTED_COUNTRY,

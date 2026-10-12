@@ -73,7 +73,7 @@ class DataStoreLocationRepository(
         longitude: Double,
         timeZoneId: String,
         accuracyMetres: Double?,
-        acquiredAtEpochMillis: Long,
+        acquiredAtEpochMillis: Long?,
         countryCode: String?,
         area: BangladeshAreaRef?,
         datasetVersion: String?,
@@ -85,7 +85,12 @@ class DataStoreLocationRepository(
             timeZoneId = timeZoneId,
             origin = LocationOrigin.DEVICE_GPS,
             accuracyMetres = accuracyMetres,
-            acquiredAt = Instant.ofEpochMilli(acquiredAtEpochMillis),
+            // A non-positive value is "the provider did not set a time", not the epoch: storing the
+            // epoch would age the fix as stale-with-a-time, and storing now() would age it as fresh.
+            // Either would be a claim about when the fix was taken that the platform did not make.
+            acquiredAt = acquiredAtEpochMillis
+                ?.takeIf { it > 0L }
+                ?.let { Instant.ofEpochMilli(it) },
             countryCode = countryCode,
             area = area,
             datasetVersion = datasetVersion,

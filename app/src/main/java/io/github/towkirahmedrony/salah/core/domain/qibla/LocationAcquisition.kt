@@ -31,7 +31,16 @@ sealed interface LocationAcquisitionResult {
         val longitude: Double,
         /** Horizontal accuracy in metres, or `null` when the provider did not report one. */
         val accuracyMetres: Double?,
-        val acquiredAtEpochMillis: Long,
+        /**
+         * When the platform recorded the fix, in epoch milliseconds, or `null` when it did not set a
+         * time.
+         *
+         * Nullable on purpose: a fix with no recorded time cannot be aged, so it is stored as an
+         * unknown-time position and the UI offers a refresh rather than claiming it was taken just now.
+         * Substituting the current time at this boundary would silently turn a possibly old cached
+         * position into a fresh one.
+         */
+        val acquiredAtEpochMillis: Long?,
     ) : LocationAcquisitionResult
 
     /**

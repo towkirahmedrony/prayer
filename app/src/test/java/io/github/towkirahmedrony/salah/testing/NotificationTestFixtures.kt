@@ -226,7 +226,7 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
         longitude: Double,
         timeZoneId: String,
         accuracyMetres: Double?,
-        acquiredAtEpochMillis: Long,
+        acquiredAtEpochMillis: Long?,
         countryCode: String?,
         area: BangladeshAreaRef?,
         datasetVersion: String?,
@@ -238,7 +238,9 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
             timeZoneId = timeZoneId,
             origin = LocationOrigin.DEVICE_GPS,
             accuracyMetres = accuracyMetres,
-            acquiredAt = Instant.ofEpochMilli(acquiredAtEpochMillis),
+            acquiredAt = acquiredAtEpochMillis
+                ?.takeIf { it > 0L }
+                ?.let { Instant.ofEpochMilli(it) },
             countryCode = countryCode,
             area = area,
             datasetVersion = datasetVersion,

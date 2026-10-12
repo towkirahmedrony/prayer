@@ -1,11 +1,14 @@
 package io.github.towkirahmedrony.salah.feature.location
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -27,12 +33,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +55,8 @@ import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
+import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionAction
+import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionPolicy
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import org.koin.androidx.compose.koinViewModel
 
@@ -67,34 +79,25 @@ fun LocationSetupScreen(
         viewModel.start()
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        if (grants.values.any { granted -> granted }) {
-            viewModel.refreshPermissionState()
-            viewModel.useCurrentLocation()
-        } else {
-            viewModel.onLocationPermissionDenied()
-        }
-    }
-
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
         viewModel.refreshPermissionState()
     }
 
+    // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
+    // platform facts it needs, so a permanently denied permission opens app settings instead of
+    // re-launching a dialog the system would silently ignore.
+    val onUseDeviceLocation = rememberDeviceLocationAction(
+        viewModel = viewModel,
+        permissionState = state.permissionState,
+    )
+
     LocationContent(
         state = state,
         isSetup = true,
         modifier = modifier,
-        onUseDeviceLocation = {
-            if (state.permissionState.isGranted) {
-                viewModel.useCurrentLocation()
-            } else {
-                permissionLauncher.launch(LOCATION_PERMISSIONS)
-            }
-        },
+        onUseDeviceLocation = onUseDeviceLocation,
         onOpenLocationSettings = {
             settingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
         },
@@ -131,34 +134,25 @@ fun LocationScreen(
         viewModel.refreshPermissionState()
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        if (grants.values.any { granted -> granted }) {
-            viewModel.refreshPermissionState()
-            viewModel.useCurrentLocation()
-        } else {
-            viewModel.onLocationPermissionDenied()
-        }
-    }
-
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
         viewModel.refreshPermissionState()
     }
 
+    // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
+    // platform facts it needs, so a permanently denied permission opens app settings instead of
+    // re-launching a dialog the system would silently ignore.
+    val onUseDeviceLocation = rememberDeviceLocationAction(
+        viewModel = viewModel,
+        permissionState = state.permissionState,
+    )
+
     LocationContent(
         state = state,
         isSetup = false,
         modifier = modifier,
-        onUseDeviceLocation = {
-            if (state.permissionState.isGranted) {
-                viewModel.useCurrentLocation()
-            } else {
-                permissionLauncher.launch(LOCATION_PERMISSIONS)
-            }
-        },
+        onUseDeviceLocation = onUseDeviceLocation,
         onOpenLocationSettings = {
             settingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
         },
@@ -485,10 +479,12 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = stringResource(
-                    if (stored.isVerifiedInSupportedCountry) {
-                        R.string.location_advanced_bangladesh_verified
-                    } else {
-                        R.string.location_advanced_bangladesh_unverified
+                    when {
+                        stored.isVerifiedInSupportedCountry ->
+                            R.string.location_advanced_bangladesh_verified
+                        stored.isWithinBoundaryTolerance ->
+                            R.string.location_advanced_bangladesh_within_tolerance
+                        else -> R.string.location_advanced_bangladesh_unverified
                     },
                 ),
                 style = MaterialTheme.typography.bodySmall,
@@ -564,10 +560,10 @@ private fun PendingFixCard(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(
-                if (fix.isCountryVerified) {
-                    R.string.location_gps_verified
-                } else {
-                    R.string.location_gps_unverified
+                when {
+                    fix.isCountryVerified -> R.string.location_gps_verified
+                    fix.isWithinBoundaryTolerance -> R.string.location_gps_within_tolerance
+                    else -> R.string.location_gps_unverified
                 },
             ),
             style = MaterialTheme.typography.bodySmall,
@@ -710,19 +706,32 @@ private fun AreaLevelList(
         return
     }
 
-    options.forEach { area ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onSelect(area.id) },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = area.id == selectedId, onClick = { onSelect(area.id) })
-            Text(
-                text = area.labelledName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+    // One selectable group per level, so TalkBack announces each row as a radio option with its own
+    // selected state and the number of options in the group. The row owns the selection and the
+    // RadioButton is non-interactive: a separately focusable button inside a clickable row makes the
+    // same option appear twice and hides which one is chosen.
+    Column(modifier = Modifier.selectableGroup()) {
+        options.forEach { area ->
+            val selected = area.id == selectedId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(area.id) },
+                    )
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = selected, onClick = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = area.labelledName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -790,6 +799,76 @@ private fun freshnessRes(freshness: LocationFreshness): Int = when (freshness) {
     LocationFreshness.RECENT -> R.string.location_freshness_recent
     LocationFreshness.STALE -> R.string.location_freshness_stale
     LocationFreshness.UNKNOWN -> R.string.location_freshness_unknown
+}
+
+/**
+ * Builds the "use the device's location" click handler shared by both location screens.
+ *
+ * Both screens offered this identically before and must keep offering it identically, so the
+ * permission handling is written once: the launcher, the decision from [LocationPermissionPolicy], and
+ * the two settings paths. Manual area selection is unaffected by any of it and stays usable with the
+ * permission denied.
+ */
+@Composable
+private fun rememberDeviceLocationAction(
+    viewModel: LocationViewModel,
+    permissionState: LocationPermissionState,
+): () -> Unit {
+    val context = LocalContext.current
+    val activity = context.findActivity()
+    var hasRequestedDialog by rememberSaveable { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.any { granted -> granted }) {
+            viewModel.refreshPermissionState()
+            viewModel.useCurrentLocation()
+        } else {
+            viewModel.onLocationPermissionDenied()
+        }
+    }
+
+    val appSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        // Returning from settings: re-read the permission so the button reflects the new answer.
+        viewModel.refreshPermissionState()
+    }
+
+    return {
+        val shouldShowRationale = activity?.let { host ->
+            LOCATION_PERMISSIONS.any { permission ->
+                ActivityCompat.shouldShowRequestPermissionRationale(host, permission)
+            }
+        } ?: false
+        when (
+            LocationPermissionPolicy.action(
+                state = permissionState,
+                hasRequestedDialog = hasRequestedDialog,
+                shouldShowRationale = shouldShowRationale,
+            ),
+        ) {
+            LocationPermissionAction.ALREADY_GRANTED -> viewModel.useCurrentLocation()
+            LocationPermissionAction.REQUEST -> {
+                hasRequestedDialog = true
+                permissionLauncher.launch(LOCATION_PERMISSIONS)
+            }
+            LocationPermissionAction.OPEN_APP_SETTINGS -> appSettingsLauncher.launch(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", context.packageName, null),
+                ),
+            )
+        }
+    }
+}
+
+/** The hosting [Activity], found through any [ContextWrapper] the Compose tree was handed. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /** Both permissions, requested together so Android 12+ can offer "Approximate" or "Precise". */

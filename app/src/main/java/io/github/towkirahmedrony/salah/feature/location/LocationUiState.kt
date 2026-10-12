@@ -65,19 +65,34 @@ sealed interface LocationMessage {
 data class PendingDeviceFix(
     val point: GeoPoint,
     val accuracyMetres: Double?,
-    val acquiredAtEpochMillis: Long,
+    /**
+     * When the platform recorded the fix, or `null` when it did not report one.
+     *
+     * Nullable so "unknown" is representable: a fix with no time is aged as
+     * [LocationFreshness.UNKNOWN] and offered a refresh, rather than being presented as a position
+     * obtained just now.
+     */
+    val acquiredAtEpochMillis: Long?,
     /** What could be said about which area this position is in. */
     val resolution: AreaResolution,
     /**
-     * The country code to store with this fix, or `null` when the boundary check could not run.
+     * The country code to store with this fix, or `null` when the boundary check could not run or did
+     * not establish containment.
      *
      * `null` is not a failure: a fix can only be *verified* as Bangladeshi against the bundled
-     * boundary, and storing `BD` when only the coarse rectangle was checked would record a check that
-     * never happened.
+     * boundary, and storing `BD` when only the coarse rectangle or the boundary tolerance accepted the
+     * position would record a check that never established containment.
      */
     val countryCode: String? = null,
-    /** True when the national boundary was consulted and accepted the position. */
+    /** True when the position is strictly inside the bundled national boundary. */
     val isCountryVerified: Boolean = false,
+    /**
+     * True when the position is outside the boundary polygon but within the tolerance.
+     *
+     * Tracked separately from [isCountryVerified] so the screen can say which allowance was applied
+     * instead of implying the point was found inside the country.
+     */
+    val isWithinBoundaryTolerance: Boolean = false,
 ) {
     /** The area the fix was attributed to, or `null` when it could not be. */
     val suggestion: AreaSuggestion? get() = (resolution as? AreaResolution.Suggested)?.suggestion
@@ -125,10 +140,17 @@ data class StoredLocationUi(
     val coordinateText: String,
     val freshness: LocationFreshness,
     /**
-     * True when the stored coordinates were accepted against the bundled boundary, or when the
+     * True when the stored coordinates are strictly inside the bundled national boundary, or when the
      * boundary was unavailable and only the coarse bounds could be checked.
      */
     val isVerifiedInSupportedCountry: Boolean,
+    /**
+     * True when the stored coordinates are outside the boundary polygon but within the tolerance.
+     *
+     * Distinct from [isVerifiedInSupportedCountry] so the screen can state that the position was
+     * accepted as a tolerance case rather than as a confirmed position inside Bangladesh.
+     */
+    val isWithinBoundaryTolerance: Boolean,
     /** True when the coordinates are outside the country's bounding rectangle. */
     val isKnownOutsideSupportedCountry: Boolean,
 )
