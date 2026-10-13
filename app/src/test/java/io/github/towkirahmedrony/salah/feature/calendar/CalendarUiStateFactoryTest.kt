@@ -486,11 +486,14 @@ class CalendarUiStateFactoryTest {
         val englishHijri = englishState.selected.lines.first { it.system == CalendarSystem.HIJRI }
         val bengaliHijri = bengaliState.selected.lines.first { it.system == CalendarSystem.HIJRI }
 
-        // The same day described twice; only the rendering language differs.
-        assertEquals("11 Ramadan 1445 AH", englishHijri.value)
-        assertEquals("১১ রমজান ১৪৪৫ AH", bengaliHijri.value)
+        // The card describes the selected day — 20 March 2024, which is 10 Ramadan 1445 because
+        // 11 March is 1 Ramadan.
+        assertEquals(LocalDate.of(2024, 3, 20), englishState.selected.date)
         assertEquals(englishState.selected.date, bengaliState.selected.date)
-        assertEquals("Monday", englishState.selected.weekday)
+        // The same day described twice; only the rendering language differs.
+        assertEquals("10 Ramadan 1445 AH", englishHijri.value)
+        assertEquals("১০ রমজান ১৪৪৫ AH", bengaliHijri.value)
+        assertEquals("Wednesday", englishState.selected.weekday)
         assertTrue(
             "expected a Bengali weekday, was ${bengaliState.selected.weekday}",
             bengaliState.selected.weekday.any { it.code in BENGALI_SCRIPT },
