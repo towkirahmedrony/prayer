@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
+import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 
 /**
  * Transient feedback shown after an action.
@@ -196,6 +197,16 @@ data class LocationUiState(
     val isAcquiring: Boolean = false,
     /** Whether automatic location is possible, and at what precision. */
     val permissionState: LocationPermissionState = LocationPermissionState.DENIED,
+    /** True while the manual-coordinate form is open. */
+    val isManualFormOpen: Boolean = false,
+    /**
+     * Raw text of the manual-coordinate form.
+     *
+     * The third way to give Salah a location, and the only one that accepts a position the bundled area
+     * dataset cannot express. Held as entered until it is saved, when the repository validates it; the
+     * fields are not parsed as the user types, so a half-typed `23.` or a lone `-` is representable.
+     */
+    val manualForm: LocationFormState = LocationFormState(),
     /** The last message, until it is dismissed. */
     val message: LocationMessage? = null,
 ) {

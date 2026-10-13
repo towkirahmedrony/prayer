@@ -295,11 +295,11 @@ val salahModules = module {
             clock = get(),
         )
     }
+    // One view model for the General, Appearance and Prayer times screens: they read and write the same
+    // two preferences (the theme and the calculation settings), and the location has moved to
+    // LocationViewModel, which is where every write of a location now happens.
     viewModel {
-        SettingsViewModel(
-            userPreferencesRepository = get(),
-            locationRepository = get(),
-        )
+        SettingsViewModel(userPreferencesRepository = get())
     }
     viewModel {
         CalendarViewModel(

@@ -10,7 +10,12 @@ import io.github.towkirahmedrony.salah.R
  * the bottom bar and destination screens use the app's localized names consistently.
  *
  * The bottom bar shows Home, Prayer, Calendar and Settings. Qibla and Ramadan are available from
- * the Home screen's daily tools, and notification settings are reached from Settings.
+ * the Home screen's daily tools.
+ *
+ * Settings is an overview of categories rather than a list of every preference, so each category is
+ * a destination of its own: the four declared below, plus prayer notifications, location and the
+ * calendar's own preferences, which already had screens. Nothing here is in the bottom bar —
+ * configuration is not a place the user works.
  */
 enum class SalahDestination(
     val route: String,
@@ -40,12 +45,26 @@ enum class SalahDestination(
     SETTINGS("settings", R.string.nav_settings),
 
     /**
-     * Prayer notification settings.
+     * The settings categories, each reached from the Settings overview and nowhere else.
+     *
+     * One destination per category rather than one screen with sections, because a settings list that
+     * grows without end is what this structure exists to avoid: a category can gain controls without
+     * making the overview longer or denser. `SettingsCategory` names them on the overview side and holds
+     * the destination it opens — the enum member itself, not a copy of the route — so the two cannot
+     * drift apart.
+     */
+    SETTINGS_GENERAL("settings_general", R.string.settings_category_general_title, inBottomBar = false),
+    SETTINGS_APPEARANCE("settings_appearance", R.string.settings_theme_title, inBottomBar = false),
+    SETTINGS_PRAYER_TIMES("settings_prayer_times", R.string.settings_category_prayer_times_title, inBottomBar = false),
+    SETTINGS_ABOUT("settings_about", R.string.settings_about_title, inBottomBar = false),
+
+    /**
+     * Prayer notification settings: the "Notifications & Adhan" category of Settings.
      *
      * A destination of its own rather than a section of Settings: it carries per-prayer detail, two
      * independent platform permission states and the live schedule status, which is more than a
-     * settings list can show honestly. Reached from Settings, and not in the bottom bar because it
-     * is a configuration screen, not a place the user works.
+     * settings list can show honestly. Reachable from the Settings overview and from the calendar and
+     * Ramadan screens, which say where the Ramadan reminders live rather than growing their own.
      */
     NOTIFICATIONS("notifications", R.string.nav_notifications, inBottomBar = false),
 

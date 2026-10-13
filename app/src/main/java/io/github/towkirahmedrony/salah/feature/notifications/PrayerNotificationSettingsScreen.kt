@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
@@ -72,9 +73,14 @@ import org.koin.androidx.compose.koinViewModel
  *  3. **Android's limits are stated.** Do Not Disturb, battery optimisation, delivery timing with
  *     inexact alarms and the fact that channel settings belong to the user are all spelled out, so
  *     nothing implies a guarantee Android does not offer.
+ *
+ * It is the "Notifications & Adhan" category of the Settings overview, and it is also reached from the
+ * calendar and Ramadan screens, which point here rather than growing reminder controls of their own.
+ * The back action pops, so it returns to whichever of those opened it.
  */
 @Composable
 fun PrayerNotificationSettingsScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PrayerNotificationSettingsViewModel = koinViewModel(),
 ) {
@@ -97,13 +103,13 @@ fun PrayerNotificationSettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = stringResource(R.string.notifications_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        SalahSubpageHeader(
+            title = stringResource(R.string.notifications_title),
+            backContentDescription = stringResource(R.string.action_back),
+            onBack = onBack,
         )
         Text(
             text = stringResource(R.string.notifications_intro),

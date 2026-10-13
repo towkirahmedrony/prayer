@@ -22,6 +22,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -76,6 +77,8 @@ class LocationViewModel(
         val isAcquiring: Boolean = false,
         val message: LocationMessage? = null,
         val permissionState: LocationPermissionState = LocationPermissionState.DENIED,
+        val isManualFormOpen: Boolean = false,
+        val manualForm: LocationFormState = LocationFormState(),
     )
 
     private val datasetSlot = MutableStateFlow(DatasetSlot(isLoading = true, dataset = null))
@@ -374,6 +377,74 @@ class LocationViewModel(
         }
     }
 
+    // Manual coordinates ------------------------------------------------------
+
+    /**
+     * Opens or closes the manual-coordinate form.
+     *
+     * A disclosure rather than a screen of its own: it is the third way to give Salah a location, and
+     * the least used, so it stays out of the way of the two most people are here for — while remaining
+     * on the screen that owns the stored location, so the result of saving appears directly above it.
+     */
+    fun toggleManualCoordinates() {
+        transient.update { it.copy(isManualFormOpen = !it.isManualFormOpen, message = null) }
+    }
+
+    /** Applies an edit to the manual form, marking it dirty so a stored value cannot overwrite it. */
+    fun onManualFormChange(transform: (LocationFormState) -> LocationFormState) {
+        transient.update { current ->
+            current.copy(manualForm = transform(current.manualForm).copy(isDirty = true), message = null)
+        }
+    }
+
+    /**
+     * Validates and stores the coordinates as entered.
+     *
+     * No country check runs on this path, and the screen says so: this form records a position the user
+     * *asserts*, which is exactly what someone outside the bundled area dataset needs, and applying the
+     * Bangladesh-only policy here would make it useless to them. Everything else is the same as the
+     * other two ways in — one repository, one validation, and a reconciliation afterwards.
+     *
+     * The reconciliation is why this action lives on this screen rather than in a settings list of its
+     * own: a location written without one would leave the alarms announcing the times of the place the
+     * user has just stopped being at. It is the one behaviour this screen adds to what the old settings
+     * form did, and it brings the manual path in line with a device fix and an area selection, which
+     * have always reconciled.
+     */
+    fun saveManualLocation() {
+        val form = transient.value.manualForm
+        val latitude = form.latitude.trim().toDoubleOrNull()
+        val longitude = form.longitude.trim().toDoubleOrNull()
+
+        viewModelScope.launch {
+            val saved = latitude != null && longitude != null && locations.saveManualLocation(
+                label = form.label.trim(),
+                latitude = latitude,
+                longitude = longitude,
+                timeZoneId = form.timeZoneId.trim(),
+            )
+            if (!saved) {
+                logger.warn(SalahDiagnosticEvents.LOCATION_SAVE_REJECTED, mapOf("origin" to "manual_entry"))
+                transient.update {
+                    it.copy(
+                        manualForm = it.manualForm.copy(hasValidationError = true),
+                        message = LocationMessage.SaveRejected,
+                    )
+                }
+                return@launch
+            }
+            logger.info(SalahDiagnosticEvents.LOCATION_SAVED, mapOf("origin" to "manual_entry"))
+            transient.update {
+                it.copy(
+                    manualForm = it.manualForm.copy(isDirty = false, hasValidationError = false),
+                    isManualFormOpen = false,
+                    message = LocationMessage.Saved,
+                )
+            }
+            reconcileNotifications()
+        }
+    }
+
     /** Removes the stored location, returning the app to its unconfigured state. */
     fun clearLocation() {
         viewModelScope.launch {
@@ -456,6 +527,10 @@ class LocationViewModel(
             pendingFix = current.pendingFix,
             isAcquiring = current.isAcquiring,
             permissionState = current.permissionState,
+            isManualFormOpen = current.isManualFormOpen,
+            // Pre-filled only from a location the user typed in, and only until they touch the form: a
+            // device fix seeded here would blur a declared position with an observed one.
+            manualForm = current.manualForm.withStoredLocation(stored),
             message = current.message,
         )
     }

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
@@ -48,6 +49,9 @@ import org.koin.androidx.compose.koinViewModel
  *  - the **date language**, which chooses whether dates are rendered in Bangla or in Latin script and
  *    numerals.
  *
+ * It is the "Calendar" category of Settings, reachable from the Settings overview as well as from the
+ * Calendar screen. The back action pops, which returns to whichever of the two opened it.
+ *
  * What is deliberately absent: a Ramadan reminder section. Those settings live with the other prayer
  * reminders, on the notifications screen, so that there is one place that owns notification
  * permissions, channels and scheduling, and so the Ramadan reminders cannot drift away from the
@@ -55,6 +59,7 @@ import org.koin.androidx.compose.koinViewModel
  */
 @Composable
 fun CalendarSettingsScreen(
+    onBack: () -> Unit,
     onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarSettingsViewModel = koinViewModel(),
@@ -65,13 +70,13 @@ fun CalendarSettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = stringResource(R.string.calendar_settings_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        SalahSubpageHeader(
+            title = stringResource(R.string.calendar_settings_title),
+            backContentDescription = stringResource(R.string.action_back),
+            onBack = onBack,
         )
         Text(
             text = stringResource(R.string.calendar_settings_body),

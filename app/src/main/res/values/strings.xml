@@ -135,7 +135,7 @@
     <string name="shortcut_ramadan_subtitle">Sehri and Iftar timetable</string>
     <string name="shortcut_calendar_subtitle">Gregorian, Bangla and Hijri</string>
     <string name="shortcut_qibla_subtitle">Compass direction</string>
-    <string name="shortcut_settings_subtitle">Appearance and location</string>
+    <string name="shortcut_settings_subtitle">Prayer, location, calendar and more</string>
 
     <!-- Data source status -->
     <string name="status_title">Data source</string>
@@ -250,14 +250,29 @@
     <string name="action_retry">Retry</string>
     <string name="action_open_settings">Open Settings</string>
 
-    <!-- Settings: prayer notifications entry point -->
-    <string name="settings_notifications_title">Prayer notifications</string>
-    <string name="settings_notifications_body">Reminders for each prayer, the sound and vibration each one uses, and whether Azan playback is available. Settings are stored on this device and work offline.</string>
-    <string name="settings_notifications_open">Open notification settings</string>
-
-    <!-- Settings -->
+    <!-- Settings: the category overview. Each category is one row here and one destination of its own. -->
     <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">Personalize your Salah experience.</string>
+    <string name="action_back">Back</string>
+
+    <string name="settings_category_general_title">General</string>
+    <string name="settings_category_general_description">Time format and other general preferences.</string>
+    <string name="settings_category_appearance_description">Light, dark or matching your device.</string>
+    <string name="settings_category_prayer_times_title">Prayer times</string>
+    <string name="settings_category_prayer_times_description">Calculation method, Asr convention and manual corrections.</string>
+    <string name="settings_category_notifications_title">Notifications &amp; Adhan</string>
+    <string name="settings_category_notifications_description">Per-prayer reminders, sound and vibration.</string>
+    <string name="settings_category_location_description">Your area in Bangladesh, read from this device or chosen by hand.</string>
+    <string name="settings_category_about_description">Version, prayer engine and what Salah does not claim.</string>
+
+    <!-- Settings: General -->
+    <string name="settings_general_body">Preferences that apply to every screen in Salah.</string>
+    <string name="settings_time_format_body">The clock Salah uses for every time it shows, including its reminders. It changes how a time is written, never how it is calculated.</string>
+
+    <!-- Settings: Appearance -->
     <string name="settings_theme_title">Appearance</string>
+    <string name="settings_theme_body">How Salah looks. Follow system uses your device\'s own light or dark setting.</string>
+    <string name="settings_theme_mode_title">Theme</string>
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
@@ -268,9 +283,7 @@
     <string name="settings_longitude">Longitude (-180 to 180)</string>
     <string name="settings_time_zone">Time zone ID</string>
     <string name="settings_save">Save location</string>
-    <string name="settings_clear">Clear location</string>
-    <string name="settings_location_saved">Location saved and stored locally.</string>
-    <string name="settings_location_cleared">Location cleared.</string>
+    <string name="settings_location_manual_open">Enter coordinates manually</string>
     <string name="settings_location_invalid">Check the coordinates and the time zone ID (for example 23.8103, 90.4125 and Asia/Dhaka).</string>
     <string name="settings_engine_title">Prayer engine</string>
     <string name="settings_engine_body">Local astronomical calculation (Adhan Kotlin), computed on this device. It needs no internet connection, no account and no permission.</string>
@@ -612,7 +625,4 @@
     <string name="location_setup_made_for">Made for Muslims in Bangladesh</string>
     <string name="location_setup_area_note">A chosen area saves that area\'s published reference coordinates, not your exact position.</string>
 
-    <string name="settings_location_system_title">Location in Bangladesh</string>
-    <string name="settings_location_system_body">Your location decides prayer times, the Qibla direction and the Sehri and Iftar times. Choose it by division, district and upazila or thana, or read it from this device. Salah currently supports locations in Bangladesh only.</string>
-    <string name="settings_location_system_open">Choose location</string>
 </resources>

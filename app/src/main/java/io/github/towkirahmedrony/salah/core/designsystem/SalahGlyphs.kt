@@ -245,6 +245,54 @@ fun ChevronDownGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, m
     drawPath(chevron, tint, style = stroke)
 }
 
+/** A right-pointing chevron, for a row that opens a screen of its own. */
+@Composable
+fun ChevronRightGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.9f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val chevron = Path().apply {
+        moveTo(9.5f, 6.5f)
+        lineTo(15f, 12f)
+        lineTo(9.5f, 17.5f)
+    }
+    drawPath(chevron, tint, style = stroke)
+}
+
+/** The same chevron pointing back: the header's back action on a configuration subpage. */
+@Composable
+fun ChevronLeftGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.9f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val chevron = Path().apply {
+        moveTo(14.5f, 6.5f)
+        lineTo(9f, 12f)
+        lineTo(14.5f, 17.5f)
+    }
+    drawPath(chevron, tint, style = stroke)
+}
+
+/** A crescent moon: the appearance category, whose subject is light and dark. */
+@Composable
+fun MoonGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    // The bite is punched with [PathFillType.EvenOdd] rather than drawn as a second colour, so the
+    // mark is one shape and sits on any background in either theme.
+    val moon = Path().apply {
+        fillType = PathFillType.EvenOdd
+        addOval(Rect(center = Offset(12f, 12f), radius = 8.6f))
+        addOval(Rect(center = Offset(17f, 8.5f), radius = 8f))
+    }
+    drawPath(moon, tint)
+}
+
+/** Three sliders: the general-preferences category, whose subject is adjustment. */
+@Composable
+fun SlidersGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    // The knob is drawn after its own rail, so the rail reads as passing behind a solid handle rather
+    // than as two dashes meeting in the middle.
+    listOf(7.5f to 9.5f, 12f to 15f, 16.5f to 8.5f).forEach { (y, knobX) ->
+        drawLine(tint, Offset(4.5f, y), Offset(19.5f, y), strokeWidth = 1.7f)
+        drawCircle(tint, radius = 2.5f, center = Offset(knobX, y))
+    }
+}
+
 /**
  * A broadcast mark: a dot with two waves leaving it on each side.
  *

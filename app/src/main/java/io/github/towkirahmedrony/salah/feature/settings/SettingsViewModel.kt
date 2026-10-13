@@ -2,7 +2,6 @@ package io.github.towkirahmedrony.salah.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
@@ -11,47 +10,44 @@ import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
-import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Settings backed by local persistence only.
+ * State and actions for the settings subpages that write to local preferences.
  *
- * Theme, manual location and every calculation setting are stored on the device; no network call
- * and no location permission is involved. Invalid input is rejected by the repository and
- * reported as a message instead of being silently dropped.
+ * One view model serves the General, Appearance and Prayer times screens because they read and write the
+ * same two preferences; a class per screen would be three copies of the same two flows. State is the
+ * repository's own, so the controls cannot show a value that is not stored, and each action writes
+ * through the repository rather than a local copy.
  *
  * Prayer settings are never written as a whole object read earlier: each action goes through
  * [UserPreferencesRepository.updatePrayerSettings], which reads and writes inside one DataStore
- * transaction. Two quick taps therefore both take effect, and the UI state cannot disagree with
- * what is stored.
+ * transaction. Two quick taps therefore both take effect, and the UI state cannot disagree with what is
+ * stored.
+ *
+ * The location used to be here too. It is not any more: the location screen owns the coordinates, the
+ * area picker and the device fix together, so a location is written from one place in the app rather
+ * than two, and every write goes through the same validation and the same reminder reconciliation.
  */
 class SettingsViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val locationRepository: LocationRepository,
 ) : ViewModel() {
 
-    private val form = MutableStateFlow(LocationFormState())
     private val message = MutableStateFlow<SettingsMessage?>(null)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         userPreferencesRepository.themeMode,
-        locationRepository.location,
         userPreferencesRepository.prayerSettings,
-        form,
         message,
-    ) { themeMode, location, prayerSettings, currentForm, currentMessage ->
+    ) { themeMode, prayerSettings, currentMessage ->
         SettingsUiState(
             themeMode = themeMode,
-            location = location,
             prayerSettings = prayerSettings,
-            form = currentForm.withStoredLocation(location),
             message = currentMessage,
         )
     }.stateIn(
@@ -59,9 +55,7 @@ class SettingsViewModel(
         started = SharingStarted.WhileSubscribed(subscribeTimeoutMillis),
         initialValue = SettingsUiState(
             themeMode = ThemeMode.SYSTEM,
-            location = null,
             prayerSettings = PrayerSettings.DEFAULT,
-            form = LocationFormState(),
             message = null,
         ),
     )
@@ -81,8 +75,24 @@ class SettingsViewModel(
     fun setHighLatitudeRule(rule: HighLatitudeRule) =
         updateSettings { it.copy(highLatitudeRule = rule) }
 
-    fun setTimeFormat(preference: TimeFormatPreference) =
-        updateSettings { it.copy(timeFormat = preference) }
+    /**
+     * How times are written everywhere in the app, including its reminders.
+     *
+     * It sits with the calculation settings rather than beside the theme because it is stored with them
+     * and read by the same screens, but it is the one setting here that changes no calculated time: the
+     * engine computes the same instants and only the formatter differs.
+     *
+     * Which is why it reports nothing. `PrayerCalculationProfile` — the value a cached timetable is
+     * validated against — does not contain the time format, so no schedule is invalidated and nothing is
+     * recalculated; the times are re-rendered in place. Announcing a recalculation here would be the one
+     * claim on this screen that is not true.
+     */
+    fun setTimeFormat(preference: TimeFormatPreference) {
+        message.value = null
+        viewModelScope.launch {
+            userPreferencesRepository.updatePrayerSettings { it.copy(timeFormat = preference) }
+        }
+    }
 
     /** Sets [prayer]'s manual correction to [minutes]; the model clamps it to the valid range. */
     fun setAdjustment(prayer: PrayerName, minutes: Int) =
@@ -102,48 +112,6 @@ class SettingsViewModel(
             // timetable is being recalculated rather than left to wonder why it moved.
             message.value = SettingsMessage.PrayerSettingsSaved
         }
-    }
-
-    // --- Location ---------------------------------------------------------------
-
-    fun onFormChange(transform: (LocationFormState) -> LocationFormState) {
-        message.value = null
-        form.update { current -> transform(current).copy(isDirty = true) }
-    }
-
-    fun saveLocation() {
-        val current = form.value
-        val latitude = current.latitude.trim().toDoubleOrNull()
-        val longitude = current.longitude.trim().toDoubleOrNull()
-
-        viewModelScope.launch {
-            val saved = latitude != null && longitude != null && locationRepository.saveManualLocation(
-                label = current.label.trim(),
-                latitude = latitude,
-                longitude = longitude,
-                timeZoneId = current.timeZoneId.trim(),
-            )
-            if (saved) {
-                form.update { it.copy(isDirty = false, hasValidationError = false) }
-                message.value = SettingsMessage.LocationSaved
-            } else {
-                form.update { it.copy(hasValidationError = true) }
-                message.value = SettingsMessage.LocationRejected
-            }
-        }
-    }
-
-    fun clearLocation() {
-        message.value = null
-        viewModelScope.launch {
-            locationRepository.clearLocation()
-            form.value = LocationFormState()
-            message.value = SettingsMessage.LocationCleared
-        }
-    }
-
-    fun dismissMessage() {
-        message.value = null
     }
 
     private companion object {

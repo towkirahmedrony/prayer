@@ -13,14 +13,23 @@ import io.github.towkirahmedrony.salah.feature.location.LocationScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
+import io.github.towkirahmedrony.salah.feature.settings.SettingsAboutScreen
+import io.github.towkirahmedrony.salah.feature.settings.SettingsAppearanceScreen
+import io.github.towkirahmedrony.salah.feature.settings.SettingsGeneralScreen
+import io.github.towkirahmedrony.salah.feature.settings.SettingsPrayerTimesScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
 import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
 
 /**
  * The navigation graph.
  *
- * Home, Prayer, Calendar (with its settings), Ramadan, Tools, Settings, prayer-notification settings
- * and the Qibla compass are implemented.
+ * Home, Prayer, Calendar (with its settings), Ramadan, Tools, Settings with its category screens,
+ * prayer-notification settings and the Qibla compass are implemented.
+ *
+ * Every configuration screen is reached by a single `navigate` and left by `popBackStack`, so back
+ * always returns to the screen that opened it — the Settings overview, the Calendar screen or Ramadan —
+ * and no screen has to know which one it was. Nothing writes to a back stack of its own: the graph's is
+ * the only one, so a repeated visit cannot leave a duplicate copy of a screen behind.
  */
 @Composable
 fun SalahNavHost(
@@ -51,6 +60,7 @@ fun SalahNavHost(
 
         composable(SalahDestination.CALENDAR_SETTINGS.route) {
             CalendarSettingsScreen(
+                onBack = { navController.popBackStack() },
                 onOpenNotifications = {
                     navController.navigate(SalahDestination.NOTIFICATIONS.route)
                 },
@@ -74,23 +84,37 @@ fun SalahNavHost(
             QiblaScreen()
         }
 
+        // Settings: the overview, then one destination per category. Each category screen is declared
+        // separately rather than resolved from a route pattern, so the graph stays the list of screens
+        // that exist — and `SettingsCategory.destination` is what the overview navigates with.
         composable(SalahDestination.SETTINGS.route) {
             SettingsScreen(
-                onOpenNotifications = {
-                    navController.navigate(SalahDestination.NOTIFICATIONS.route)
-                },
-                onOpenLocation = {
-                    navController.navigate(SalahDestination.LOCATION.route)
-                },
+                onOpenCategory = { category -> navController.navigate(category.destination.route) },
             )
         }
 
+        composable(SalahDestination.SETTINGS_GENERAL.route) {
+            SettingsGeneralScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(SalahDestination.SETTINGS_APPEARANCE.route) {
+            SettingsAppearanceScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(SalahDestination.SETTINGS_PRAYER_TIMES.route) {
+            SettingsPrayerTimesScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(SalahDestination.SETTINGS_ABOUT.route) {
+            SettingsAboutScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(SalahDestination.LOCATION.route) {
-            LocationScreen()
+            LocationScreen(onBack = { navController.popBackStack() })
         }
 
         composable(SalahDestination.NOTIFICATIONS.route) {
-            PrayerNotificationSettingsScreen()
+            PrayerNotificationSettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

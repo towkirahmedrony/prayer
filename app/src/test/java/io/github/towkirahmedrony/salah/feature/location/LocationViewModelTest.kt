@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.location
 
+import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
@@ -8,6 +9,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationAcquisitionResu
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.testing.FakeBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.testing.FakeLocationPermissionSource
@@ -372,6 +374,118 @@ class LocationViewModelTest {
 
         assertEquals(LocationMessage.SaveRejected, states.settled().message)
         assertNull("nothing may be stored from a partial selection", locations.location.first())
+    }
+
+    // --- Manual coordinates ----------------------------------------------------
+
+    @Test
+    fun `a manual entry is stored as entered and reconciles the reminders`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.toggleManualCoordinates()
+        runCurrent()
+        assertTrue("the disclosure opens the form", states.settled().isManualFormOpen)
+
+        viewModel.onManualFormChange {
+            it.copy(label = "Home", latitude = "23.8103", longitude = "90.4125", timeZoneId = "Asia/Dhaka")
+        }
+        runCurrent()
+        viewModel.saveManualLocation()
+        runCurrent()
+
+        val saved = locations.location.first()
+        assertNotNull("a valid entry must be stored", saved)
+        assertEquals("Home", saved!!.label)
+        assertEquals(23.8103, saved.latitude, 1e-9)
+        assertEquals(90.4125, saved.longitude, 1e-9)
+        assertEquals("Asia/Dhaka", saved.timeZoneId)
+        // Stored as asserted rather than as observed: no country check runs on this path, which is what
+        // makes the form usable for a place the bundled dataset does not contain.
+        assertEquals(LocationOrigin.MANUAL_ENTRY, saved.origin)
+        assertNull(saved.countryCode)
+
+        val afterSave = states.settled()
+        assertEquals(LocationMessage.Saved, afterSave.message)
+        assertFalse("the saved form closes", afterSave.isManualFormOpen)
+
+        // The repair this screen adds: the old settings form wrote the location and left the alarms on
+        // the previous one, so the reminders are reconciled here as they are for the other two paths.
+        assertEquals(
+            "a saved location must reschedule the reminders",
+            "LOCATION_CHANGED",
+            logger.detailsOf(SalahDiagnosticEvents.RECONCILE_STARTED)?.get("reason"),
+        )
+
+        // The coordinates are in the store, but never in the log: diagnostics record the outcome, not
+        // the position.
+        assertFalse(logger.renderAll().contains("23.8103"))
+        assertFalse(logger.renderAll().contains("90.4125"))
+    }
+
+    @Test
+    fun `an invalid manual entry is refused and changes nothing`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        val reconcilesBefore = logger.count(SalahDiagnosticEvents.RECONCILE_STARTED)
+
+        viewModel.toggleManualCoordinates()
+        runCurrent()
+        viewModel.onManualFormChange {
+            // A latitude that is not a number and no longitude at all: the repository is never reached.
+            it.copy(label = "Home", latitude = "north", longitude = "", timeZoneId = "Asia/Dhaka")
+        }
+        runCurrent()
+        viewModel.saveManualLocation()
+        runCurrent()
+
+        val afterSave = states.settled()
+        assertEquals(LocationMessage.SaveRejected, afterSave.message)
+        assertTrue("the fields are marked as the problem", afterSave.manualForm.hasValidationError)
+        assertTrue("the form stays open so the entry can be corrected", afterSave.isManualFormOpen)
+        assertNull("nothing may be stored", locations.location.first())
+        assertEquals(
+            "a refused save must not reschedule anything",
+            reconcilesBefore,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+    }
+
+    @Test
+    fun `a stored manual entry fills the form until the user types over it`() = runTest(mainDispatcher) {
+        locations.set(
+            requireNotNull(
+                LocationInfo.create(
+                    label = "Home",
+                    latitude = 23.8103,
+                    longitude = 90.4125,
+                    timeZoneId = "Asia/Dhaka",
+                ),
+            ),
+        )
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        val restored = states.settled().manualForm
+        assertEquals("Home", restored.label)
+        assertEquals("23.8103", restored.latitude)
+        assertEquals("90.4125", restored.longitude)
+        assertEquals("Asia/Dhaka", restored.timeZoneId)
+
+        viewModel.onManualFormChange { it.copy(label = "Office") }
+        runCurrent()
+
+        // The user's own text wins for the rest of the visit, and the stored location is untouched until
+        // it is saved.
+        assertEquals("Office", states.settled().manualForm.label)
+        assertEquals("Home", locations.location.first()?.label)
     }
 
     // --- Harness ---------------------------------------------------------------

@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
@@ -50,6 +53,7 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.domain.location.AreaResolution
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
@@ -59,6 +63,7 @@ import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionAction
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionPolicy
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
+import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import io.github.towkirahmedrony.salah.feature.common.sourceLabelRes
 import org.koin.androidx.compose.koinViewModel
 
@@ -70,9 +75,15 @@ import org.koin.androidx.compose.koinViewModel
  * read one state and call one view model, so the first launch and every later change apply exactly the
  * same validation — there is no second code path that could accept a location the first one would
  * refuse.
+ *
+ * It is also the "Location" category of Settings, and it is the only screen that writes a location. The
+ * manual-coordinate form used to sit on the Settings page and write through its own view model; it is a
+ * disclosure here instead, so all three ways in share one repository, one validation and one reminder
+ * reconciliation, and so a saved position is shown as the current location on the same screen.
  */
 @Composable
 fun LocationScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LocationViewModel = koinViewModel(),
 ) {
@@ -114,6 +125,10 @@ fun LocationScreen(
         onDiscardFix = viewModel::discardPendingFix,
         onClearLocation = viewModel::clearLocation,
         onDismissMessage = viewModel::dismissMessage,
+        onToggleManualCoordinates = viewModel::toggleManualCoordinates,
+        onManualFormChange = viewModel::onManualFormChange,
+        onSaveManualLocation = viewModel::saveManualLocation,
+        onBack = onBack,
     )
 }
 
@@ -127,6 +142,10 @@ fun LocationScreen(
  *
  * The first-launch screen is a separate composable with its own framing; both render the same state
  * and call the same view model, so there is still exactly one set of rules behind the two.
+ *
+ * The manual-coordinate form is last of the three ways in, and only rendered once the user has opened
+ * it: it is the escape hatch for a position the bundled area dataset cannot express, not a second
+ * primary path, and the two primary ones stay where they were.
  */
 @Composable
 private fun LocationContent(
@@ -144,18 +163,22 @@ private fun LocationContent(
     onDiscardFix: () -> Unit,
     onClearLocation: () -> Unit,
     onDismissMessage: () -> Unit,
+    onToggleManualCoordinates: () -> Unit,
+    onManualFormChange: ((LocationFormState) -> LocationFormState) -> Unit,
+    onSaveManualLocation: () -> Unit,
+    onBack: () -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = stringResource(R.string.location_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        SalahSubpageHeader(
+            title = stringResource(R.string.location_title),
+            backContentDescription = stringResource(R.string.action_back),
+            onBack = onBack,
         )
 
         // Dataset status -----------------------------------------------------
@@ -284,6 +307,28 @@ private fun LocationContent(
             }
         }
 
+        // Manual coordinates --------------------------------------------------
+        // The third way to give Salah a location, behind a disclosure: the least used of the three, and
+        // the only one that stores a position the country policy does not cover. Kept off the screen
+        // until asked for, so the two ways most people are here for are not competing with a form.
+        if (!state.isPickerOpen && state.pendingFix == null && !state.isManualFormOpen) {
+            OutlinedButton(
+                onClick = onToggleManualCoordinates,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(text = stringResource(R.string.settings_location_manual_open))
+            }
+        }
+
+        if (state.isManualFormOpen) {
+            ManualCoordinatesSection(
+                state = state,
+                onFormChange = onManualFormChange,
+                onSave = onSaveManualLocation,
+                onClose = onToggleManualCoordinates,
+            )
+        }
+
         // Offered when automatic location is unavailable *and* nothing is stored yet: it is the one
         // failure the user can fix without leaving the screen's subject. Once a location exists there
         // is nothing to unblock, so the button would only be noise.
@@ -295,6 +340,103 @@ private fun LocationContent(
 
         state.message?.let { message ->
             LocationMessageRow(message = message, onDismiss = onDismissMessage)
+        }
+    }
+}
+
+/**
+ * The manual-coordinate form: a position typed in by hand, with the time zone it belongs to.
+ *
+ * The reason it exists at all is stated on it: a position is stored as entered and no country check is
+ * applied, so it is usable for a place the bundled area dataset does not contain. That is also why it is
+ * not the primary path — the area picker stores a published reference coordinate and the bundled policy
+ * has checked it, and both of those are the more defensible answer whenever they are available.
+ *
+ * The fields are raw text, so a half-typed `23.` or a lone `-` is representable while typing; parsing and
+ * validation happen once, on save, in the repository. The error state is shown in place rather than only
+ * as a message, because the invalid field is right here.
+ */
+@Composable
+private fun ManualCoordinatesSection(
+    state: LocationUiState,
+    onFormChange: ((LocationFormState) -> LocationFormState) -> Unit,
+    onSave: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val form = state.manualForm
+
+    SalahSectionCard {
+        Text(
+            text = stringResource(R.string.settings_location_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.settings_location_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+
+        OutlinedTextField(
+            value = form.label,
+            onValueChange = { value -> onFormChange { it.copy(label = value) } },
+            label = { Text(stringResource(R.string.settings_location_label)) },
+            singleLine = true,
+            isError = form.hasValidationError,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = form.latitude,
+                onValueChange = { value -> onFormChange { it.copy(latitude = value) } },
+                label = { Text(stringResource(R.string.settings_latitude)) },
+                singleLine = true,
+                isError = form.hasValidationError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = form.longitude,
+                onValueChange = { value -> onFormChange { it.copy(longitude = value) } },
+                label = { Text(stringResource(R.string.settings_longitude)) },
+                singleLine = true,
+                isError = form.hasValidationError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedTextField(
+            value = form.timeZoneId,
+            onValueChange = { value -> onFormChange { it.copy(timeZoneId = value) } },
+            label = { Text(stringResource(R.string.settings_time_zone)) },
+            placeholder = { Text("Asia/Dhaka") },
+            singleLine = true,
+            isError = form.hasValidationError,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (form.hasValidationError) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_location_invalid),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onSave) {
+                Text(text = stringResource(R.string.settings_save))
+            }
+            OutlinedButton(onClick = onClose) {
+                Text(text = stringResource(R.string.location_action_cancel))
+            }
         }
     }
 }
