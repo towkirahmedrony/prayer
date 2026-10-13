@@ -221,6 +221,7 @@ fun AppLanguage.labelRes(): Int = when (this) {
 
 @StringRes
 fun UnavailabilityReason.messageRes(): Int = when (this) {
+    UnavailabilityReason.DEVICE_DATE_UNAVAILABLE -> R.string.reason_device_date_unavailable
     UnavailabilityReason.NO_LOCATION_CONFIGURED -> R.string.reason_no_location
     UnavailabilityReason.CALCULATION_NOT_CONFIGURED -> R.string.reason_calculation_not_configured
     UnavailabilityReason.CALCULATION_NOT_POSSIBLE -> R.string.reason_calculation_not_possible

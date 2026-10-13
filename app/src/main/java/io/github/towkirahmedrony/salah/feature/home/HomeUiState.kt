@@ -29,8 +29,15 @@ sealed interface HomeUiState {
     /** At least one upstream flow has not emitted yet. */
     data object Loading : HomeUiState
 
-    /** The device date could not be read, so nothing can be shown honestly. */
-    data class Failed(val detail: String) : HomeUiState
+    /**
+     * The device date could not be read, so nothing can be shown honestly.
+     *
+     * [reason] is a stable identifier rather than a sentence, so the wording is chosen by the UI in the
+     * interface language and this file stays Android-free — the same rule every other section of this
+     * state follows. Only an unreadable device date reaches this state: a *provider* failure is
+     * reported as [Ready.failureDetail] instead, so the timetable that still exists is not hidden by it.
+     */
+    data class Failed(val reason: UnavailabilityReason) : HomeUiState
 
     data class Ready(
         /**

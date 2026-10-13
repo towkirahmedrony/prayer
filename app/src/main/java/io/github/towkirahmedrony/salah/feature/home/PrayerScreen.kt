@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.components.CurrentPrayerHeroCard
 import io.github.towkirahmedrony.salah.feature.home.components.TimetableCard
 import org.koin.androidx.compose.koinViewModel
@@ -45,7 +46,7 @@ fun PrayerScreen(
         when (val state = uiState) {
             HomeUiState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             is HomeUiState.Failed -> Text(
-                text = state.detail,
+                text = stringResource(state.reason.messageRes()),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )

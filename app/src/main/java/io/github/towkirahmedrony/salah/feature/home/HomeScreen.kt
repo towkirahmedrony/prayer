@@ -11,6 +11,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
+import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.components.*
 import org.koin.androidx.compose.koinViewModel
 
@@ -25,7 +27,7 @@ fun HomeScreen(
     when (val state = uiState) {
         HomeUiState.Loading -> HomeSkeleton(modifier)
         is HomeUiState.Failed -> HomeFailure(
-            detail = state.detail,
+            reason = state.reason,
             onRetry = viewModel::onRetry,
             modifier = modifier,
         )
@@ -40,7 +42,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeFailure(
-    detail: String,
+    reason: UnavailabilityReason,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +61,7 @@ private fun HomeFailure(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = detail,
+            text = stringResource(reason.messageRes()),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

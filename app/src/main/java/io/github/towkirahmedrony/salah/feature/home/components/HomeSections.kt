@@ -558,8 +558,13 @@ private fun TimeRow(
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                // A prayer is a period, not a point: show where it opens and where it closes.
-                text = if (endTime != null) "$time – $endTime" else time,
+                // A prayer is a period, not a point: show where it opens and where it closes. The join
+                // is a resource because the separator and the order are part of the language.
+                text = if (endTime != null) {
+                    stringResource(R.string.home_time_range, time, endTime)
+                } else {
+                    time
+                },
                 style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
                 color = if (highlighted) {
                     MaterialTheme.colorScheme.primary
@@ -570,7 +575,7 @@ private fun TimeRow(
             )
             if (endTime != null && endsNextDay) {
                 Text(
-                    text = "ends next day",
+                    text = stringResource(R.string.home_ends_next_day),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

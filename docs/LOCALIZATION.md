@@ -89,9 +89,9 @@ MainActivity.setContent { SalahApp() }
 |----------------------------|------------------------------------|-------|
 | Bottom navigation          | Yes                                | `nav_*` labels (`nav_home`, `nav_calendar`, `nav_settings`, …) |
 | Settings overview + General| Yes                                | Including the selector's own labels and the back action |
-| Home                       | Yes (as far as its strings are translated) | Home's own date lines and prayer times keep the calendar/date-language and device-locale formatting described below |
+| Home                       | **Yes, in full**                   | Every label, button, state and reason the composed screen can render. Its date lines follow the interface language too (§6); its prayer *times* keep the device-locale clock format. See §10 |
 | Calendar                   | Yes, in full                       | Every string it can show, plus month/weekday/day rendering |
-| Ramadan, Qibla, Location, Notifications | Only the strings already translated in `values-bn` | These screens are out of scope for this phase; they keep the deliberate partial translation |
+| Ramadan, Qibla, Location, Notifications | Only the strings already translated in `values-bn` | These screens are out of scope; they keep the deliberate partial translation |
 
 The Bangla translation stays **partial for explanatory wording** on purpose: Salah's English sentences
 make specific claims about sources and limits (what is an estimate, what is not verified, which
@@ -99,8 +99,10 @@ authority is not claimed), and translating them loosely would change an accuracy
 records that decision and scopes its `MissingTranslation` ignore to `bn` by message, so adding any other
 untranslated locale is still an error.
 
-The **Calendar is the exception**: every string it can render is translated, and its completeness is
-enforced by tests rather than by lint (§8).
+**Home and the Calendar are the exceptions**: every string each of those screens can render is
+translated, and their completeness is enforced by tests rather than by lint (§8). Home's own copy
+includes the sentences that explain *why* a section is empty, because those are the sentences a reader
+of Home actually meets when something is missing — see §10 for the audit that closed them.
 
 ## 6. App language vs. calendar system vs. date language
 
@@ -140,10 +142,26 @@ and the rule is:
   and by Ramadan, the displayed month is still built from the same Gregorian anchor, and switching
   language selects nothing and navigates nowhere.
 
-Home's date lines and prayer times are produced by `DeviceClockCalendarRepository` and
-`HomeUiStateFactory` from the stored date-language preference and the device locale's numeral policy;
-this phase does not change that, and changing the interface language triggers no recalculation of the
-prayer schedule.
+Home's date lines are produced by `DeviceClockCalendarRepository`, which now receives the stored
+`AppLanguage` as an input of its own: `observeToday()` renders today's Gregorian date, weekday, Bangla
+date and Hijri date in the interface language, so selecting Bengali on an English phone gives Bengali
+month and weekday names for the same day. The precedence is the same one the Calendar uses —
+`DateLanguagePreference.SYSTEM` means "follow the interface", while an explicit `BANGLA`/`ENGLISH`
+still wins, because that setting is a statement about the dates themselves. The conversions, the day
+and the calendar system are untouched: only the locale the strings are written in changes, and
+`AppLanguage.SYSTEM` still resolves to `Locale.getDefault()`, so a fresh install behaves exactly as it
+did before the selector existed.
+
+**Prayer *times* are deliberately not part of that rule.** A time is formatted by `timeFormatterFor`
+from `TimeFormatPreference`, whose `SYSTEM` branch means the device's own clock convention — a
+different, stored setting from the interface language — and the same formatter writes the times in
+prayer notifications. Making Home's times follow the interface language would therefore make the app
+and its own reminders disagree about how "5:12 PM" is written, which is the disagreement
+`TimeFormatting` exists to prevent. The countdown is also left alone: `CountdownFormatter` emits
+`H:MM:SS` digits under `Locale.ROOT` on purpose, because it is a reading of elapsed time rather than a
+religious value. Either way no calculation changes — only the words around a time do.
+
+Changing the interface language triggers no recalculation of the prayer schedule.
 
 ## 7. Bengali numerals and typography
 
@@ -177,7 +195,8 @@ prayer schedule.
 | `SettingsCategoryTest` | The General category is a visible row on the overview and opens a declared destination; both languages are offered under stable identifiers |
 | `CalendarFormattingTest` | Bangla and Arabic-Indic numerals replace every decimal digit; a Bengali Gregorian heading and date carry Bengali digits and no Western one; the substitution is idempotent; English output is unchanged |
 | `CalendarUiStateFactoryTest` | A Bengali interface renders the Gregorian grid's heading, weekday header and day numbers in Bengali with the same days, month, selection and Ramadan data; an explicit date language still wins; the Bangla mode's heading is Bengali in both; the language changes no calendar system, line or source |
-| `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments |
+| `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments. Since the Home audit (§10) it also pins **every** string the Home composition tree can render — non-missing, non-blank, in Bengali script, with matching format arguments — and it reads the Home composables' own sources to assert that none of them renders a hardcoded sentence (a literal containing a space) |
+| `DeviceClockCalendarRepositoryTest` | Today's date lines are written in the interface language for the same day, with no Western digit left in the Gregorian date; an explicit date language still wins over the interface language; the default (`SYSTEM` + device locale) is unchanged |
 
 `LocalizationResourcesTest` reads the real files from `app/src/main/res`, found by walking up from the
 working directory, so it checks what ships. It exists because a missing resource key compiles, ships and
@@ -189,13 +208,22 @@ and `assembleDebug` on every push to `main` and uploads the debug APK.
 
 ## 9. Known limitations
 
-* **The translation is partial outside the Calendar.** The explanatory wording on Home, Ramadan, Qibla,
-  Location, Notifications and the Qibla/About screens stays in English until it can be reviewed by
+* **The translation is partial outside Home and the Calendar.** The explanatory wording on Ramadan,
+  Qibla, Location, Notifications and the About screens stays in English until it can be reviewed by
   someone competent to review those accuracy claims (see `app/lint.xml`). Selecting Bengali therefore
   changes those screens' already-translated labels and leaves their paragraphs in English.
-* **Home's date lines and prayer times do not follow the interface language.** They follow the calendar's
-  date-language preference and the device locale's time formatting; making them follow the interface
-  language would change what a time looks like and is deliberately out of scope here.
+* **Home's prayer *times* do not follow the interface language**, and neither does the countdown. They
+  follow `TimeFormatPreference` and the device's own clock convention — deliberately, and for the reason
+  given in §6: the same formatter writes the times inside prayer notifications, so a language-driven
+  time format would make the app and its own reminders disagree. The words around a time are Bengali;
+  the digits and the clock convention are not. See §10 for why this is the one gap left on Home.
+* **Home's calculation-option names stay English.** `method_*`, `asr_*`, `high_latitude_*` and
+  `time_format_*` are the conventional names of calculation authorities (`Umm al-Qura University,
+  Makkah`, `ISNA (North America)`, …) and of settings choices, and they belong to Settings → Prayer
+  times rather than to Home's own copy. The one Home component that would render them
+  (`CalculationCard`) is not part of the composed Home screen, so nothing on the screen shows them; if
+  that card is ever wired up, those keys have to be translated first. §10 records this explicitly
+  rather than leaving it to be discovered.
 * **No per-app language integration with Android's system settings.** The choice is stored by Salah and
   applied by Salah; it does not appear in the OS "App languages" list, and it does not use
   `AppCompatDelegate.setApplicationLocales` (this app has no AppCompat dependency).
@@ -205,3 +233,74 @@ and `assembleDebug` on every push to `main` and uploads the debug APK.
 * **`SYSTEM` follows the device locale at the time the shell composes.** Changing the device locale
   while the app is running re-resolves through Compose's own configuration handling; the app does not
   pin or restore a locale itself.
+
+## 10. The Home audit
+
+Home is the screen the app opens on, so it is the screen where a leftover English word is noticed
+first. This section records the audit that closed it: what was actually wrong, and what is
+deliberately still English.
+
+### The three root causes
+
+The visible English came from three different places, and only one of them was a missing translation.
+Treating all three as "add strings" would have left two of them in place.
+
+1. **Labels written straight into composables.** `PremiumHomeSections` and `HomeSections` rendered
+   around twenty literals — the hero card's `CURRENT PRAYER` / `UP NEXT`, `Time until …`, `Starts …`,
+   `Ends …`, `Next prayer`, `Today's Prayer Times`, `View all →`, the prohibited card's heading and
+   `View details →`, `Your Daily Tools` and its four tile names, the fortnightly `ends next day`, and
+   the `Salah` / `Your Complete Islamic Companion` brand line. No resource lookup, so no language — and
+   because it was not a *resource*, `values-bn` could never have covered it. Every one of them is now a
+   `stringResource`, including the joins (`%1$s, %2$s`, `%1$s – %2$s`, `%1$s — %2$s`), because the
+   separator and the word order in a joined string are properties of the language rather than of the
+   layout.
+2. **Keys with no Bengali value.** Every string the composed screen *did* pull from resources —
+   the prayer and solar-event names, the prohibited-interval names, the location card, the next-prayer
+   card, the calculation and provenance cards, the shared loading/error/retry states and the `reason_*`
+   sentences that explain an empty section — had no `values-bn` entry, so it fell back to English. The
+   `reason_*` set is the one that mattered most in practice: those are the sentences a reader meets when
+   a schedule, a location or the rules are missing.
+3. **A sentence assembled in code.** `HomeUiStateFactory` returned
+   `HomeUiState.Failed(detail = "The Gregorian date is unavailable.")` — an English sentence built in an
+   Android-free factory and handed to the UI as text. It is now
+   `UnavailabilityReason.DEVICE_DATE_UNAVAILABLE`, a stable identifier that `DomainLabels.messageRes()`
+   maps to a resource, which is the pattern every other section of Home already used. The same
+   treatment was **not** applied to a *provider* failure's diagnostic text: that is a report about a
+   software fault (a provider id and an exception), it is deliberately reported verbatim rather than
+   rewritten, and only appears on `Ready.failureDetail`, whose title and retry action are translated.
+
+A fourth cause was found and fixed on the date line rather than in a resource (§6): today's weekday and
+dates were rendered in the *device* locale, so Bengali showed `Saturday, 13 October 2026`. The
+interface language is now that rendering locale, with an explicit date-language preference still
+winning.
+
+### What is deliberately still English, and why
+
+| Item | Reason |
+|------|--------|
+| `app_name` (`Salah`), `home_prayer_times_arabic` (`مواقيت الصلاة`), `home_time_unavailable` (`—`) | Marked `translatable="false"`: a product name, the traditional Arabic heading, and a dash are the same in every language |
+| `method_*`, `asr_*`, `high_latitude_*`, `time_format_*` | Conventional names of calculation authorities and of settings choices; rendered only by `CalculationCard`, which is not part of the composed Home screen (§9) |
+| A provider failure's `detail` | Diagnostic text naming a provider and its error; rewriting it would destroy the diagnosis. Its heading (`state_error_title`) and its retry action are Bengali |
+| Prayer times and the countdown digits | Formatted values under `TimeFormatPreference` / `CountdownFormatter`, deliberately shared with prayer notifications (§6, §9) |
+| The place name | The user's own selected location (`Dhaka`, a division, a GPS-derived area name). Localising it would be inventing a name for a place the user chose |
+| `shortcut_qibla` and the pilgrimage/prayer names | Proper names, rendered as the established Bengali terms (`কিবলা`, `ফজর`, `যোহর`, …) rather than as transliterations of the English |
+
+### Components inspected
+
+The whole composition tree, not just `HomeScreen`: `HomeTopBar`, `LocationAndDateHeader`,
+`FailureBanner`, `CurrentPrayerHeroCard`, `TodayPrayerTimesSection` / `TodayPrayerCard`,
+`ForbiddenTimesCard`, `SunTimesCard`, `DailyToolsSection` / `DailyToolItem`, and — on the prayer screen
+Home's two actions open — `TimetableCard`. The dead components that live in the same package
+(`BrandHeader`, `CalculationCard`, `ProvenanceCard`, `ShortcutsCard`, `NextPrayerCard`,
+`SolarEventsCard`, `ProhibitedTimesCard`, `CalendarCard`, `LocationCard`) were inspected and their
+literals localised too, so re-wiring one of them cannot reintroduce English; the resources they use are
+translated as far as the table above allows.
+
+### Two labels that changed wording on purpose
+
+* The prohibited-times card was headed `Forbidden Prayer Times` in the composable while the project's
+  own resource for the same card read `Prohibited prayer times`. The composable now uses
+  `home_prohibited_title`, so one card has one name — and that name is the one the documentation and
+  the Bengali file already used. The English wording of that heading therefore changes slightly.
+* The Home brand line and header are rendered from `app_name` / `app_tagline` instead of literals, which
+  is what makes `Your Complete Islamic Companion` a translated string rather than a frozen one.

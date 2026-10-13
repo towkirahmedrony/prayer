@@ -8,6 +8,16 @@ package io.github.towkirahmedrony.salah.core.model
  * explained in the UI, so a placeholder value is never presented as religious information.
  */
 enum class UnavailabilityReason {
+    /**
+     * The device's own date could not be read.
+     *
+     * The only reason that empties a whole screen rather than a section of one: the Gregorian day from
+     * the device clock is the identity every other reading on that screen is anchored to, so when it
+     * cannot be produced there is no honest screen to draw. It is carried as a reason rather than as a
+     * sentence so that the wording is chosen by the UI in the interface language.
+     */
+    DEVICE_DATE_UNAVAILABLE,
+
     /** No location has been configured, so no calculation input exists. */
     NO_LOCATION_CONFIGURED,
 

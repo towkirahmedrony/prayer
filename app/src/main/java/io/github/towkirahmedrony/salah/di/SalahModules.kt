@@ -153,6 +153,10 @@ val salahModules = module {
             // The repository's *inputs* are the stored calendar settings, so moving the Hijri offset or
             // the date language re-emits today and the displayed month instead of waiting for a restart.
             settings = get<UserPreferencesRepository>().calendarSettings,
+            // The interface language is the locale "follow the device" now means for today's date
+            // lines, so Home's weekday and dates are written in the language the rest of the screen is
+            // in. An explicit date-language choice still wins. See docs/LOCALIZATION.md section 6.
+            interfaceLanguage = get<UserPreferencesRepository>().appLanguage,
             banglaCalendar = get(),
             hijriCalendar = get(),
             ramadanCalendar = get(),

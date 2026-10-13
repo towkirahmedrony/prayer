@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.data.calendar
 
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
@@ -100,11 +101,15 @@ class DeviceClockCalendarRepositoryTest {
     private fun TestScope.observe(
         clock: Clock,
         settings: MutableStateFlow<CalendarSettings> = MutableStateFlow(CalendarSettings.DEFAULT),
+        interfaceLanguage: MutableStateFlow<AppLanguage> = MutableStateFlow(AppLanguage.SYSTEM),
     ): MutableList<CalendarSnapshot> {
         val snapshots = mutableListOf<CalendarSnapshot>()
         backgroundScope.launch {
-            DeviceClockCalendarRepository(clock = clock, settings = settings).observeToday()
-                .collect { snapshots += it }
+            DeviceClockCalendarRepository(
+                clock = clock,
+                settings = settings,
+                interfaceLanguage = interfaceLanguage,
+            ).observeToday().collect { snapshots += it }
         }
         return snapshots
     }
@@ -204,6 +209,49 @@ class DeviceClockCalendarRepositoryTest {
         runCurrent()
 
         assertEquals("1 Ramadan 1445 AH", hijriDate(snapshots[1]))
+    }
+
+    @Test
+    fun `today's date lines follow the interface language, not the device's`() = runTest {
+        // 11 March 2024 is the same day as the device-locale test above; only the language it is
+        // written in changes. The interface language is the `SYSTEM` branch of the date-language
+        // preference — which is the whole reason a reader who picks Bengali on an English phone gets
+        // Bengali month and weekday names instead of Latin ones.
+        val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
+        val snapshots = observe(clock, interfaceLanguage = MutableStateFlow(AppLanguage.BANGLA))
+        runCurrent()
+
+        val snapshot = snapshots.single()
+        // The Bangla and Hijri dates are composed from explicit month tables, so they are exact — and
+        // they are the *same dates* the device-locale run produced, which is what makes this a change
+        // of script rather than of data.
+        assertEquals("২৭ ফাল্গুন ১৪৩০", banglaDate(snapshot))
+        assertEquals("১ রমজান ১৪৪৫ AH", hijriDate(snapshot))
+        // The Gregorian date and the weekday name come from the platform's locale data, so they are
+        // checked for the script and the numerals rather than spelled out here: Bengali script, and not
+        // one Western digit left in the year.
+        val gregorian = gregorianDate(snapshot)
+        assertTrue("the Gregorian date is not in Bengali: $gregorian", gregorian.any { it.inBengaliBlock() })
+        assertFalse("the Gregorian date kept Western digits: $gregorian", gregorian.any { it in '0'..'9' })
+        val weekday = snapshot.weekdayLabel.orEmpty()
+        assertTrue("the weekday is not in Bengali: $weekday", weekday.any { it inBengaliBlock() })
+    }
+
+    @Test
+    fun `an explicit date language still wins over the interface language`() = runTest {
+        // The two settings answer different questions: the interface language is how the screen is
+        // written, the date language is which script the dates themselves are in. A reader who chose
+        // English words but Bengali dates must get Bengali dates.
+        val settings = MutableStateFlow(CalendarSettings(dateLanguage = DateLanguagePreference.BANGLA))
+        val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
+        val snapshots = observe(
+            clock,
+            settings = settings,
+            interfaceLanguage = MutableStateFlow(AppLanguage.ENGLISH),
+        )
+        runCurrent()
+
+        assertEquals("২৭ ফাল্গুন ১৪৩০", banglaDate(snapshots.single()))
     }
 
     @Test
@@ -359,3 +407,6 @@ class DeviceClockCalendarRepositoryTest {
         assertEquals(LocalDate.of(2024, 4, 8), window.end)
     }
 }
+
+/** True when [this] is in the Bengali Unicode block (U+0980–U+09FF). */
+private fun Char.inBengaliBlock(): Boolean = code in 0x0980..0x09FF

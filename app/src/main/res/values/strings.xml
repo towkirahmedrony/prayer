@@ -83,6 +83,54 @@
     <string name="home_shortcuts_title">Islamic tools</string>
 
     <!--
+      Home: the hero card.
+
+      The hero card names the prayer period that is open right now, or the one that opens next. Its
+      countdown is the time until the next boundary in the timetable — never the time left to perform
+      the prayer (see the note on home_current_prayer_* above). The waiting labels are worded so they
+      attach to a *time*, not to an act of worship.
+
+      `CURRENT PRAYER` is written in capitals in this resource rather than upper-cased at the call
+      site: Bengali has no letter case, so a call-site `uppercase()` would be a no-op there and a
+      typographic decision made in code. Keeping the capitals in the English value keeps that decision
+      where the words are.
+    -->
+    <string name="home_hero_status_current">CURRENT PRAYER</string>
+    <string name="home_hero_status_up_next">UP NEXT</string>
+    <string name="home_hero_subtitle_active">Currently in prayer time</string>
+    <string name="home_hero_subtitle_next">Next prayer</string>
+    <string name="home_hero_time_until">Time until %1$s</string>
+    <string name="home_hero_time_until_begins">Time until %1$s begins</string>
+    <string name="home_hero_time_remaining">Time remaining</string>
+    <string name="home_hero_starts">Starts %1$s</string>
+    <string name="home_hero_since_last_night">Since last night</string>
+    <string name="home_hero_ends">Ends %1$s</string>
+    <string name="home_hero_ends_next_day">Ends %1$s (tomorrow)</string>
+    <!-- The next prayer and its time, joined by a dash so the two read as one reading. -->
+    <string name="home_hero_next_at">%1$s — %2$s</string>
+
+    <!-- Home: the day's timetable strip and the two actions that leave the card. -->
+    <string name="home_today_prayer_times_title">Today\'s Prayer Times</string>
+    <string name="home_action_view_all">View all →</string>
+    <string name="home_action_view_details">View details →</string>
+
+    <!-- Home: one prohibited interval in the card's compact form: name, then its bounds. -->
+    <string name="home_prohibited_window">%1$s — %2$s–%3$s</string>
+
+    <!-- Home: the row of tool tiles under the prayer content. -->
+    <string name="home_daily_tools_title">Your Daily Tools</string>
+
+    <!--
+      Home: a prayer shown as the period it is — where it opens, then where it closes — and the
+      marker for a closing time that falls on the following local date (Isha closes at next Fajr).
+    -->
+    <string name="home_time_range">%1$s – %2$s</string>
+    <string name="home_ends_next_day">ends next day</string>
+
+    <!-- Home: the header's weekday and date on one line, in the interface language's own order. -->
+    <string name="home_weekday_and_date">%1$s, %2$s</string>
+
+    <!--
       The Tools destination.
 
       tools_subtitle and tools_unavailable_note are explanatory sentences, so they stay in English
@@ -161,6 +209,7 @@
     <string name="status_observed_at">Observed at %1$s</string>
 
     <!-- Unavailability reasons (mapped from the domain) -->
+    <string name="reason_device_date_unavailable">The Gregorian date is unavailable, so no date can be shown.</string>
     <string name="reason_no_location">Add a location in Settings to enable this section.</string>
     <string name="reason_calculation_not_configured">Prayer calculation is not configured yet.</string>
     <string name="reason_calculation_not_possible">No timetable can be calculated for this location and date: the sun does not reach the twilight angle the selected method needs. Try a different method, a different high-latitude rule, or another location.</string>

@@ -71,7 +71,8 @@ class HomeUiStateFactory(
         // genuine failure, because the device date could not be read.
         val gregorian = calendar?.gregorian as? CalendarDateState.Available
         if (calendar != null && gregorian == null) {
-            return HomeUiState.Failed(detail = "The Gregorian date is unavailable.")
+            // A reason, not a sentence: the screen renders it in whichever language is selected.
+            return HomeUiState.Failed(reason = UnavailabilityReason.DEVICE_DATE_UNAVAILABLE)
         }
 
         val schedule = (scheduleState as? PrayerScheduleState.Available)?.schedule

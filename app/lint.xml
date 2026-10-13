@@ -10,11 +10,13 @@
   reviewed by someone competent to review that wording. Translating them loosely would change an
   accuracy claim, which is exactly the kind of change this app must not make silently.
 
-  The **Calendar** screen is the one screen this policy does not allow to be partial: every string it
-  can show is translated. Its completeness is enforced by `LocalizationResourcesTest` rather than by
-  lint, because this ignore would otherwise stay quiet about a forgotten calendar key too. The
-  interface language is a stored preference with its own selector on Settings > General — a choice the
-  app applies at runtime, not a build-time decision; see docs/LOCALIZATION.md.
+  Two screens are not allowed to be partial: the **Calendar** and **Home**. Every string either of them
+  can show is translated, including the sentences they use to explain an empty section. Their
+  completeness is enforced by `LocalizationResourcesTest` rather than by lint, because this ignore would
+  otherwise stay quiet about a forgotten key on either of them too — and it additionally reads Home's
+  composables to assert that none of them renders a hardcoded sentence. The interface language is a
+  stored preference with its own selector on Settings > General — a choice the app applies at runtime,
+  not a build-time decision; see docs/LOCALIZATION.md, §5 and §10.
 
   Android's resource resolution falls back to `values/` for anything a locale does not define, so the
   app is complete in either case; this is a supported configuration rather than a defect.

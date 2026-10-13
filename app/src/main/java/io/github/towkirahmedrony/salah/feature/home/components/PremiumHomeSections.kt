@@ -48,13 +48,14 @@ fun HomeTopBar(
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    text = "Salah",
+                    // `app_name` is not translatable: a product name is the same in every language.
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    text = "Your Complete Islamic Companion",
+                    text = stringResource(R.string.app_tagline),
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                     color = GoldText,
                 )
@@ -121,8 +122,13 @@ fun LocationAndDateHeader(
             }
             Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = state.gregorianDate?.let { date -> state.weekday?.let { "$it, $date" } ?: date }
-                    ?: stringResource(R.string.home_date_pending),
+                // The weekday and the date are both formatted values, and the order they are joined in
+                // is a property of the language, not of this layout — so the join is a resource too.
+                text = state.gregorianDate?.let { date ->
+                    state.weekday?.let { weekday ->
+                        stringResource(R.string.home_weekday_and_date, weekday, date)
+                    } ?: date
+                } ?: stringResource(R.string.home_date_pending),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -178,7 +184,9 @@ fun CurrentPrayerHeroCard(
 
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = if (active) "CURRENT PRAYER" else "UP NEXT",
+                text = stringResource(
+                    if (active) R.string.home_hero_status_current else R.string.home_hero_status_up_next,
+                ),
                 style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
                 color = Color.White.copy(alpha = 0.75f),
                 fontWeight = FontWeight.SemiBold,
@@ -191,7 +199,9 @@ fun CurrentPrayerHeroCard(
                 color = Color.White,
             )
             Text(
-                text = if (active) "Currently in prayer time" else "Next prayer",
+                text = stringResource(
+                    if (active) R.string.home_hero_subtitle_active else R.string.home_hero_subtitle_next,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
             )
@@ -202,10 +212,16 @@ fun CurrentPrayerHeroCard(
                     style = MaterialTheme.typography.displaySmall.copy(fontSize = 32.sp, fontWeight = FontWeight.Bold),
                     color = Color.White,
                 )
+                // The caption names the *time* the countdown runs to, never the prayer as something to
+                // be performed: Salah does not rule on how long a prayer may be offered.
                 val countdownCaption = when {
-                    active && nextLabel != null -> "Time until $nextLabel"
-                    !active && nextLabel != null -> "Time until $nextLabel begins"
-                    else -> "Time remaining"
+                    active && nextLabel != null ->
+                        stringResource(R.string.home_hero_time_until, nextLabel)
+
+                    !active && nextLabel != null ->
+                        stringResource(R.string.home_hero_time_until_begins, nextLabel)
+
+                    else -> stringResource(R.string.home_hero_time_remaining)
                 }
                 Text(
                     text = countdownCaption,
@@ -227,7 +243,9 @@ fun CurrentPrayerHeroCard(
                 if (active) {
                     // `startTime` is null only for the Isha period that began before today's schedule.
                     Text(
-                        text = state.startTime?.let { "Starts $it" } ?: "Since last night",
+                        text = state.startTime?.let { start ->
+                            stringResource(R.string.home_hero_starts, start)
+                        } ?: stringResource(R.string.home_hero_since_last_night),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.85f),
                         maxLines = 1,
@@ -237,7 +255,11 @@ fun CurrentPrayerHeroCard(
                         // The closing time can be tomorrow's Fajr, which is why it may differ from
                         // today's Fajr in the list by a minute; say so instead of leaving it ambiguous.
                         Text(
-                            text = if (state.endsNextDay) "Ends $nextTime (tomorrow)" else "Ends $nextTime",
+                            text = if (state.endsNextDay) {
+                                stringResource(R.string.home_hero_ends_next_day, nextTime)
+                            } else {
+                                stringResource(R.string.home_hero_ends, nextTime)
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             maxLines = 1,
@@ -246,7 +268,7 @@ fun CurrentPrayerHeroCard(
                     }
                 } else {
                     Text(
-                        text = "Next prayer",
+                        text = stringResource(R.string.home_next_prayer_title),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.85f),
                         maxLines = 1,
@@ -254,7 +276,7 @@ fun CurrentPrayerHeroCard(
                     )
                     if (nextLabel != null && nextTime != null) {
                         Text(
-                            text = "$prayerName — $nextTime",
+                            text = stringResource(R.string.home_hero_next_at, prayerName, nextTime),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             maxLines = 1,
@@ -281,13 +303,13 @@ fun TodayPrayerTimesSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Today's Prayer Times",
+                text = stringResource(R.string.home_today_prayer_times_title),
                 style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
-                text = "View all →",
+                text = stringResource(R.string.home_action_view_all),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = ForestGreenPrimary,
@@ -340,7 +362,7 @@ private fun TodayPrayerCard(row: PrayerRow, isSelected: Boolean, modifier: Modif
         )
         Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = row.timeLabel ?: "—",
+            text = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -387,13 +409,15 @@ fun ForbiddenTimesCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Forbidden Prayer Times",
+                    // The card's own heading, shared with the full `ProhibitedTimesCard` so one card
+                    // cannot end up with two names for the same thing.
+                    text = stringResource(R.string.home_prohibited_title),
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "View details →",
+                    text = stringResource(R.string.home_action_view_details),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = ForestGreenPrimary,
@@ -416,7 +440,12 @@ fun ForbiddenTimesCard(
                     } else {
                         state.prohibited.windows.take(3).forEach { window ->
                             Text(
-                                text = "${stringResource(window.kind.labelRes())} — ${window.startsAt}–${window.endsAt}",
+                                text = stringResource(
+                                    R.string.home_prohibited_window,
+                                    stringResource(window.kind.labelRes()),
+                                    window.startsAt,
+                                    window.endsAt,
+                                ),
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
@@ -464,7 +493,7 @@ fun SunTimesCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = row.timeLabel ?: "—",
+                        text = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -482,7 +511,7 @@ fun DailyToolsSection(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Your Daily Tools",
+            text = stringResource(R.string.home_daily_tools_title),
             style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -492,12 +521,14 @@ fun DailyToolsSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            DailyToolItem(title = "Qibla", icon = { QiblaGlyph(ForestGreenPrimary) }, onClick = { onNavigate("qibla") }, modifier = Modifier.weight(1f))
-            DailyToolItem(title = "Calendar", icon = { CalendarGlyph(ForestGreenPrimary) }, onClick = { onNavigate("calendar") }, modifier = Modifier.weight(1f))
-            DailyToolItem(title = "Ramadan", icon = { RamadanGlyph(ForestGreenPrimary) }, onClick = { onNavigate("ramadan") }, modifier = Modifier.weight(1f))
+            // Each tile is labelled with the destination it opens, using that destination's own name
+            // resource, so a tile cannot say one thing and lead to a screen headed another.
+            DailyToolItem(title = stringResource(R.string.shortcut_qibla), icon = { QiblaGlyph(ForestGreenPrimary) }, onClick = { onNavigate("qibla") }, modifier = Modifier.weight(1f))
+            DailyToolItem(title = stringResource(R.string.nav_calendar), icon = { CalendarGlyph(ForestGreenPrimary) }, onClick = { onNavigate("calendar") }, modifier = Modifier.weight(1f))
+            DailyToolItem(title = stringResource(R.string.nav_ramadan), icon = { RamadanGlyph(ForestGreenPrimary) }, onClick = { onNavigate("ramadan") }, modifier = Modifier.weight(1f))
             // Labelled for the screen it opens: this tile navigates to the tools destination, and Salah
             // has no Tasbih feature to name it after. The mark is the tools destination's own glyph.
-            DailyToolItem(title = "Tools", icon = { TasbihGlyph(ForestGreenPrimary) }, onClick = { onNavigate("tools") }, modifier = Modifier.weight(1f))
+            DailyToolItem(title = stringResource(R.string.nav_tools), icon = { TasbihGlyph(ForestGreenPrimary) }, onClick = { onNavigate("tools") }, modifier = Modifier.weight(1f))
         }
     }
 }

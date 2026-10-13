@@ -7,16 +7,19 @@
   identifier and the shell applies it to every screen without recreating the activity, so these strings
   are reached either way.
 
-  This is a PARTIAL translation of the explanatory strings on purpose. Android falls back to
-  values/strings.xml for anything not listed here, and Salah's English wording makes specific claims
-  about sources and limits that must not be translated loosely — so the explanatory paragraphs that
-  state what is estimated and what is not stay in English until someone competent to review that
-  wording has reviewed it.
+   This is a PARTIAL translation of the explanatory strings on purpose. Android falls back to
+   values/strings.xml for anything not listed here, and Salah's English wording makes specific claims
+   about sources and limits that must not be translated loosely — so the explanatory paragraphs that
+   state what is estimated and what is not stay in English until someone competent to review that
+   wording has reviewed it.
 
-  The Calendar screen is the deliberate exception. Every string that screen shows is translated here,
-  including its explanatory and error text, because it is the screen this phase localises in full and a
-  half-Bengali calendar is exactly what a reader would notice first. The same goes for the language
-  selector's own labels: a control that changes the interface language has to be legible in both.
+   **Home and the Calendar are the two deliberate exceptions**, and they are translated in full: every
+   string each of those screens can render is here, including its explanatory and error text, its empty
+   states and the reasons it gives for them. A half-Bengali Home screen is the first thing a reader
+   notices — it is the screen the app opens on — so it does not get the partial treatment the remaining
+   screens keep. `LocalizationResourcesTest` enforces that completeness for both screens rather than
+   trusting it. The language selector's own labels are translated for the same reason: a control that
+   changes the interface language has to be legible in both.
 
   The calendar's date language (which script and numerals the dates themselves use) is a separate,
   explicit setting and is not affected by the interface language — see Calendar settings.
@@ -44,6 +47,108 @@
     <string name="calendar_next_month">পরের মাস</string>
     <string name="calendar_go_to_today">আজকের তারিখে যান</string>
     <string name="calendar_estimated_badge">আনুমানিক</string>
+
+    <!--
+      The Home screen, in full.
+
+      Home is the second screen whose translation is complete rather than partial (the Calendar is the
+      first). Everything Home can render is here — its header, its hero card, its timetable strip, the
+      prohibited-time card, the daily tool tiles, its empty and error states and the reasons it gives
+      for them — so selecting Bengali cannot leave a single label, button or sentence of that screen in
+      English.
+
+      Two things are deliberately absent and stay English by falling through to `values/strings.xml`:
+      `app_name` ("Salah") and the Arabic `home_prayer_times_arabic` heading, both marked
+      `translatable="false"` in the default file. The times and dates themselves are not resources:
+      they are formatted values, and which script they are written in is a separate, stored
+      preference — see docs/LOCALIZATION.md section 6.
+    -->
+    <string name="app_tagline">আপনার সম্পূর্ণ ইসলামি সঙ্গী</string>
+
+    <!-- Home: the hero card, which names the prayer period that is open now — or the one that is next. -->
+    <string name="home_hero_status_current">বর্তমান ওয়াক্ত</string>
+    <string name="home_hero_status_up_next">পরবর্তী ওয়াক্ত</string>
+    <string name="home_hero_subtitle_active">এখন নামাজের ওয়াক্ত চলছে</string>
+    <string name="home_hero_subtitle_next">পরবর্তী নামাজ</string>
+    <string name="home_hero_time_until">%1$s পর্যন্ত বাকি সময়</string>
+    <string name="home_hero_time_until_begins">%1$s শুরু হতে বাকি সময়</string>
+    <string name="home_hero_time_remaining">বাকি সময়</string>
+    <string name="home_hero_starts">শুরু %1$s</string>
+    <string name="home_hero_since_last_night">গত রাত থেকে চলছে</string>
+    <string name="home_hero_ends">শেষ %1$s</string>
+    <string name="home_hero_ends_next_day">শেষ %1$s (আগামীকাল)</string>
+    <string name="home_hero_next_at">%1$s — %2$s</string>
+
+    <!-- Home: the day's timetable strip and the two actions that leave it. -->
+    <string name="home_today_prayer_times_title">আজকের নামাজের সময়সূচি</string>
+    <string name="home_action_view_all">সব দেখুন →</string>
+    <string name="home_action_view_details">বিস্তারিত দেখুন →</string>
+    <string name="home_prohibited_window">%1$s — %2$s–%3$s</string>
+    <string name="home_daily_tools_title">আপনার দৈনন্দিন টুল</string>
+
+    <!-- Home: a prayer shown as the period it is, and the marker for a next-day closing time. -->
+    <string name="home_time_range">%1$s – %2$s</string>
+    <string name="home_ends_next_day">পরদিন শেষ হয়</string>
+    <string name="home_weekday_and_date">%1$s, %2$s</string>
+
+    <!-- Home: the header, the location card and the calculation card. -->
+    <string name="home_weekday_unknown">বার পাওয়া যাচ্ছে না</string>
+    <string name="home_location_title">অবস্থান</string>
+    <string name="home_location_none_title">কোনো অবস্থান নির্ধারিত নেই</string>
+    <string name="home_location_none_body">নামাজের সময় হিসাব করার আগে সালাহর একটি অবস্থান প্রয়োজন। সেটিংসে নিজে একটি অবস্থান যোগ করুন।</string>
+    <string name="home_location_manual">নিজে দেওয়া অবস্থান</string>
+    <string name="home_location_coordinates">%1$.4f, %2$.4f</string>
+    <string name="home_location_timezone">সময় অঞ্চল: %1$s</string>
+    <string name="home_adjusted_by">%1$s মিনিট সমন্বয় প্রয়োগ করা হয়েছে</string>
+    <string name="home_calculation_title">হিসাব</string>
+    <string name="home_calculation_method">পদ্ধতি: %1$s</string>
+    <string name="home_calculation_asr">আসর: %1$s</string>
+    <string name="home_calculation_high_latitude">উচ্চ অক্ষাংশ: %1$s</string>
+    <string name="home_calculation_adjusted">এতে আপনার নিজে দেওয়া মিনিট সমন্বয় ধরা আছে।</string>
+
+    <!-- Home: the timetable, the solar events and the next-prayer card. -->
+    <string name="home_prayer_timetable_title">দৈনিক সময়সূচি</string>
+    <string name="home_solar_title">সূর্যোদয়, সৌর মধ্যাহ্ন ও সূর্যাস্ত</string>
+    <string name="home_solar_note">সৌর ঘটনাগুলো পাঁচ ওয়াক্ত নামাজ থেকে আলাদা করে দেখানো হয়েছে।</string>
+    <string name="home_next_prayer_title">পরবর্তী নামাজ</string>
+    <string name="home_next_prayer_none">এখনও কোনো নামাজের সময়সূচি না থাকায় কাউন্টডাউন দেখানো হচ্ছে না।</string>
+    <string name="home_next_prayer_at">%1$s-এ</string>
+    <string name="home_next_prayer_remaining">%1$s বাকি</string>
+
+    <!-- Home: the prohibited-time card. -->
+    <string name="home_prohibited_title">নামাজের নিষিদ্ধ সময়</string>
+    <string name="home_prohibited_none">কোনো নিষিদ্ধ সময়ের নিয়ম কনফিগার করা না থাকায় কোনো বিরতি দেখানো হচ্ছে না। সালাহ নিজে থেকে বানানো বিরতি দেখায় না।</string>
+    <string name="prohibited_window_range">%1$s – %2$s</string>
+
+    <!-- Home: the shortcut tiles and the provenance card. -->
+    <string name="home_shortcuts_title">ইসলামি টুল</string>
+    <string name="shortcut_qibla">কিবলা</string>
+    <string name="shortcut_ramadan_subtitle">সেহরি ও ইফতারের সময়সূচি</string>
+    <string name="shortcut_calendar_subtitle">গ্রেগরিয়ান, বাংলা ও হিজরি</string>
+    <string name="shortcut_qibla_subtitle">কম্পাসের দিক</string>
+    <string name="shortcut_settings_subtitle">নামাজ, অবস্থান, ক্যালেন্ডার ও আরও</string>
+    <string name="status_title">তথ্যের উৎস</string>
+    <string name="status_offline_ready">অফলাইন-প্রধান · এই ডিভাইসেই সংরক্ষিত</string>
+    <string name="status_source_label">উৎস: %1$s</string>
+    <string name="status_source_unconfigured">কনফিগার করা নেই</string>
+    <string name="status_source_local_calculation">স্থানীয় জ্যোতির্বিজ্ঞানভিত্তিক হিসাব</string>
+    <string name="status_source_remote_api">দূরবর্তী সরবরাহকারী (%1$s)</string>
+    <string name="status_source_user_timetable">ব্যবহারকারীর সময়সূচি (%1$s)</string>
+    <string name="status_observed_at">%1$s-এ পাওয়া গেছে</string>
+
+    <!--
+      Home: why a section has no value. These are the sentences Home shows in place of a timetable or
+      a location block, and they are translated as literally as the Bangla allows: each one states a
+      limit or a missing input, and a loose rendering would change what Salah claims about the data it
+      did not show.
+    -->
+    <string name="reason_device_date_unavailable">গ্রেগরিয়ান তারিখ পাওয়া যাচ্ছে না, তাই কোনো তারিখ দেখানো হচ্ছে না।</string>
+    <string name="reason_no_location">এই অংশটি চালু করতে সেটিংসে একটি অবস্থান যোগ করুন।</string>
+    <string name="reason_calculation_not_configured">নামাজের সময়ের হিসাব এখনও কনফিগার করা হয়নি।</string>
+    <string name="reason_calculation_not_possible">এই অবস্থান ও তারিখের জন্য কোনো সময়সূচি হিসাব করা যাচ্ছে না: নির্বাচিত পদ্ধতির প্রয়োজনীয় গোধূলির কোণ পর্যন্ত সূর্য পৌঁছায় না। অন্য কোনো পদ্ধতি, ভিন্ন উচ্চ-অক্ষাংশ নিয়ম বা অন্য অবস্থান ব্যবহার করে দেখুন।</string>
+    <string name="reason_rules_not_verified">যাচাই করা নিয়মসমূহ এখনও কনফিগার করা হয়নি।</string>
+    <string name="reason_network_unavailable">দূরবর্তী সরবরাহকারী পাওয়া যাচ্ছে না। সংরক্ষিত স্থানীয় তথ্য থাকলে তা এখনও দেখানো হচ্ছে।</string>
+    <string name="reason_unknown">এই অংশটি এখনও পাওয়া যাচ্ছে না।</string>
 
     <!-- Ramadan -->
     <string name="calendar_ramadan_title">রমজান ক্যালেন্ডার</string>
@@ -145,9 +250,11 @@
       paragraphs, its error explanations and its accuracy-claim wording are therefore untranslated on
       purpose rather than by omission.
 
-      shortcut_qibla is deliberately absent: it is the Qibla screen's own title and the Home and Tools
-      tile, and no shortcut_* tile in Salah is translated yet, so translating only this one would make
-      one screen's heading the odd one out.
+      `shortcut_qibla` used to be absent here on the grounds that no shortcut tile was translated. It
+      is now present, because Home's daily-tools row renders it and Home is translated in full: a
+      "Qibla" tile left in English beside Bengali neighbours is exactly the leftover this file exists to
+      prevent. The Qibla screen's own heading therefore reads Bengali too, which is consistent with the
+      tile that opens it.
     -->
     <string name="qibla_section_compass">কম্পাস</string>
     <string name="qibla_section_location">অবস্থান</string>
