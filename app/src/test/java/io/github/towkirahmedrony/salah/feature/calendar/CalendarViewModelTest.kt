@@ -1,9 +1,11 @@
 package io.github.towkirahmedrony.salah.feature.calendar
 
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
@@ -58,10 +60,12 @@ class CalendarViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(mainDispatcher)
-        // Both the repository and the view model read "today" in the device zone, so pin it to UTC to
-        // match the fixed clock. The default locale is pinned to English too, because the Gregorian
-        // mode follows the device language and an assertion on "September 2024" must not depend on
-        // the machine's own locale.
+        // Both the repository and the view model read "today" in the zone a location-local day is
+        // decided in, which is the device's own zone when no location is configured — the case these
+        // tests are — so pin it to UTC to match the fixed clock. (Where a location *is* configured its
+        // zone answers instead; see the location-zone test below.) The default locale is pinned to
+        // English too, because the Gregorian mode follows the device language and an assertion on
+        // "September 2024" must not depend on the machine's own locale.
         originalZone = TimeZone.getDefault()
         originalLocale = Locale.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
@@ -285,18 +289,55 @@ class CalendarViewModelTest {
             assertEquals(CalendarSystem.GREGORIAN, preferences.calendarSettings.first().preferredSystem)
         }
 
-    /** Builds the view model over the real repository and the real factory, with a fixed clock. */
-    private fun viewModelAt(instant: String): CalendarViewModel {
+    @Test
+    fun `opens on the month containing the location's day, not the device's`() = runTest(mainDispatcher) {
+        // The device is pinned to UTC; the location is on UTC+6. At 20:00 UTC on 13 October the device
+        // still calls it the 13th while Dhaka has already turned to the 14th. The screen has to agree
+        // with the day the calendar repository marks as today, or it would open on a month that does not
+        // contain the day it then highlights.
+        val locations = MutableStateFlow<LocationInfo?>(dhaka)
+        val states = observe(viewModelAt("2026-10-13T20:00:00Z", locations))
+        runCurrent()
+
+        val ready = latestReady(states)
+        assertEquals(LocalDate.of(2026, 10, 14), ready.today.date)
+        assertEquals(LocalDate.of(2026, 10, 14), ready.selected.date)
+        assertTrue(ready.selectedIsToday)
+        // And the grid actually covers that day, which is what makes the anchor the right month.
+        assertTrue(
+            "the day being marked is not in the grid",
+            ready.weeks.flatten().any { cell -> cell?.date == LocalDate.of(2026, 10, 14) },
+        )
+    }
+
+    /** The stored location the location-zone test resolves its day from. */
+    private val dhaka = checkNotNull(LocationInfo.create("Dhaka", 23.8103, 90.4125, "Asia/Dhaka"))
+
+    /**
+     * Builds the view model over the real repository and the real factory, with a fixed clock.
+     *
+     * [locations] is the stored location, when the test needs one: both the repository and the view
+     * model then take their day from its zone, which is the shared source the production wiring uses.
+     */
+    private fun TestScope.viewModelAt(
+        instant: String,
+        locations: MutableStateFlow<LocationInfo?>? = null,
+    ): CalendarViewModel {
         val clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC"))
+        val dayZone = locations?.let { source ->
+            LocationDayZone(locationSource = source, scope = backgroundScope)
+        }
         val repository = DeviceClockCalendarRepository(
             clock = clock,
             settings = preferences.calendarSettings,
+            dayZone = dayZone,
         )
         return CalendarViewModel(
             calendarRepository = repository,
             userPreferencesRepository = preferences,
             uiStateFactory = CalendarUiStateFactory(),
             clock = clock,
+            dayZone = dayZone,
         )
     }
 

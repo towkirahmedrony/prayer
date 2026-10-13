@@ -60,10 +60,15 @@ class HomeUiStateFactory(
         prohibitedState: ProhibitedPeriodsState,
         now: ZonedDateTime,
         /**
-         * The following local date's Fajr, when the caller has it. It closes Isha's period, which is
-         * the one period whose ending boundary is not on the day's own schedule.
+         * The following local date's **schedule**, when the caller has it.
+         *
+         * It answers two questions that today's timetable cannot: the boundary that closes Isha's
+         * period, and — once today's last prayer has begun — what the next prayer actually is, since
+         * that is the following day's Fajr. The whole schedule is taken rather than a bare instant so
+         * both answers come from one calculation the same engine produced for the same place, and so
+         * the resolver can check that it really is tomorrow's before using it.
          */
-        nextDayFajr: ZonedDateTime? = null,
+        nextDaySchedule: PrayerSchedule? = null,
     ): HomeUiState {
         // `null` means the calendar snapshot has not been produced yet, which is a *pending* state,
         // not a failure: Home renders the prayer content and a placeholder date, and the calendar
@@ -85,9 +90,15 @@ class HomeUiStateFactory(
             .withLocale(locale)
             .withZone(zone)
 
-        // The resolver returns null rather than guessing when the schedule is for another day,
-        // incomplete, or already finished, so the countdown can never be fabricated.
-        val nextPrayer = nextPrayerResolver.resolve(schedule, now)
+        // Tomorrow's Fajr, derived here from tomorrow's own schedule rather than accepted as a bare
+        // instant, so Isha's closing boundary and the next-prayer countdown are the same calculation.
+        // `null` when tomorrow has not been produced — the honest answer, not an invented boundary.
+        val nextDayFajr = nextDaySchedule?.timeOf(PrayerName.FAJR)
+
+        // The resolver returns null rather than guessing when the schedule is for another day or
+        // incomplete, so the countdown can never be fabricated. It is given tomorrow's schedule so that
+        // after today's last prayer it can name tomorrow's Fajr instead of reporting nothing.
+        val nextPrayer = nextPrayerResolver.resolve(schedule, now, nextDaySchedule)
         val nextPrayerSection = NextPrayerSection(
             prayer = nextPrayer?.prayer,
             time = nextPrayer?.let { timeFormatter.format(it.time) },

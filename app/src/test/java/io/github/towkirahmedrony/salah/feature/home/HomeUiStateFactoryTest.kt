@@ -35,6 +35,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -183,7 +184,7 @@ class HomeUiStateFactoryTest {
         calendar: CalendarSnapshot = this.calendar,
         prohibitedState: ProhibitedPeriodsState = prohibitedNotAvailable,
         now: ZonedDateTime = this.now,
-        nextDayFajr: ZonedDateTime? = null,
+        nextDaySchedule: PrayerSchedule? = null,
     ): HomeUiState.Ready {
         val state = factory.create(
             calendar = calendar,
@@ -192,7 +193,7 @@ class HomeUiStateFactoryTest {
             scheduleState = scheduleState,
             prohibitedState = prohibitedState,
             now = now,
-            nextDayFajr = nextDayFajr,
+            nextDaySchedule = nextDaySchedule,
         )
         assertTrue("expected Ready but was $state", state is HomeUiState.Ready)
         return state as HomeUiState.Ready
@@ -342,12 +343,12 @@ class HomeUiStateFactoryTest {
 
     @Test
     fun `Isha is closed by the next day's Fajr when it is available`() {
-        val nextDayFajr = date.plusDays(1).atTime(4, 39).atZone(zone)
         val state = ready(
             location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
             scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
             now = date.atTime(20, 0).atZone(zone),
-            nextDayFajr = nextDayFajr,
+            nextDaySchedule = completeSchedule(date.plusDays(1)),
         )
 
         assertTrue(state.currentPrayer.isActive)
@@ -355,6 +356,36 @@ class HomeUiStateFactoryTest {
         assertEquals(PrayerName.FAJR, state.currentPrayer.endsWithPrayer)
         assertTrue("the closing Fajr is on the following day", state.currentPrayer.endsNextDay)
         assertEquals("8:39:00", state.currentPrayer.countdown)
+    }
+
+    @Test
+    fun `once Isha has begun the next prayer is tomorrow's Fajr`() {
+        // 20:00 is past Isha (18:51), so today's timetable has nothing left to name. Tomorrow's own
+        // schedule is the answer, and it is the same value that closes Isha's period above: one
+        // calculation used twice, not a second Fajr for the next-prayer card.
+        val tomorrow = completeSchedule(date.plusDays(1))
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(20, 0).atZone(zone),
+            nextDaySchedule = tomorrow,
+        )
+
+        assertEquals(PrayerName.FAJR, state.nextPrayer.prayer)
+        assertEquals("04:39", state.nextPrayer.time)
+        assertEquals("8:39:00", state.nextPrayer.countdown)
+        // And the secondary countdown on the current-period card agrees with the main one.
+        assertEquals(state.nextPrayer.prayer, state.currentPrayer.next.prayer)
+        assertEquals(state.nextPrayer.countdown, state.currentPrayer.next.countdown)
+        // The instant is tomorrow's own Fajr, not a reused today's — the two differ by exactly a day.
+        val todayFajr = completeSchedule().timeOf(PrayerName.FAJR)!!
+        val tomorrowFajr = tomorrow.timeOf(PrayerName.FAJR)!!
+        assertNotEquals(todayFajr, tomorrowFajr)
+        assertEquals(Duration.ofDays(1), Duration.between(todayFajr, tomorrowFajr))
+        assertTrue("the next prayer must be in the future", tomorrowFajr.isAfter(date.atTime(20, 0).atZone(zone)))
+        // And the strip marks the Fajr row as the next prayer, which nothing did before.
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.FAJR }.isNext)
     }
 
     @Test
@@ -368,10 +399,9 @@ class HomeUiStateFactoryTest {
         assertFalse(state.currentPrayer.isActive)
         assertNull(state.currentPrayer.countdown)
         assertEquals(UnavailabilityReason.UNKNOWN, state.currentPrayer.unavailable)
-        // 20:00 is after Isha, and `NextPrayerResolver` resolves only within the day it was given:
-        // once the last prayer has begun it reports nothing rather than guessing at tomorrow's Fajr.
-        // That is the same absence that leaves Isha's period unresolved above, so the two cards are
-        // consistent with each other instead of one inventing a boundary for the other.
+        // 20:00 is after Isha, and with no next-day schedule there is nothing to name: neither the
+        // closing boundary nor the next prayer is invented. The two cards are unresolved together
+        // rather than one guessing a boundary for the other.
         assertNull(state.nextPrayer.prayer)
         assertNull(state.nextPrayer.countdown)
         assertNull(state.currentPrayer.next.prayer)

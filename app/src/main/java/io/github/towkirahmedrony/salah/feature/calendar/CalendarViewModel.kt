@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
@@ -37,9 +38,13 @@ import java.util.Locale
  * before the month's start and the day after its end, which is one month of *that* system in either
  * direction. This is what makes month navigation follow the selected calendar.
  *
- * **Which month.** Read in the device's current zone rather than the injected [Clock]'s zone. The
- * clock is deliberately bound to UTC so that every consumer converts explicitly, and a *calendar*
- * month is a property of where the user is, not of UTC — near a month boundary the two disagree.
+ * **Which month.** "Today" is read in the *configured location's* zone, not the injected [Clock]'s zone
+ * and not the device's. The clock is deliberately bound to UTC so that every consumer converts
+ * explicitly, and the day a month is anchored on has to be the same day the repository marks as today
+ * and the prayer timetable is calculated for — otherwise the screen can open on the month before the
+ * one containing the day it is highlighting. [LocationDayZone] resolves it, so this screen and the
+ * calendar repository answer that question from one place; with no location configured the device's own
+ * zone answers, which is the behaviour this screen had before.
  *
  * **The selection always stays inside the displayed month.** Navigating months with no selection in
  * view would leave the details card describing a day the user cannot see, so navigation selects the
@@ -61,6 +66,14 @@ class CalendarViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val uiStateFactory: CalendarUiStateFactory,
     private val clock: Clock,
+    /**
+     * The zone a location-local civil day is decided in, or `null` to follow the device's own zone.
+     *
+     * `null` is the default so a construction with no location keeps the behaviour the existing tests
+     * pinned; the application passes the real one, the same instance the calendar repository resolves
+     * its days with, so the anchor month and the "today" cell cannot disagree.
+     */
+    private val dayZone: LocationDayZone? = null,
 ) : ViewModel() {
 
     /** A Gregorian day inside the displayed month; the month itself comes from the repository. */
@@ -144,7 +157,8 @@ class CalendarViewModel(
         selectedDate.value = target
     }
 
-    private fun today(): LocalDate = clock.instant().atZone(ZoneId.systemDefault()).toLocalDate()
+    private fun today(): LocalDate =
+        clock.instant().atZone(dayZone?.current() ?: ZoneId.systemDefault()).toLocalDate()
 
     /** The four inputs a month is built from; kept as a value so the combine has one type. */
     private data class MonthRequest(

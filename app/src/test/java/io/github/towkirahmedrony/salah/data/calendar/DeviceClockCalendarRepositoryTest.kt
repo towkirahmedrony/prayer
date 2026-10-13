@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.data.calendar
 
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
@@ -7,6 +8,7 @@ import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.IslamicOccasion
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,8 +39,10 @@ import java.util.TimeZone
  * Three things are under test here and nowhere else, because they are the repository's own job rather
  * than a converter's:
  *
- *  1. **which Gregorian day it is** — taken from the device clock in the device's own zone, so a
- *     device date or time-zone change moves it;
+ *  1. **which Gregorian day it is** — the instant comes from the device clock and is placed on a day in
+ *     the *configured location's* zone, so the date line above the prayer times and the times
+ *     themselves cannot name two different civil days; with no location configured the device's own
+ *     zone answers, and then a device time-zone change still moves it;
  *  2. **that a rollover re-emits** — the header must stop showing yesterday at local midnight, without
  *     polling and correctly across a daylight-saving day;
  *  3. **that the stored settings are inputs** — moving the Hijri offset must move the displayed Hijri
@@ -86,8 +90,11 @@ class DeviceClockCalendarRepositoryTest {
         available(snapshot.hijri as? CalendarDateState.Available)
 
     /** Whole milliseconds from [from] to the next local midnight in the current default zone. */
-    private fun millisUntilNextLocalMidnight(from: Instant): Long {
-        val zone = ZoneId.systemDefault()
+    private fun millisUntilNextLocalMidnight(from: Instant): Long =
+        millisUntilNextMidnight(from, ZoneId.systemDefault())
+
+    /** Whole milliseconds from [from] to the next midnight in [zone]. */
+    private fun millisUntilNextMidnight(from: Instant, zone: ZoneId): Long {
         val midnight = from.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
         return Duration.between(from, midnight).toMillis()
     }
@@ -102,13 +109,23 @@ class DeviceClockCalendarRepositoryTest {
         clock: Clock,
         settings: MutableStateFlow<CalendarSettings> = MutableStateFlow(CalendarSettings.DEFAULT),
         interfaceLanguage: MutableStateFlow<AppLanguage> = MutableStateFlow(AppLanguage.SYSTEM),
+        /**
+         * The stored location's zone is resolved from this, or `null` for a repository with no
+         * location zone source at all — which is every test above the location-zone ones, and the
+         * device-zone behaviour they pin.
+         */
+        locations: MutableStateFlow<LocationInfo?>? = null,
     ): MutableList<CalendarSnapshot> {
         val snapshots = mutableListOf<CalendarSnapshot>()
+        val dayZone = locations?.let { source ->
+            LocationDayZone(locationSource = source, scope = backgroundScope)
+        }
         backgroundScope.launch {
             DeviceClockCalendarRepository(
                 clock = clock,
                 settings = settings,
                 interfaceLanguage = interfaceLanguage,
+                dayZone = dayZone,
             ).observeToday().collect { snapshots += it }
         }
         return snapshots
@@ -209,6 +226,67 @@ class DeviceClockCalendarRepositoryTest {
         runCurrent()
 
         assertEquals("1 Ramadan 1445 AH", hijriDate(snapshots[1]))
+    }
+
+    // --- The day is the *location's* day ---------------------------------------
+
+    private val dhaka = checkNotNull(LocationInfo.create("Dhaka", 23.8103, 90.4125, "Asia/Dhaka"))
+
+    /** A location on UTC-7 in March, so the same instant can be a different civil day from Dhaka's. */
+    private val losAngeles =
+        checkNotNull(LocationInfo.create("Los Angeles", 34.0522, -118.2437, "America/Los_Angeles"))
+
+    @Test
+    fun `takes the day from the configured location's zone, not the device's`() = runTest {
+        // The device is on UTC (pinned above) and the location is on UTC+6, so 20:00 UTC is already the
+        // next civil day in Dhaka. The header must name the day the prayer timetable underneath it was
+        // calculated for: 12 March 2024 is 2 Ramadan 1445 and 28 Falgun 1430, not the device's 11 March.
+        val clock = MutableClock(Instant.parse("2024-03-11T20:00:00Z"), ZoneId.of("UTC"))
+        val snapshots = observe(clock, locations = MutableStateFlow<LocationInfo?>(dhaka))
+        runCurrent()
+
+        val snapshot = snapshots.single()
+        assertEquals("12 March 2024", gregorianDate(snapshot))
+        assertEquals("Tuesday", snapshot.weekdayLabel)
+        assertEquals("2 Ramadan 1445 AH", hijriDate(snapshot))
+        assertEquals("28 Falgun 1430", banglaDate(snapshot))
+    }
+
+    @Test
+    fun `a location change re-emits the day in the new location's zone`() = runTest {
+        // The device's zone never moves here, so only the stored location can explain a changed date:
+        // 20:00 UTC is 12 March in Dhaka (UTC+6) and still 11 March in Los Angeles (UTC-7).
+        val clock = MutableClock(Instant.parse("2024-03-11T20:00:00Z"), ZoneId.of("UTC"))
+        val locations = MutableStateFlow<LocationInfo?>(dhaka)
+        val snapshots = observe(clock, locations = locations)
+        runCurrent()
+        assertEquals("12 March 2024", gregorianDate(snapshots.last()))
+
+        locations.value = losAngeles
+        runCurrent()
+
+        assertTrue("a location change must emit a new snapshot", snapshots.size >= 2)
+        assertEquals("11 March 2024", gregorianDate(snapshots.last()))
+    }
+
+    @Test
+    fun `rolls over at the location's local midnight, not the device's`() = runTest {
+        // 17:59 UTC is 23:59 in Dhaka, so the location's day turns one minute later — while the device's
+        // own (UTC) day still has six hours to run. The wait has to be measured in the location's zone.
+        val start = Instant.parse("2026-10-11T17:59:00Z")
+        val clock = MutableClock(start, ZoneId.of("UTC"))
+        val snapshots = observe(clock, locations = MutableStateFlow<LocationInfo?>(dhaka))
+        runCurrent()
+        assertEquals("11 October 2026", gregorianDate(snapshots[0]))
+
+        clock.current = Instant.parse("2026-10-11T18:00:00Z")
+        advanceTimeBy(millisUntilNextMidnight(start, ZoneId.of("Asia/Dhaka")) + 1)
+        runCurrent()
+
+        assertEquals("12 October 2026", gregorianDate(snapshots.last()))
+        // The device's own zone has *not* rolled over — it is still 11 October in UTC — which is what
+        // makes the new snapshot the location's day rather than the device's.
+        assertEquals(LocalDate.of(2026, 10, 11), clock.current.atZone(ZoneId.of("UTC")).toLocalDate())
     }
 
     @Test

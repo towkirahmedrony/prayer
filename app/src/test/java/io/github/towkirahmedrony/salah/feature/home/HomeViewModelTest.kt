@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.home
 
 import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
@@ -24,6 +25,7 @@ import io.github.towkirahmedrony.salah.core.model.RamadanWindow
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.SolarEventEntry
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
+import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,6 +46,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -52,8 +55,10 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.TimeZone
 
 /**
  * The Home screen's **data contract** — the half `HomeUiStateFactoryTest` cannot reach.
@@ -260,20 +265,153 @@ class HomeViewModelTest {
         )
     }
 
+    @Test
+    fun `after Isha the next prayer is tomorrow's Fajr, counted down like every other`() =
+        runTest(mainDispatcher) {
+            storedLocation.value = dhaka
+            val repository = FakeScheduleRepository()
+            val states = observe(home(repository))
+            runCurrent()
+
+            // 20:00 in Dhaka: today's Isha (18:51) has begun, so nothing on today's timetable is still
+            // ahead. The next prayer is tomorrow's Fajr, and the countdown is to that real instant.
+            clock.set(ZonedDateTime.of(date, LocalTime.of(20, 0), zone).toInstant())
+            tick(1_000)
+
+            val ready = latestReady(states)
+            assertEquals(PrayerName.FAJR, ready.nextPrayer.prayer)
+            assertEquals("8:39:00", ready.nextPrayer.countdown)
+            assertNotNull("the next prayer carries its time", ready.nextPrayer.time)
+            // Tomorrow's Fajr is the same boundary that closes today's Isha period, so the two cards
+            // agree instead of one of them going blank.
+            assertEquals(PrayerName.ISHA, ready.currentPrayer.prayer)
+            assertTrue(ready.currentPrayer.isActive)
+            assertEquals("8:39:00", ready.currentPrayer.countdown)
+            assertTrue(ready.currentPrayer.endsNextDay)
+        }
+
+    @Test
+    fun `past midnight the next prayer is the new day's Fajr, not yesterday's leftover`() =
+        runTest(mainDispatcher) {
+            storedLocation.value = dhaka
+            val repository = FakeScheduleRepository()
+            val states = observe(home(repository))
+            runCurrent()
+            // 15:00: the Dhuhr period is open, so the next prayer is Asr.
+            assertEquals(PrayerName.ASR, latestReady(states).nextPrayer.prayer)
+
+            // 00:30 the following morning: the local day has rolled over while the app stayed open, the
+            // new day's schedule has been requested, and Fajr is simply the next thing on it.
+            clock.set(ZonedDateTime.of(date.plusDays(1), LocalTime.of(0, 30), zone).toInstant())
+            tick(1_000)
+
+            val ready = latestReady(states)
+            assertEquals(PrayerName.FAJR, ready.nextPrayer.prayer)
+            assertEquals("4:09:00", ready.nextPrayer.countdown)
+            // The period is still the Isha that began yesterday, closed by the new day's own Fajr. That
+            // boundary is on *this* schedule, so it is no longer a "next day" one, and its start — which
+            // is on yesterday's timetable — is not shown.
+            assertEquals(PrayerName.ISHA, ready.currentPrayer.prayer)
+            assertTrue(ready.currentPrayer.isActive)
+            assertNull("the start is on the previous day's timetable", ready.currentPrayer.startTime)
+            assertFalse(ready.currentPrayer.endsNextDay)
+            assertTrue(
+                "the new day's schedule must have been asked for",
+                repository.requestedDates().contains(date.plusDays(1)),
+            )
+        }
+
+    @Test
+    fun `moving the location re-derives tomorrow as well as today`() = runTest(mainDispatcher) {
+        storedLocation.value = dhaka
+        val repository = FakeScheduleRepository()
+        val states = observe(home(repository))
+        runCurrent()
+        clock.set(ZonedDateTime.of(date, LocalTime.of(20, 0), zone).toInstant())
+        tick(1_000)
+        assertEquals(PrayerName.FAJR, latestReady(states).nextPrayer.prayer)
+
+        storedLocation.value = chattogram
+        runCurrent()
+
+        // The next prayer is re-derived rather than carried over: tomorrow's schedule is requested again
+        // for the new place, and the answer still resolves.
+        val ready = latestReady(states)
+        assertEquals("Chattogram", ready.location.label)
+        assertEquals(PrayerName.FAJR, ready.nextPrayer.prayer)
+        // Which of the two days is asked for first is not part of the contract — they are independent
+        // shared flows — so the assertion is about what was asked for, not the order.
+        assertEquals(
+            setOf(date, date.plusDays(1)),
+            repository.requestedDates().takeLast(2).toSet(),
+        )
+        assertEquals(
+            listOf("Chattogram", "Chattogram"),
+            repository.requests.takeLast(2).map { it?.location?.label },
+        )
+    }
+
+    @Test
+    fun `the header date and the timetable name the same location-local day`() = runTest(mainDispatcher) {
+        // The device is on UTC and the location is on UTC+6, so 20:00 UTC is already 12 October in Dhaka
+        // while the device still says the 11th. That is the reported defect: the date above the times and
+        // the times themselves were derived in two different zones. Both must be the location's day.
+        val originalZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        try {
+            clock.set(Instant.parse("2026-10-11T20:00:00Z"))
+            storedLocation.value = dhaka
+            val locations = MutableStateFlow<LocationInfo?>(dhaka)
+            val repository = FakeScheduleRepository()
+            val states = observe(
+                home(
+                    repository = repository,
+                    calendarRepository = DeviceClockCalendarRepository(
+                        clock = clock,
+                        dayZone = LocationDayZone(locationSource = locations, scope = backgroundScope),
+                    ),
+                ),
+            )
+            runCurrent()
+
+            val ready = latestReady(states)
+            // The timetable is for the location's day — 12 October, and the 13th as its tomorrow —
+            // rather than the device's 11 October. Which is asked for first is not part of the contract.
+            assertEquals(
+                setOf(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 13)),
+                repository.requestedDates().toSet(),
+            )
+            // ...and the date line above it names that same day, not the device's 11 October.
+            assertEquals("12 October 2026", ready.gregorianDate)
+            // The header line and the Gregorian section are the same snapshot, so they cannot disagree
+            // with each other either.
+            assertEquals(ready.gregorianDate, ready.gregorianSection.value)
+            // And the Bangla and Hijri lines resolve for that same day rather than going missing.
+            assertNotNull(ready.banglaSection.value)
+            assertNotNull(ready.hijriSection.value)
+        } finally {
+            TimeZone.setDefault(originalZone)
+        }
+    }
+
     /**
      * A view model over the real factory and the real resolvers, with only the repositories faked.
      *
      * The start-up snapshot collects on the test's own `backgroundScope`, so its collectors cannot
      * outlive the test.
      */
-    private fun TestScope.home(repository: PrayerScheduleRepository): HomeViewModel = HomeViewModel(
+    private fun TestScope.home(
+        repository: PrayerScheduleRepository,
+        /** The calendar the header reads, defaulting to the one that never produces a snapshot. */
+        calendarRepository: CalendarRepository = UnproducedCalendar,
+    ): HomeViewModel = HomeViewModel(
         startup = StartupSnapshot(
             storedLocationSource = storedLocation,
             prayerSettingsSource = prayerSettings,
             scope = backgroundScope,
         ),
         prayerScheduleRepository = repository,
-        calendarRepository = UnproducedCalendar,
+        calendarRepository = calendarRepository,
         prohibitedPeriodsRepository = UnverifiedProhibitedPeriods,
         uiStateFactory = HomeUiStateFactory(
             nextPrayerResolver = NextPrayerResolver(),

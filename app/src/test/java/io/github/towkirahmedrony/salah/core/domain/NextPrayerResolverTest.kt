@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.core.domain
 
+import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationProfile
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -110,5 +111,108 @@ class NextPrayerResolverTest {
         val next = resolver.resolve(completeSchedule(), time(15, 0))
         assertNotNull(next)
         assertEquals(Duration.ofMinutes(58), next!!.remaining)
+    }
+
+    // --- After the last prayer: the following day's Fajr -----------------------
+
+    /** Tomorrow's schedule, built the way the repository would: same place, same profile, next day. */
+    private fun nextDaySchedule(
+        targetDate: LocalDate = date.plusDays(1),
+        location: LocationInfo = this.location,
+        profile: PrayerCalculationProfile = PrayerCalculationProfile.DEFAULT_KARACHI_HANAFI,
+    ): PrayerSchedule = completeSchedule().copy(
+        date = targetDate,
+        location = location,
+        profile = profile,
+        prayers = completeSchedule().prayers.map { entry ->
+            PrayerTimeEntry(
+                entry.prayer,
+                targetDate.atTime(entry.time.hour, entry.time.minute).atZone(zone),
+                entry.adjustmentMinutes,
+            )
+        },
+        solarEvents = completeSchedule().solarEvents.map { entry ->
+            SolarEventEntry(entry.event, targetDate.atTime(entry.time.hour, entry.time.minute).atZone(zone))
+        },
+    )
+
+    @Test
+    fun `names tomorrow's Fajr once Isha has begun`() {
+        // 19:00: today's Isha (18:51) has started, so nothing on today's schedule is still ahead.
+        val next = resolver.resolve(completeSchedule(), time(19, 0), nextDaySchedule())
+
+        assertNotNull("the next prayer after Isha is tomorrow's Fajr", next)
+        assertEquals(PrayerName.FAJR, next!!.prayer)
+        assertEquals(date.plusDays(1).atTime(4, 39).atZone(zone), next.time)
+        assertEquals(Duration.ofHours(9).plusMinutes(39), next.remaining)
+    }
+
+    @Test
+    fun `counts down to tomorrow's Fajr across local midnight`() {
+        // 23:59 is still today; 00:30 belongs to tomorrow's schedule, where Fajr is still ahead, so the
+        // answer changes hands from "tomorrow's Fajr" to "today's Fajr" without ever going missing.
+        val beforeMidnight = resolver.resolve(completeSchedule(), time(23, 59), nextDaySchedule())
+        assertEquals(PrayerName.FAJR, beforeMidnight?.prayer)
+        assertEquals(date.plusDays(1).atTime(4, 39).atZone(zone), beforeMidnight?.time)
+        assertEquals(Duration.ofMinutes(280), beforeMidnight?.remaining)
+
+        val afterMidnight = resolver.resolve(
+            nextDaySchedule(),
+            time(0, 30).plusDays(1),
+            nextDaySchedule(date.plusDays(2)),
+        )
+        assertEquals(PrayerName.FAJR, afterMidnight?.prayer)
+        assertEquals(date.plusDays(1).atTime(4, 39).atZone(zone), afterMidnight?.time)
+        assertEquals(Duration.ofHours(4).plusMinutes(9), afterMidnight?.remaining)
+    }
+
+    @Test
+    fun `is unchanged while any prayer of the day is still ahead`() {
+        // Tomorrow's schedule is supplied here too, and must be ignored: Isha is still the next prayer.
+        val next = resolver.resolve(completeSchedule(), time(17, 0), nextDaySchedule())
+
+        assertEquals(PrayerName.ISHA, next?.prayer)
+        assertEquals(time(18, 51), next?.time)
+    }
+
+    @Test
+    fun `refuses a next-day schedule that is not tomorrow's own`() {
+        val now = time(19, 0)
+
+        // Another date...
+        assertNull(resolver.resolve(completeSchedule(), now, nextDaySchedule(targetDate = date.plusDays(2))))
+        assertNull(resolver.resolve(completeSchedule(), now, nextDaySchedule(targetDate = date)))
+        // ...another place...
+        val elsewhere = checkNotNull(LocationInfo.create("Chattogram", 22.3569, 91.7832, "Asia/Dhaka"))
+        assertNull(resolver.resolve(completeSchedule(), now, nextDaySchedule(location = elsewhere)))
+        // ...another profile...
+        assertNull(
+            resolver.resolve(
+                completeSchedule(),
+                now,
+                nextDaySchedule(profile = PrayerCalculationProfile.DEFAULT_KARACHI_HANAFI.copy(asrMethod = AsrCalculationMethod.STANDARD)),
+            ),
+        )
+        // ...or an incomplete one must all be refused rather than answered with its Fajr.
+        assertNull(
+            resolver.resolve(
+                completeSchedule(),
+                now,
+                nextDaySchedule().copy(prayers = nextDaySchedule().prayers.filterNot { it.prayer == PrayerName.MAGHRIB }),
+            ),
+        )
+    }
+
+    @Test
+    fun `never reuses today's Fajr as tomorrow's`() {
+        // A "next day" schedule whose Fajr is actually today's is the shape a mistake would take.
+        val reused = nextDaySchedule().copy(
+            prayers = completeSchedule().prayers,
+        )
+        val next = resolver.resolve(completeSchedule(), time(19, 0), reused)
+
+        // Fajr 04:39 today is behind the moment, so nothing is returned — the resolver does not fall
+        // back to it, and does not report a negative countdown.
+        assertNull(next)
     }
 }

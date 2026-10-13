@@ -19,6 +19,14 @@ import java.time.LocalDate
  * [io.github.towkirahmedrony.salah.core.domain.calendar.CalendarMonthResolver] decides which Gregorian
  * days the selected calendar system's month covers.
  *
+ * **Which day "today" is.** The instant comes from the device clock, and the zone that places it on a
+ * day is the *configured location's* zone — resolved once by
+ * [io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone] — falling back to the device's
+ * own zone only when no location is configured. That is deliberate: the calendar day and the prayer
+ * timetable are read together on one screen, and the timetable is calculated for the location, so
+ * deriving the two in different zones would let them name different civil days. See
+ * `docs/CALCULATION_CORRECTNESS_REVIEW.md` §3.
+ *
  * Nothing here formats text for a layout and nothing here is a UI type; the values are domain types,
  * so the conversion stays independently testable.
  *

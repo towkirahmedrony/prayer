@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarMonthResolve
 import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEngine
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanPlaybackManager
@@ -136,6 +137,15 @@ val salahModules = module {
         )
     }
 
+    // Location-local day ------------------------------------------------------
+    // One authoritative answer to "which zone is a location-dependent civil day decided in": the
+    // configured location's own zone, or the device's own when nothing is configured. The calendar
+    // repository and the Calendar screen both read this same instance, so the date line above the
+    // prayer times and the times themselves cannot land on two different civil days. It resolves the
+    // zone from the same LocationRepository every other location consumer reads, so it cannot disagree
+    // with the coordinates in force. See docs/CALCULATION_CORRECTNESS_REVIEW.md §3.
+    single { LocationDayZone(locationSource = get<LocationRepository>().location, scope = get()) }
+
     // Calendar ----------------------------------------------------------------
     // The four converters are pure, stateless and cheap, so they are singletons: two instances could
     // only ever produce the same answer, and sharing them keeps the repository, the coordinator and the
@@ -157,6 +167,9 @@ val salahModules = module {
             // lines, so Home's weekday and dates are written in the language the rest of the screen is
             // in. An explicit date-language choice still wins. See docs/LOCALIZATION.md section 6.
             interfaceLanguage = get<UserPreferencesRepository>().appLanguage,
+            // The day is a *location-local* one, so the date lines above the prayer times and the times
+            // themselves cannot name two different civil days. See docs/CALCULATION_CORRECTNESS_REVIEW.md §3.
+            dayZone = get(),
             banglaCalendar = get(),
             hijriCalendar = get(),
             ramadanCalendar = get(),
@@ -313,6 +326,9 @@ val salahModules = module {
             userPreferencesRepository = get(),
             uiStateFactory = get(),
             clock = get(),
+            // The same zone source the repository reads, so the month this screen opens on contains the
+            // day the repository marks as today.
+            dayZone = get(),
         )
     }
     // The coordinator is injected for the Hijri offset, which moves the Ramadan window the Sehri and

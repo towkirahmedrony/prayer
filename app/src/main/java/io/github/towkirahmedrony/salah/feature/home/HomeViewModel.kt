@@ -13,7 +13,7 @@ import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
-import io.github.towkirahmedrony.salah.core.model.PrayerName
+import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
@@ -220,9 +220,16 @@ class HomeViewModel(
                 initialValue = PrayerScheduleState.Loading,
             )
 
-    /** Tomorrow's Fajr, or `null` while it is not available. */
-    private val nextDayFajr: Flow<ZonedDateTime?> = nextDayScheduleState
-        .map { state -> (state as? PrayerScheduleState.Available)?.schedule?.timeOf(PrayerName.FAJR) }
+    /**
+     * Tomorrow's schedule itself, or `null` while it is not available.
+     *
+     * Passed on whole rather than reduced to its Fajr here: the same schedule closes Isha's period and
+     * answers "what is the next prayer" once today's last prayer has begun, and
+     * [io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver] is the place that decides whether
+     * the candidate really is tomorrow's before using it.
+     */
+    private val nextDaySchedule: Flow<PrayerSchedule?> = nextDayScheduleState
+        .map { state -> (state as? PrayerScheduleState.Available)?.schedule }
         .distinctUntilChanged()
 
     private val prohibitedState: Flow<ProhibitedPeriodsState> =
@@ -286,8 +293,8 @@ class HomeViewModel(
         criticalInputs,
         calendarFlow,
         prohibitedFlow,
-        nextDayFajr,
-    ) { critical, calendar, prohibited, tomorrowsFajr ->
+        nextDaySchedule,
+    ) { critical, calendar, prohibited, tomorrowsSchedule ->
         uiStateFactory.create(
             calendar = calendar,
             location = critical.location,
@@ -295,7 +302,7 @@ class HomeViewModel(
             scheduleState = critical.scheduleState,
             prohibitedState = prohibited,
             now = critical.now,
-            nextDayFajr = tomorrowsFajr,
+            nextDaySchedule = tomorrowsSchedule,
         )
     }.onEach { state ->
         // The state becoming `Ready` is what makes Home renderable. The composable existing is not:
