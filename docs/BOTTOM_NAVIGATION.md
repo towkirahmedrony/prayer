@@ -37,6 +37,10 @@ rather than lighting an unrelated one. That was true before this change and is u
 - **The Tools screen was rebuilt** from two shortcut tiles into rows driven by `ToolsEntry` (section 3).
   The tiles' routes were string literals inside the feature package; each row now holds a
   `SalahDestination` member, so no route is spelled outside the destination enum.
+- **Home's daily-tools row was corrected in one word.** Its last tile was labelled "Tasbih" while it
+  navigated to the `tools` route — a name for a feature Salah does not have, on a control that opened
+  something else. It now reads "Tools", which is the destination it opens and the tab it matches; the
+  glyph, the destination and the rest of the row are unchanged.
 - **`Tools` gained a subtitle and an honesty note**, because a tab is the first place a user looks for a
   feature that is not there (section 3).
 

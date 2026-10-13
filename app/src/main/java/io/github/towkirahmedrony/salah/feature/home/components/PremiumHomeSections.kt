@@ -495,7 +495,9 @@ fun DailyToolsSection(
             DailyToolItem(title = "Qibla", icon = { QiblaGlyph(ForestGreenPrimary) }, onClick = { onNavigate("qibla") }, modifier = Modifier.weight(1f))
             DailyToolItem(title = "Calendar", icon = { CalendarGlyph(ForestGreenPrimary) }, onClick = { onNavigate("calendar") }, modifier = Modifier.weight(1f))
             DailyToolItem(title = "Ramadan", icon = { RamadanGlyph(ForestGreenPrimary) }, onClick = { onNavigate("ramadan") }, modifier = Modifier.weight(1f))
-            DailyToolItem(title = "Tasbih", icon = { TasbihGlyph(ForestGreenPrimary) }, onClick = { onNavigate("tools") }, modifier = Modifier.weight(1f))
+            // Labelled for the screen it opens: this tile navigates to the tools destination, and Salah
+            // has no Tasbih feature to name it after. The mark is the tools destination's own glyph.
+            DailyToolItem(title = "Tools", icon = { TasbihGlyph(ForestGreenPrimary) }, onClick = { onNavigate("tools") }, modifier = Modifier.weight(1f))
         }
     }
 }
