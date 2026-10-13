@@ -24,12 +24,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -51,10 +54,12 @@ import java.time.LocalDate
 /**
  * The Calendar screen.
  *
- * One Gregorian month, read as three calendars at once. The month grid is always the Gregorian month —
- * that is the grid Bangla and Hijri dates are laid over, because a civil month is what a user
- * navigates — and the view chips choose which of the three is emphasised in the selected-day details
- * and in the grid's own annotation.
+ * One month, shown in whichever of the three calendars is selected. The view chips switch the grid
+ * itself: Gregorian reads as a Gregorian month, Bangla as a Bangladesh Bangla month (Bengali month
+ * and weekday names, Bengali numerals) and Hijri as a Hijri month (Arabic names and Arabic-Indic
+ * numerals, laid out right-to-left). Every day also carries its other two representations in the
+ * selected-day card below, and a day's Gregorian date remains its identity for prayer times and
+ * Ramadan.
  *
  * Everything shown is produced by the repository and mapped by [CalendarUiStateFactory], so this file
  * contains layout and no date arithmetic. Two rules it does enforce:
@@ -153,28 +158,39 @@ private fun ReadyContent(
     ViewSwitcher(system = state.system, onSelectSystem = onSelectSystem)
 
     SalahSectionCard {
-        MonthNavigation(
-            monthLabel = state.monthLabel,
-            onPreviousMonth = onPreviousMonth,
-            onNextMonth = onNextMonth,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        WeekdayHeader(labels = state.weekdayLabels)
-        Spacer(modifier = Modifier.height(4.dp))
-        state.weeks.forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                week.forEach { cell ->
-                    MonthCell(
-                        cell = cell,
-                        onClick = { cell.date?.let(onSelectDate) },
-                        modifier = Modifier.weight(1f),
-                    )
+        // The Hijri calendar is read right-to-left. The direction is scoped to the month card alone,
+        // so the app's navigation, headings and every other card are untouched; inside it the weekday
+        // columns and the previous/next controls mirror, which is how an Arabic calendar reads.
+        CompositionLocalProvider(
+            LocalLayoutDirection provides if (state.system == CalendarSystem.HIJRI) {
+                LayoutDirection.Rtl
+            } else {
+                LayoutDirection.Ltr
+            },
+        ) {
+            MonthNavigation(
+                monthLabel = state.monthLabel,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            WeekdayHeader(labels = state.weekdayLabels)
+            Spacer(modifier = Modifier.height(4.dp))
+            state.weeks.forEach { week ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    week.forEach { cell ->
+                        MonthCell(
+                            cell = cell,
+                            onClick = { cell.date?.let(onSelectDate) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onGoToToday) {
-            Text(text = stringResource(R.string.calendar_go_to_today))
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = onGoToToday) {
+                Text(text = stringResource(R.string.calendar_go_to_today))
+            }
         }
     }
 
@@ -341,9 +357,11 @@ private fun MonthCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        if (cell.dayOfMonth != null) {
+        if (cell.dayLabel != null) {
             Text(
-                text = cell.dayOfMonth.toString(),
+                // Already rendered in the calendar mode's numerals by the state factory, so the mode
+                // selection changes the digits as well as the month and weekday names.
+                text = cell.dayLabel,
                 style = MaterialTheme.typography.bodyMedium,
                 color = content,
                 fontWeight = when (cell.stage) {

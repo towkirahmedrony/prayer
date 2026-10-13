@@ -192,7 +192,7 @@
     <string name="calendar_settings_title">Calendar settings</string>
     <string name="calendar_settings_body">Stored on this device. These preferences change what every calendar screen shows.</string>
     <string name="calendar_default_view_title">Default calendar view</string>
-    <string name="calendar_default_view_body">Which calendar the Calendar screen highlights when you open it. The other calendars are still shown for every date.</string>
+    <string name="calendar_default_view_body">Which calendar the Calendar screen opens on. The month grid, its month and weekday names, the day numbers and the year all follow the selected calendar; the other calendars are still shown for the selected day.</string>
     <string name="calendar_hijri_adjustment_title">Hijri date adjustment</string>
     <string name="calendar_hijri_adjustment_body">Salah\'s Hijri date is an Umm al-Qura estimate. If your community follows a different date, shift it here: every Hijri date, the estimated Ramadan range and the Ramadan reminders move with it. The result is still reported as an estimate, because it is one.</string>
     <string name="calendar_hijri_adjustment_value">Adjustment: %1$s day(s)</string>

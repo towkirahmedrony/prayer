@@ -75,6 +75,29 @@ class HijriCalendar {
     }
 
     /**
+     * The Gregorian date on which [month] of [hijriYear] begins, or `null` outside the platform's table.
+     *
+     * @param adjustmentDays the user's Hijri offset. The start is shifted by the same amount
+     *   [dateOf] shifts a day, so the first day of the displayed Hijri month is the Gregorian day
+     *   whose adjusted Hijri date is `<month> 1`.
+     */
+    fun monthStart(hijriYear: Int, month: HijriMonth, adjustmentDays: Int = 0): LocalDate? {
+        val first = runCatching { HijrahDate.of(hijriYear, month.monthNumber, 1) }.getOrNull() ?: return null
+        return runCatching { LocalDate.ofEpochDay(first.toEpochDay() - adjustmentDays) }.getOrNull()
+    }
+
+    /**
+     * Number of days in [month] of [hijriYear], or `null` when the platform's table does not cover it.
+     *
+     * Read from the table rather than assumed, so a 29-day Hijri month stays 29 days and a 30-day one
+     * stays 30 — the same reason [ramadanWindow] reads the month's own length.
+     */
+    fun monthLength(hijriYear: Int, month: HijriMonth): Int? {
+        val first = runCatching { HijrahDate.of(hijriYear, month.monthNumber, 1) }.getOrNull() ?: return null
+        return first.lengthOfMonth().takeIf { it in HIJRI_MONTH_LENGTHS }
+    }
+
+    /**
      * The estimated Gregorian range of Ramadan [hijriYear].
      *
      * Derived from the Hijri calendar rather than stored, so changing the Hijri offset moves the
@@ -147,5 +170,8 @@ class HijriCalendar {
     private companion object {
         /** Ramadan is the ninth Hijri month. */
         const val RAMADAN_MONTH_NUMBER = 9
+
+        /** A lunar Hijri month is always 29 or 30 days; anything else means the table was unusable. */
+        val HIJRI_MONTH_LENGTHS = 29..30
     }
 }

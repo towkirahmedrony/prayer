@@ -301,7 +301,9 @@ class DeviceClockCalendarRepositoryTest {
     @Test
     fun `lays out a month with every day converted, including leap day`() = runTest {
         val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
-        val month = DeviceClockCalendarRepository(clock = clock).observeMonth(YearMonth.of(2024, 3)).first()
+        val month = DeviceClockCalendarRepository(clock = clock)
+            .observeMonth(CalendarSystem.GREGORIAN, LocalDate.of(2024, 3, 1))
+            .first()
 
         assertEquals(YearMonth.of(2024, 3), month.yearMonth)
         assertEquals(31, month.days.size)
@@ -324,7 +326,9 @@ class DeviceClockCalendarRepositoryTest {
     @Test
     fun `lays out a February with the leap day when the year has one`() = runTest {
         val clock = MutableClock(Instant.parse("2024-02-29T09:00:00Z"), ZoneId.of("UTC"))
-        val month = DeviceClockCalendarRepository(clock = clock).observeMonth(YearMonth.of(2024, 2)).first()
+        val month = DeviceClockCalendarRepository(clock = clock)
+            .observeMonth(CalendarSystem.GREGORIAN, LocalDate.of(2024, 2, 1))
+            .first()
 
         assertEquals(29, month.days.size)
         assertEquals(LocalDate.of(2024, 2, 29), month.days.last().date)

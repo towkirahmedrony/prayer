@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.core.model
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
@@ -46,20 +47,27 @@ data class BanglaDate(
     val monthNumber: Int get() = month.ordinal + 1
 }
 
-/** The twelve months of the Hijri (Islamic) lunar year. Declaration order is the year order. */
-enum class HijriMonth(val englishName: String, val bengaliName: String) {
-    MUHARRAM("Muharram", "মুহাররম"),
-    SAFAR("Safar", "সফর"),
-    RABI_AL_AWWAL("Rabi' al-Awwal", "রবিউল আউয়াল"),
-    RABI_AL_THANI("Rabi' al-Thani", "রবিউস সানি"),
-    JUMADA_AL_AWWAL("Jumada al-Awwal", "জমাদিউল আউয়াল"),
-    JUMADA_AL_THANI("Jumada al-Thani", "জমাদিউস সানি"),
-    RAJAB("Rajab", "রজব"),
-    SHABAN("Sha'ban", "শাবান"),
-    RAMADAN("Ramadan", "রমজান"),
-    SHAWWAL("Shawwal", "শাওয়াল"),
-    DHU_AL_QADAH("Dhu al-Qa'dah", "জিলকদ"),
-    DHU_AL_HIJJAH("Dhu al-Hijjah", "জিলহজ"),
+/**
+ * The twelve months of the Hijri (Islamic) lunar year. Declaration order is the year order.
+ *
+ * Each month carries its name in three scripts for the same reason `BanglaMonth` carries two: a month
+ * name is part of the *conversion result* the Hijri calendar mode renders, so it cannot depend on the
+ * device's locale data. `arabicName` is what the Hijri calendar mode shows, since that mode presents
+ * the Islamic calendar in its own script; see docs/CALENDAR_IMPLEMENTATION.md.
+ */
+enum class HijriMonth(val englishName: String, val bengaliName: String, val arabicName: String) {
+    MUHARRAM("Muharram", "মুহাররম", "مُحَرَّم"),
+    SAFAR("Safar", "সফর", "صَفَر"),
+    RABI_AL_AWWAL("Rabi' al-Awwal", "রবিউল আউয়াল", "رَبيع الأوّل"),
+    RABI_AL_THANI("Rabi' al-Thani", "রবিউস সানি", "رَبيع الآخر"),
+    JUMADA_AL_AWWAL("Jumada al-Awwal", "জমাদিউল আউয়াল", "جُمادى الأولى"),
+    JUMADA_AL_THANI("Jumada al-Thani", "জমাদিউস সানি", "جُمادى الآخِرة"),
+    RAJAB("Rajab", "রজব", "رَجَب"),
+    SHABAN("Sha'ban", "শাবান", "شَعْبان"),
+    RAMADAN("Ramadan", "রমজান", "رَمَضان"),
+    SHAWWAL("Shawwal", "শাওয়াল", "شَوّال"),
+    DHU_AL_QADAH("Dhu al-Qa'dah", "জিলকদ", "ذو القَعْدة"),
+    DHU_AL_HIJJAH("Dhu al-Hijjah", "জিলহজ", "ذو الحِجّة"),
     ;
 
     /** 1-based month number inside the Hijri year. */
@@ -221,6 +229,16 @@ data class CalendarMonth(
      * is always consistent with the range shown beside it.
      */
     val ramadanWindow: RamadanWindow?,
+
+    /**
+     * The weekday the first *column* of the grid represents.
+     *
+     * Carried here rather than inferred from the first real day, because a month rarely starts on the
+     * week's first day: deriving column headers from the first day of the month would shift every
+     * header by that many columns. The grid lays the cells out with this value and the header row is
+     * built from the same value, so the two cannot disagree.
+     */
+    val firstDayOfWeek: DayOfWeek,
 ) {
     /** Every real day of the month, in order. */
     val days: List<CalendarDay> get() = weeks.flatten().mapNotNull { it }

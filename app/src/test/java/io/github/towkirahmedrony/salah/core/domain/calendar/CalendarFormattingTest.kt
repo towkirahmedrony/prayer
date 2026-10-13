@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.core.domain.calendar
 
 import io.github.towkirahmedrony.salah.core.model.BanglaDate
 import io.github.towkirahmedrony.salah.core.model.BanglaMonth
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HijriDate
 import io.github.towkirahmedrony.salah.core.model.HijriDateSource
@@ -26,6 +27,7 @@ class CalendarFormattingTest {
 
     private val formatting = CalendarFormatting()
     private val bangla = Locale("bn")
+    private val arabic = Locale("ar")
     private val english = Locale.ENGLISH
 
     @Test
@@ -114,9 +116,68 @@ class CalendarFormattingTest {
     }
 
     @Test
+    fun `Arabic-Indic numerals replace every decimal digit`() {
+        assertEquals("١٤٤٥", ArabicNumerals.format(1445))
+        assertEquals("٠", ArabicNumerals.format(0))
+        assertEquals("٣٠", ArabicNumerals.format(30))
+        // A sign is preserved rather than dropped, so a negative offset cannot read as positive.
+        assertEquals("-٢", ArabicNumerals.format(-2))
+    }
+
+    @Test
+    fun `the Hijri mode renders Arabic month names and Arabic-Indic numerals`() {
+        val date = HijriDate(
+            year = 1445,
+            month = HijriMonth.RAMADAN,
+            day = 1,
+            source = HijriDateSource.ESTIMATED_UMM_AL_QURA,
+        )
+        // Ramadan in Arabic script, with Arabic-Indic digits for the day and the year.
+        assertEquals("١ رَمَضان ١٤٤٥", formatting.hijri(date, arabic))
+        assertEquals("رَمَضان ١٤٤٥", formatting.hijriMonth(date, arabic))
+        assertEquals("١٤٤٥", formatting.numerals(1445, arabic))
+        assertTrue(formatting.isArabic(arabic))
+        assertTrue(!formatting.isArabic(english))
+
+        // Every Hijri month carries an Arabic name, and it is not a transliteration of the Latin one.
+        HijriMonth.entries.forEach { month ->
+            assertTrue(month.arabicName.isNotBlank())
+            assertNotEquals(month.englishName, month.arabicName)
+            assertTrue(
+                "${month.name} should be rendered in Arabic script",
+                month.arabicName.any { character -> character.code in ARABIC_SCRIPT },
+            )
+        }
+    }
+
+    @Test
+    fun `the grid locale follows the selected calendar system, not the device`() {
+        // The Gregorian grid follows the stored date language...
+        assertEquals(english, formatting.gridLocale(CalendarSystem.GREGORIAN, DateLanguagePreference.ENGLISH))
+        assertEquals(bangla.language, formatting.gridLocale(CalendarSystem.GREGORIAN, DateLanguagePreference.BANGLA).language)
+        // ...while the Bangla and Hijri grids carry their own script whatever the date language is.
+        assertEquals(bangla.language, formatting.gridLocale(CalendarSystem.BANGLA, DateLanguagePreference.ENGLISH).language)
+        assertEquals(arabic.language, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.ENGLISH).language)
+        assertEquals(arabic.language, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.BANGLA).language)
+    }
+
+    @Test
+    fun `a Bangla month heading is the Bangla month and year, not the Gregorian one`() {
+        // 1 Ashwin 1431 is 16 September 2024; the heading names the Bangla month, not September.
+        val date = BanglaDate(year = 1431, month = BanglaMonth.ASHWIN, day = 1)
+        assertEquals("আশ্বিন ১৪৩১", formatting.banglaMonth(date, bangla))
+        assertEquals("Ashwin 1431", formatting.banglaMonth(date, english))
+    }
+
+    @Test
     fun `a Gregorian month label localises the month name, not only the digits`() {
         // August 2026 must not render as a number-to-string of the month index.
         val label = formatting.gregorianMonth(LocalDate.of(2026, 8, 1), english)
         assertEquals("August 2026", label)
+    }
+
+    private companion object {
+        /** Unicode block for Arabic, so an Arabic name can be asserted to be in Arabic script. */
+        val ARABIC_SCRIPT = 0x0600..0x06FF
     }
 }

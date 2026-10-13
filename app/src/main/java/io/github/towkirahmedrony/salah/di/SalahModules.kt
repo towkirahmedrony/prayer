@@ -7,6 +7,7 @@ import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
+import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarMonthResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
@@ -144,6 +145,8 @@ val salahModules = module {
     single { RamadanCalendar(hijriCalendar = get()) }
     single { GregorianCalendarGrid() }
     single { CalendarFormatting() }
+    // The two converters decide which Gregorian days the selected calendar system's month covers.
+    single { CalendarMonthResolver(banglaCalendar = get(), hijriCalendar = get()) }
     single<CalendarRepository> {
         DeviceClockCalendarRepository(
             clock = get(),
@@ -155,6 +158,7 @@ val salahModules = module {
             ramadanCalendar = get(),
             grid = get(),
             formatting = get(),
+            monthResolver = get(),
         )
     }
     single { CalendarUiStateFactory(formatting = get()) }

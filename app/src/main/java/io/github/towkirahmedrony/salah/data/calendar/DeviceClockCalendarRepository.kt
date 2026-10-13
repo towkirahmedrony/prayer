@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.data.calendar
 
 import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
+import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarMonthResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
@@ -56,6 +57,7 @@ class DeviceClockCalendarRepository(
     private val ramadanCalendar: RamadanCalendar = RamadanCalendar(hijriCalendar),
     private val grid: GregorianCalendarGrid = GregorianCalendarGrid(),
     private val formatting: CalendarFormatting = CalendarFormatting(),
+    private val monthResolver: CalendarMonthResolver = CalendarMonthResolver(banglaCalendar, hijriCalendar),
 ) : CalendarRepository {
 
     override fun observeToday(): Flow<CalendarSnapshot> =
@@ -63,9 +65,9 @@ class DeviceClockCalendarRepository(
             snapshotAt(instant, calendarSettings)
         }.distinctUntilChanged()
 
-    override fun observeMonth(month: YearMonth): Flow<CalendarMonth> =
+    override fun observeMonth(system: CalendarSystem, anchor: LocalDate): Flow<CalendarMonth> =
         combine(midnightTicks(), settings) { instant, calendarSettings ->
-            monthAt(month, instant, calendarSettings)
+            monthAt(system, anchor, instant, calendarSettings)
         }.distinctUntilChanged()
 
     override fun observeTodayDate(): Flow<LocalDate> =
@@ -93,7 +95,8 @@ class DeviceClockCalendarRepository(
     }
 
     private fun monthAt(
-        month: YearMonth,
+        system: CalendarSystem,
+        anchor: LocalDate,
         instant: Instant,
         calendarSettings: CalendarSettings,
     ): CalendarMonth {
@@ -102,9 +105,21 @@ class DeviceClockCalendarRepository(
         // One window for the whole month, so a day's Ramadan number can never disagree with the range
         // the screen shows beside the grid.
         val window = ramadanCalendar.windowFor(today, calendarSettings.hijriAdjustmentDays)
+        // The selected calendar system's month, expressed as the Gregorian days it covers. When the
+        // system's month cannot be established (a date outside the verified Bangla range or the
+        // platform's Hijri table) the Gregorian month is laid out instead and the screen states the
+        // unavailability, so the grid is never empty and no date is invented.
+        val span = monthResolver.monthContaining(system, anchor, calendarSettings.hijriAdjustmentDays)
+            ?: monthResolver.monthContaining(CalendarSystem.GREGORIAN, anchor)
+            ?: return grid.layout(
+                yearMonth = YearMonth.from(anchor),
+                firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek,
+                today = today,
+                ramadanWindow = window,
+            ) { date -> dayOf(date, today, window, calendarSettings) }
 
         return grid.layout(
-            yearMonth = month,
+            dates = span.dates,
             firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek,
             today = today,
             ramadanWindow = window,

@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsR
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarMonth
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -51,7 +52,6 @@ import org.junit.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -401,7 +401,7 @@ class HomeViewModelTest {
     private object UnproducedCalendar : CalendarRepository {
         override fun observeToday(): Flow<CalendarSnapshot> = flow { awaitCancellation() }
 
-        override fun observeMonth(month: YearMonth): Flow<CalendarMonth> = emptyFlow()
+        override fun observeMonth(system: CalendarSystem, anchor: LocalDate): Flow<CalendarMonth> = emptyFlow()
 
         override fun observeTodayDate(): Flow<LocalDate> = emptyFlow()
 

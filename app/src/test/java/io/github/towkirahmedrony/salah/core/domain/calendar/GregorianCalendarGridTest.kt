@@ -148,4 +148,31 @@ class GregorianCalendarGridTest {
         assertEquals(window, month.ramadanWindow)
         assertNull(layout(YearMonth.of(2025, 3)).ramadanWindow)
     }
+
+    @Test
+    fun `a month span that is not a Gregorian month lays out the same way`() {
+        // Ashwin 1431 runs 16 September to 16 October 2024. 16 September 2024 is a Monday, so with a
+        // Sunday-first week it sits one column in.
+        val start = LocalDate.of(2024, 9, 16)
+        val dates = (0 until 31).map { start.plusDays(it.toLong()) }
+        val month = grid.layout(dates, DayOfWeek.SUNDAY, today, null, ::emptyDay)
+
+        assertEquals(31, month.days.size)
+        assertEquals(start, month.days.first().date)
+        assertEquals(LocalDate.of(2024, 10, 16), month.days.last().date)
+        assertEquals(1, month.weeks.first().takeWhile { it == null }.size)
+        assertTrue(month.weeks.all { it.size == 7 })
+        // The first day of the week the grid padded with travels with the month, so the header row can
+        // be built from it rather than guessed from the month's first day.
+        assertEquals(DayOfWeek.SUNDAY, month.firstDayOfWeek)
+        // The Gregorian year-month of the anchor is carried as the stable navigation reference.
+        assertEquals(YearMonth.of(2024, 9), month.yearMonth)
+    }
+
+    @Test
+    fun `an empty span lays out no days instead of throwing`() {
+        val month = grid.layout(emptyList(), DayOfWeek.SUNDAY, today, null, ::emptyDay)
+        assertTrue(month.weeks.isEmpty())
+        assertTrue(month.days.isEmpty())
+    }
 }

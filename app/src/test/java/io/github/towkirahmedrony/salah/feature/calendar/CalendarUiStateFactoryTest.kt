@@ -23,6 +23,7 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.TextStyle
 import java.time.ZoneId
 import java.util.Locale
 import java.util.TimeZone
@@ -52,6 +53,12 @@ class CalendarUiStateFactoryTest {
         TimeZone.setDefault(originalDefault)
     }
 
+    /**
+     * The month the app would build: the selected system's month containing `month`'s first day.
+     *
+     * The system comes from [settings], exactly as the view model passes it, so the month under test
+     * is never built for one calendar and rendered as another.
+     */
     private suspend fun monthAt(
         instant: String,
         month: YearMonth,
@@ -59,7 +66,20 @@ class CalendarUiStateFactoryTest {
     ) = DeviceClockCalendarRepository(
         clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")),
         settings = flowOf(settings),
-    ).observeMonth(month).first()
+    ).observeMonth(settings.preferredSystem, month.atDay(1)).first()
+
+    /**
+     * Same, but anchored on an explicit Gregorian day, so a test can sit inside a Bangla or Hijri
+     * month whose span does not line up with a Gregorian month.
+     */
+    private suspend fun monthAt(
+        instant: String,
+        anchor: LocalDate,
+        settings: CalendarSettings,
+    ) = DeviceClockCalendarRepository(
+        clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")),
+        settings = flowOf(settings),
+    ).observeMonth(settings.preferredSystem, anchor).first()
 
     @Test
     fun `today is both today and the selection until the user picks another day`() = runTest {
@@ -165,19 +185,35 @@ class CalendarUiStateFactoryTest {
     }
 
     @Test
-    fun `weekday headers follow the locale's own first day of the week`() = runTest {
+    fun `weekday headers label the columns the grid actually lays out`() = runTest {
         val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
         val state = factory.create(month, CalendarSettings.DEFAULT, month.today, english) as CalendarUiState.Ready
 
+        // The header's first column is the week's first day — the value the grid padded with — not the
+        // weekday the month happens to start on. March 2024 starts on a Friday, so deriving the header
+        // from the first real day would shift every label by five columns.
         assertEquals(7, state.weekdayLabels.size)
-        val firstRealDate = month.weeks.flatten().first { it != null }!!.date
         assertEquals(
-            firstRealDate.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, english),
+            month.firstDayOfWeek.getDisplayName(TextStyle.SHORT, english),
             state.weekdayLabels.first(),
         )
-        // The last column is the day before the first, in week order: the header is a real week.
-        val lastColumn = firstRealDate.dayOfWeek.plus(6)
-        assertEquals(lastColumn.getDisplayName(java.time.format.TextStyle.SHORT, english), state.weekdayLabels.last())
+        assertEquals(
+            month.firstDayOfWeek.plus(6).getDisplayName(TextStyle.SHORT, english),
+            state.weekdayLabels.last(),
+        )
+
+        // And every column carries the weekday of the days beneath it, so no header can mislabel one.
+        state.weeks.forEachIndexed { weekIndex, week ->
+            week.forEachIndexed { column, cell ->
+                if (cell?.date != null) {
+                    assertEquals(
+                        "week $weekIndex, column $column",
+                        cell.date!!.dayOfWeek.getDisplayName(TextStyle.SHORT, english),
+                        state.weekdayLabels[column],
+                    )
+                }
+            }
+        }
     }
 
     @Test
@@ -232,24 +268,82 @@ class CalendarUiStateFactoryTest {
     }
 
     @Test
-    fun `the preferred view is reported, and the grid is always the Gregorian month`() = runTest {
-        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
-        val state = factory.create(
-            month,
-            CalendarSettings(preferredSystem = CalendarSystem.HIJRI),
-            month.today,
-            english,
-        ) as CalendarUiState.Ready
+    fun `selecting the Bangla view lays out the Bangla calendar month, not the Gregorian one`() = runTest {
+        // 20 September 2024 is inside Ashwin 1431, which runs 16 September to 16 October 2024.
+        val settings = CalendarSettings(preferredSystem = CalendarSystem.BANGLA)
+        val month = monthAt("2024-09-20T09:00:00Z", LocalDate.of(2024, 9, 20), settings)
+        val state = factory.create(month, settings, LocalDate.of(2024, 9, 20), english) as CalendarUiState.Ready
+
+        assertEquals(CalendarSystem.BANGLA, state.system)
+        // The heading is the Bangla month and year in Bengali script, not "September 2024".
+        assertEquals("আশ্বিন ১৪৩১", state.monthLabel)
+        // The grid is the Bangla month's own span, and Ashwin has 31 days.
+        assertEquals(LocalDate.of(2024, 9, 16), state.monthStart)
+        assertEquals(LocalDate.of(2024, 10, 16), state.monthEnd)
+        assertEquals(31, state.weeks.flatten().count { it != null })
+        // Every cell number is the Bangla day of month, 1..31, and the digits are Bengali.
+        assertEquals((1..31).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
+        val firstOfAshwin = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 9, 16) }!!
+        assertEquals(1, firstOfAshwin.dayOfMonth)
+        assertEquals("১", firstOfAshwin.dayLabel)
+        // Weekday headers are in Bengali script, not the English abbreviations.
+        assertTrue(state.weekdayLabels.all { it.isNotBlank() })
+        assertTrue(
+            "expected Bengali weekday labels, were ${state.weekdayLabels}",
+            state.weekdayLabels.any { label -> label.any { character -> character.code in BENGALI_SCRIPT } },
+        )
+        // The cell still carries its Gregorian identity, so date-dependent features are unaffected.
+        assertEquals(LocalDate.of(2024, 9, 16), firstOfAshwin.date)
+    }
+
+    @Test
+    fun `selecting the Hijri view lays out the Hijri calendar month with Arabic names and numerals`() = runTest {
+        // 20 March 2024 is inside Ramadan 1445, which runs 11 March to 9 April 2024.
+        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
+        val state = factory.create(month, settings, LocalDate.of(2024, 3, 20), english) as CalendarUiState.Ready
 
         assertEquals(CalendarSystem.HIJRI, state.system)
-        // The month itself does not change with the view: Bangla and Hijri are read *over* the
-        // Gregorian grid, because a civil month is what a user navigates.
-        assertEquals(YearMonth.of(2024, 3), state.month)
+        assertEquals("رَمَضان ١٤٤٥", state.monthLabel)
+        assertEquals(LocalDate.of(2024, 3, 11), state.monthStart)
+        assertEquals(LocalDate.of(2024, 4, 9), state.monthEnd)
+        // Ramadan 1445 has 30 days, and the grid holds exactly those days numbered 1..30.
+        assertEquals(30, state.weeks.flatten().count { it != null })
+        assertEquals((1..30).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
+        val firstOfRamadan = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!
+        assertEquals(1, firstOfRamadan.dayOfMonth)
+        assertEquals("١", firstOfRamadan.dayLabel)
+        // Weekday headers are in Arabic script.
+        assertTrue(
+            "expected Arabic weekday labels, were ${state.weekdayLabels}",
+            state.weekdayLabels.any { label -> label.any { character -> character.code in ARABIC_SCRIPT } },
+        )
+    }
+
+    @Test
+    fun `the Gregorian view is unchanged by the other modes' corrections`() = runTest {
+        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
+        val state = factory.create(month, CalendarSettings.DEFAULT, LocalDate.of(2024, 3, 11), english) as
+            CalendarUiState.Ready
+
+        assertEquals(CalendarSystem.GREGORIAN, state.system)
         assertEquals("March 2024", state.monthLabel)
-        // The 11th is a Monday in the grid, whatever view is selected.
+        assertEquals(YearMonth.of(2024, 3), state.month)
+        assertEquals(LocalDate.of(2024, 3, 1), state.monthStart)
+        assertEquals(LocalDate.of(2024, 3, 31), state.monthEnd)
+        assertEquals((1..31).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
+        assertEquals("11", state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!.dayLabel)
         assertEquals(
             DayOfWeek.MONDAY,
             state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!.date!!.dayOfWeek,
         )
+    }
+
+    private companion object {
+        /** Unicode block for Bengali, so a header can be asserted to be in Bengali script. */
+        val BENGALI_SCRIPT = 0x0980..0x09FF
+
+        /** Unicode block for Arabic, so a header can be asserted to be in Arabic script. */
+        val ARABIC_SCRIPT = 0x0600..0x06FF
     }
 }

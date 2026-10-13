@@ -28,10 +28,19 @@ sealed interface CalendarUiState {
         /** The calendar the user is currently reading. */
         val system: CalendarSystem,
 
-        /** The month being displayed, so the navigation actions can move from it. */
+        /** The Gregorian month of the grid's first day, kept as a stable anchor for the screen. */
         val month: YearMonth,
 
-        /** Localised month and year, for example `October 2026`. */
+        /**
+         * First Gregorian day of the displayed month, inclusive. The month is the *selected calendar
+         * system's* month, so this is not necessarily the first of a Gregorian month.
+         */
+        val monthStart: LocalDate,
+
+        /** Last Gregorian day of the displayed month, inclusive. */
+        val monthEnd: LocalDate,
+
+        /** Localised month and year in the selected calendar, for example `October 2026`. */
         val monthLabel: String,
 
         /** Column headers, in the locale's week order. */
@@ -77,10 +86,18 @@ enum class CalendarCellStage {
     TODAY_SELECTED,
 }
 
-/** One cell of the month grid. [dayOfMonth] is `null` exactly when the stage is [CalendarCellStage.PADDING]. */
+/**
+ * One cell of the month grid.
+ *
+ * [date] is the cell's Gregorian identity — the date every other feature is keyed by — while
+ * [dayOfMonth] and [dayLabel] are its number *in the selected calendar system*.
+ * [dayOfMonth] is `null` exactly when the stage is [CalendarCellStage.PADDING]; [dayLabel] is the same
+ * number rendered in the mode's numerals (`14`, `১৪`, `١٤`) and is `null` for a padding cell.
+ */
 data class CalendarCell(
     val date: LocalDate?,
     val dayOfMonth: Int?,
+    val dayLabel: String?,
     val stage: CalendarCellStage,
     val isRamadanDay: Boolean,
     val occasion: IslamicOccasion?,

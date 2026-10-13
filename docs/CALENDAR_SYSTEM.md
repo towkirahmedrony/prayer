@@ -60,7 +60,8 @@ Deliberately **not** implemented, and reported as such in the UI rather than hid
                        ▼                                      ▼
         core/domain/calendar (pure, Android-free)      PrayerScheduleRepository
         ├── GregorianCalendarGrid                      (the existing Phase 2 engine,
-        ├── BanglaCalendar                              unchanged, offline)
+        ├── CalendarMonthResolver                       unchanged, offline)
+        ├── BanglaCalendar
         ├── HijriCalendar
         ├── RamadanCalendar
         └── CalendarFormatting                    PrayerNotificationCoordinator
@@ -72,9 +73,10 @@ Dependency direction, and why each boundary exists:
 
 | Component | Owns | Does not do |
 |---|---|---|
-| `GregorianCalendarGrid` | the week layout of a month | read a clock, a locale or a device; format text |
+| `GregorianCalendarGrid` | the week layout of any run of consecutive days | read a clock, a locale or a device; format text |
+| `CalendarMonthResolver` | which Gregorian days the selected system's month covers | format text or read a clock |
 | `BanglaCalendar` | Bangladesh conversion in both directions | any zone, locale, clock or I/O |
-| `HijriCalendar` | Umm al-Qura conversion, the day offset, the Ramadan window, observances | any UI wording |
+| `HijriCalendar` | Umm al-Qura conversion, the day offset, Hijri month starts/lengths, the Ramadan window, observances | any UI wording |
 | `RamadanCalendar` | the Sehri/Iftar *rule* (Sehri = Fajr, Iftar = Maghrib) | calculate prayer times |
 | `CalendarFormatting` | choosing a locale and composing date strings | contain domain rules |
 | `DeviceClockCalendarRepository` | which Gregorian day is meant, and the midnight/zone refresh | format for a layout |
@@ -96,21 +98,23 @@ instances could only ever produce the same answer.
 - **The device zone, not the prayer location's zone**, is the right choice for a *calendar*: a civil
   calendar is an artifact of where the user is, while prayer times are an astronomical property of where
   they pray. The prayer location's zone governs the *times* (§8).
-- **Month navigation** moves a `YearMonth`, so month, year and leap-year boundaries are `java.time`'s
-  arithmetic and cannot be off by one. February 2024 has 29 days, February 1900 and 2100 have 28, and
+- **Month navigation** is `java.time`'s arithmetic in the Gregorian mode, so month, year and leap-year
+  boundaries cannot be off by one. February 2024 has 29 days, February 1900 and 2100 have 28, and
   February 2000 has 29 (`GregorianCalendarGridTest`).
-- **The grid is always the Gregorian month.** Bangla and Hijri dates are read *over* it, because a civil
-  month is what a user navigates; the view chips choose which calendar is emphasised in the selected-day
-  details, not which days exist.
+- **The grid is the selected calendar system's month.** The Gregorian mode shows a Gregorian month; the
+  Bangla and Hijri modes show a Bangladesh Bangla month and a Hijri month, which do not line up with
+  Gregorian months. `CalendarMonthResolver` answers "which Gregorian days does the selected system's
+  month containing this day cover", and every cell keeps its Gregorian date as its identity, so prayer
+  times and Ramadan still key off the same day (`CalendarMonthResolverTest`).
 - **Today is carried inside the month value** (`CalendarMonth.today`) rather than re-read by the screen,
   so the grid, the header and the details card are one consistent snapshot even after the user navigates
   to another month.
 - **Today and the selection are drawn as different treatments.** Today alone is a muted fill, the
   selection is an outlined tint, and the two together are the solid accent, so navigating away from the
   current month cannot make the selection look like today (`CalendarUiStateFactoryTest`).
-- **The first day of the week is the locale's own.** `WeekFields.of(locale).firstDayOfWeek` is passed in,
-  and the column headers are derived from the first week's real dates, so the header can never mislabel a
-  column when the week does not start on Sunday.
+- **The first day of the week is the locale's own.** `WeekFields.of(locale).firstDayOfWeek` is passed in
+  and carried on the month (`CalendarMonth.firstDayOfWeek`), and the column headers are built from that
+  same value, so a header can never sit above the wrong column when the week does not start on Sunday.
 
 ---
 
@@ -345,7 +349,7 @@ clear:
 | Device time zone or DST | same, at the next local midnight |
 | Hijri offset | every Hijri date, the Ramadan window and day numbers, the Hijri labels, the reminders |
 | Date language | every formatted date and month label |
-| Default view | the emphasised calendar only (no date changes) |
+| Default view | the displayed month itself — its heading, weekday names, day numbers and length all switch to the selected calendar system |
 | Location or calculation method | the schedules, and therefore every Sehri/Iftar time |
 
 ---
@@ -412,8 +416,9 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 6. **The calendar day follows the device zone**, so a user whose device zone differs from their location's
    zone will see the Gregorian/Bangla/Hijri date of where the device is, while the times are those of the
    configured location. This is deliberate (§3) but it is a real difference the user could notice.
-7. **A date outside a converter's range is refused**, so the Calendar screen can show a month in which the
-   Bangla or Hijri column is explained rather than filled in.
+7. **A date outside a converter's range is refused.** Selecting Bangla or Hijri for a month the converter
+   cannot cover falls back to the Gregorian month for the grid and states the reason on the selected day,
+   rather than showing a fabricated month.
 8. **No on-device verification has been performed.** The screens have not been exercised on physical
    hardware, in either theme, at a large font scale, or with a real device time-zone change. What is
    verified is the logic: the converters, the state mapping and the persistence are covered by the tests
@@ -429,12 +434,14 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 | Test | Covers |
 |---|---|
 | `BanglaCalendarTest` | the published rules and reference dates; every month start; month, year and leap-year boundaries; the 14 April New Year; a whole supported year converted and converted back; refusal before 2019 and after 2399 |
-| `HijriCalendarTest` | the Umm al-Qura reference conversions; month boundaries on both sides; the adjustment and its source label; Ramadan window lengths (29 and 30 days); the window search; `isRamadan` under an offset; observances; the table's bounds |
+| `HijriCalendarTest` | the Umm al-Qura reference conversions; month boundaries on both sides; the adjustment and its source label; Hijri month starts and lengths (29 and 30 days); Ramadan window lengths; the window search; `isRamadan` under an offset; observances; the table's bounds |
+| `CalendarMonthResolverTest` | which Gregorian days each system's month covers; the Gregorian leap day; the Bangla month boundaries (Bhadra/Ashwin, Falgun's leap 30 days); the Hijri month length and its movement with the adjustment; refusal outside both supported ranges; every day of every month numbered 1..length |
 | `RamadanCalendarTest` | Sehri = Fajr and Iftar = Maghrib; the manual adjustment moving Sehri with Fajr; a missing Fajr/Maghrib producing no time; day numbering; `IN_RAMADAN`/`UPCOMING`/`FAR_AWAY` on both sides of each boundary |
-| `GregorianCalendarGridTest` | seven cells per row; day order and padding; leading blanks for four different week starts; leap years including the century rules; year transitions; extreme months; `today` and the Ramadan window carried through |
-| `CalendarFormattingTest` | Bangla numerals; the language preference choosing the locale; Bangla and Hijri date strings composed without mixing scripts; the platform's formatter for Gregorian dates; weekday labels |
+| `GregorianCalendarGridTest` | seven cells per row; day order and padding; leading blanks for four different week starts; leap years including the century rules; year transitions; extreme months; `today`, the Ramadan window and the first day of week carried through; a span that is not a Gregorian month |
+| `CalendarFormattingTest` | Bangla and Arabic-Indic numerals; the language preference choosing the locale; the grid locale following the calendar system; Bangla and Hijri date and month strings composed without mixing scripts; the platform's formatter for Gregorian dates; weekday labels |
 | `DeviceClockCalendarRepositoryTest` | the device day in the device's zone; the verified/unverified source flags; the date language; the rollover at local midnight; the Hijri month boundary at midnight; DST; out-of-range reporting for both converters; a month laid out with real Bangla/Hijri dates and Ramadan day numbers; the Ramadan window and its movement with the offset |
-| `CalendarUiStateFactoryTest` | today vs the selection vs both; three resolved date lines and the Hijri source; out-of-range stated rather than blanked; no window → no range; weekday headers; the adjustment moving the Hijri date and the Ramadan day number together |
+| `CalendarUiStateFactoryTest` | today vs the selection vs both; three resolved date lines and the Hijri source; out-of-range stated rather than blanked; no window → no range; weekday headers labelling the columns the grid lays out; the Bangla and Hijri views laying out their own month, heading, weekday names and numerals; the adjustment moving the Hijri date and the Ramadan day number together |
+| `CalendarViewModelTest` | selecting a mode changing the displayed month immediately; the choice persisted; the stored mode restored on open; month navigation moving one month of the selected system; the selection staying inside the displayed month |
 | `RamadanUiStateFactoryTest` | one row per day with day numbers; Sehri/Iftar columns equal to Fajr/Maghrib; a missing Fajr; missing schedules counted once and shown per row; provenance; no window → no rows; the Hijri adjustment; today marked by date; the location's zone |
 | `RamadanReminderPlanTest` | Sehri planned as a lead-in only; Iftar at Maghrib plus an optional lead-in; nothing outside Ramadan; switches and master switch; unique slots and request codes; a Ramadan end leaving nothing behind; inherited sound/vibration; a passed Fajr; lead-time clamping |
 | `RamadanReminderCoordinatorTest` | what the coordinator actually registers: the Sehri lead-in at the calculated Fajr and Iftar at the calculated Maghrib for both window days and nothing else; the Hijri offset moving which days are in Ramadan, in both directions, and the day that leaves Ramadan being cancelled; the last day of Ramadan keeping its reminders while the day after schedules none, and those reminders going on the next day; one switch cancelling only its own alarms; the master switch and a missing location leaving nothing; repeating a reconciliation not duplicating an alarm |
@@ -459,3 +466,5 @@ lint and builds the APK.
 - **The notification subsystem the Ramadan reminders use**:
   [`docs/PRAYER_NOTIFICATIONS.md`](PRAYER_NOTIFICATIONS.md).
 - **Structure and dependency rules**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md).
+- **The calendar-mode implementation in detail** (how a selection reaches the grid, and the two-locale
+  rule): [`docs/CALENDAR_IMPLEMENTATION.md`](CALENDAR_IMPLEMENTATION.md).

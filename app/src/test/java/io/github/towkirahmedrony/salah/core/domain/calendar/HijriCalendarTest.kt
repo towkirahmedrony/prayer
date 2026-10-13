@@ -111,6 +111,37 @@ class HijriCalendarTest {
     }
 
     @Test
+    fun `a month's start and length come from the platform's table`() {
+        // 1 Ramadan 1445 is 11 March 2024 and the month has 30 days; 1 Ramadan 1446 is 1 March 2025
+        // and has 29 — the same values the Ramadan window assertions use.
+        assertEquals(LocalDate.parse("2024-03-11"), calendar.monthStart(1445, HijriMonth.RAMADAN))
+        assertEquals(30, calendar.monthLength(1445, HijriMonth.RAMADAN))
+        assertEquals(LocalDate.parse("2025-03-01"), calendar.monthStart(1446, HijriMonth.RAMADAN))
+        assertEquals(29, calendar.monthLength(1446, HijriMonth.RAMADAN))
+        // Sha'ban 1445 ends the day before Ramadan, so it has 29 days.
+        assertEquals(29, calendar.monthLength(1445, HijriMonth.SHABAN))
+        assertEquals(LocalDate.parse("2024-02-11"), calendar.monthStart(1445, HijriMonth.SHABAN))
+    }
+
+    @Test
+    fun `a month's start moves with the user's adjustment, exactly as a date does`() {
+        // A positive offset displays a later Hijri date, so the Gregorian start of the month is a day
+        // earlier — the same relationship `dateOf` and `ramadanWindow` implement.
+        assertEquals(LocalDate.parse("2024-03-10"), calendar.monthStart(1445, HijriMonth.RAMADAN, 1))
+        assertEquals(LocalDate.parse("2024-03-12"), calendar.monthStart(1445, HijriMonth.RAMADAN, -1))
+        // The length is a property of the month, not of where it starts, so it does not move.
+        assertEquals(30, calendar.monthLength(1445, HijriMonth.RAMADAN))
+    }
+
+    @Test
+    fun `a month outside the platform's table has no start or length`() {
+        assertNull(calendar.monthStart(1299, HijriMonth.RAMADAN))
+        assertNull(calendar.monthLength(1299, HijriMonth.RAMADAN))
+        assertNull(calendar.monthStart(1601, HijriMonth.MUHARRAM))
+        assertNull(calendar.monthLength(1601, HijriMonth.MUHARRAM))
+    }
+
+    @Test
     fun `the Ramadan window moves with the user's adjustment`() {
         // A positive offset means the displayed Hijri date is later, so Ramadan starts a day earlier
         // in the Gregorian calendar — the same relationship `dateOf` implements.
