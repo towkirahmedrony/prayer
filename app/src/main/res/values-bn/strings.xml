@@ -7,19 +7,19 @@
   identifier and the shell applies it to every screen without recreating the activity, so these strings
   are reached either way.
 
-   This is a PARTIAL translation of the explanatory strings on purpose. Android falls back to
-   values/strings.xml for anything not listed here, and Salah's English wording makes specific claims
-   about sources and limits that must not be translated loosely — so the explanatory paragraphs that
-   state what is estimated and what is not stay in English until someone competent to review that
-   wording has reviewed it.
+  This is a PARTIAL translation of the explanatory strings on purpose. Android falls back to
+  values/strings.xml for anything not listed here, and Salah's English wording makes specific claims
+  about sources and limits that must not be translated loosely — so the explanatory paragraphs that
+  state what is estimated and what is not stay in English until someone competent to review that
+  wording has reviewed it.
 
-   **Home and the Calendar are the two deliberate exceptions**, and they are translated in full: every
-   string each of those screens can render is here, including its explanatory and error text, its empty
-   states and the reasons it gives for them. A half-Bengali Home screen is the first thing a reader
-   notices — it is the screen the app opens on — so it does not get the partial treatment the remaining
-   screens keep. `LocalizationResourcesTest` enforces that completeness for both screens rather than
-   trusting it. The language selector's own labels are translated for the same reason: a control that
-   changes the interface language has to be legible in both.
+  **Home and the Calendar are the two deliberate exceptions**, and they are translated in full: every
+  string each of those screens can render is here, including its explanatory and error text, its empty
+  states and the reasons it gives for them. A half-Bengali Home screen is the first thing a reader
+  notices — it is the screen the app opens on — so it does not get the partial treatment the remaining
+  screens keep. `LocalizationResourcesTest` enforces that completeness for both screens rather than
+  trusting it. The language selector's own labels are translated for the same reason: a control that
+  changes the interface language has to be legible in both.
 
   The calendar's date language (which script and numerals the dates themselves use) is a separate,
   explicit setting and is not affected by the interface language — see Calendar settings.

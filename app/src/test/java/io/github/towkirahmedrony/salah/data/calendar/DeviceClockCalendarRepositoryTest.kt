@@ -234,7 +234,7 @@ class DeviceClockCalendarRepositoryTest {
         assertTrue("the Gregorian date is not in Bengali: $gregorian", gregorian.any { it.inBengaliBlock() })
         assertFalse("the Gregorian date kept Western digits: $gregorian", gregorian.any { it in '0'..'9' })
         val weekday = snapshot.weekdayLabel.orEmpty()
-        assertTrue("the weekday is not in Bengali: $weekday", weekday.any { it inBengaliBlock() })
+        assertTrue("the weekday is not in Bengali: $weekday", weekday.any { it.inBengaliBlock() })
     }
 
     @Test
