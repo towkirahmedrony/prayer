@@ -28,6 +28,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimar
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
+import io.github.towkirahmedrony.salah.feature.app.ProvideAppLanguageStrings
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
 import org.koin.androidx.compose.koinViewModel
@@ -51,31 +52,41 @@ import org.koin.androidx.compose.koinViewModel
  * shell: the preference is read here, applied here, and a change reaches the UI on the next emission
  * without a restart. Passing a fixed mode instead would leave the stored value alive in the store and
  * the radio group, and nowhere else.
+ *
+ * **The language preference.** Applied here for the same reason and in the same way: the shell reads
+ * [AppViewModel.appLanguage] and wraps everything it draws in [ProvideAppLanguageStrings]. Every
+ * string under the shell — the bottom bar, the Settings overview, Home, Calendar — is therefore
+ * resolved in the chosen language, and the choice reaches the UI on the next emission with no
+ * activity recreation. Nothing below this point reads the language itself, so the language cannot be
+ * applied on one screen and not another.
  */
 @Composable
 fun SalahApp(
     appViewModel: AppViewModel = koinViewModel(),
 ) {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
+    val appLanguage by appViewModel.appLanguage.collectAsStateWithLifecycle()
     val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
 
-    SalahTheme(themeMode = themeMode) {
-        when {
-            setupState is LocationSetupState.Complete -> AppShell()
+    ProvideAppLanguageStrings(language = appLanguage) {
+        SalahTheme(themeMode = themeMode) {
+            when {
+                setupState is LocationSetupState.Complete -> AppShell()
 
-            setupState.requiresSetup -> Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-            ) { innerPadding ->
-                LocationSetupScreen(modifier = Modifier.padding(innerPadding))
-            }
+                setupState.requiresSetup -> Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) { innerPadding ->
+                    LocationSetupScreen(modifier = Modifier.padding(innerPadding))
+                }
 
-            // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:
-            // the gate is short-lived, and the Home layout arriving into a screen that already has
-            // its shape is a smaller change than a spinner being swapped out for a whole screen.
-            else -> Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-            ) { innerPadding ->
-                HomeSkeleton(modifier = Modifier.padding(innerPadding))
+                // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:
+                // the gate is short-lived, and the Home layout arriving into a screen that already has
+                // its shape is a smaller change than a spinner being swapped out for a whole screen.
+                else -> Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) { innerPadding ->
+                    HomeSkeleton(modifier = Modifier.padding(innerPadding))
+                }
             }
         }
     }

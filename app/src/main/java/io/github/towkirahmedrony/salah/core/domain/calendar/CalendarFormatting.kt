@@ -30,6 +30,16 @@ import java.util.Locale
  *    selected-day card show all three calendars at once, so there one script has to be chosen for all
  *    of them: [localeFor], driven by [DateLanguagePreference].
  *
+ * ## `systemDefault` is the interface language
+ *
+ * [DateLanguagePreference.SYSTEM]'s branch of [localeFor], and the Gregorian branch of [gridLocale], do
+ * not read the device locale from inside this class: the caller passes the locale the interface is
+ * currently written in as [systemDefault]. The calendar view model passes `AppLanguage`'s locale, so
+ * "follow the interface" really follows the app's language selector instead of the phone's setting —
+ * which is the difference between a Bengali interface showing Bengali month names and a Bengali
+ * interface showing Latin ones. A caller that passes nothing gets `Locale.getDefault()`, which is the
+ * pre-selector behaviour and is what the domain-level tests pin.
+ *
  * ## Numerals
  *
  * Bangla and Hijri dates are composed here from the month identifier plus [numerals], rather than
@@ -41,7 +51,15 @@ import java.util.Locale
  */
 class CalendarFormatting {
 
-    /** The locale dates are rendered in for [preference] in the side-by-side date list. */
+    /**
+     * The locale dates are rendered in for [preference] in the side-by-side date list.
+     *
+     * [systemDefault] is the locale the caller's interface is written in — the calendar screen passes
+     * the selected [io.github.towkirahmedrony.salah.core.model.AppLanguage]'s locale — so that
+     * "follow the device" follows the *app's* language, not the phone's. The parameter is still named
+     * for the device because that is what [systemDefault] defaults to when a caller has no interface
+     * language to offer: the domain tests and the Home snapshot path.
+     */
     fun localeFor(preference: DateLanguagePreference, systemDefault: Locale = Locale.getDefault()): Locale =
         when (preference) {
             DateLanguagePreference.SYSTEM -> systemDefault
@@ -57,6 +75,11 @@ class CalendarFormatting {
      * render in Bengali and Arabic respectively. That is what makes "select Bangla" produce a Bangla
      * calendar rather than an anglicised one, and it keeps the grid's script a function of the one
      * setting the user changed — the calendar mode.
+     *
+     * The Bangla and Hijri branches ignore both [dateLanguage] and [systemDefault] on purpose: those
+     * modes exist to present a calendar in its own script, so a Bengali Bangla calendar and an Arabic
+     * Hijri calendar are not something the interface language is allowed to override. Only the
+     * Gregorian grid defers, and only when the stored date language asks it to.
      */
     fun gridLocale(
         system: CalendarSystem,

@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import org.koin.androidx.compose.koinViewModel
@@ -19,19 +20,28 @@ import org.koin.androidx.compose.koinViewModel
 /**
  * General settings.
  *
- * One preference today: the clock Salah writes times in. It is general rather than a prayer-time
- * setting because it is not an input to the calculation — the engine computes the same instants either
- * way — but a display choice the Home screen, the Ramadan timetable and every delivered reminder all
- * read, which is why changing it is immediate everywhere and changes no calculated time.
+ * Two preferences, both of which apply to the app as a whole rather than to one calculation:
  *
- * It is deliberately its own screen rather than a section of Prayer times: on that screen every control
- * changes a time, and mixing in one that only changes how a time is printed would invite the reader to
- * wonder which is which.
+ *  - the **interface language**, in the `Language / ভাষা` group at the top. It is the first control on
+ *    the screen because it is the one a user who cannot read the current language needs to find
+ *    before anything else, and it is a plain radio group rather than a subpage of its own: three
+ *    choices do not need a navigation layer, and a selector behind one more tap is the failure this
+ *    placement exists to avoid;
+ *  - the **time format**, which is general rather than a prayer-time setting because it is not an
+ *    input to the calculation — the engine computes the same instants either way — but a display
+ *    choice the Home screen, the Ramadan timetable and every delivered reminder all read, which is why
+ *    changing it is immediate everywhere and changes no calculated time.
  *
- * There is no app-language control. Salah ships a deliberately partial Bangla translation chosen at
- * build time (see `app/lint.xml`), and the calendar's date language is a calendar preference; neither is
- * a language selector, so no control is offered rather than one that appears to switch the interface and
- * does not.
+ * The language control is deliberately not a calendar control. Salah has *two* language-ish
+ * preferences and they do different things: this one decides the words on every screen, while the
+ * calendar's own "date language" decides the script and numerals dates are written in and lives with
+ * the calendar preferences next to the dates themselves. Both are offered, each once, and neither
+ * changes the other — see `docs/LOCALIZATION.md`.
+ *
+ * A change to either preference is stored through the repository, so the selection the screen shows is
+ * the stored value rather than a local copy: reopening this screen, or restarting the app, shows the
+ * same choice. The one thing that could look like success without being it — a write that failed —
+ * is reported by [SettingsMessageBlock] rather than silently swallowed.
  */
 @Composable
 fun SettingsGeneralScreen(
@@ -54,6 +64,19 @@ fun SettingsGeneralScreen(
 
         SalahSectionCard {
             SettingsOptionGroup(
+                title = stringResource(R.string.settings_language_title),
+                body = stringResource(R.string.settings_language_body),
+                options = AppLanguage.entries,
+                selected = uiState.appLanguage,
+                label = { it.labelRes() },
+                hint = { null },
+                onSelect = viewModel::setAppLanguage,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+        }
+
+        SalahSectionCard {
+            SettingsOptionGroup(
                 title = stringResource(R.string.settings_time_format_title),
                 body = stringResource(R.string.settings_time_format_body),
                 options = TimeFormatPreference.entries,
@@ -64,5 +87,9 @@ fun SettingsGeneralScreen(
             )
             Spacer(modifier = Modifier.height(2.dp))
         }
+
+        // Only ever the language control's failure: the time format below the prayer times has its own
+        // message on that screen, and both are the same component.
+        SettingsMessageBlock(uiState.message)
     }
 }

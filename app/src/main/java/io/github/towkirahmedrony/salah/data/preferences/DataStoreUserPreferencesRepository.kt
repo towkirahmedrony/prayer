@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
@@ -46,6 +47,21 @@ class DataStoreUserPreferencesRepository(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { preferences -> preferences[Keys.THEME_MODE] = mode.name }
+    }
+
+    // --- Interface language -----------------------------------------------------
+
+    override val appLanguage: Flow<AppLanguage> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences ->
+            AppLanguage.fromIdentifier(preferences[Keys.APP_LANGUAGE])
+        }
+
+    override suspend fun setAppLanguage(language: AppLanguage) {
+        // One key, so selecting a language cannot rewrite the theme, the calculation settings or the
+        // calendar settings that share this store. The edit itself throws on a store that cannot be
+        // written, which is what lets the settings screen avoid claiming a change it did not make.
+        dataStore.edit { preferences -> preferences[Keys.APP_LANGUAGE] = language.name }
     }
 
     override val prayerSettings: Flow<PrayerSettings> = dataStore.data
@@ -136,6 +152,7 @@ class DataStoreUserPreferencesRepository(
 
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val CALCULATION_METHOD = stringPreferencesKey("prayer_calculation_method")
         val ASR_METHOD = stringPreferencesKey("prayer_asr_method")
         val HIGH_LATITUDE_RULE = stringPreferencesKey("prayer_high_latitude_rule")

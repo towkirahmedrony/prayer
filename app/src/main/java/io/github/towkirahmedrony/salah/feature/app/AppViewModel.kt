@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCata
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,8 +20,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * App-level state shared above the navigation graph: the theme, and whether Salah has a location it
- * can work with.
+ * App-level state shared above the navigation graph: the theme, the interface language, and whether
+ * Salah has a location it can work with.
  *
  * **Optimistic gate.** A stored location is accepted as soon as it arrives, using only the coarse
  * bounds check (which needs no dataset). The dataset then loads in the background and the full
@@ -45,6 +46,22 @@ class AppViewModel(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = ThemeMode.SYSTEM,
+    )
+
+    /**
+     * The language every screen's strings resolve in, applied by the shell.
+     *
+     * Read here rather than inside each screen because it is an app-wide choice: the bottom bar, the
+     * Settings overview and the Calendar are all rebuilt from this one value, so a second read
+     * anywhere would be a second source of truth about the interface language. [AppLanguage.SYSTEM]
+     * is the initial value because it is the default *and* the do-nothing case — the first frame
+     * renders whatever the device's own locale says, exactly as it did before a selector existed, and
+     * a stored explicit language replaces it when the store has been read.
+     */
+    val appLanguage: StateFlow<AppLanguage> = userPreferencesRepository.appLanguage.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AppLanguage.DEFAULT,
     )
 
     private val dataset = MutableStateFlow<BangladeshLocationDataset?>(null)

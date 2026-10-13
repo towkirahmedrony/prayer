@@ -4,11 +4,17 @@
   (`app/src/main/res/values-bn/strings.xml`), and this file is where that decision is recorded.
 
   The strings the Bangla file defines are the ones whose meaning is unambiguous: the names of the
-  calendars, months, prayers and observances, and the short navigation and calendar labels. The
-  explanatory strings — the ones that state what is an estimate, what Salah cannot verify, and which
-  authority it does not claim to match — stay in English until they can be reviewed by someone
-  competent to review that wording. Translating them loosely would change an accuracy claim, which is
-  exactly the kind of change this app must not make silently.
+  calendars, months, prayers and observances, the short navigation and calendar labels, and the language
+  selector's own labels. The explanatory strings — the ones that state what is an estimate, what Salah
+  cannot verify, and which authority it does not claim to match — stay in English until they can be
+  reviewed by someone competent to review that wording. Translating them loosely would change an
+  accuracy claim, which is exactly the kind of change this app must not make silently.
+
+  The **Calendar** screen is the one screen this policy does not allow to be partial: every string it
+  can show is translated. Its completeness is enforced by `LocalizationResourcesTest` rather than by
+  lint, because this ignore would otherwise stay quiet about a forgotten calendar key too. The
+  interface language is a stored preference with its own selector on Settings > General — a choice the
+  app applies at runtime, not a build-time decision; see docs/LOCALIZATION.md.
 
   Android's resource resolution falls back to `values/` for anything a locale does not define, so the
   app is complete in either case; this is a supported configuration rather than a defect.

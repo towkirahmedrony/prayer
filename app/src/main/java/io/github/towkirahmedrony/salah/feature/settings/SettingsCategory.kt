@@ -18,8 +18,11 @@ import io.github.towkirahmedrony.salah.navigation.SalahDestination
  * to its own destination and that none of them is the Settings screen itself or a bottom-bar tab.
  *
  * Only categories with real settings behind them are declared. There is no "Account" entry because
- * Salah has no accounts, and no separate "Language" entry because app language is not a preference the
- * app exposes — the calendar's date language is a calendar preference and lives with the calendar.
+ * Salah has no accounts, and no separate "Language" entry because the interface language is a single
+ * three-way choice and lives on [GENERAL] with the other app-wide preference — a whole category and an
+ * extra tap would make the one control a user who cannot read the current language most needs the
+ * hardest to reach. The calendar's *date* language is a different preference and stays with the
+ * calendar, where the dates it affects are.
  */
 enum class SettingsCategory(
     val destination: SalahDestination,
@@ -27,7 +30,7 @@ enum class SettingsCategory(
     @StringRes val descriptionRes: Int,
 ) {
 
-    /** Time format: the one preference that applies to the app as a whole. */
+    /** Interface language and time format: the preferences that apply to the app as a whole. */
     GENERAL(
         destination = SalahDestination.SETTINGS_GENERAL,
         titleRes = R.string.settings_category_general_title,

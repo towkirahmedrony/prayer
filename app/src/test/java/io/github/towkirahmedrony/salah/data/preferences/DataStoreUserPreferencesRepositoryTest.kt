@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
@@ -231,5 +232,89 @@ class DataStoreUserPreferencesRepositoryTest {
         repository.setThemeMode(ThemeMode.DARK)
         assertEquals(ThemeMode.DARK, repository.themeMode.first())
         assertEquals(CalendarSystem.BANGLA, repository.calendarSettings.first().preferredSystem)
+    }
+
+    // --- Interface language --------------------------------------------------------
+
+    @Test
+    fun `the interface language defaults to following the device`() = runTest {
+        // The default is not "English": it is the absence of a choice, which is what the app did
+        // before the selector existed, so no install changes language on upgrade.
+        assertEquals(AppLanguage.SYSTEM, repository.appLanguage.first())
+        assertEquals(AppLanguage.DEFAULT, repository.appLanguage.first())
+    }
+
+    @Test
+    fun `the selected language is stored by its identifier and survives a restart`() = runTest {
+        repository.setAppLanguage(AppLanguage.BANGLA)
+
+        // A fresh repository over the same file stands in for a process restart.
+        val restarted = DataStoreUserPreferencesRepository(dataStore)
+
+        assertEquals(AppLanguage.BANGLA, restarted.appLanguage.first())
+        // And what is on disk is the stable identifier, never a translated display label.
+        assertEquals("BANGLA", dataStore.data.first()[stringPreferencesKey("app_language")])
+        assertEquals("bn", AppLanguage.BANGLA.languageTag)
+    }
+
+    @Test
+    fun `switching back to English is stored too`() = runTest {
+        repository.setAppLanguage(AppLanguage.BANGLA)
+        repository.setAppLanguage(AppLanguage.ENGLISH)
+
+        assertEquals(AppLanguage.ENGLISH, DataStoreUserPreferencesRepository(dataStore).appLanguage.first())
+        assertEquals("en", AppLanguage.ENGLISH.languageTag)
+    }
+
+    @Test
+    fun `an unknown stored language falls back to following the device`() = runTest {
+        // Simulates a store written by a different version, or edited by hand.
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("app_language")] = "KLINGON"
+        }
+
+        assertEquals(AppLanguage.SYSTEM, repository.appLanguage.first())
+    }
+
+    @Test
+    fun `choosing a language touches nothing else in the store`() = runTest {
+        repository.setThemeMode(ThemeMode.DARK)
+        repository.updatePrayerSettings {
+            it.copy(method = PrayerCalculationMethod.TURKEY, adjustmentsMinutes = mapOf(PrayerName.FAJR to -3))
+        }
+        repository.updateCalendarSettings {
+            it.copy(
+                preferredSystem = CalendarSystem.HIJRI,
+                dateLanguage = DateLanguagePreference.BANGLA,
+                hijriAdjustmentDays = 1,
+            )
+        }
+
+        repository.setAppLanguage(AppLanguage.BANGLA)
+
+        // The language is one key of its own. Changing it must not reset the theme, the calculation
+        // settings, the selected calendar system, the calendar's date language or the Hijri offset.
+        assertEquals(AppLanguage.BANGLA, repository.appLanguage.first())
+        assertEquals(ThemeMode.DARK, repository.themeMode.first())
+        assertEquals(PrayerCalculationMethod.TURKEY, repository.prayerSettings.first().method)
+        assertEquals(-3, repository.prayerSettings.first().adjustmentFor(PrayerName.FAJR))
+        assertEquals(CalendarSystem.HIJRI, repository.calendarSettings.first().preferredSystem)
+        assertEquals(DateLanguagePreference.BANGLA, repository.calendarSettings.first().dateLanguage)
+        assertEquals(1, repository.calendarSettings.first().hijriAdjustmentDays)
+    }
+
+    @Test
+    fun `a language write adds exactly one key and rewrites nothing else`() = runTest {
+        // The strongest form of "unrelated settings are preserved": the stored key set is compared
+        // before and after, so a write that re-serialised another preference — even to the same value —
+        // would still be visible here.
+        repository.setThemeMode(ThemeMode.DARK)
+        repository.updatePrayerSettings { it.copy(method = PrayerCalculationMethod.KUWAIT) }
+        repository.updateCalendarSettings { it.copy(preferredSystem = CalendarSystem.BANGLA) }
+        val before = dataStore.data.first().asMap().keys
+
+        repository.setAppLanguage(AppLanguage.BANGLA)
+
+        assertEquals(before + stringPreferencesKey("app_language"), dataStore.data.first().asMap().keys)
     }
 }

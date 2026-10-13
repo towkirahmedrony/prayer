@@ -279,9 +279,12 @@ CI (`.github/workflows/android-apk.yml`) is the authoritative check: it runs
 - **Azan playback is unavailable.** No recording with a redistributable licence is bundled, so no
   control is offered and the screen says so. The playback machinery exists and is tested. The setting
   becomes live by implementing `AzanAudioSource`.
-- **There is no app-language control.** The Bangla translation is a build-time choice and the calendar's
-  date language is a calendar preference; neither is an interface language, so no selector is offered
-  rather than one that would appear to switch the app and not.
+- **The interface language is a preference, and only the Calendar is fully translated.** Settings >
+  General offers English, Bengali and "Follow the device", and the choice is applied to every screen
+  without recreating the activity. The *Calendar* screen is translated in full; the rest of the app keeps
+  the deliberate partial translation recorded in `app/lint.xml`, so some explanatory paragraphs are still
+  English. The calendar's *date language* remains a separate calendar preference — see
+  `docs/LOCALIZATION.md`.
 - **There is no date-format setting.** `TimeFormatPreference` is the only display format the app has.
 - **The Hijri date is an estimate.** The offset is the only correction available; Salah does not
   integrate an authority source and never labels a date as confirmed.

@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.calendar
 
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
@@ -22,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -172,6 +174,59 @@ class CalendarViewModelTest {
         assertTrue(state.selectedIsToday)
     }
 
+    @Test
+    fun `changing the interface language re-renders the same dates and writes no calendar setting`() =
+        runTest(mainDispatcher) {
+            val viewModel = viewModelAt("2026-10-13T09:00:00Z")
+            val states = observe(viewModel)
+            runCurrent()
+
+            val asEnglish = latestReady(states)
+            assertEquals("October 2026", asEnglish.monthLabel)
+            assertEquals(CalendarSystem.GREGORIAN, asEnglish.system)
+            val dates = asEnglish.weeks.flatten().mapNotNull { cell -> cell?.date }
+            assertEquals(31, dates.size)
+            assertEquals(LocalDate.of(2026, 10, 13), asEnglish.selected.date)
+
+            // The General screen's selector stores Bengali, which re-emits the month and re-renders it.
+            preferences.selectLanguage(AppLanguage.BANGLA)
+            runCurrent()
+
+            val asBengali = latestReady(states)
+            // The same calendar, the same month span, the same days and the same selection: a language
+            // change is a rendering change and must not navigate, re-select or re-read a date.
+            assertEquals(CalendarSystem.GREGORIAN, asBengali.system)
+            assertEquals(asEnglish.monthStart, asBengali.monthStart)
+            assertEquals(asEnglish.monthEnd, asBengali.monthEnd)
+            assertEquals(asEnglish.selected.date, asBengali.selected.date)
+            assertEquals(dates, asBengali.weeks.flatten().mapNotNull { cell -> cell?.date })
+            assertEquals(asEnglish.selectedIsToday, asBengali.selectedIsToday)
+            assertTrue(asBengali.selectedIsToday)
+            assertEquals(asEnglish.ramadan.todayDayNumber, asBengali.ramadan.todayDayNumber)
+
+            // Rendered in Bengali instead: the heading is neither English nor still in Western digits,
+            // and the day numbers come from the Bangla numeral table.
+            assertNotEquals(asEnglish.monthLabel, asBengali.monthLabel)
+            assertTrue(
+                "the Bengali heading still carries Western digits: ${asBengali.monthLabel}",
+                asBengali.monthLabel.none { character -> character in '0'..'9' },
+            )
+            assertTrue(
+                "the Bengali heading carries no Bengali script: ${asBengali.monthLabel}",
+                asBengali.monthLabel.any { character -> character.code in 0x0980..0x09FF },
+            )
+            assertTrue(
+                "day numbers are still Western after the language change",
+                asBengali.weeks.flatten()
+                    .mapNotNull { cell -> cell?.dayLabel }
+                    .none { label -> label.any { character -> character in '0'..'9' } },
+            )
+
+            // And the interface language is not a calendar setting: the stored calendar is untouched,
+            // so switching to Bengali cannot be confused with selecting the Bangla civil calendar.
+            assertEquals(CalendarSystem.GREGORIAN, preferences.calendarSettings.first().preferredSystem)
+        }
+
     /** Builds the view model over the real repository and the real factory, with a fixed clock. */
     private fun viewModelAt(instant: String): CalendarViewModel {
         val clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC"))
@@ -207,14 +262,29 @@ class CalendarViewModelTest {
     }
 
     /** The one preference store the view model reads and writes, in memory. */
-    private class FakePreferences(initial: CalendarSettings) : UserPreferencesRepository {
+    private class FakePreferences(
+        initial: CalendarSettings,
+        initialLanguage: AppLanguage = AppLanguage.DEFAULT,
+    ) : UserPreferencesRepository {
 
         private val calendar = MutableStateFlow(initial)
+        private val language = MutableStateFlow(initialLanguage)
 
         override val calendarSettings: Flow<CalendarSettings> = calendar
 
         override suspend fun updateCalendarSettings(transform: (CalendarSettings) -> CalendarSettings) {
             calendar.value = transform(calendar.value)
+        }
+
+        override val appLanguage: Flow<AppLanguage> = language
+
+        override suspend fun setAppLanguage(value: AppLanguage) {
+            language.value = value
+        }
+
+        /** Moves the stored language, as the General screen's selector would. */
+        fun selectLanguage(value: AppLanguage) {
+            language.value = value
         }
 
         override val themeMode: Flow<ThemeMode> = MutableStateFlow(ThemeMode.SYSTEM)

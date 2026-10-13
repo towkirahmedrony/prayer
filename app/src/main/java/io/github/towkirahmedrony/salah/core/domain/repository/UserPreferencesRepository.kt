@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.core.domain.repository
 
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
@@ -11,6 +12,25 @@ interface UserPreferencesRepository {
     val themeMode: Flow<ThemeMode>
 
     suspend fun setThemeMode(mode: ThemeMode)
+
+    /**
+     * The language the interface is written in.
+     *
+     * A preference of its own, stored under its own key, so choosing a language cannot disturb the
+     * theme, the calculation settings or the calendar settings — and because it is a preference the
+     * interface is rebuilt from, not a build-time choice, it takes effect on the next emission rather
+     * than on the next install. Like the other flows it always emits a value: a fresh install reads
+     * [AppLanguage.DEFAULT], which is "follow the device".
+     */
+    val appLanguage: Flow<AppLanguage>
+
+    /**
+     * Stores the interface language.
+     *
+     * Writes exactly one key. A failure (an unwritable store) is thrown rather than swallowed, so a
+     * caller that reports success can only do so when the value really was stored.
+     */
+    suspend fun setAppLanguage(language: AppLanguage)
 
     /**
      * The prayer-calculation and display settings.

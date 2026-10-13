@@ -2,14 +2,24 @@
 <!--
   Bangla translations of the user-facing labels Salah's calendar, Ramadan and navigation surfaces use.
 
-  This is a partial translation on purpose. Android falls back to values/strings.xml for anything not
-  listed here, and Salah's English wording makes specific claims about sources and limits that must not
-  be translated loosely — so the strings translated here are the ones whose meaning is unambiguous
-  (names of calendars, months, prayers and observance, and short navigation labels). The explanatory
-  paragraphs that state what is estimated and what is not stay in English until they can be reviewed.
+  How these are selected: by the device's own locale, or by the language selector on
+  Settings > General (see docs/LOCALIZATION.md). The selector stores its choice as a stable language
+  identifier and the shell applies it to every screen without recreating the activity, so these strings
+  are reached either way.
 
-  Salah does not switch language from inside the app; these are selected by the device locale, and the
-  calendar's own date language is a separate, explicit setting (see Calendar settings).
+  This is a PARTIAL translation of the explanatory strings on purpose. Android falls back to
+  values/strings.xml for anything not listed here, and Salah's English wording makes specific claims
+  about sources and limits that must not be translated loosely — so the explanatory paragraphs that
+  state what is estimated and what is not stay in English until someone competent to review that
+  wording has reviewed it.
+
+  The Calendar screen is the deliberate exception. Every string that screen shows is translated here,
+  including its explanatory and error text, because it is the screen this phase localises in full and a
+  half-Bengali calendar is exactly what a reader would notice first. The same goes for the language
+  selector's own labels: a control that changes the interface language has to be legible in both.
+
+  The calendar's date language (which script and numerals the dates themselves use) is a separate,
+  explicit setting and is not affected by the interface language — see Calendar settings.
 -->
 <resources>
     <!-- Navigation -->
@@ -193,4 +203,71 @@
 
     <string name="qibla_calibration_dismiss">আপাতত বন্ধ করুন</string>
     <string name="qibla_message_dismiss">বন্ধ করুন</string>
+
+    <!--
+      Settings: the overview and the General screen.
+
+      Translated because the language selector lives here: a reader who cannot read the current
+      interface has to be able to reach and recognise it, and the row that leads to it is part of that
+      path. Only the labels on the way to the selector are translated; the other categories' names are
+      left to the same policy as the rest of the explanatory wording.
+    -->
+    <string name="settings_title">সেটিংস</string>
+    <string name="settings_subtitle">আপনার সালাহ অভিজ্ঞতা নিজের মতো সাজান।</string>
+    <string name="action_back">ফিরে যান</string>
+    <string name="settings_category_general_title">সাধারণ</string>
+    <string name="settings_category_general_description">ভাষা, সময়ের ধরন এবং অন্যান্য সাধারণ পছন্দ।</string>
+    <string name="settings_general_body">সালাহর প্রতিটি স্ক্রিনে প্রযোজ্য পছন্দসমূহ।</string>
+    <string name="settings_time_format_title">সময়ের ধরন</string>
+
+    <!-- The language selector itself. settings_language_title is bare "ভাষা" here because the
+         English "Language / ভাষা" split exists only to be legible from the other side. -->
+    <string name="settings_language_title">ভাষা</string>
+    <string name="settings_language_body">সালাহর ইন্টারফেস যে ভাষায় লেখা হবে। এটি শুধু লেখার ভাষা বদলায়, আর কিছু নয়: কোন ক্যালেন্ডার দেখানো হবে, তারিখ কোন লিপিতে লেখা হবে এবং হিজরি সমন্বয়—সবই ক্যালেন্ডার সেটিংস, এই পছন্দে অপরিবর্তিত থাকে।</string>
+    <string name="settings_language_system">ডিভাইস অনুযায়ী</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_bangla">বাংলা</string>
+    <string name="settings_language_save_failed">ভাষাটি সংরক্ষণ করা যায়নি, তাই আগের ভাষাটিই এখনও ব্যবহৃত হচ্ছে।</string>
+
+    <!--
+      Calendar screen: the strings the English file defines but this one did not.
+
+      This is the complete set the Calendar screen can render — its headings, its month navigation,
+      the estimated-date source wording, the empty and error states, the occasion note and the buttons
+      that leave it. Nothing on that screen is left in English.
+    -->
+    <string name="calendar_view_gregorian_hint">ডিভাইসের সরকারি ক্যালেন্ডার।</string>
+    <string name="calendar_view_bangla_hint">বাংলাদেশের সরকারি বঙ্গাব্দ, যা ২০১৯ সালে সংশোধিত বাংলা একাডেমির নিয়ম অনুসারে।</string>
+    <string name="calendar_view_hijri_hint">এই ডিভাইসের উম্মুল কুরা সারণি থেকে অনুমান করা। ঘোষিত তারিখ নয়।</string>
+    <string name="calendar_hijri_source_calculated">এই ডিভাইসের উম্মুল কুরা ক্যালেন্ডার থেকে অনুমান করা — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
+    <string name="calendar_hijri_source_adjusted">উম্মুল কুরা ক্যালেন্ডার থেকে অনুমান করে আপনার হিজরি সমন্বয় অনুযায়ী সরানো — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
+    <string name="calendar_cell_description">তারিখ %1$s</string>
+
+    <string name="calendar_ramadan_range">আনুমানিক রমজান: %1$s</string>
+    <string name="calendar_ramadan_unavailable">এই সময়ের জন্য এই ডিভাইসে নির্ভরযোগ্য কোনো রমজান সময়কাল পাওয়া যায়নি, তাই একটি অনুমান করা সময়কাল দেখানোর বদলে কিছুই দেখানো হচ্ছে না।</string>
+    <string name="calendar_ramadan_in_ramadan">আজ আনুমানিক রমজান সময়কালের ভিতরে পড়েছে।</string>
+    <string name="calendar_ramadan_upcoming">এই ডিভাইসের হিসাব অনুযায়ী, পরবর্তী রমজান প্রায় দুই মাসের মধ্যে আশা করা হচ্ছে।</string>
+    <string name="calendar_ramadan_not_near">এই ডিভাইসের হিসাব অনুযায়ী, রমজান এখন থেকে প্রায় দুই মাসেরও বেশি দূরে।</string>
+    <string name="calendar_ramadan_estimate_note">এই সময়কাল উম্মুল কুরার হিসাব থেকে পাওয়া, বাংলাদেশের ধর্মীয় কর্তৃপক্ষের ঘোষণা থেকে নয়; তাই স্থানীয় চাঁদ দেখার ভিত্তিতে শুরু ও শেষ এক দিন সরে যেতে পারে।</string>
+    <string name="calendar_occasion_note">পালনীয় দিনগুলো হিজরি ক্যালেন্ডার অনুসরণ করে, তাই স্থানীয় চাঁদ দেখার ভিত্তিতে সেগুলো এক দিন সরে যেতে পারে।</string>
+
+    <string name="calendar_settings_body">এই ডিভাইসে সংরক্ষিত। এই পছন্দগুলো প্রতিটি ক্যালেন্ডার স্ক্রিনে যা দেখানো হয় তা পরিবর্তন করে।</string>
+    <string name="calendar_default_view_body">ক্যালেন্ডার স্ক্রিন কোন ক্যালেন্ডারে খুলবে। মাসের গ্রিড, তার মাস ও বারগুলোর নাম, দিনের সংখ্যা এবং বছর—সবই নির্বাচিত ক্যালেন্ডার অনুসরণ করে; নির্বাচিত দিনের জন্য অন্য ক্যালেন্ডারগুলোও দেখানো হয়।</string>
+    <string name="calendar_hijri_adjustment_body">সালাহর হিজরি তারিখ উম্মুল কুরার একটি অনুমান। আপনার সমাজ ভিন্ন তারিখ অনুসরণ করলে এখানে তা সমন্বয় করুন: প্রতিটি হিজরি তারিখ, আনুমানিক রমজান সময়কাল এবং রমজানের রিমাইন্ডার এর সাথে সরে যাবে। ফলাফলটি এখনও অনুমান হিসেবেই জানানো হয়, কারণ তা অনুমানই।</string>
+    <string name="calendar_hijri_adjustment_value">সমন্বয়: %1$s দিন</string>
+    <string name="calendar_hijri_adjustment_range">−%1$d থেকে +%1$d দিনের মধ্যে</string>
+    <string name="calendar_language_body">ক্যালেন্ডারের তারিখ কোন লিপি ও সংখ্যায় লেখা হবে। এটি ইন্টারফেসের ভাষা থেকে আলাদা।</string>
+    <string name="calendar_sources_title">এই তারিখগুলো কোথা থেকে আসে</string>
+    <string name="calendar_sources_body">গ্রেগরিয়ান তারিখ আসে ডিভাইসের ঘড়ি থেকে। বঙ্গাব্দ ২০১৯ সালে সংশোধিত বাংলাদেশের সরকারি নিয়মে রূপান্তর করা হয়, এবং যে বছরগুলোর জন্য নিয়মগুলো যাচাই করা হয়েছে শুধু সেগুলোর জন্যই তা দেখানো হয়। হিজরি তারিখ অ্যান্ড্রয়েডে অন্তর্ভুক্ত উম্মুল কুরা সারণি থেকে অনুমান করা হয় এবং সর্বদা অনুমান হিসেবেই চিহ্নিত থাকে। এর কোনোটির জন্যই ইন্টারনেট সংযোগ লাগে না।</string>
+    <string name="calendar_reminders_note">সেহরি ও ইফতারের রিমাইন্ডার অন্য নামাজের রিমাইন্ডারগুলোর সাথেই কনফিগার করা হয়, তাই তারা একই শিডিউলার, একই অনুমতি এবং একই চ্যানেল ভাগ করে নেয়।</string>
+    <string name="calendar_source_computed">এই ডিভাইসে হিসাব করা</string>
+
+    <string name="calendar_open_settings">ক্যালেন্ডার সেটিংস খুলুন</string>
+    <string name="calendar_open_ramadan">রমজান ক্যালেন্ডার খুলুন</string>
+    <string name="calendar_open_notifications">নামাজের রিমাইন্ডার সেটিংস খুলুন</string>
+
+    <!-- The Calendar screen's states, so its loading, failure and out-of-range text is Bengali too. -->
+    <string name="reason_calendar_out_of_range">এই তারিখটি নির্বাচিত ক্যালেন্ডারের জন্য সালাহ যে পরিসরে রূপান্তর করতে পারে তার বাইরে, তাই একটি আনুমানিক তারিখ দেখানোর বদলে কোনো তারিখ দেখানো হচ্ছে না।</string>
+    <string name="reason_calendar_not_implemented">ক্যালেন্ডার রূপান্তর এখনও কার্যকর করা হয়নি।</string>
+    <string name="action_open_settings">সেটিংস খুলুন</string>
 </resources>

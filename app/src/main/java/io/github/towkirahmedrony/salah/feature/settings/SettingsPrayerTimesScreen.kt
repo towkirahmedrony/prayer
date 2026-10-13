@@ -144,9 +144,15 @@ fun SettingsPrayerTimesScreen(
 /**
  * The last action's outcome, when saying nothing would leave the user unsure.
  *
- * Only the recalculation is reported: adding a minute changes every time on the Home screen, and a
- * change that large is worth one line of explanation. Its text is inline rather than a snackbar, because
- * a snackbar over a scrolling list can be missed and this message has no action to take.
+ * Two outcomes are worth a line, and only two. The recalculation is reported because adding a minute
+ * changes every time on the Home screen, and a change that large deserves an explanation. A rejected
+ * language write is reported because the selector renders the *stored* value: without this line the
+ * user would be looking at a choice that did not stick. Everything else on these screens shows its own
+ * result in the control that changed it, so a success message would be noise.
+ *
+ * Its text is inline rather than a snackbar, because a snackbar over a scrolling list can be missed and
+ * neither message has an action to take. A failure is drawn in the error colour rather than the
+ * primary one, so "did not save" cannot be mistaken at a glance for "recalculated".
  */
 @Composable
 internal fun SettingsMessageBlock(message: SettingsMessage?) {
@@ -154,8 +160,12 @@ internal fun SettingsMessageBlock(message: SettingsMessage?) {
     Text(
         text = when (message) {
             SettingsMessage.PrayerSettingsSaved -> stringResource(R.string.settings_calculation_saved)
+            SettingsMessage.LanguageSaveFailed -> stringResource(R.string.settings_language_save_failed)
         },
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.primary,
+        color = when (message) {
+            SettingsMessage.LanguageSaveFailed -> MaterialTheme.colorScheme.error
+            SettingsMessage.PrayerSettingsSaved -> MaterialTheme.colorScheme.primary
+        },
     )
 }

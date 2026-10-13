@@ -70,10 +70,12 @@ offers "Remove location" for the same store. Only the location screen's action r
 
 ## 4. What is deliberately absent
 
-- **No app-language control.** Salah ships a deliberately partial Bangla translation fixed at build time
-  (see `app/lint.xml`), and the calendar's *date language* is a calendar preference. Neither is a
-  language selector, so no control is offered rather than one that appears to switch the interface and
-  does not.
+- **No separate Language category.** The interface language *is* a preference (the selector lives on
+  Settings > General, beside the time format), but it is a single three-way choice rather than a
+  screenful of settings, so it gets a card rather than a category of its own — a category would put the
+  one control a reader who cannot read the current language most needs behind an extra tap. The
+  calendar's *date language* is a different preference and stays with the calendar. See
+  `docs/LOCALIZATION.md`.
 - **No account or profile section.** There are no accounts.
 - **No date-format setting.** `TimeFormatPreference` is the only display format the app has.
 - **No theme extras** (font size, density): the settings that exist are the settings that work.

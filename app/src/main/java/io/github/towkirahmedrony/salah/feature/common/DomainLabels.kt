@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
@@ -200,6 +201,22 @@ fun DateLanguagePreference.labelRes(): Int = when (this) {
     DateLanguagePreference.SYSTEM -> R.string.calendar_language_system
     DateLanguagePreference.BANGLA -> R.string.calendar_language_bangla
     DateLanguagePreference.ENGLISH -> R.string.calendar_language_english
+}
+
+/**
+ * The choices on the General screen's language selector.
+ *
+ * Deliberately separate resources from [DateLanguagePreference]'s labels even though two of them read
+ * the same: the calendar's date language and the interface language are different preferences, and
+ * sharing one resource would make a later change to either label silently change the wrong control.
+ * `Follow the device` is named rather than shown as a blank, because it is a real choice — the one a
+ * fresh install is on — and an empty radio row would look like a missing option.
+ */
+@StringRes
+fun AppLanguage.labelRes(): Int = when (this) {
+    AppLanguage.SYSTEM -> R.string.settings_language_system
+    AppLanguage.ENGLISH -> R.string.settings_language_english
+    AppLanguage.BANGLA -> R.string.settings_language_bangla
 }
 
 @StringRes

@@ -32,7 +32,14 @@ import java.util.Locale
  *
  * [systemLocale] is a parameter rather than a `Locale.getDefault()` call inside the method so a test
  * can pin it, and so the one place that decides between the stored date-language preference and the
- * device's own locale is [CalendarFormatting.localeFor].
+ * interface's language is [CalendarFormatting.localeFor].
+ *
+ * **The interface language is [systemLocale].** The calendar view model passes the selected
+ * `AppLanguage`'s locale here, so with Bengali selected and the stored date language left on "follow",
+ * a Gregorian grid reads `অক্টোবর ২০২৬` and its weekday headers and day numbers are Bengali too —
+ * while the Gregorian days themselves, the selection and the Ramadan window are untouched. Selecting
+ * English passes `en` and the same month renders in Latin script. Nothing about the *data* changes: the
+ * month is still built by the repository from the same Gregorian anchor.
  */
 class CalendarUiStateFactory(
     private val formatting: CalendarFormatting = CalendarFormatting(),
@@ -80,7 +87,8 @@ class CalendarUiStateFactory(
 
     /**
      * The month heading in the selected calendar system — `October 2026`, `আশ্বিন ১৪৩১` or
-     * `رَمَضان ١٤٤٥`.
+     * `رَمَضان ١٤٤٥` — rendered in [gridLocale], which for a Gregorian grid is the interface language
+     * unless the stored date language overrides it.
      *
      * Derived from the month's own first convertible day, so the heading is the system's month and
      * year, not the Gregorian month the days happen to fall in. When the system's month is not

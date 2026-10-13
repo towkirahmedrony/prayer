@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
@@ -12,6 +13,7 @@ import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,7 @@ import kotlinx.coroutines.launch
  * State and actions for the settings subpages that write to local preferences.
  *
  * One view model serves the General, Appearance and Prayer times screens because they read and write the
- * same two preferences; a class per screen would be three copies of the same two flows. State is the
+ * same preferences; a class per screen would be several copies of the same flows. State is the
  * repository's own, so the controls cannot show a value that is not stored, and each action writes
  * through the repository rather than a local copy.
  *
@@ -53,11 +55,13 @@ class SettingsViewModel(
     val uiState: StateFlow<SettingsUiState> = combine(
         userPreferencesRepository.themeMode,
         userPreferencesRepository.prayerSettings,
+        userPreferencesRepository.appLanguage,
         message,
-    ) { themeMode, prayerSettings, currentMessage ->
+    ) { themeMode, prayerSettings, appLanguage, currentMessage ->
         SettingsUiState(
             themeMode = themeMode,
             prayerSettings = prayerSettings,
+            appLanguage = appLanguage,
             message = currentMessage,
         )
     }.stateIn(
@@ -66,12 +70,43 @@ class SettingsViewModel(
         initialValue = SettingsUiState(
             themeMode = ThemeMode.SYSTEM,
             prayerSettings = PrayerSettings.DEFAULT,
+            appLanguage = AppLanguage.DEFAULT,
             message = null,
         ),
     )
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { userPreferencesRepository.setThemeMode(mode) }
+    }
+
+    // --- Interface language -----------------------------------------------------
+
+    /**
+     * Stores the interface [language] the General screen's selector chose.
+     *
+     * **Nothing is rescheduled.** A language changes words, not times: it is not part of any
+     * calculation, so the reminders are left alone and no timetable is invalidated. The one call this
+     * deliberately does *not* make is [PrayerNotificationCoordinator.reconcile], which every other
+     * control on these screens makes — rescheduling the alarm set because a label changed would be
+     * work with no effect on any delivered reminder.
+     *
+     * **A failure is reported, never assumed away.** The control renders the *stored* language, so a
+     * write that did not happen leaves the selection where it was; this catches the failure, clears any
+     * earlier message and reports [SettingsMessage.LanguageSaveFailed] so the screen can say which
+     * language is really in force instead of leaving the user with a selection that quietly did not
+     * stick. [CancellationException] is rethrown because a cancelled scope is not a failed write.
+     */
+    fun setAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            try {
+                userPreferencesRepository.setAppLanguage(language)
+                message.value = null
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                message.value = SettingsMessage.LanguageSaveFailed
+            }
+        }
     }
 
     // --- Prayer calculation -----------------------------------------------------

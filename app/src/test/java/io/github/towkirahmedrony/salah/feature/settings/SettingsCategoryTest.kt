@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.settings
 
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.navigation.SalahDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -97,6 +98,49 @@ class SettingsCategoryTest {
                 category.descriptionRes,
             )
         }
+    }
+
+    /**
+     * The language selector's home, asserted as a reachability property rather than a screenshot.
+     *
+     * The selector is rendered by `SettingsGeneralScreen`, which is the screen `SETTINGS_GENERAL`
+     * opens. So "the language selector can be reached" reduces to two things this can check without a
+     * device: the General category is on the overview (which renders `SettingsCategory.entries`), and
+     * it opens the destination the graph declares. A row that is missing, or that opens a route the
+     * graph does not know, is precisely how a control becomes unreachable while still compiling.
+     */
+    @Test
+    fun `the screen that carries the language selector is one tap from Settings`() {
+        val general = SettingsCategory.entries.first { category ->
+            category.destination == SalahDestination.SETTINGS_GENERAL
+        }
+
+        // The overview renders every entry, so this category is a visible row.
+        assertTrue("the General category is not on the Settings overview", general in SettingsCategory.entries)
+        // And the row opens a real destination rather than a route that silently does nothing.
+        assertEquals(
+            SalahDestination.SETTINGS_GENERAL,
+            SalahDestination.fromRoute(general.destination.route),
+        )
+        assertFalse("the language screen must not be a bottom-bar tab", general.destination.inBottomBar)
+    }
+
+    /**
+     * Both choices the task requires are offered, under stable identifiers.
+     *
+     * The screen renders `AppLanguage.entries`, so this is the whole list a user can pick from, and it
+     * is asserted here beside the reachability check so "the selector exists" and "the selector has
+     * both languages" fail in the same place if either regresses.
+     */
+    @Test
+    fun `the selector offers English and Bengali with stable identifiers`() {
+        assertTrue(AppLanguage.entries.contains(AppLanguage.ENGLISH))
+        assertTrue(AppLanguage.entries.contains(AppLanguage.BANGLA))
+        assertEquals("en", AppLanguage.ENGLISH.languageTag)
+        assertEquals("bn", AppLanguage.BANGLA.languageTag)
+        // The stored value is the identifier, never a translated display label.
+        assertNotEquals("English", AppLanguage.ENGLISH.name)
+        assertNotEquals("বাংলা", AppLanguage.BANGLA.name)
     }
 
     @Test

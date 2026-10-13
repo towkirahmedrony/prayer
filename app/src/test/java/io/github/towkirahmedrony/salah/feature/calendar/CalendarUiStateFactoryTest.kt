@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.calendar
 
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HijriDateSource
 import io.github.towkirahmedrony.salah.core.model.IslamicOccasion
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -40,6 +42,10 @@ class CalendarUiStateFactoryTest {
 
     private val factory = CalendarUiStateFactory()
     private val english = Locale.ENGLISH
+
+    /** The locale the shell passes when the interface language is Bengali. */
+    private val bengali = Locale.forLanguageTag("bn")
+
     private lateinit var originalDefault: TimeZone
 
     @Before
@@ -80,6 +86,135 @@ class CalendarUiStateFactoryTest {
         clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC")),
         settings = flowOf(settings),
     ).observeMonth(settings.preferredSystem, anchor).first()
+
+    /** True when [this] is in the Bengali Unicode block (U+0980–U+09FF). */
+    private fun Char.inBengaliBlock(): Boolean = code in 0x0980..0x09FF
+
+    @Test
+    fun `a Bengali interface renders the grid in Bengali without moving a single date`() = runTest {
+        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
+        // Gregorian, with the stored date language left on "follow the interface": the case the
+        // language selector actually changes.
+        val settings = CalendarSettings.DEFAULT
+
+        val asEnglish = factory.create(month, settings, month.today, english) as CalendarUiState.Ready
+        val asBengali = factory.create(month, settings, month.today, bengali) as CalendarUiState.Ready
+
+        // Same calendar, same month, same selection, same Ramadan data: only the script changed. If a
+        // language choice could move any of these it would be a date change, not a translation.
+        assertEquals(CalendarSystem.GREGORIAN, asBengali.system)
+        assertEquals(asEnglish.month, asBengali.month)
+        assertEquals(asEnglish.monthStart, asBengali.monthStart)
+        assertEquals(asEnglish.monthEnd, asBengali.monthEnd)
+        assertEquals(asEnglish.selected.date, asBengali.selected.date)
+        assertEquals(asEnglish.selectedIsToday, asBengali.selectedIsToday)
+        assertEquals(asEnglish.weeks.size, asBengali.weeks.size)
+        assertEquals(asEnglish.hijriAdjustmentDays, asBengali.hijriAdjustmentDays)
+        assertEquals(asEnglish.ramadan.todayDayNumber, asBengali.ramadan.todayDayNumber)
+
+        // The heading really is Bengali: `March 2024` is what English gives, and the Bengali one is
+        // neither that nor still written in Western digits.
+        assertEquals("March 2024", asEnglish.monthLabel)
+        assertNotEquals(asEnglish.monthLabel, asBengali.monthLabel)
+        assertTrue(
+            "the Bengali month heading is still in Western digits: ${asBengali.monthLabel}",
+            asBengali.monthLabel.none { character -> character in '0'..'9' },
+        )
+
+        // Day numbers are composed from the Bangla numeral table, so this holds on every device
+        // regardless of how complete its locale data is.
+        val bengaliDayLabels = asBengali.weeks.flatten().mapNotNull { cell -> cell?.dayLabel }
+        assertTrue("the Bengali grid has no day numbers at all", bengaliDayLabels.isNotEmpty())
+        bengaliDayLabels.forEach { label ->
+            assertTrue("a Bengali day number is still Western: $label", label.none { it in '0'..'9' })
+        }
+        assertTrue(
+            "no Bengali day number carries a Bengali digit",
+            bengaliDayLabels.any { label -> label.any { character -> character.inBengaliBlock() } },
+        )
+
+        // The weekday header follows the same locale, and the columns still line up with the days
+        // beneath them — the grid's alignment is a property of the month, not of the language.
+        assertEquals(7, asBengali.weekdayLabels.size)
+        assertNotEquals(asEnglish.weekdayLabels, asBengali.weekdayLabels)
+        asBengali.weekdayLabels.forEach { label ->
+            assertTrue(
+                "a Bengali weekday header is still Latin: $label",
+                label.any { character -> character.inBengaliBlock() },
+            )
+        }
+        asBengali.weeks.forEach { week ->
+            week.forEachIndexed { column, cell ->
+                cell?.date?.let { date ->
+                    assertEquals(
+                        "weekday header and day are misaligned after the language change",
+                        date.dayOfWeek.getDisplayName(TextStyle.SHORT, bengali),
+                        asBengali.weekdayLabels[column],
+                    )
+                }
+            }
+        }
+
+        // Today is still today, and still the selection: the marks survive the language change.
+        assertEquals(
+            asEnglish.weeks.flatten().count { it?.stage == CalendarCellStage.TODAY_SELECTED },
+            asBengali.weeks.flatten().count { it?.stage == CalendarCellStage.TODAY_SELECTED },
+        )
+    }
+
+    @Test
+    fun `an explicit date language still wins over the interface language`() = runTest {
+        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
+        val chosenEnglish = CalendarSettings(dateLanguage = DateLanguagePreference.ENGLISH)
+
+        val state = factory.create(month, chosenEnglish, month.today, bengali) as CalendarUiState.Ready
+
+        // A Bengali interface does not override a deliberate statement about the dates themselves.
+        assertEquals("March 2024", state.monthLabel)
+        assertEquals(CalendarSystem.GREGORIAN, state.system)
+        assertEquals(DateLanguagePreference.ENGLISH, state.dateLanguage)
+    }
+
+    @Test
+    fun `the interface language renders all three calendars but changes none of them`() = runTest {
+        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
+        val selected = LocalDate.of(2024, 3, 11)
+
+        val asEnglish = factory.create(month, CalendarSettings.DEFAULT, selected, english) as CalendarUiState.Ready
+        val asBengali = factory.create(month, CalendarSettings.DEFAULT, selected, bengali) as CalendarUiState.Ready
+
+        // The same three lines, describing the same date, with the same availability — a translation
+        // must never add or remove a representation.
+        assertEquals(asEnglish.selected.lines.map { it.system }, asBengali.selected.lines.map { it.system })
+        assertEquals(asEnglish.selected.lines.map { it.unavailable }, asBengali.selected.lines.map { it.unavailable })
+        assertEquals(selected, asBengali.selected.date)
+        assertEquals(
+            HijriDateSource.ESTIMATED_UMM_AL_QURA,
+            asBengali.selected.lines.first { it.system == CalendarSystem.HIJRI }.source,
+        )
+        // And the date list's Gregorian line is Bengali, while the Bangla and Hijri lines were already
+        // in their own scripts.
+        assertTrue(
+            asBengali.selected.lines.first { it.system == CalendarSystem.GREGORIAN }
+                .value!!.any { character -> character.inBengaliBlock() },
+        )
+    }
+
+    @Test
+    fun `the selected calendar system comes from the settings, not from the language`() = runTest {
+        val banglaSettings = CalendarSettings(preferredSystem = CalendarSystem.BANGLA)
+        val anchor = LocalDate.of(2024, 3, 11)
+        val month = monthAt("2024-03-11T09:00:00Z", anchor, banglaSettings)
+
+        val asEnglish = factory.create(month, banglaSettings, anchor, english) as CalendarUiState.Ready
+        val asBengali = factory.create(month, banglaSettings, anchor, bengali) as CalendarUiState.Ready
+
+        assertEquals(CalendarSystem.BANGLA, asEnglish.system)
+        assertEquals(CalendarSystem.BANGLA, asBengali.system)
+        // The Bangla mode presents the calendar in Bengali in both, because that mode is about the
+        // dates themselves; only the side-by-side date list defers to the interface language.
+        assertEquals(asEnglish.monthLabel, asBengali.monthLabel)
+    }
 
     @Test
     fun `today is both today and the selection until the user picks another day`() = runTest {

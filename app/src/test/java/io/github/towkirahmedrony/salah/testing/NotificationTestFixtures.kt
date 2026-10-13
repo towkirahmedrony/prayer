@@ -18,6 +18,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotification
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
@@ -299,18 +300,32 @@ class FakePrayerNotificationPreferencesRepository(
 }
 
 /**
- * Calculation preferences; the notification path reads the profile, the time format and the stored
- * Hijri offset, because the Hijri offset is what decides which dates are in Ramadan.
+ * Calculation, calendar, theme and interface-language preferences; the notification path reads the
+ * profile, the time format and the stored Hijri offset, because the Hijri offset is what decides which
+ * dates are in Ramadan.
+ *
+ * The four are held separately and written separately, exactly as the real repository does, so a test
+ * can assert that changing one leaves the others alone — which is the property that makes the language
+ * selector safe to add beside three existing preference groups.
  */
 class FakeUserPreferencesRepository(
     initialSettings: PrayerSettings = PrayerSettings.DEFAULT,
     initialTheme: ThemeMode = ThemeMode.SYSTEM,
     initialCalendarSettings: CalendarSettings = CalendarSettings.DEFAULT,
+    initialAppLanguage: AppLanguage = AppLanguage.DEFAULT,
 ) : UserPreferencesRepository {
 
     private val settingsState = MutableStateFlow(initialSettings)
     private val themeState = MutableStateFlow(initialTheme)
     private val calendarState = MutableStateFlow(initialCalendarSettings)
+    private val languageState = MutableStateFlow(initialAppLanguage)
+
+    /**
+     * When set, the next [setAppLanguage] throws this instead of storing anything, which models a
+     * store that cannot be written. Clear it to let the following write succeed; nothing is stored
+     * while it is set, so the observable language stays where it was.
+     */
+    var languageWriteFailure: Throwable? = null
 
     override val themeMode: Flow<ThemeMode> = themeState
 
@@ -328,6 +343,13 @@ class FakeUserPreferencesRepository(
 
     override suspend fun updateCalendarSettings(transform: (CalendarSettings) -> CalendarSettings) {
         calendarState.value = transform(calendarState.value)
+    }
+
+    override val appLanguage: Flow<AppLanguage> = languageState
+
+    override suspend fun setAppLanguage(language: AppLanguage) {
+        languageWriteFailure?.let { failure -> throw failure }
+        languageState.value = language
     }
 
     /** Moves the stored Hijri offset, for a scenario where the user realigns the calendar. */

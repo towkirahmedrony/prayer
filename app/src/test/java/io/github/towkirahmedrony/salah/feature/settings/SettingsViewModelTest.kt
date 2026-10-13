@@ -3,7 +3,10 @@ package io.github.towkirahmedrony.salah.feature.settings
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.CalendarSettings
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
@@ -229,6 +232,160 @@ class SettingsViewModelTest {
 
         assertEquals(emptyMap<PrayerName, Int>(), repository.prayerSettings.first().adjustmentsMinutes)
     }
+
+    // --- The language selector ----------------------------------------------------
+
+    @Test
+    fun `the stored language is what the selector opens on`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository(initialAppLanguage = AppLanguage.BANGLA)
+        val viewModel = settingsViewModel(repository)
+
+        val state = viewModel.awaitState { it.appLanguage == AppLanguage.BANGLA }
+
+        assertEquals(AppLanguage.BANGLA, state.appLanguage)
+        // Nothing was changed, so there is nothing to report — the selector is not a control that
+        // announces itself on open.
+        assertNull(state.message)
+    }
+
+    @Test
+    fun `a fresh install shows the default, which follows the device`() = runTest(mainDispatcher) {
+        val viewModel = settingsViewModel(FakeUserPreferencesRepository())
+
+        assertEquals(AppLanguage.DEFAULT, viewModel.awaitState { true }.appLanguage)
+        assertEquals(AppLanguage.SYSTEM, viewModel.awaitState { true }.appLanguage)
+    }
+
+    @Test
+    fun `choosing Bengali stores the Bengali identifier`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository()
+        val viewModel = settingsViewModel(repository)
+
+        viewModel.setAppLanguage(AppLanguage.BANGLA)
+        runCurrent()
+
+        // Stored by the stable identifier and nowhere else: the translated label the radio row shows
+        // is a string resource and never reaches the store.
+        assertEquals(AppLanguage.BANGLA, repository.appLanguage.first())
+        assertEquals("bn", AppLanguage.BANGLA.languageTag)
+        // And the control follows the store, so the tapped choice is the one shown as selected.
+        assertEquals(
+            AppLanguage.BANGLA,
+            viewModel.awaitState { it.appLanguage == AppLanguage.BANGLA }.appLanguage,
+        )
+    }
+
+    @Test
+    fun `choosing English stores the English identifier`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository(initialAppLanguage = AppLanguage.BANGLA)
+        val viewModel = settingsViewModel(repository)
+
+        viewModel.setAppLanguage(AppLanguage.ENGLISH)
+        runCurrent()
+
+        assertEquals(AppLanguage.ENGLISH, repository.appLanguage.first())
+        assertEquals("en", AppLanguage.ENGLISH.languageTag)
+        assertEquals(
+            AppLanguage.ENGLISH,
+            viewModel.awaitState { it.appLanguage == AppLanguage.ENGLISH }.appLanguage,
+        )
+    }
+
+    @Test
+    fun `the chosen language is restored when the screen is recreated`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository()
+        settingsViewModel(repository).setAppLanguage(AppLanguage.BANGLA)
+        runCurrent()
+
+        // A second view model over the same store: leaving Settings and coming back, or restarting the
+        // app, which is the case the preference exists for.
+        val reopened = settingsViewModel(repository)
+
+        assertEquals(
+            AppLanguage.BANGLA,
+            reopened.awaitState { it.appLanguage == AppLanguage.BANGLA }.appLanguage,
+        )
+    }
+
+    @Test
+    fun `a failed language write is reported and the stored language is unchanged`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository()
+        repository.languageWriteFailure = IllegalStateException("the store is not writable")
+        val viewModel = settingsViewModel(repository)
+
+        viewModel.setAppLanguage(AppLanguage.BANGLA)
+        runCurrent()
+
+        // Nothing was stored...
+        assertEquals(AppLanguage.DEFAULT, repository.appLanguage.first())
+        val reported = viewModel.awaitState { it.message != null }
+        // ...the selection still shows the language really in force...
+        assertEquals(AppLanguage.DEFAULT, reported.appLanguage)
+        // ...and the screen says so rather than implying the choice took effect.
+        assertEquals(SettingsMessage.LanguageSaveFailed, reported.message)
+
+        // A later write that succeeds clears the message and does change the language, so the failure
+        // is not sticky.
+        repository.languageWriteFailure = null
+        viewModel.setAppLanguage(AppLanguage.ENGLISH)
+        runCurrent()
+
+        assertEquals(AppLanguage.ENGLISH, repository.appLanguage.first())
+        assertEquals(
+            AppLanguage.ENGLISH,
+            viewModel.awaitState { it.appLanguage == AppLanguage.ENGLISH }.appLanguage,
+        )
+    }
+
+    @Test
+    fun `a language change leaves the other preferences and the reminders alone`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository(
+            initialSettings = PrayerSettings(
+                method = PrayerCalculationMethod.TURKEY,
+                adjustmentsMinutes = mapOf(PrayerName.FAJR to -3),
+            ),
+            initialTheme = ThemeMode.DARK,
+            initialCalendarSettings = CalendarSettings(
+                preferredSystem = CalendarSystem.HIJRI,
+                hijriAdjustmentDays = 1,
+            ),
+        )
+        val viewModel = settingsViewModel(repository)
+        viewModel.awaitState { it.appLanguage == AppLanguage.DEFAULT }
+
+        viewModel.setAppLanguage(AppLanguage.BANGLA)
+        runCurrent()
+
+        assertEquals(AppLanguage.BANGLA, repository.appLanguage.first())
+        // The theme, the calculation settings and every calendar preference are untouched: the language
+        // is its own key, so a word changing cannot move a time or a date.
+        assertEquals(ThemeMode.DARK, repository.themeMode.first())
+        assertEquals(PrayerCalculationMethod.TURKEY, repository.prayerSettings.first().method)
+        assertEquals(-3, repository.prayerSettings.first().adjustmentFor(PrayerName.FAJR))
+        assertEquals(CalendarSystem.HIJRI, repository.calendarSettings.first().preferredSystem)
+        assertEquals(1, repository.calendarSettings.first().hijriAdjustmentDays)
+        // And the alarm set is not rebuilt, because no calculated time changed.
+        assertEquals(
+            "changing the interface language must not reschedule the reminders",
+            0,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+    }
+
+    @Test
+    fun `the selector's options are the app's two explicit languages plus the device`() =
+        runTest(mainDispatcher) {
+            // What the General screen renders: `AppLanguage.entries`, with both explicit choices
+            // present and the default on the device's own locale.
+            val viewModel = settingsViewModel(FakeUserPreferencesRepository())
+            val state = viewModel.awaitState { true }
+
+            assertEquals(
+                listOf(AppLanguage.SYSTEM, AppLanguage.ENGLISH, AppLanguage.BANGLA),
+                AppLanguage.entries.toList(),
+            )
+            assertEquals(AppLanguage.SYSTEM, state.appLanguage)
+        }
 
     /**
      * The first state that satisfies [predicate], waiting for it rather than assuming how many

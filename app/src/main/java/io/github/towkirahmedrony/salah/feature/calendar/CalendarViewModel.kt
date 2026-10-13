@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 /**
  * Drives the Calendar screen.
@@ -43,6 +45,15 @@ import java.time.ZoneId
  * view would leave the details card describing a day the user cannot see, so navigation selects the
  * first day of the new month (or the last day of the previous one), and switching calendar system
  * re-anchors on the selected day so its month is the one shown.
+ *
+ * **The interface language reaches the dates, without touching the data.** [AppLanguage] is combined
+ * in and passed to [CalendarUiStateFactory] as the locale the grid and the date list are rendered in,
+ * which is what makes a Bengali interface show Bengali month and weekday names for the same
+ * Gregorian days. It is an input to the *request* and to nothing else: it does not move the displayed
+ * month, change the selection, re-read the calendar or alter the stored calendar system, so switching
+ * language re-renders the same dates rather than navigating anywhere. An explicitly chosen
+ * [io.github.towkirahmedrony.salah.core.model.DateLanguagePreference] still wins over it, because that
+ * setting is a deliberate statement about the dates themselves.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CalendarViewModel(
@@ -58,9 +69,10 @@ class CalendarViewModel(
 
     val uiState: StateFlow<CalendarUiState> = combine(
         userPreferencesRepository.calendarSettings,
+        userPreferencesRepository.appLanguage,
         displayedAnchor,
         selectedDate,
-    ) { settings, anchor, selected -> MonthRequest(settings, anchor, selected) }
+    ) { settings, language, anchor, selected -> MonthRequest(settings, language, anchor, selected) }
         .flatMapLatest { request ->
             // Reading the month of the *selected* system: a Bangla or Hijri selection re-emits a grid
             // of that system's days, so the screen updates as soon as the chip is tapped. A change to
@@ -72,6 +84,11 @@ class CalendarViewModel(
                         month = month,
                         settings = request.settings,
                         selected = request.selected,
+                        // The locale the interface is currently written in, which is the locale the
+                        // grid and the date list fall back to whenever the stored date language says
+                        // "follow the interface". SYSTEM keeps the device's own locale, which is both
+                        // the default and the behaviour the app had before a selector existed.
+                        systemLocale = request.language.locale() ?: Locale.getDefault(),
                     )
                 }
         }
@@ -129,9 +146,11 @@ class CalendarViewModel(
 
     private fun today(): LocalDate = clock.instant().atZone(ZoneId.systemDefault()).toLocalDate()
 
-    /** The three inputs a month is built from; kept as a value so the combine has one type. */
+    /** The four inputs a month is built from; kept as a value so the combine has one type. */
     private data class MonthRequest(
         val settings: CalendarSettings,
+        /** The interface language, used only as the date-rendering locale. */
+        val language: AppLanguage,
         val anchor: LocalDate,
         val selected: LocalDate,
     )

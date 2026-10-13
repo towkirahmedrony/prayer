@@ -269,7 +269,7 @@
     <string name="action_back">Back</string>
 
     <string name="settings_category_general_title">General</string>
-    <string name="settings_category_general_description">Time format and other general preferences.</string>
+    <string name="settings_category_general_description">Language, time format and other general preferences.</string>
     <string name="settings_category_appearance_description">Light, dark or matching your device.</string>
     <string name="settings_category_prayer_times_title">Prayer times</string>
     <string name="settings_category_prayer_times_description">Calculation method, Asr convention and manual corrections.</string>
@@ -278,7 +278,25 @@
     <string name="settings_category_location_description">Your area in Bangladesh, read from this device or chosen by hand.</string>
     <string name="settings_category_about_description">Version, prayer engine and what Salah does not claim.</string>
 
-    <!-- Settings: General -->
+    <!--
+      Settings: General.
+
+      The language group's title is written `Language / ভাষা` in English and `ভাষা` in Bangla, so it can
+      be recognised by a reader who is stuck in the other language: a user who cannot read the current
+      interface must still be able to find the control that changes it, and the language's own name is
+      the one label that is always legible to the person looking for it.
+
+      settings_language_body states the boundary between this preference and the calendar's, because the
+      two are easy to confuse and confusing them is the mistake that would make Salah appear to change a
+      date when only a label changed.
+    -->
+    <string name="settings_language_title">Language / ভাষা</string>
+    <string name="settings_language_body">The language Salah\'s interface is written in. It changes the words on every screen and nothing else: which calendar is shown, which script dates are written in and the Hijri offset are all calendar settings, unchanged by this choice.</string>
+    <string name="settings_language_system">Follow the device</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_bangla">বাংলা</string>
+    <string name="settings_language_save_failed">That language could not be saved, so the previous one is still in use.</string>
+
     <string name="settings_general_body">Preferences that apply to every screen in Salah.</string>
     <string name="settings_time_format_body">The clock Salah uses for every time it shows, including its reminders. It changes how a time is written, never how it is calculated.</string>
 
