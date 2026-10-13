@@ -83,7 +83,8 @@ class CalendarViewModelTest {
         val gregorian = latestReady(states)
         assertEquals(CalendarSystem.GREGORIAN, gregorian.system)
         assertEquals("September 2024", gregorian.monthLabel)
-        assertEquals(30, gregorian.weeks.flatten().count { it != null })
+        // A padding cell is a cell with no date, so the real days are the ones that carry a date.
+        assertEquals(30, gregorian.weeks.flatten().count { it.date != null })
 
         // 20 September 2024 is inside Ashwin 1431 (16 September - 16 October 2024).
         viewModel.onSelectSystem(CalendarSystem.BANGLA)
@@ -94,7 +95,7 @@ class CalendarViewModelTest {
         assertEquals("আশ্বিন ১৪৩১", bangla.monthLabel)
         assertEquals(LocalDate.of(2024, 9, 16), bangla.monthStart)
         assertEquals(LocalDate.of(2024, 10, 16), bangla.monthEnd)
-        assertEquals(31, bangla.weeks.flatten().count { it != null })
+        assertEquals(31, bangla.weeks.flatten().count { it.date != null })
         // And it was persisted through the one preference store, not held on the screen.
         assertEquals(CalendarSystem.BANGLA, preferences.calendarSettings.first().preferredSystem)
     }
@@ -114,7 +115,7 @@ class CalendarViewModelTest {
         assertEquals("رَمَضان ١٤٤٥", hijri.monthLabel)
         assertEquals(LocalDate.of(2024, 3, 11), hijri.monthStart)
         assertEquals(LocalDate.of(2024, 4, 9), hijri.monthEnd)
-        assertEquals(30, hijri.weeks.flatten().count { it != null })
+        assertEquals(30, hijri.weeks.flatten().count { it.date != null })
     }
 
     @Test

@@ -280,7 +280,8 @@ class CalendarUiStateFactoryTest {
         // The grid is the Bangla month's own span, and Ashwin has 31 days.
         assertEquals(LocalDate.of(2024, 9, 16), state.monthStart)
         assertEquals(LocalDate.of(2024, 10, 16), state.monthEnd)
-        assertEquals(31, state.weeks.flatten().count { it != null })
+        // Padding cells carry no date, so this counts the real days of the month.
+        assertEquals(31, state.weeks.flatten().count { it.date != null })
         // Every cell number is the Bangla day of month, 1..31, and the digits are Bengali.
         assertEquals((1..31).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
         val firstOfAshwin = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 9, 16) }!!
@@ -308,7 +309,7 @@ class CalendarUiStateFactoryTest {
         assertEquals(LocalDate.of(2024, 3, 11), state.monthStart)
         assertEquals(LocalDate.of(2024, 4, 9), state.monthEnd)
         // Ramadan 1445 has 30 days, and the grid holds exactly those days numbered 1..30.
-        assertEquals(30, state.weeks.flatten().count { it != null })
+        assertEquals(30, state.weeks.flatten().count { it.date != null })
         assertEquals((1..30).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
         val firstOfRamadan = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!
         assertEquals(1, firstOfRamadan.dayOfMonth)
