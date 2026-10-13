@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
+import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.CalendarMonth
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
@@ -361,14 +362,14 @@ class HomeViewModelTest {
         try {
             clock.set(Instant.parse("2026-10-11T20:00:00Z"))
             storedLocation.value = dhaka
-            val locations = MutableStateFlow<LocationInfo?>(dhaka)
             val repository = FakeScheduleRepository()
+            val stored = MutableStateFlow<StoredLocationState>(StoredLocationState.Loaded(dhaka))
             val states = observe(
                 home(
                     repository = repository,
                     calendarRepository = DeviceClockCalendarRepository(
                         clock = clock,
-                        dayZone = LocationDayZone(locationSource = locations, scope = backgroundScope),
+                        dayZone = LocationDayZone(stored),
                     ),
                 ),
             )

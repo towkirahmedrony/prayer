@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.calendar
 
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
@@ -295,8 +296,10 @@ class CalendarViewModelTest {
         // still calls it the 13th while Dhaka has already turned to the 14th. The screen has to agree
         // with the day the calendar repository marks as today, or it would open on a month that does not
         // contain the day it then highlights.
-        val locations = MutableStateFlow<LocationInfo?>(dhaka)
-        val states = observe(viewModelAt("2026-10-13T20:00:00Z", locations))
+        // The stored location as the app publishes it — already read, because the location gate does not
+        // let a location-dependent screen exist before it is.
+        val stored = MutableStateFlow<StoredLocationState>(StoredLocationState.Loaded(dhaka))
+        val states = observe(viewModelAt("2026-10-13T20:00:00Z", stored))
         runCurrent()
 
         val ready = latestReady(states)
@@ -316,17 +319,15 @@ class CalendarViewModelTest {
     /**
      * Builds the view model over the real repository and the real factory, with a fixed clock.
      *
-     * [locations] is the stored location, when the test needs one: both the repository and the view
-     * model then take their day from its zone, which is the shared source the production wiring uses.
+     * [stored] is the stored location, when the test needs one: both the repository and the view model
+     * then take their day from its zone, which is the shared source the production wiring uses.
      */
     private fun TestScope.viewModelAt(
         instant: String,
-        locations: MutableStateFlow<LocationInfo?>? = null,
+        stored: MutableStateFlow<StoredLocationState>? = null,
     ): CalendarViewModel {
         val clock = Clock.fixed(Instant.parse(instant), ZoneId.of("UTC"))
-        val dayZone = locations?.let { source ->
-            LocationDayZone(locationSource = source, scope = backgroundScope)
-        }
+        val dayZone = stored?.let { LocationDayZone(it) }
         val repository = DeviceClockCalendarRepository(
             clock = clock,
             settings = preferences.calendarSettings,

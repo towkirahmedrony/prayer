@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.data.calendar
 
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
+import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
@@ -110,16 +111,14 @@ class DeviceClockCalendarRepositoryTest {
         settings: MutableStateFlow<CalendarSettings> = MutableStateFlow(CalendarSettings.DEFAULT),
         interfaceLanguage: MutableStateFlow<AppLanguage> = MutableStateFlow(AppLanguage.SYSTEM),
         /**
-         * The stored location's zone is resolved from this, or `null` for a repository with no
-         * location zone source at all — which is every test above the location-zone ones, and the
-         * device-zone behaviour they pin.
+         * The stored location as the app publishes it, or `null` for a repository with no location zone
+         * source at all — which is every test above the location-zone ones, and the device-zone
+         * behaviour they pin.
          */
-        locations: MutableStateFlow<LocationInfo?>? = null,
+        locations: MutableStateFlow<StoredLocationState>? = null,
     ): MutableList<CalendarSnapshot> {
         val snapshots = mutableListOf<CalendarSnapshot>()
-        val dayZone = locations?.let { source ->
-            LocationDayZone(locationSource = source, scope = backgroundScope)
-        }
+        val dayZone = locations?.let { stored -> LocationDayZone(stored) }
         backgroundScope.launch {
             DeviceClockCalendarRepository(
                 clock = clock,
@@ -236,13 +235,17 @@ class DeviceClockCalendarRepositoryTest {
     private val losAngeles =
         checkNotNull(LocationInfo.create("Los Angeles", 34.0522, -118.2437, "America/Los_Angeles"))
 
+    /** The stored location as the app publishes it: a hot snapshot, readable without suspending. */
+    private fun stored(location: LocationInfo?): MutableStateFlow<StoredLocationState> =
+        MutableStateFlow(StoredLocationState.Loaded(location))
+
     @Test
     fun `takes the day from the configured location's zone, not the device's`() = runTest {
         // The device is on UTC (pinned above) and the location is on UTC+6, so 20:00 UTC is already the
         // next civil day in Dhaka. The header must name the day the prayer timetable underneath it was
         // calculated for: 12 March 2024 is 2 Ramadan 1445 and 28 Falgun 1430, not the device's 11 March.
         val clock = MutableClock(Instant.parse("2024-03-11T20:00:00Z"), ZoneId.of("UTC"))
-        val snapshots = observe(clock, locations = MutableStateFlow<LocationInfo?>(dhaka))
+        val snapshots = observe(clock, locations = stored(dhaka))
         runCurrent()
 
         val snapshot = snapshots.single()
@@ -257,12 +260,12 @@ class DeviceClockCalendarRepositoryTest {
         // The device's zone never moves here, so only the stored location can explain a changed date:
         // 20:00 UTC is 12 March in Dhaka (UTC+6) and still 11 March in Los Angeles (UTC-7).
         val clock = MutableClock(Instant.parse("2024-03-11T20:00:00Z"), ZoneId.of("UTC"))
-        val locations = MutableStateFlow<LocationInfo?>(dhaka)
+        val locations = stored(dhaka)
         val snapshots = observe(clock, locations = locations)
         runCurrent()
         assertEquals("12 March 2024", gregorianDate(snapshots.last()))
 
-        locations.value = losAngeles
+        locations.value = StoredLocationState.Loaded(losAngeles)
         runCurrent()
 
         assertTrue("a location change must emit a new snapshot", snapshots.size >= 2)
@@ -275,7 +278,7 @@ class DeviceClockCalendarRepositoryTest {
         // own (UTC) day still has six hours to run. The wait has to be measured in the location's zone.
         val start = Instant.parse("2026-10-11T17:59:00Z")
         val clock = MutableClock(start, ZoneId.of("UTC"))
-        val snapshots = observe(clock, locations = MutableStateFlow<LocationInfo?>(dhaka))
+        val snapshots = observe(clock, locations = stored(dhaka))
         runCurrent()
         assertEquals("11 October 2026", gregorianDate(snapshots[0]))
 

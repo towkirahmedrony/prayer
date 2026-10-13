@@ -168,8 +168,9 @@ class NextPrayerResolverTest {
 
     @Test
     fun `is unchanged while any prayer of the day is still ahead`() {
-        // Tomorrow's schedule is supplied here too, and must be ignored: Isha is still the next prayer.
-        val next = resolver.resolve(completeSchedule(), time(17, 0), nextDaySchedule())
+        // 17:40 is after Maghrib (17:36) and before Isha (18:51), and tomorrow's schedule is supplied
+        // here too: it must be ignored while today still has a prayer to come.
+        val next = resolver.resolve(completeSchedule(), time(17, 40), nextDaySchedule())
 
         assertEquals(PrayerName.ISHA, next?.prayer)
         assertEquals(time(18, 51), next?.time)

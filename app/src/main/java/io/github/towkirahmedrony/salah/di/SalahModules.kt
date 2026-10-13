@@ -141,10 +141,13 @@ val salahModules = module {
     // One authoritative answer to "which zone is a location-dependent civil day decided in": the
     // configured location's own zone, or the device's own when nothing is configured. The calendar
     // repository and the Calendar screen both read this same instance, so the date line above the
-    // prayer times and the times themselves cannot land on two different civil days. It resolves the
-    // zone from the same LocationRepository every other location consumer reads, so it cannot disagree
-    // with the coordinates in force. See docs/CALCULATION_CORRECTNESS_REVIEW.md §3.
-    single { LocationDayZone(locationSource = get<LocationRepository>().location, scope = get()) }
+    // prayer times and the times themselves cannot land on two different civil days.
+    //
+    // It projects StartupSnapshot — the same read of the same LocationRepository that the location gate
+    // and Home already use — because a screen may need the answer synchronously while it is being
+    // constructed (the Calendar screen picks the month to open on before it can collect anything), and
+    // that snapshot is exactly the value this application publishes hot for that purpose.
+    single { LocationDayZone(storedLocation = get<StartupSnapshot>().storedLocation) }
 
     // Calendar ----------------------------------------------------------------
     // The four converters are pure, stateless and cheap, so they are singletons: two instances could
