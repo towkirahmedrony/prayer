@@ -46,8 +46,16 @@ import java.util.Locale
  * handed to a platform formatter. Two reasons: the month name is part of the conversion *result*
  * (see `BanglaMonth` and `HijriMonth`), and composing the string guarantees the numerals always match
  * the month names. A half-localised date — Bangla month name with Western digits — is impossible by
- * construction. The Gregorian date does go through the platform's formatter, with the same chosen
- * locale, so it is localised as a unit by the platform and never mixes scripts either.
+ * construction.
+ *
+ * The Gregorian date does go through the platform's formatter, which is what gives it the locale's
+ * own month names, word order and era suffix, but the platform is not trusted with the *digits*: the
+ * formatted text is passed through [localizeDigits] so the numbers are written in the same script as
+ * the names beside them. That is not belt-and-braces. `java.util` on the JVM renders `bn` with
+ * Western digits (`মার্চ 2024`) even though the month name is Bengali, and Android's ICU renders the
+ * same locale with Bengali ones, so without this step a Bengali calendar would show a Bengali month
+ * heading over Latin year digits above a grid of Bengali day numbers. Substituting is idempotent —
+ * text that is already in the right numerals is left alone — so both platforms end up identical.
  */
 class CalendarFormatting {
 
@@ -115,19 +123,30 @@ class CalendarFormatting {
      * Localised Gregorian date, for example `14 April 2024` or `১৪ এপ্রিল ২০২৪`.
      *
      * Delegated to the platform's formatter with the explicitly chosen locale: the Gregorian calendar
-     * is the platform's own, so its month names and numerals are already correct for every locale the
-     * device supports.
+     * is the platform's own, so its month names and word order are already correct for every locale
+     * the device supports. The digits are the one part not left to it — see [localizeDigits].
      */
-    fun gregorian(date: LocalDate, locale: Locale): String =
-        date.format(DateTimeFormatter.ofPattern(GREGORIAN_PATTERN, locale).withLocale(locale))
+    fun gregorian(date: LocalDate, locale: Locale): String = localizeDigits(
+        date.format(DateTimeFormatter.ofPattern(GREGORIAN_PATTERN, locale).withLocale(locale)),
+        locale,
+    )
 
     /** Localised weekday name, for example `Sunday` or `রবিবার`. */
     fun weekday(date: LocalDate, locale: Locale): String =
         date.format(DateTimeFormatter.ofPattern(WEEKDAY_PATTERN, locale).withLocale(locale))
 
-    /** Month and year of a Gregorian month, for the calendar header. */
-    fun gregorianMonth(date: LocalDate, locale: Locale): String =
-        date.format(DateTimeFormatter.ofPattern(MONTH_PATTERN, locale).withLocale(locale))
+    /**
+     * Month and year of a Gregorian month, for the calendar header.
+     *
+     * `অক্টোবর ২০২৬` in Bengali and `October 2026` in English. The year goes through the same
+     * [localizeDigits] step as [gregorian], because this is the string that sits directly above the
+     * grid's day numbers: a Bengali calendar whose heading read `অক্টোবর 2026` over cells reading
+     * `১ ২ ৩` would be mixing two numeral systems within one screen.
+     */
+    fun gregorianMonth(date: LocalDate, locale: Locale): String = localizeDigits(
+        date.format(DateTimeFormatter.ofPattern(MONTH_PATTERN, locale).withLocale(locale)),
+        locale,
+    )
 
     /** Short weekday label for the calendar header row. */
     fun weekdayShortLabel(dayOfWeek: DayOfWeek, locale: Locale): String =
@@ -155,6 +174,19 @@ class CalendarFormatting {
 
     /** `1 Ramadan 1447 AH` — the era marker used where the calendar system must be unmistakable. */
     fun hijriWithEra(date: HijriDate, locale: Locale): String = "${hijri(date, locale)} $HIJRI_ERA"
+
+    /**
+     * [text] with every Western decimal digit written in [locale]'s own numerals.
+     *
+     * Only the digits the platform left in Western form are replaced, and Bengali and Arabic-Indic
+     * digits are already outside `'0'..'9'`, so a string that arrives correctly localised is returned
+     * unchanged. That is what makes this safe to apply to platform output on both Android and the JVM.
+     */
+    private fun localizeDigits(text: String, locale: Locale): String = when (locale.language) {
+        BANGLA_LANGUAGE -> BanglaNumerals.substitute(text)
+        ARABIC_LANGUAGE -> ArabicNumerals.substitute(text)
+        else -> text
+    }
 
     /** The month name in the script [locale] uses. */
     private fun hijriMonthName(month: HijriMonth, locale: Locale): String = when (locale.language) {
@@ -191,7 +223,15 @@ object BanglaNumerals {
     private val DIGITS = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
 
     /** [value] with each decimal digit replaced by its Bangla digit. A leading `-` is preserved. */
-    fun format(value: Int): String = formatWithDigits(value, DIGITS)
+    fun format(value: Int): String = substitute(value.toString())
+
+    /**
+     * [text] with each Western digit replaced by its Bangla digit, and everything else left as it is.
+     *
+     * The same table as [format], applied to a string the platform formatted rather than to a number:
+     * a month heading keeps its month name, its spaces and its punctuation and only changes script.
+     */
+    fun substitute(text: String): String = substituteDigits(text, DIGITS)
 }
 
 /**
@@ -206,15 +246,20 @@ object ArabicNumerals {
     private val DIGITS = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
 
     /** [value] with each decimal digit replaced by its Arabic-Indic digit. A leading `-` is preserved. */
-    fun format(value: Int): String = formatWithDigits(value, DIGITS)
+    fun format(value: Int): String = substitute(value.toString())
+
+    /** [text] with each Western digit replaced by its Arabic-Indic digit, everything else untouched. */
+    fun substitute(text: String): String = substituteDigits(text, DIGITS)
 }
 
-/** Shared digit-table substitution used by both numeral tables. */
-private fun formatWithDigits(value: Int, digits: CharArray): String {
-    val sign = if (value < 0) "-" else ""
-    val decimal = value.toString().removePrefix("-")
-    return sign + decimal.map { character ->
-        val index = character - '0'
-        if (index in digits.indices) digits[index] else character
-    }.joinToString(separator = "")
-}
+/**
+ * Shared digit-table substitution used by both numeral tables.
+ *
+ * Character by character rather than number by number, so it can be applied to a date the platform
+ * formatted: every Western digit becomes the table's digit and every other character — a `-`, a
+ * space, a Bengali letter, an Arabic letter, a Bengali digit already in place — passes through.
+ */
+private fun substituteDigits(text: String, digits: CharArray): String = text.map { character ->
+    val index = character - '0'
+    if (index in digits.indices) digits[index] else character
+}.joinToString(separator = "")

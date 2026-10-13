@@ -22,6 +22,12 @@ import java.util.Locale
  * numerals or scripts. Salah composes the Bangla and Hijri strings itself from the converted value plus
  * one numeral table, so `১৪ বৈশাখ ১৪৩১` cannot come out half-localised, and the assertion is on the
  * exact expected string rather than "contains a digit".
+ *
+ * The Gregorian strings are the one exception, and only in *how* they are asserted: their month names
+ * and word order come from the platform's own locale data, which differs between a JDK and Android, so
+ * an exact string would be a test of the device rather than of Salah. What is asserted instead is the
+ * part Salah decides — that the digits are the chosen locale's own numerals and that a Bengali label
+ * carries no Western digit — which is the property every device must agree on.
  */
 class CalendarFormattingTest {
 
@@ -176,8 +182,47 @@ class CalendarFormattingTest {
         assertEquals("August 2026", label)
     }
 
+    @Test
+    fun `a Bengali Gregorian label writes its numbers in Bengali numerals`() {
+        val date = LocalDate.of(2024, 3, 11)
+
+        // The month name comes from the platform, the digits from the app's own table. The JVM renders
+        // `bn` with Western digits and Android's ICU renders it with Bengali ones, so the platform is
+        // not allowed to decide this: the heading that sits above a grid of Bengali day numbers must
+        // not be a Bengali month over a Latin year.
+        val heading = formatting.gregorianMonth(date, bangla)
+        assertTrue("the Bengali month heading is still in Western digits: $heading",
+            heading.none { character -> character in '0'..'9' })
+        assertTrue("the Bengali month heading carries no Bengali digit: $heading",
+            heading.any { character -> character in '০'..'৯' })
+        assertTrue("the Bengali month heading has no Bengali month name: $heading",
+            heading.any { character -> character.code in BENGALI_SCRIPT })
+
+        // And the full date, which is what the selected-day card shows, is written the same way.
+        val full = formatting.gregorian(date, bangla)
+        assertTrue("the Bengali Gregorian date is still in Western digits: $full",
+            full.none { character -> character in '0'..'9' })
+        assertTrue("the Bengali Gregorian date carries no Bengali digit: $full",
+            full.any { character -> character in '০'..'৯' })
+
+        // English is untouched by the substitution, character for character.
+        assertEquals("March 2024", formatting.gregorianMonth(date, english))
+        assertEquals("11 March 2024", formatting.gregorian(date, english))
+
+        // And the substitution is idempotent, which is what makes it safe on both platforms: the
+        // Bengali digits a device's own formatter already produced survive a second pass.
+        assertEquals(heading, BanglaNumerals.substitute(heading))
+        assertEquals("১৪ এপ্রিল ২০২৪", BanglaNumerals.substitute("14 এপ্রিল ২০২৪"))
+        // Arabic-Indic digits are outside '0'..'9' and are left alone too.
+        assertEquals("١٤ أبريل ٢٠٢٤", ArabicNumerals.substitute("١٤ أبريل ٢٠٢٤"))
+        assertEquals("٢٠٢٤", ArabicNumerals.substitute("2024"))
+    }
+
     private companion object {
         /** Unicode block for Arabic, so an Arabic name can be asserted to be in Arabic script. */
         val ARABIC_SCRIPT = 0x0600..0x06FF
+
+        /** Unicode block for Bengali, for the same reason on the Gregorian heading. */
+        val BENGALI_SCRIPT = 0x0980..0x09FF
     }
 }

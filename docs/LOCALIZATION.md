@@ -150,9 +150,15 @@ prayer schedule.
 * **Day numbers and Bangla/Hijri dates** use the explicit digit tables in `CalendarFormatting`
   (`BanglaNumerals`, `ArabicNumerals`), not a platform formatter, so they are identical on every device
   regardless of how complete its locale data is.
-* **Gregorian month names, weekday names and years** come from the platform's CLDR data via
+* **Gregorian month names, weekday names and word order** come from the platform's CLDR data via
   `java.time` with the chosen locale, which is the project's existing convention for Gregorian
   formatting.
+* **Gregorian *digits* do not.** The platform's own output is passed through `BanglaNumerals` /
+  `ArabicNumerals` before it is shown, because the two platforms disagree: the JVM renders `bn` as
+  `মার্চ 2024` (Bengali month name, Western digits) while Android's ICU renders it as `মার্চ ২০২৪`. Left
+  alone, that mixed heading would sit above a grid of Bengali day numbers. The substitution only
+  rewrites `0`–`9` and is idempotent, so a device that already produced Bengali digits is unaffected and
+  both platforms render identically. Pinned by `CalendarFormattingTest`.
 * **Fonts.** No font is bundled. Bengali is rendered with the platform's system font stack, which ships
   Bengali coverage; `SalahTheme` documents this. No glyph substitution or fallback font is configured,
   and the `Language / ভাষা` title is written so the selector is legible even if a glyph were missing.
@@ -169,6 +175,7 @@ prayer schedule.
 | `DataStoreUserPreferencesRepositoryTest` | Default is `SYSTEM`; the chosen language survives repository recreation; an unknown stored value falls back; a language write adds exactly one key and rewrites nothing else |
 | `SettingsViewModelTest` | The selector opens on the stored value; choosing Bengali/English stores the right identifier; the choice is restored on a new view model; a failed write is reported as `LanguageSaveFailed` with the stored language unchanged; a language change leaves the theme, the calculation settings and every calendar setting alone and reschedules nothing |
 | `SettingsCategoryTest` | The General category is a visible row on the overview and opens a declared destination; both languages are offered under stable identifiers |
+| `CalendarFormattingTest` | Bangla and Arabic-Indic numerals replace every decimal digit; a Bengali Gregorian heading and date carry Bengali digits and no Western one; the substitution is idempotent; English output is unchanged |
 | `CalendarUiStateFactoryTest` | A Bengali interface renders the Gregorian grid's heading, weekday header and day numbers in Bengali with the same days, month, selection and Ramadan data; an explicit date language still wins; the Bangla mode's heading is Bengali in both; the language changes no calendar system, line or source |
 | `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments |
 
