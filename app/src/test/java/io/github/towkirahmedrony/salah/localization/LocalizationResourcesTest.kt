@@ -24,6 +24,13 @@ import java.io.File
  * It reads the real files from `app/src/main/res`, found by walking up from the working directory, so
  * it checks what ships rather than a copy. No Android API is involved: the files are parsed with a
  * plain regex over the `<string name="…">value</string>` shape these files use.
+ *
+ * The same treatment was later extended to the two surfaces this change localised: **Tools** and
+ * **Settings**. Every `tools_*`, `settings_*`, calculation-option and location string, and every
+ * notification string, is asserted to have a non-blank Bengali value written in Bengali script, with
+ * its format arguments intact — and a scan of the Tools, Settings, Notifications, Location, Qibla and
+ * Ramadan composables asserts none of them renders a hardcoded sentence. Home, the Calendar, Tools and
+ * every Settings screen are therefore localised in full, not partially.
  */
 class LocalizationResourcesTest {
 
@@ -260,6 +267,147 @@ class LocalizationResourcesTest {
         )
     }
 
+    // --- Tools and Settings: the surfaces completed after Home and the Calendar -----
+
+    @Test
+    fun `every Tools and Settings string the English resources define has a Bengali translation`() {
+        // A prefix rather than a hand-listed set, so a string added to the Tools or Settings screens
+        // without a Bengali value fails here instead of silently falling back to English. The prefixes
+        // cover the Tools page and its destination screens, the Settings overview and every category
+        // it opens, the calculation options, the notification strings and the location strings.
+        val scoped = scopedToolsAndSettingsKeys()
+
+        assertTrue(
+            "the English resources define no Tools or Settings strings at all",
+            scoped.isNotEmpty(),
+        )
+
+        val bengali = bengaliStrings()
+        val missing = scoped.filterNot { bengali.containsKey(it) }.sorted()
+
+        assertTrue(
+            "the Tools and Settings screens are not fully localised; these keys have no Bengali " +
+                "value: $missing",
+            missing.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `no Tools or Settings string is blank in Bengali`() {
+        val bengali = bengaliStrings()
+        val blank = scopedToolsAndSettingsKeys().filter { bengali[it]?.isBlank() == true }.sorted()
+
+        assertTrue("these Tools or Settings strings have an empty Bengali value: $blank", blank.isEmpty())
+    }
+
+    @Test
+    fun `the Tools and Settings words are written in Bengali script`() {
+        // Non-blank is not enough: an English sentence pasted under a Bengali key would leave the
+        // screen it was meant to localise exactly as it was. The three keys that legitimately carry no
+        // Bengali words are excluded — they hold a format placeholder, a separator or a language's own
+        // name (`English`), so demanding Bengali script in them would fail a correct translation.
+        val bengali = bengaliStrings()
+        val latinOnly = scopedToolsAndSettingsKeys()
+            .filterNot { it in TOOLS_SETTINGS_LATIN_ONLY }
+            .filter { key -> bengali[key].orEmpty().none { character -> character.inBengaliBlock() } }
+
+        assertTrue(
+            "these Tools or Settings strings are still written in Latin script: $latinOnly",
+            latinOnly.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `a Bengali Tools or Settings string keeps the format arguments of its English original`() {
+        // The same failure mode as the Calendar and Home checks: a dropped or renumbered placeholder
+        // reaches production as an `IllegalFormatException` rather than as a missing word.
+        val english = englishStrings()
+        val bengali = bengaliStrings()
+
+        scopedToolsAndSettingsKeys().forEach { key ->
+            val original = english[key] ?: return@forEach
+            val translated = bengali[key] ?: return@forEach
+            assertEquals(
+                "$key changes its format arguments in Bengali",
+                formatArguments(original),
+                formatArguments(translated),
+            )
+        }
+    }
+
+    @Test
+    fun `the Tools page's own strings exist in both languages`() {
+        // The Tools screen is a list of destinations, so its own copy is small and stable: the heading,
+        // the one-line description, the three tool names and descriptions, and the note that states
+        // what Salah does not offer. Every one of them has to exist in both files, or the screen would
+        // be half in one language whichever is selected.
+        val english = englishStrings()
+        val bengali = bengaliStrings()
+
+        listOf(
+            "nav_tools",
+            "tools_subtitle",
+            "tools_prayer_times_title",
+            "tools_prayer_times_description",
+            "shortcut_qibla",
+            "shortcut_qibla_subtitle",
+            "nav_ramadan",
+            "shortcut_ramadan_subtitle",
+            "tools_unavailable_note",
+        ).forEach { key ->
+            assertTrue("$key is missing from the English resources", english.containsKey(key))
+            assertTrue("$key is missing from the Bengali resources", bengali.containsKey(key))
+            assertTrue("$key has an empty English value", english.getValue(key).isNotBlank())
+            assertTrue("$key has an empty Bengali value", bengali.getValue(key).isNotBlank())
+        }
+    }
+
+    @Test
+    fun `the Settings categories and their subpages are named in Bengali`() {
+        // The overview draws a row per category and each row opens a screen; the names on the way in
+        // and the headings of the screens themselves are the strings a reader navigates with, so they
+        // are checked as a set rather than trusted.
+        val bengali = bengaliStrings()
+
+        listOf(
+            "settings_title",
+            "settings_category_general_title",
+            "settings_theme_title",
+            "settings_category_prayer_times_title",
+            "settings_category_notifications_title",
+            "nav_location",
+            "calendar_settings_title",
+            "settings_about_title",
+        ).forEach { key ->
+            val value = bengali.getValue(key)
+            assertTrue(
+                "$key is still written in Latin script: $value",
+                value.any { character -> character.inBengaliBlock() },
+            )
+        }
+    }
+
+    @Test
+    fun `no Tools or Settings composable renders a hardcoded sentence`() {
+        // The audit that localised these screens found their copy in resources rather than in code, and
+        // this is the guard that keeps it that way: a sentence is a literal with a space *and* a letter,
+        // so a bare separator or whitespace literal (`" · "`, `" "`) is not treated as copy while a
+        // pasted English sentence is. The Android-free logic files are excluded on purpose — they hold
+        // route strings, log fields and diagnostic text, never rendered copy — and comments are
+        // stripped first, because these packages are documented heavily and their prose quotes labels.
+        val offenders = toolsSettingsSourceFiles().flatMap { file ->
+            codeLiterals(file.readText())
+                .filter { literal -> literal.contains(' ') && literal.any { character -> character.isLetter() } }
+                .map { literal -> "${file.name}: \"$literal\"" }
+        }
+
+        assertTrue(
+            "these Tools or Settings composables render a hardcoded sentence instead of a string " +
+                "resource: $offenders",
+            offenders.isEmpty(),
+        )
+    }
+
     // --- Reading the real files --------------------------------------------------
 
     private fun englishStrings(): Map<String, String> =
@@ -325,6 +473,45 @@ class LocalizationResourcesTest {
     }
 
     /**
+     * The Tools, Settings, Notification, Location, Qibla and Ramadan sources, found by walking up from
+     * the working directory exactly like [resourceDirectory] does.
+     *
+     * The `feature` directory is located, and then the packages the localised surfaces live in; a
+     * missing directory fails loudly instead of making the literal check vacuous.
+     */
+    private fun toolsSettingsSourceFiles(): List<File> {
+        var base: File? = File(".").absoluteFile
+        repeat(SEARCH_DEPTH) {
+            val current = base ?: return@repeat
+            TOOLS_SETTINGS_SOURCE_CANDIDATES
+                .map { relative -> File(current, relative) }
+                .firstOrNull { candidate -> candidate.isDirectory }
+                ?.let { feature ->
+                    return TOOLS_SETTINGS_PACKAGES
+                        .map { pkg -> File(feature, pkg) }
+                        .filter { it.isDirectory }
+                        .flatMap { directory ->
+                            directory.walkTopDown()
+                                .filter { file -> file.isFile && file.name.endsWith(".kt") }
+                                .toList()
+                        }
+                        .filterNot { file -> file.name in TOOLS_SETTINGS_LOGIC_FILES }
+                }
+            base = current.parentFile
+        }
+        error(
+            "The Tools and Settings sources were not found. Searched upwards from " +
+                "${File(".").absolutePath} for ${TOOLS_SETTINGS_SOURCE_CANDIDATES.joinToString()}.",
+        )
+    }
+
+    /** The English keys whose name begins with one of the Tools or Settings prefixes. */
+    private fun scopedToolsAndSettingsKeys(): List<String> =
+        englishStrings().keys
+            .filter { key -> TOOLS_SETTINGS_PREFIXES.any { prefix -> key.startsWith(prefix) } }
+            .sorted()
+
+    /**
      * Every double-quoted literal in [source], with comments removed first.
      *
      * A raw read would find the labels this check is about inside the package's own KDoc, which quotes
@@ -342,6 +529,86 @@ class LocalizationResourcesTest {
 
     private companion object {
         const val SEARCH_DEPTH = 5
+
+        /**
+         * The key prefixes owned by the Tools and Settings surfaces.
+         *
+         * `notification_` and `notifications_` are deliberately separate: the singular prefix covers
+         * the reminder content and channel names Android draws, the plural one the settings screen.
+         */
+        val TOOLS_SETTINGS_PREFIXES = listOf(
+            "tools_",
+            "settings_",
+            "method_",
+            "asr_",
+            "high_latitude_",
+            "time_format_",
+            "notification_",
+            "notifications_",
+            "location_",
+            "qibla_",
+            "ramadan_",
+        )
+
+        /**
+         * The Tools/Settings keys that legitimately carry no Bengali word: a bare placeholder, a
+         * coordinate separator, and `English` — the language's own name, which is written the same in
+         * both languages and must not be transliterated.
+         */
+        val TOOLS_SETTINGS_LATIN_ONLY = setOf(
+            "settings_language_english",
+            "qibla_location_updated",
+            "qibla_coordinates",
+        )
+
+        /**
+         * The packages the localised surfaces live in, relative to the `feature` directory.
+         *
+         * `common` is included because the calculation-option, location-source and unavailability
+         * label mappings live there, and a hardcoded sentence in one of them would reach several of
+         * these screens.
+         */
+        val TOOLS_SETTINGS_PACKAGES = listOf(
+            "tools",
+            "settings",
+            "notifications",
+            "location",
+            "qibla",
+            "ramadan",
+            "common",
+        )
+
+        /**
+         * The Tools/Settings packages' Android-free files, which hold no rendered text: the state
+         * types, their factories, the view models, the route/resource enums and the label mappings.
+         * They carry navigation routes, log-field names and diagnostic strings as literals, and none of
+         * those is interface copy.
+         */
+        val TOOLS_SETTINGS_LOGIC_FILES = setOf(
+            "ToolsEntry.kt",
+            "SettingsCategory.kt",
+            "SettingsUiState.kt",
+            "SettingsViewModel.kt",
+            "PrayerNotificationSettingsUiState.kt",
+            "PrayerNotificationSettingsViewModel.kt",
+            "LocationUiState.kt",
+            "LocationViewModel.kt",
+            "LocationFormState.kt",
+            "LocationOriginLabels.kt",
+            "DomainLabels.kt",
+            "QiblaUiState.kt",
+            "QiblaViewModel.kt",
+            "QiblaLabels.kt",
+            "RamadanUiState.kt",
+            "RamadanUiStateFactory.kt",
+            "RamadanViewModel.kt",
+        )
+
+        /** The `feature` directory, relative to the repository root or the module directory. */
+        val TOOLS_SETTINGS_SOURCE_CANDIDATES = listOf(
+            "app/src/main/java/io/github/towkirahmedrony/salah/feature",
+            "src/main/java/io/github/towkirahmedrony/salah/feature",
+        )
 
         val RELATIVE_CANDIDATES = listOf(
             "app/src/main/res",

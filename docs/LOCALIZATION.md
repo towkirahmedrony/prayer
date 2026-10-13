@@ -87,22 +87,24 @@ MainActivity.setContent { SalahApp() }
 
 | Screen                     | Responds to the interface language | Notes |
 |----------------------------|------------------------------------|-------|
-| Bottom navigation          | Yes                                | `nav_*` labels (`nav_home`, `nav_calendar`, `nav_settings`, …) |
-| Settings overview + General| Yes                                | Including the selector's own labels and the back action |
-| Home                       | **Yes, in full**                   | Every label, button, state and reason the composed screen can render. Its date lines follow the interface language too (§6); its prayer *times* keep the device-locale clock format. See §10 |
+| Bottom navigation          | Yes, in full                       | `nav_*` labels (`nav_home`, `nav_calendar`, `nav_settings`, …) |
+| Home                       | Yes, in full                       | Every label, button, state and reason the composed screen can render. Its date lines follow the interface language too (§6); its prayer *times* keep the device-locale clock format. See §10 |
 | Calendar                   | Yes, in full                       | Every string it can show, plus month/weekday/day rendering |
-| Ramadan, Qibla, Location, Notifications | Only the strings already translated in `values-bn` | These screens are out of scope; they keep the deliberate partial translation |
+| Tools                      | Yes, in full                       | The Tools page and every screen it opens — Prayer, Qibla and Ramadan. See §11 |
+| Settings                   | Yes, in full                       | The overview and every category it opens: General, Appearance, Prayer times, Notifications & Adhan, Location, Calendar and About. See §11 |
+| Prayer notifications       | Yes, in full                       | A Settings category, also reached from the Calendar and Ramadan: the permission explanations, the schedule wording, each prayer's controls and the non-urgent status text |
+| Location                   | Yes, in full                       | A Settings category and the first-launch gate: the picker, the manual form, its validation and every provider/permission/error message |
+| Qibla, Ramadan             | Yes, in full                       | The two other Tools destinations, including their explanatory paragraphs and error descriptions |
+| Work-in-progress destinations | Yes, in full                    | `wip_*` and `feature_prayer_*` |
 
-The Bangla translation stays **partial for explanatory wording** on purpose: Salah's English sentences
+The Bangla translation was **partial for explanatory wording** for a while: Salah's English sentences
 make specific claims about sources and limits (what is an estimate, what is not verified, which
-authority is not claimed), and translating them loosely would change an accuracy claim. `app/lint.xml`
-records that decision and scopes its `MissingTranslation` ignore to `bn` by message, so adding any other
-untranslated locale is still an error.
-
-**Home and the Calendar are the exceptions**: every string each of those screens can render is
-translated, and their completeness is enforced by tests rather than by lint (§8). Home's own copy
-includes the sentences that explain *why* a section is empty, because those are the sentences a reader
-of Home actually meets when something is missing — see §10 for the audit that closed them.
+authority is not claimed), and those were left until they could be reviewed. Home and the Calendar were
+completed first; Tools and Settings — including the explanation, permission, error and empty-state
+wording — are completed now, so the partial policy no longer applies anywhere and `app/lint.xml` no
+longer suppresses `MissingTranslation` for `bn` (§8). The only strings that still exist solely in the
+default file are the three marked `translatable="false"` — `app_name` ("Salah"), the Arabic
+`home_prayer_times_arabic` heading and the `—` / `…` placeholders — which carry no words to translate.
 
 ## 6. App language vs. calendar system vs. date language
 
@@ -195,7 +197,7 @@ Changing the interface language triggers no recalculation of the prayer schedule
 | `SettingsCategoryTest` | The General category is a visible row on the overview and opens a declared destination; both languages are offered under stable identifiers |
 | `CalendarFormattingTest` | Bangla and Arabic-Indic numerals replace every decimal digit; a Bengali Gregorian heading and date carry Bengali digits and no Western one; the substitution is idempotent; English output is unchanged |
 | `CalendarUiStateFactoryTest` | A Bengali interface renders the Gregorian grid's heading, weekday header and day numbers in Bengali with the same days, month, selection and Ramadan data; an explicit date language still wins; the Bangla mode's heading is Bengali in both; the language changes no calendar system, line or source |
-| `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments. Since the Home audit (§10) it also pins **every** string the Home composition tree can render — non-missing, non-blank, in Bengali script, with matching format arguments — and it reads the Home composables' own sources to assert that none of them renders a hardcoded sentence (a literal containing a space) |
+| `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments. Since the Home audit (§10) it also pins **every** string the Home composition tree can render — non-missing, non-blank, in Bengali script, with matching format arguments — and it reads the Home composables' own sources to assert that none of them renders a hardcoded sentence (a literal containing a space). Since the Tools/Settings audit (§11) it does the same for every key under `tools_`, `settings_`, `method_`, `asr_`, `high_latitude_`, `time_format_`, `notification(s)_`, `location_`, `qibla_` and `ramadan_`: presence, non-blank, Bengali script and matching format arguments, plus a scan of those six packages' composables for a hardcoded sentence, and it checks that the Tools page's own copy and the Settings category names exist in both languages |
 | `DeviceClockCalendarRepositoryTest` | Today's date lines are written in the interface language for the same day, with no Western digit left in the Gregorian date; an explicit date language still wins over the interface language; the default (`SYSTEM` + device locale) is unchanged |
 
 `LocalizationResourcesTest` reads the real files from `app/src/main/res`, found by walking up from the
@@ -208,22 +210,24 @@ and `assembleDebug` on every push to `main` and uploads the debug APK.
 
 ## 9. Known limitations
 
-* **The translation is partial outside Home and the Calendar.** The explanatory wording on Ramadan,
-  Qibla, Location, Notifications and the About screens stays in English until it can be reviewed by
-  someone competent to review those accuracy claims (see `app/lint.xml`). Selecting Bengali therefore
-  changes those screens' already-translated labels and leaves their paragraphs in English.
+* **Nothing user-facing is left in English any more.** Home, the Calendar, Tools and every Settings
+  screen are translated in full, and the remaining screens' strings are translated too, so the only
+  English a Bengali interface can still show is the three `translatable="false"` values (`Salah`, the
+  Arabic heading, the dash) and machine values that are not translatable by design — a provider id, the
+  place name the user chose, a formatted time under `TimeFormatPreference`, and `CountdownFormatter`'s
+  `Locale.ROOT` digits (§6). A future string added without a Bengali value is caught by lint (the
+  `MissingTranslation` ignore is gone) and by `LocalizationResourcesTest`.
 * **Home's prayer *times* do not follow the interface language**, and neither does the countdown. They
   follow `TimeFormatPreference` and the device's own clock convention — deliberately, and for the reason
   given in §6: the same formatter writes the times inside prayer notifications, so a language-driven
   time format would make the app and its own reminders disagree. The words around a time are Bengali;
   the digits and the clock convention are not. See §10 for why this is the one gap left on Home.
-* **Home's calculation-option names stay English.** `method_*`, `asr_*`, `high_latitude_*` and
-  `time_format_*` are the conventional names of calculation authorities (`Umm al-Qura University,
-  Makkah`, `ISNA (North America)`, …) and of settings choices, and they belong to Settings → Prayer
-  times rather than to Home's own copy. The one Home component that would render them
-  (`CalculationCard`) is not part of the composed Home screen, so nothing on the screen shows them; if
-  that card is ever wired up, those keys have to be translated first. §10 records this explicitly
-  rather than leaving it to be discovered.
+* **The calculation-option names are translated, but Home does not render them.** `method_*`,
+  `asr_*`, `high_latitude_*` and `time_format_*` are the conventional names of calculation authorities
+  (`Umm al-Qura University, Makkah`, `ISNA (North America)`, …) and of settings choices. They are now
+  Bengali, because Settings → Prayer times and the time-format control on General render them and both
+  are localised in full (§11). The one Home component that would render them (`CalculationCard`) is
+  still not part of the composed Home screen, so nothing on Home shows them either way.
 * **No per-app language integration with Android's system settings.** The choice is stored by Salah and
   applied by Salah; it does not appear in the OS "App languages" list, and it does not use
   `AppCompatDelegate.setApplicationLocales` (this app has no AppCompat dependency).
@@ -304,3 +308,107 @@ translated as far as the table above allows.
   the Bengali file already used. The English wording of that heading therefore changes slightly.
 * The Home brand line and header are rendered from `app_name` / `app_tagline` instead of literals, which
   is what makes `Your Complete Islamic Companion` a translated string rather than a frozen one.
+
+## 11. The Tools and Settings audit
+
+Tools and Settings were the last two surfaces left partially translated. Home and the Calendar were
+done first (§10), so the work here was to finish the same job for the Tools page and for the Settings
+overview and every category it opens, without changing what any screen does or how either language is
+stored.
+
+### What was actually wrong
+
+The English text a Bengali reader met on these screens had two causes, and neither was a single missing
+label:
+
+1. **Keys with no Bengali value.** Most of the strings the screens *did* pull from resources — the
+   Settings category names and descriptions, the Appearance, Prayer-times, Notifications, Location and
+   About copy, the calculation-method, Asr and high-latitude option names and their hints, the
+   time-format choices, the whole notification-settings screen and the whole location screen — had no
+   `values-bn` entry, so Android fell back to English for every one of them. This was the bulk of the
+   work: 310 keys, listed and translated in `app/src/main/res/values-bn/strings.xml`.
+2. **Strings that only existed in English resources the screens shared with Home.** The Tools page
+   names its rows after the destinations they open (`nav_ramadan`, `shortcut_qibla`, …), so those had to
+   agree with the Bengali the Home daily-tools row already used — and they now do, from one resource.
+
+A hardcoded sentence in a composable, which was one of Home's three causes (§10), was **not** found on
+any of these screens: the audit scanned every composable under `tools`, `settings`, `notifications`,
+`location`, `qibla`, `ramadan` and `common` for a rendered literal, and the only literals with a space
+are a separator (`" · "`) and a space (`" "`), not copy. So the fix here really was the resources — and
+the test that now guards that (below) makes a pasted sentence a failure rather than a silent one.
+
+### What was localised
+
+* **Tools** — the heading, its description, all three tool rows (name and one-line description), and the
+  note that states Quran, Dua and Tasbih are not part of Salah yet.
+* **The Tools destinations** — the Prayer screen (already covered by the Home keys), the whole Qibla
+  screen and the whole Ramadan screen, including their explanatory paragraphs, error descriptions, the
+  manual-coordinate form and the accessibility descriptions of the dial.
+* **Settings** — the overview title, subtitle and every category row; General (language and time
+  format); Appearance (the three theme modes); Prayer times (calculation method, Asr convention,
+  high-latitude rule and the per-prayer minute corrections); Notifications & Adhan (the permission
+  cards, the master switch, the schedule card, each prayer's sound/vibration/advance controls, the
+  sunrise and Ramadan reminders, the Azan disclaimer and the limitations card); Location (the setup
+  screen, the management screen, the division/district/upazila picker, the manual form and every
+  validation, permission and provider message); Calendar (already translated); and About.
+* **Shared surfaces** — the shared loading/error/retry strings, the back action, the notification
+  channels and reminder content Android draws, and the planned-destination screen.
+
+Nothing about behaviour changed. The DataStore keys, the stored enum identifiers, the calendar
+preferences, the location system, the calculation profile and the reminder scheduler are all untouched:
+this change adds translations and the tests that pin them, and no stored value or navigation route moved
+(confirmed by the existing `DataStoreUserPreferencesRepositoryTest`, `SettingsViewModelTest`,
+`SettingsCategoryTest` and `SalahBottomNavigationTest`, which still hold).
+
+### Bengali terminology
+
+The translation uses the terms the earlier work established, so the same idea reads the same on every
+screen:
+
+| English | Bengali | English | Bengali |
+|---------|---------|---------|---------|
+| Tools | টুলস | Settings | সেটিংস |
+| Prayer times | নামাজের সময়সূচি | Location | অবস্থান |
+| Qibla | কিবলা | Notifications | নোটিফিকেশন |
+| Ramadan | রমজান | Adhan | আজান |
+| Sehri | সেহরি | Appearance | চেহারা ও প্রদর্শন |
+| Iftar | ইফতার | About Salah | Salah সম্পর্কে |
+| Back | ফিরে যান | Loading… | লোড হচ্ছে… |
+| Retry | আবার চেষ্টা করুন | Save | সংরক্ষণ করুন |
+| Cancel | বাতিল | On / Off | চালু / বন্ধ |
+
+A few strings are deliberately **not** translated or transliterated: `settings_language_english` stays
+`English` (a language's name is written in its own script), the Arabic `home_prayer_times_arabic`
+heading stays Arabic, `app_name` stays `Salah`, and the astronomical coordinates and IANA time-zone ids
+(`Asia/Dhaka`) stay in Latin because they are values rather than words.
+
+### How a new screen adds strings
+
+1. Add the English string to `app/src/main/res/values/strings.xml` with a name that follows the
+existing convention (`<surface>_<thing>`, e.g. `settings_foo_title`, `tools_foo_description`).
+2. Add the Bengali string under the **same name** to `app/src/main/res/values-bn/strings.xml`. The name
+   is the key in both files; only the value changes.
+3. Keep the format arguments identical **and in the same order** (`%1$s`, `%2$d`, …). A reordered or
+   dropped placeholder is an `IllegalFormatException` at runtime, and `LocalizationResourcesTest`
+   compares the arguments of a Bengali string against its English original.
+4. Do not build a sentence in code. Pass a stable value or a resource id through the UI state and let
+   the screen resolve it, as `DomainLabels` and `LocationOriginLabels` do.
+5. If the surface is one of the four with a completeness test, add the key to the relevant list in
+   `LocalizationResourcesTest`; if it belongs to a prefix the test already checks (`settings_`,
+   `tools_`, `notification`, `location_`, …), nothing else is needed — the test finds it by prefix.
+
+### Tests added or updated
+
+`LocalizationResourcesTest` gained seven checks (§8): completeness, non-blank, Bengali-script and
+format-argument checks over the `tools_`/`settings_`/`method_`/`asr_`/`high_latitude_`/`time_format_`/
+`notification(s)_`/`location_`/`qibla_`/`ramadan_` prefixes; explicit existence checks for the Tools
+page's own copy and the Settings category names; and the composable scan described above. No existing
+test was removed or weakened, and no behavioural test changed: the change is additive.
+
+### Verification
+
+No Gradle task is run locally (the project's Android build runs only in CI). The changes were checked
+statically — resource references, format arguments, prefix completeness and the composable scan were all
+re-run over the real files — and the pushed commit's GitHub Actions run is the authoritative
+`testDebugUnitTest` / `lintDebug` / `assembleDebug` result, reported with the change.
+

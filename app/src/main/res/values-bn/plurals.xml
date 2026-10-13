@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bangla plural forms for the reminder lead-in wording.
+
+  `notification_minutes` reads "<n> minutes" in the reminder text, and a locale's plural categories are
+  not the same everywhere, so the Bangla file has to declare the forms Bengali actually uses rather than
+  copying the English two. Bengali distinguishes `one` (i = 0 or n = 1) and `other`; both read the same
+  in this wording, which is why the two items carry the same text.
+-->
+<resources>
+    <plurals name="notification_minutes">
+        <item quantity="one">%1$d মিনিট</item>
+        <item quantity="other">%1$d মিনিট</item>
+    </plurals>
+</resources>

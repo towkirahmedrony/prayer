@@ -1,34 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Salah ships a deliberately **partial** Bangla translation
-  (`app/src/main/res/values-bn/strings.xml`), and this file is where that decision is recorded.
+  Translation policy for Salah.
 
-  The strings the Bangla file defines are the ones whose meaning is unambiguous: the names of the
-  calendars, months, prayers and observances, the short navigation and calendar labels, and the language
-  selector's own labels. The explanatory strings — the ones that state what is an estimate, what Salah
-  cannot verify, and which authority it does not claim to match — stay in English until they can be
-  reviewed by someone competent to review that wording. Translating them loosely would change an
-  accuracy claim, which is exactly the kind of change this app must not make silently.
+  Salah ships a **complete** Bangla translation (`app/src/main/res/values-bn/strings.xml`) and an
+  English default (`app/src/main/res/values/strings.xml`). Every translatable string the English file
+  defines has a Bangla value; the only strings that fall through to English are the three marked
+  `translatable="false"` (`app_name` = "Salah", the Arabic `home_prayer_times_arabic` heading and the
+  `—`/`…` placeholders), which carry no words to translate.
 
-  Two screens are not allowed to be partial: the **Calendar** and **Home**. Every string either of them
-  can show is translated, including the sentences they use to explain an empty section. Their
-  completeness is enforced by `LocalizationResourcesTest` rather than by lint, because this ignore would
-  otherwise stay quiet about a forgotten key on either of them too — and it additionally reads Home's
-  composables to assert that none of them renders a hardcoded sentence. The interface language is a
-  stored preference with its own selector on Settings > General — a choice the app applies at runtime,
-  not a build-time decision; see docs/LOCALIZATION.md, §5 and §10.
+  The translation used to be deliberately **partial** — the explanatory wording that states what is an
+  estimate, what Salah cannot verify, and which authority it does not claim to match stayed in English
+  until it could be reviewed. Home, the Calendar, the Tools screen and every Settings screen (General,
+  Appearance, Prayer times, Notifications and Adhan, Location, Calendar and About) are now translated in
+  full, so that policy no longer applies and this file no longer suppresses `MissingTranslation`: adding
+  a new string to the default file without a Bangla value is an error again. Completeness is
+  additionally pinned by `LocalizationResourcesTest`, which reads the real resource files and asserts
+  that the `tools_*` and `settings_*` families, the calculation options, the notification strings and
+  the location strings all have a non-blank Bengali value written in Bengali script.
 
-  Android's resource resolution falls back to `values/` for anything a locale does not define, so the
-  app is complete in either case; this is a supported configuration rather than a defect.
-  `MissingTranslation` is a *translation policy* check rather than a correctness one, so this is the
-  answer Salah gives it.
-
-  The ignore is scoped to Bangla by message, so adding any other locale without translating it is
-  still an error. Every other lint check keeps the severity configured in `app/build.gradle.kts`
+  Every other lint check keeps the severity configured in `app/build.gradle.kts`
   (`abortOnError = true`, `warningsAsErrors = false`).
 -->
 <lint>
-    <issue id="MissingTranslation">
-        <ignore regexp="is not translated in &quot;bn&quot;" />
-    </issue>
 </lint>
