@@ -153,6 +153,13 @@ data class PrayerRow(
     /** Manual correction already applied to [timeLabel]; `0` when the time is unadjusted. */
     val adjustmentMinutes: Int = 0,
     val isNext: Boolean,
+    /**
+     * Formatted time this prayer's period ends, or `null` when it cannot be resolved (for
+     * example Isha, while tomorrow's Fajr has not been calculated yet). Never invented.
+     */
+    val endTimeLabel: String? = null,
+    /** True when [endTimeLabel] falls on the following local date (Isha closes at next Fajr). */
+    val endsNextDay: Boolean = false,
 )
 
 data class SolarRow(

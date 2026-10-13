@@ -111,7 +111,7 @@ private fun AppShell() {
                             }
                         },
                         icon = {
-                            val tint = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
+                            val tint = if (selected) Color.White else Color.White.copy(alpha = 0.8f)
                             when (dest) {
                                 SalahDestination.HOME -> DomeGlyph(tint = tint)
                                 SalahDestination.PRAYER -> LanternGlyph(tint = tint)
@@ -123,7 +123,7 @@ private fun AppShell() {
                         label = {
                             Text(
                                 text = stringResource(dest.labelRes),
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.6f),
+                                color = if (selected) Color.White else Color.White.copy(alpha = 0.8f),
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(

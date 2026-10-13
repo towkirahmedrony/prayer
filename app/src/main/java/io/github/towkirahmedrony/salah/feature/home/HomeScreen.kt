@@ -80,7 +80,7 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(key = "top-bar") {
@@ -127,6 +127,10 @@ private fun HomeContent(
                 // data binding.
                 onViewDetails = { onNavigate("prayer") },
             )
+        }
+
+        item(key = "sun-times") {
+            SunTimesCard(rows = state.solarRows)
         }
 
         item(key = "daily-tools") {

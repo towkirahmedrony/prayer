@@ -11,6 +11,9 @@ val MintContainer = Color(0xFFD4E8DC)
 val MintLight = Color(0xFFE5F1EB)
 val GoldAccent = Color(0xFFC49A45)
 val GoldMuted = Color(0xFFE0C588)
+
+/** Darker gold for small text on the cream canvas: GoldAccent alone is too faint to read there. */
+val GoldText = Color(0xFF86601C)
 val WarmCanvas = Color(0xFFF4F2EC)
 val CardSurfaceWhite = Color(0xFFFFFFFF)
 val TextDark = Color(0xFF14241D)

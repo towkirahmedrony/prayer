@@ -343,6 +343,8 @@ fun TimetableCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
                 time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
                 highlighted = row.isNext,
                 adjustmentMinutes = row.adjustmentMinutes,
+                endTime = row.endTimeLabel,
+                endsNextDay = row.endsNextDay,
             )
             if (index != state.prayerRows.lastIndex) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -526,6 +528,8 @@ private fun TimeRow(
     time: String,
     highlighted: Boolean,
     adjustmentMinutes: Int,
+    endTime: String? = null,
+    endsNextDay: Boolean = false,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
@@ -552,16 +556,26 @@ private fun TimeRow(
                 )
             }
         }
-        Text(
-            text = time,
-            style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
-            color = if (highlighted) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                // A prayer is a period, not a point: show where it opens and where it closes.
+                text = if (endTime != null) "$time – $endTime" else time,
+                style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                color = if (highlighted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            if (endTime != null && endsNextDay) {
+                Text(
+                    text = "ends next day",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

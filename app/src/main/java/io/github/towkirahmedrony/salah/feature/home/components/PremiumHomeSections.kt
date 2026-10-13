@@ -22,12 +22,14 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.*
 import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldAccent
+import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldText
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.CurrentPrayerSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
+import io.github.towkirahmedrony.salah.feature.home.SolarRow
 
 @Composable
 fun HomeTopBar(
@@ -54,7 +56,7 @@ fun HomeTopBar(
                 Text(
                     text = "Your Complete Islamic Companion",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = GoldAccent,
+                    color = GoldText,
                 )
             }
         }
@@ -110,6 +112,9 @@ fun LocationAndDateHeader(
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = "⌵", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -219,22 +224,43 @@ fun CurrentPrayerHeroCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                val startTime = if (active) state.startTime else null
-                Text(
-                    text = if (active && startTime != null) "$prayerName — $startTime" else "Next prayer",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (nextLabel != null && nextTime != null) {
+                if (active) {
+                    // `startTime` is null only for the Isha period that began before today's schedule.
                     Text(
-                        text = if (active) "$nextLabel — $nextTime" else "$prayerName — $nextTime",
+                        text = state.startTime?.let { "Starts $it" } ?: "Since last night",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (nextTime != null) {
+                        // The closing time can be tomorrow's Fajr, which is why it may differ from
+                        // today's Fajr in the list by a minute; say so instead of leaving it ambiguous.
+                        Text(
+                            text = if (state.endsNextDay) "Ends $nextTime (tomorrow)" else "Ends $nextTime",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Next prayer",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (nextLabel != null && nextTime != null) {
+                        Text(
+                            text = "$prayerName — $nextTime",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -291,15 +317,18 @@ private fun TodayPrayerCard(row: PrayerRow, isSelected: Boolean, modifier: Modif
             .clip(RoundedCornerShape(16.dp))
             .background(bg)
             .border(1.dp, borderCol, RoundedCornerShape(16.dp))
-            .padding(vertical = 8.dp, horizontal = 3.dp),
+            .padding(vertical = 10.dp, horizontal = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        when (row.prayer) {
-            PrayerName.FAJR -> SunrisePrayerGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
-            PrayerName.DHUHR -> OctagramGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
-            PrayerName.ASR -> Text("◷", fontSize = 18.sp, color = ForestGreenPrimary)
-            PrayerName.MAGHRIB -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
-            PrayerName.ISHA -> CrescentGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+        // Fixed-size icon slot so every chip lines up, whatever the glyph.
+        Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+            when (row.prayer) {
+                PrayerName.FAJR -> SunrisePrayerGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+                PrayerName.DHUHR -> OctagramGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+                PrayerName.ASR -> ClockGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+                PrayerName.MAGHRIB -> SunsetGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+                PrayerName.ISHA -> NightGlyph(ForestGreenPrimary, modifier = Modifier.size(20.dp))
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -307,14 +336,35 @@ private fun TodayPrayerCard(row: PrayerRow, isSelected: Boolean, modifier: Modif
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
         )
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = row.timeLabel ?: "—",
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
+            maxLines = 1,
         )
+        // The prayer's end time, under its start, joined by a short dash so it reads as a range.
+        val endTime = row.endTimeLabel
+        if (endTime != null) {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 3.dp)
+                    .width(8.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant),
+            )
+            Text(
+                text = endTime,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -381,6 +431,50 @@ fun ForbiddenTimesCard(
     }
 }
 
+/**
+ * Sunrise, solar noon and sunset for today, straight from the schedule's solar events.
+ *
+ * Shown as solar events (not prayers). Renders nothing when the schedule carries none of them, so
+ * no time is ever invented.
+ */
+@Composable
+fun SunTimesCard(
+    rows: List<SolarRow>,
+    modifier: Modifier = Modifier,
+) {
+    if (rows.none { it.timeLabel != null }) return
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE8E6DE)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            rows.forEach { row ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(row.event.labelRes()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = row.timeLabel ?: "—",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun DailyToolsSection(
     onNavigate: (String) -> Unit,
@@ -400,7 +494,7 @@ fun DailyToolsSection(
         ) {
             DailyToolItem(title = "Qibla", icon = { QiblaGlyph(ForestGreenPrimary) }, onClick = { onNavigate("qibla") }, modifier = Modifier.weight(1f))
             DailyToolItem(title = "Calendar", icon = { CalendarGlyph(ForestGreenPrimary) }, onClick = { onNavigate("calendar") }, modifier = Modifier.weight(1f))
-            DailyToolItem(title = "Ramadan", icon = { CrescentGlyph(ForestGreenPrimary) }, onClick = { onNavigate("ramadan") }, modifier = Modifier.weight(1f))
+            DailyToolItem(title = "Ramadan", icon = { RamadanGlyph(ForestGreenPrimary) }, onClick = { onNavigate("ramadan") }, modifier = Modifier.weight(1f))
             DailyToolItem(title = "Tasbih", icon = { TasbihGlyph(ForestGreenPrimary) }, onClick = { onNavigate("tools") }, modifier = Modifier.weight(1f))
         }
     }

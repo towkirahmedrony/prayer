@@ -130,11 +130,14 @@ class HomeUiStateFactory(
             nextPrayer = nextPrayerSection,
             prayerRows = PrayerName.entries.map { prayer ->
                 val entry = schedule?.prayers?.firstOrNull { it.prayer == prayer }
+                val end = periodEnd(schedule, prayer, nextDayFajr)
                 PrayerRow(
                     prayer = prayer,
                     timeLabel = entry?.let { timeFormatter.format(it.time) },
                     adjustmentMinutes = entry?.adjustmentMinutes ?: 0,
                     isNext = nextPrayer?.prayer == prayer,
+                    endTimeLabel = end?.let { timeFormatter.format(it.time) },
+                    endsNextDay = end?.isNextDay == true,
                 )
             },
             solarRows = SolarEvent.entries.map { event ->
@@ -219,6 +222,40 @@ class HomeUiStateFactory(
             next = next,
             unavailable = scheduleState.asTimetableNote() ?: status.reason,
         )
+    }
+
+    /** The moment a prayer's period closes, and whether that moment is on the next local date. */
+    private data class PeriodEnd(val time: ZonedDateTime, val isNextDay: Boolean)
+
+    /**
+     * Resolves where a prayer's period ends, using the same convention as
+     * [CurrentPrayerPeriodResolver]: Fajr closes at sunrise, Dhuhr at Asr, Asr at Maghrib,
+     * Maghrib at Isha and Isha at the next day's Fajr.
+     *
+     * Returns `null` instead of guessing when the schedule is incomplete or the closing boundary
+     * is not available, so a row can only ever show an end time that really exists.
+     */
+    private fun periodEnd(
+        schedule: PrayerSchedule?,
+        prayer: PrayerName,
+        nextDayFajr: ZonedDateTime?,
+    ): PeriodEnd? {
+        if (schedule == null || !schedule.isComplete) return null
+        return when (prayer) {
+            PrayerName.FAJR -> schedule.timeOf(SolarEvent.SUNRISE)?.let { PeriodEnd(it, false) }
+            PrayerName.DHUHR -> schedule.timeOf(PrayerName.ASR)?.let { PeriodEnd(it, false) }
+            PrayerName.ASR -> schedule.timeOf(PrayerName.MAGHRIB)?.let { PeriodEnd(it, false) }
+            PrayerName.MAGHRIB -> schedule.timeOf(PrayerName.ISHA)?.let { PeriodEnd(it, false) }
+            PrayerName.ISHA -> {
+                val isha = schedule.timeOf(PrayerName.ISHA)
+                val closing = nextDayFajr?.withZoneSameInstant(schedule.zoneId)
+                if (isha != null && closing != null && closing.isAfter(isha)) {
+                    PeriodEnd(closing, true)
+                } else {
+                    null
+                }
+            }
+        }
     }
 
     /**
