@@ -2,6 +2,8 @@ package io.github.towkirahmedrony.salah.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
+import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
@@ -33,9 +35,17 @@ import kotlinx.coroutines.launch
  * The location used to be here too. It is not any more: the location screen owns the coordinates, the
  * area picker and the device fix together, so a location is written from one place in the app rather
  * than two, and every write goes through the same validation and the same reminder reconciliation.
+ *
+ * **The scheduler is reconciled from here.** Every control on the Prayer times screen changes the
+ * calculated times, and the reminders are planned from those times — so the write is followed by
+ * [PrayerNotificationCoordinator.reconcile], the same call the notification screen, the location
+ * screen and the reboot receiver make. Without it the alarms would keep announcing the previous
+ * profile until the next app start or date change. The time format is the one exception and says so
+ * below: it changes no calculated time and therefore reschedules nothing.
  */
 class SettingsViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val coordinator: PrayerNotificationCoordinator,
 ) : ViewModel() {
 
     private val message = MutableStateFlow<SettingsMessage?>(null)
@@ -111,6 +121,14 @@ class SettingsViewModel(
             // Any of these changes alters the calculated times, so the user is told that the
             // timetable is being recalculated rather than left to wonder why it moved.
             message.value = SettingsMessage.PrayerSettingsSaved
+            // And the reminders are rebuilt from those times. The coordinator reads the persisted
+            // profile itself, so it plans against the value just written rather than against a copy
+            // read before the change; and because its plan is derived from the repository, repeating
+            // the call replaces the alarm set instead of duplicating it.
+            //
+            // CancellationException is the only thing it propagates; a platform refusal or a missing
+            // schedule is returned as a value, so an unavailable timetable cannot break this screen.
+            coordinator.reconcile(ReconcileReason.SETTINGS_CHANGED)
         }
     }
 

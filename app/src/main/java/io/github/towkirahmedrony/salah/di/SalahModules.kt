@@ -299,7 +299,9 @@ val salahModules = module {
     // two preferences (the theme and the calculation settings), and the location has moved to
     // LocationViewModel, which is where every write of a location now happens.
     viewModel {
-        SettingsViewModel(userPreferencesRepository = get())
+        // The coordinator is injected because a calculation change moves every scheduled time; the
+        // reconciliation that follows the write is what keeps the reminders in step with it.
+        SettingsViewModel(userPreferencesRepository = get(), coordinator = get())
     }
     viewModel {
         CalendarViewModel(
@@ -309,7 +311,9 @@ val salahModules = module {
             clock = get(),
         )
     }
-    viewModel { CalendarSettingsViewModel(userPreferencesRepository = get()) }
+    // The coordinator is injected for the Hijri offset, which moves the Ramadan window the Sehri and
+    // Iftar reminders are planned from.
+    viewModel { CalendarSettingsViewModel(userPreferencesRepository = get(), coordinator = get()) }
     viewModel {
         RamadanViewModel(
             calendarRepository = get(),
@@ -330,6 +334,8 @@ val salahModules = module {
             permissionChecker = get(),
             declinationProvider = get(),
             qiblaCalculator = get(),
+            // The screen writes the app's one location, so an adopted fix must reschedule the reminders.
+            coordinator = get(),
             logger = get(),
             clock = get(),
         )

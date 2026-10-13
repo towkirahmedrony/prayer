@@ -1,7 +1,10 @@
 package io.github.towkirahmedrony.salah.feature.qibla
 
+import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassAvailability
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassSensorSource
 import io.github.towkirahmedrony.salah.core.domain.qibla.GeomagneticDeclinationProvider
@@ -22,9 +25,15 @@ import io.github.towkirahmedrony.salah.testing.FakeCompassSensorSource
 import io.github.towkirahmedrony.salah.testing.FakeLocationPermissionSource
 import io.github.towkirahmedrony.salah.testing.FakeLocationProvider
 import io.github.towkirahmedrony.salah.testing.FakeLocationRepository
+import io.github.towkirahmedrony.salah.testing.FakePermissionStatusProvider
+import io.github.towkirahmedrony.salah.testing.FakePrayerNotificationPreferencesRepository
+import io.github.towkirahmedrony.salah.testing.FakePrayerNotificationScheduler
+import io.github.towkirahmedrony.salah.testing.FakePrayerScheduleRepository
+import io.github.towkirahmedrony.salah.testing.FakeUserPreferencesRepository
 import io.github.towkirahmedrony.salah.testing.FixedDeclinationProvider
 import io.github.towkirahmedrony.salah.testing.RecordingLogger
 import io.github.towkirahmedrony.salah.testing.syntheticDataset
+import io.github.towkirahmedrony.salah.testing.testSchedule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
@@ -45,6 +54,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.abs
 
@@ -78,6 +88,15 @@ import kotlin.math.abs
 class QiblaViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
+
+    private val logger = RecordingLogger()
+    private val notificationScheduler = FakePrayerNotificationScheduler()
+    private val notificationPermissions = FakePermissionStatusProvider()
+    private val notificationSettings = FakePrayerNotificationPreferencesRepository()
+    private val userPreferences = FakeUserPreferencesRepository()
+
+    /** The date the stored fix falls on in Dhaka, so reconciliation has a schedule to find. */
+    private val schedules = FakePrayerScheduleRepository(mapOf(FIX_DATE to testSchedule(FIX_DATE, DHAKA_ZONE)))
 
     @Before
     fun installMainDispatcher() {
@@ -520,6 +539,78 @@ class QiblaViewModelTest {
         assertTrue(viewModel.uiState.value.form.hasValidationError)
     }
 
+    // --- The location this screen writes is the app's location ------------------
+
+    @Test
+    fun `adopting a device fix reschedules the reminders`() = runTest(dispatcher) {
+        val provider = FakeLocationProvider().apply { fixAt(GeoPoint(23.86, 89.24), accuracyMetres = 12.0) }
+        val viewModel = viewModel(locations = FakeLocationRepository(), provider = provider)
+        observe(viewModel)
+
+        assertEquals(
+            "opening the screen schedules nothing",
+            0,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+
+        viewModel.useCurrentLocation()
+        advanceUntilIdle()
+
+        assertEquals(
+            "the adopted location rebuilds the alarm set once",
+            1,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+        assertTrue(
+            "the reminders are planned from the stored location's own schedule",
+            notificationScheduler.registered.isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun `a refused fix leaves the alarms alone`() = runTest(dispatcher) {
+        val provider = FakeLocationProvider().apply { fixAt(GeoPoint(26.0, 92.0)) }
+        val viewModel = viewModel(locations = FakeLocationRepository(), provider = provider)
+        observe(viewModel)
+
+        viewModel.useCurrentLocation()
+        advanceUntilIdle()
+
+        assertEquals(
+            "nothing was stored, so there is nothing to reschedule",
+            0,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+        assertTrue("an unadopted fix must not schedule anything", notificationScheduler.registered.isEmpty())
+    }
+
+    @Test
+    fun `storing manual coordinates reschedules the reminders`() = runTest(dispatcher) {
+        val viewModel = viewModel(locations = FakeLocationRepository(dhaka()))
+        observe(viewModel)
+
+        viewModel.onFormChange {
+            it.copy(label = "Home", latitude = "23.8103", longitude = "90.4125", timeZoneId = "Asia/Dhaka")
+        }
+        viewModel.saveManualLocation()
+        advanceUntilIdle()
+
+        assertEquals(1, logger.count(SalahDiagnosticEvents.RECONCILE_STARTED))
+
+        // An entry the repository refuses must not reschedule either.
+        val rejected = viewModel(locations = FakeLocationRepository(dhaka()))
+        observe(rejected)
+        rejected.onFormChange { it.copy(label = "Home", latitude = "north", longitude = "") }
+        rejected.saveManualLocation()
+        advanceUntilIdle()
+
+        assertEquals(
+            "a rejected entry changes no location, so no reminders move",
+            1,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+    }
+
     // --- Harness --------------------------------------------------------------
 
     /**
@@ -551,7 +642,20 @@ class QiblaViewModelTest {
         permissionChecker = permissionChecker,
         declinationProvider = declination,
         qiblaCalculator = QiblaCalculator(),
-        logger = RecordingLogger(),
+        // The real coordinator over fake edges: this screen writes the app's only location, so the
+        // rescheduling a write triggers is part of what is being exercised here.
+        coordinator = PrayerNotificationCoordinator(
+            planner = PrayerNotificationPlanner(),
+            notificationSettings = notificationSettings,
+            userPreferences = userPreferences,
+            locations = locations,
+            schedules = schedules,
+            scheduler = notificationScheduler,
+            permissions = notificationPermissions,
+            logger = logger,
+            clock = CLOCK,
+        ),
+        logger = logger,
         clock = CLOCK,
     )
 
@@ -579,6 +683,13 @@ class QiblaViewModelTest {
                 origin = LocationOrigin.MANUAL_ENTRY,
             ),
         )
+
+        val DHAKA_ZONE: ZoneId = ZoneId.of("Asia/Dhaka")
+
+        /** The local day the device fix below lands on, so the schedule lookup is not a guess. */
+        val FIX_DATE: LocalDate = Instant.ofEpochMilli(FakeLocationProvider.FIX_TIMESTAMP)
+            .atZone(DHAKA_ZONE)
+            .toLocalDate()
 
         /** Dhaka, whose bearing is pinned independently in `QiblaCalculatorTest`. */
         fun dhaka(): LocationInfo = manual(label = "Dhaka, Bangladesh", latitude = 23.8103, longitude = 90.4125)

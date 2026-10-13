@@ -27,7 +27,6 @@ import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
-import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
@@ -46,12 +45,18 @@ import org.koin.androidx.compose.koinViewModel
  * derives it from the location and the bundled dataset, so "setup is complete" and "a usable
  * location exists" can never disagree. Nothing here marks setup as finished — saving a location is
  * what does that, and it is also what makes this screen disappear.
+ *
+ * **The appearance preference.** The theme comes from the stored [AppViewModel.themeMode] rather than
+ * from a parameter with a default, so the Appearance screen's choice is what actually re-themes the
+ * shell: the preference is read here, applied here, and a change reaches the UI on the next emission
+ * without a restart. Passing a fixed mode instead would leave the stored value alive in the store and
+ * the radio group, and nowhere else.
  */
 @Composable
 fun SalahApp(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
     appViewModel: AppViewModel = koinViewModel(),
 ) {
+    val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
     val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
 
     SalahTheme(themeMode = themeMode) {

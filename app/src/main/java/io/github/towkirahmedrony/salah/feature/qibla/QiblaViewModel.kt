@@ -10,6 +10,8 @@ import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixAdoptionPol
 import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixRejectionReason
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
+import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.qibla.CalibrationAdvice
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassAccuracyGate
 import io.github.towkirahmedrony.salah.core.domain.qibla.CompassAvailability
@@ -65,6 +67,13 @@ import kotlin.time.Duration.Companion.seconds
  *
  * **Nothing here reads a coordinate into the log.** Location diagnosis records the origin,
  * freshness, provider and accuracy — never the latitude or longitude.
+ *
+ * **A write here reschedules the reminders.** This screen stores through the same
+ * [LocationRepository] the prayer engine and the location screen use, so a position adopted here
+ * changes the calculated times everywhere — which is exactly why the write is followed by the same
+ * [PrayerNotificationCoordinator.reconcile] the location screen performs. The bearing is the screen's
+ * subject, but the location it is computed from is the app's, and leaving the previous alarms in
+ * place would have Salah announce the times of the place the user has just stopped being at.
  */
 class QiblaViewModel(
     private val locations: LocationRepository,
@@ -75,6 +84,7 @@ class QiblaViewModel(
     private val permissionChecker: LocationPermissionChecker,
     private val declinationProvider: GeomagneticDeclinationProvider,
     private val qiblaCalculator: QiblaCalculator,
+    private val coordinator: PrayerNotificationCoordinator,
     private val logger: DiagnosticsLogger,
     private val clock: Clock,
 ) : ViewModel() {
@@ -327,6 +337,7 @@ class QiblaViewModel(
                         message = if (saved) QiblaMessage.DeviceLocationAcquired else QiblaMessage.LocationFailed,
                     )
                 }
+                if (saved) reconcileNotifications()
             }
 
             is DeviceFixAdoption.Rejected -> {
@@ -407,6 +418,7 @@ class QiblaViewModel(
                     message = if (saved) QiblaMessage.LocationSaved else QiblaMessage.LocationRejected,
                 )
             }
+            if (saved) reconcileNotifications()
         }
     }
 
@@ -420,7 +432,26 @@ class QiblaViewModel(
                     message = QiblaMessage.LocationCleared,
                 )
             }
+            reconcileNotifications()
         }
+    }
+
+    /**
+     * Rebuilds the alarm set for the location that was just stored.
+     *
+     * Called after every successful write and after a clear, because the schedule and the reminders are
+     * derived from the coordinates. A failed reconciliation is logged rather than thrown: the location
+     * is already stored, and the next app start reconciles again.
+     */
+    private suspend fun reconcileNotifications() {
+        runCatching { coordinator.reconcile(ReconcileReason.LOCATION_CHANGED) }
+            .onFailure { error ->
+                logger.error(
+                    SalahDiagnosticEvents.RECONCILE_UNAVAILABLE,
+                    error,
+                    mapOf("reason" to "location_changed"),
+                )
+            }
     }
 
     // --- Presentation -----------------------------------------------------------
