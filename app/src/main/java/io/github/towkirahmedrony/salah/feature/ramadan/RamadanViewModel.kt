@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.Locale
 
 /**
  * Drives the Ramadan screen.
@@ -84,7 +85,8 @@ class RamadanViewModel(
         settingsSnapshot,
         windowSnapshot,
         message,
-    ) { today, settings, windowState, currentMessage ->
+        userPreferencesRepository.appLanguage,
+    ) { today, settings, windowState, currentMessage, language ->
         val state = uiStateFactory.create(
             RamadanUiStateInputs(
                 today = today,
@@ -95,6 +97,10 @@ class RamadanViewModel(
                 schedules = windowState.schedules,
                 locationConfigured = windowState.locationConfigured,
             ),
+            // The interface language, so the Hijri rows, weekday names and heading follow the language
+            // selector rather than the device locale. A change re-renders the same window and the same
+            // times: this is an input to the formatting and to nothing else.
+            systemLocale = language.locale() ?: Locale.getDefault(),
         )
         // The factory is pure and knows nothing about transient feedback, so it is attached here from a
         // value that was set by a real reconciliation result.

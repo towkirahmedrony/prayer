@@ -433,14 +433,15 @@ class CalendarUiStateFactoryTest {
     }
 
     @Test
-    fun `selecting the Hijri view lays out the Hijri calendar month with Arabic names and numerals`() = runTest {
+    fun `selecting the Hijri view follows the interface language instead of always using Arabic`() = runTest {
         // 20 March 2024 is inside Ramadan 1445, which runs 11 March to 9 April 2024.
         val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
         val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
         val state = factory.create(month, settings, LocalDate.of(2024, 3, 20), english) as CalendarUiState.Ready
 
         assertEquals(CalendarSystem.HIJRI, state.system)
-        assertEquals("رَمَضان ١٤٤٥", state.monthLabel)
+        // The English interface gets the Hijri month in English, not in Arabic script.
+        assertEquals("Ramadan 1445", state.monthLabel)
         assertEquals(LocalDate.of(2024, 3, 11), state.monthStart)
         assertEquals(LocalDate.of(2024, 4, 9), state.monthEnd)
         // Ramadan 1445 has 30 days, and the grid holds exactly those days numbered 1..30.
@@ -448,12 +449,54 @@ class CalendarUiStateFactoryTest {
         assertEquals((1..30).toList(), state.weeks.flatten().mapNotNull { it?.dayOfMonth })
         val firstOfRamadan = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!
         assertEquals(1, firstOfRamadan.dayOfMonth)
-        assertEquals("١", firstOfRamadan.dayLabel)
-        // Weekday headers are in Arabic script.
+        // Western numerals beside the Latin month name, so the English grid is not half-localised.
+        assertEquals("1", firstOfRamadan.dayLabel)
+        assertNoArabicScript(state)
+    }
+
+    @Test
+    fun `selecting the Hijri view in a Bengali interface renders Bengali names and numerals`() = runTest {
+        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
+        val state = factory.create(month, settings, LocalDate.of(2024, 3, 20), bengali) as CalendarUiState.Ready
+
+        assertEquals(CalendarSystem.HIJRI, state.system)
+        assertEquals("রমজান ১৪৪৫", state.monthLabel)
+        assertEquals(LocalDate.of(2024, 3, 11), state.monthStart)
+        assertEquals(LocalDate.of(2024, 4, 9), state.monthEnd)
+        val firstOfRamadan = state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!
+        // Bengali numerals beside the Bengali month name, not Arabic-Indic ones.
+        assertEquals("১", firstOfRamadan.dayLabel)
         assertTrue(
-            "expected Arabic weekday labels, were ${state.weekdayLabels}",
-            state.weekdayLabels.any { label -> label.any { character -> character.code in ARABIC_SCRIPT } },
+            "expected Bengali weekday labels, were ${state.weekdayLabels}",
+            state.weekdayLabels.any { label -> label.any { character -> character.code in BENGALI_SCRIPT } },
         )
+        assertNoArabicScript(state)
+    }
+
+    @Test
+    fun `the Hijri dates in the selected-day card follow the interface language`() = runTest {
+        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
+        val englishState = factory.create(month, settings, LocalDate.of(2024, 3, 20), english) as
+            CalendarUiState.Ready
+        val bengaliState = factory.create(month, settings, LocalDate.of(2024, 3, 20), bengali) as
+            CalendarUiState.Ready
+
+        val englishHijri = englishState.selected.lines.first { it.system == CalendarSystem.HIJRI }
+        val bengaliHijri = bengaliState.selected.lines.first { it.system == CalendarSystem.HIJRI }
+
+        // The same day described twice; only the rendering language differs.
+        assertEquals("11 Ramadan 1445 AH", englishHijri.value)
+        assertEquals("১১ রমজান ১৪৪৫ AH", bengaliHijri.value)
+        assertEquals(englishState.selected.date, bengaliState.selected.date)
+        assertEquals("Monday", englishState.selected.weekday)
+        assertTrue(
+            "expected a Bengali weekday, was ${bengaliState.selected.weekday}",
+            bengaliState.selected.weekday.any { it.code in BENGALI_SCRIPT },
+        )
+        assertNoArabicScript(englishState)
+        assertNoArabicScript(bengaliState)
     }
 
     @Test
@@ -473,6 +516,26 @@ class CalendarUiStateFactoryTest {
             DayOfWeek.MONDAY,
             state.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!.date!!.dayOfWeek,
         )
+    }
+
+    /**
+     * Fails when any Hijri label in [state] is still written in Arabic script.
+     *
+     * The Arabic month names and Arabic-Indic numerals exist for an Arabic rendering locale only, so an
+     * English or Bengali calendar must contain no character from the Arabic block at all. Checking every
+     * label the screen draws — the heading, the weekday headers, the grid's day numbers and both date
+     * cards — is what makes "no Arabic left in the English or Bengali UI" a real assertion rather than a
+     * spot check.
+     */
+    private fun assertNoArabicScript(state: CalendarUiState.Ready) {
+        val labels = listOf(state.monthLabel) +
+            state.weekdayLabels +
+            state.weeks.flatten().mapNotNull { it.dayLabel } +
+            listOf(state.selected.weekday, state.today.weekday) +
+            (state.selected.lines + state.today.lines).mapNotNull { it.value }
+
+        val offenders = labels.filter { label -> label.any { it.code in ARABIC_SCRIPT } }
+        assertTrue("expected no Arabic-script labels, found $offenders", offenders.isEmpty())
     }
 
     private companion object {

@@ -56,10 +56,10 @@ import java.time.LocalDate
  *
  * One month, shown in whichever of the three calendars is selected. The view chips switch the grid
  * itself: Gregorian reads as a Gregorian month, Bangla as a Bangladesh Bangla month (Bengali month
- * and weekday names, Bengali numerals) and Hijri as a Hijri month (Arabic names and Arabic-Indic
- * numerals, laid out right-to-left). Every day also carries its other two representations in the
- * selected-day card below, and a day's Gregorian date remains its identity for prayer times and
- * Ramadan.
+ * and weekday names, Bengali numerals) and Hijri as a Hijri month whose month name, weekday names and
+ * numerals follow the interface language — `Ramadan 1445` in English, `রমজান ১৪৪৫` in Bengali — laid
+ * out right-to-left. Every day also carries its other two representations in the selected-day card
+ * below, and a day's Gregorian date remains its identity for prayer times and Ramadan.
  *
  * Everything shown is produced by the repository and mapped by [CalendarUiStateFactory], so this file
  * contains layout and no date arithmetic. Two rules it does enforce:
@@ -158,9 +158,10 @@ private fun ReadyContent(
     ViewSwitcher(system = state.system, onSelectSystem = onSelectSystem)
 
     SalahSectionCard {
-        // The Hijri calendar is read right-to-left. The direction is scoped to the month card alone,
-        // so the app's navigation, headings and every other card are untouched; inside it the weekday
-        // columns and the previous/next controls mirror, which is how an Arabic calendar reads.
+        // The Hijri month card keeps its right-to-left presentation — a property of the mode rather
+        // than of the labels, so localising the month names leaves it unchanged. The direction is
+        // scoped to the month card alone, so the app's navigation, headings and every other card are
+        // untouched; inside it the weekday columns and the previous/next controls mirror.
         CompositionLocalProvider(
             LocalLayoutDirection provides if (state.system == CalendarSystem.HIJRI) {
                 LayoutDirection.Rtl

@@ -23,18 +23,20 @@ import java.util.Locale
  * There are two independent choices in Salah, and this class keeps them apart:
  *
  *  - **Which calendar system** the calendar grid shows — Gregorian, Bangladesh Bangla or Hijri. That
- *    is the *data*: it decides which month, which days and which year the grid contains. It also
- *    decides the script the grid is written in, because a Bangla calendar written in Latin script and
- *    a Hijri calendar written in Latin script are not what those modes are for. See [gridLocale].
+ *    is the *data*: it decides which month, which days and which year the grid contains. It does *not*
+ *    pin the grid's script — the Gregorian and Hijri grids are written in the interface language (or an
+ *    explicit date-language preference), so a Bengali interface shows `রমজান ১৪৪৫` and an English one
+ *    shows `Ramadan 1445`. Only the Bangla mode pins Bengali, because its month names are the
+ *    calendar's own rather than a rendering of a Gregorian month. See [gridLocale].
  *  - **Which date language** the side-by-side date list is written in — the Today card and the
  *    selected-day card show all three calendars at once, so there one script has to be chosen for all
  *    of them: [localeFor], driven by [DateLanguagePreference].
  *
  * ## `systemDefault` is the interface language
  *
- * [DateLanguagePreference.SYSTEM]'s branch of [localeFor], and the Gregorian branch of [gridLocale], do
- * not read the device locale from inside this class: the caller passes the locale the interface is
- * currently written in as [systemDefault]. The calendar view model passes `AppLanguage`'s locale, so
+ * [DateLanguagePreference.SYSTEM]'s branch of [localeFor], and the Gregorian and Hijri branches of
+ * [gridLocale], do not read the device locale from inside this class: the caller passes the locale the
+ * interface is currently written in as [systemDefault]. The calendar view model passes `AppLanguage`'s locale, so
  * "follow the interface" really follows the app's language selector instead of the phone's setting —
  * which is the difference between a Bengali interface showing Bengali month names and a Bengali
  * interface showing Latin ones. A caller that passes nothing gets `Locale.getDefault()`, which is the
@@ -78,16 +80,20 @@ class CalendarFormatting {
     /**
      * The locale the calendar **grid and its heading** are rendered in for [system].
      *
-     * The calendar system decides its own script: Gregorian follows the stored date language (so a
-     * user who wants Bangla-script Gregorian dates still gets them), while the Bangla and Hijri modes
-     * render in Bengali and Arabic respectively. That is what makes "select Bangla" produce a Bangla
-     * calendar rather than an anglicised one, and it keeps the grid's script a function of the one
-     * setting the user changed — the calendar mode.
+     * The calendar system decides *which* month is shown; the interface language decides *the words*.
+     * The Gregorian and Hijri grids both defer to the stored date language — whose
+     * [DateLanguagePreference.SYSTEM] branch follows [systemDefault], the interface language — so a
+     * Bengali interface shows a Bengali Hijri month (`রমজান ১৪৪৫`) and an English one shows an English
+     * Hijri month (`Ramadan 1445`). This is what makes the Hijri mode follow the language selector
+     * instead of always rendering in Arabic script.
      *
-     * The Bangla and Hijri branches ignore both [dateLanguage] and [systemDefault] on purpose: those
-     * modes exist to present a calendar in its own script, so a Bengali Bangla calendar and an Arabic
-     * Hijri calendar are not something the interface language is allowed to override. Only the
-     * Gregorian grid defers, and only when the stored date language asks it to.
+     * The Bangla branch is the one exception, and it is not an oversight: that mode exists to present
+     * the Bangladeshi civil calendar in its own script, and its month names (`বৈশাখ`) are the
+     * calendar's own rather than an alternative rendering of a Gregorian month, so there is no second
+     * language to render them in. The stored [dateLanguage] still wins for the other two grids, because
+     * that setting is a deliberate statement about the dates themselves — an explicit `ENGLISH` gives
+     * `Ramadan 1445` even on a Bengali phone, and an explicit `BANGLA` gives `রমজান ১৪৪৫` on an English
+     * one.
      */
     fun gridLocale(
         system: CalendarSystem,
@@ -96,7 +102,7 @@ class CalendarFormatting {
     ): Locale = when (system) {
         CalendarSystem.GREGORIAN -> localeFor(dateLanguage, systemDefault)
         CalendarSystem.BANGLA -> Locale(BANGLA_LANGUAGE)
-        CalendarSystem.HIJRI -> Locale(ARABIC_LANGUAGE)
+        CalendarSystem.HIJRI -> localeFor(dateLanguage, systemDefault)
     }
 
     /** True when [locale] renders dates in Bangla script and numerals. */
@@ -168,7 +174,10 @@ class CalendarFormatting {
     fun hijri(date: HijriDate, locale: Locale): String =
         "${numerals(date.day, locale)} ${hijriMonthName(date.month, locale)} ${numerals(date.year, locale)}"
 
-    /** Month and year of a Hijri month, for the calendar heading, for example `رَمَضان ١٤٤٥`. */
+    /**
+     * Month and year of a Hijri month, for the calendar heading, for example `Ramadan 1445` or
+     * `রমজান ১৪৪৫` — the heading follows the rendering locale like every other calendar label.
+     */
     fun hijriMonth(date: HijriDate, locale: Locale): String =
         "${hijriMonthName(date.month, locale)} ${numerals(date.year, locale)}"
 
@@ -237,9 +246,11 @@ object BanglaNumerals {
 /**
  * Arabic-Indic numerals (٠–٩).
  *
- * The same shape as [BanglaNumerals] and for the same reasons: the Hijri calendar mode is written in
- * Arabic script, and composing its numerals from a table keeps the digits and the month name in the
- * same script on every device.
+ * The same shape as [BanglaNumerals] and for the same reasons: composing the digits from a table keeps
+ * them in the same script as the month name beside them on every device. This table is chosen only for a
+ * genuinely Arabic rendering locale — the Hijri *mode* is localised like the other modes, so an English
+ * or Bengali calendar uses the Western or Bengali table and an Arabic-Indic digit never leaks into it.
+ * See [CalendarFormatting.gridLocale].
  */
 object ArabicNumerals {
 

@@ -103,7 +103,7 @@ class CalendarViewModelTest {
     }
 
     @Test
-    fun `selecting Hijri shows the Hijri month with Arabic names`() = runTest(mainDispatcher) {
+    fun `selecting Hijri shows the Hijri month in the interface language`() = runTest(mainDispatcher) {
         val viewModel = viewModelAt("2024-03-20T09:00:00Z")
         val states = observe(viewModel)
         runCurrent()
@@ -114,11 +114,69 @@ class CalendarViewModelTest {
 
         val hijri = latestReady(states)
         assertEquals(CalendarSystem.HIJRI, hijri.system)
-        assertEquals("رَمَضان ١٤٤٥", hijri.monthLabel)
+        // The device is English here, so the Hijri month is English rather than Arabic script.
+        assertEquals("Ramadan 1445", hijri.monthLabel)
         assertEquals(LocalDate.of(2024, 3, 11), hijri.monthStart)
         assertEquals(LocalDate.of(2024, 4, 9), hijri.monthEnd)
         assertEquals(30, hijri.weeks.flatten().count { it.date != null })
     }
+
+    @Test
+    fun `the Hijri month follows the interface language without changing the dates`() =
+        runTest(mainDispatcher) {
+            val viewModel = viewModelAt("2024-03-20T09:00:00Z")
+            val states = observe(viewModel)
+            runCurrent()
+
+            viewModel.onSelectSystem(CalendarSystem.HIJRI)
+            runCurrent()
+
+            val asEnglish = latestReady(states)
+            assertEquals("Ramadan 1445", asEnglish.monthLabel)
+            val firstOfRamadan = asEnglish.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!
+            assertEquals("1", firstOfRamadan.dayLabel)
+
+            preferences.selectLanguage(AppLanguage.BANGLA)
+            runCurrent()
+
+            val asBengali = latestReady(states)
+            assertEquals("রমজান ১৪৪৫", asBengali.monthLabel)
+            assertEquals(
+                "১",
+                asBengali.weeks.flatten().first { it?.date == LocalDate.of(2024, 3, 11) }!!.dayLabel,
+            )
+            // The same calendar, the same span, the same days and the same selection. A language change
+            // re-renders; it must not navigate, re-select or move a single date.
+            assertEquals(asEnglish.system, asBengali.system)
+            assertEquals(asEnglish.monthStart, asBengali.monthStart)
+            assertEquals(asEnglish.monthEnd, asBengali.monthEnd)
+            assertEquals(asEnglish.selected.date, asBengali.selected.date)
+            assertEquals(
+                asEnglish.weeks.flatten().mapNotNull { cell -> cell?.date },
+                asBengali.weeks.flatten().mapNotNull { cell -> cell?.date },
+            )
+            // And the language selector is not a calendar setting: the stored system is untouched.
+            assertEquals(CalendarSystem.HIJRI, preferences.calendarSettings.first().preferredSystem)
+        }
+
+    @Test
+    fun `a stored interface language opens the calendar in that language, Hijri included`() =
+        runTest(mainDispatcher) {
+            // What the General screen's selector leaves in the store, read back by a fresh view model:
+            // the same path a process restart takes.
+            preferences = FakePreferences(
+                CalendarSettings(preferredSystem = CalendarSystem.HIJRI),
+                initialLanguage = AppLanguage.BANGLA,
+            )
+
+            val viewModel = viewModelAt("2024-03-20T09:00:00Z")
+            val states = observe(viewModel)
+            runCurrent()
+
+            val restored = latestReady(states)
+            assertEquals(CalendarSystem.HIJRI, restored.system)
+            assertEquals("রমজান ১৪৪৫", restored.monthLabel)
+        }
 
     @Test
     fun `month navigation moves one month of the selected calendar system`() = runTest(mainDispatcher) {

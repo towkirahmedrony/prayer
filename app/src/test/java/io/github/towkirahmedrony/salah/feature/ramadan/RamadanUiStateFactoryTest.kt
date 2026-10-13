@@ -211,6 +211,32 @@ class RamadanUiStateFactoryTest {
     }
 
     @Test
+    fun `the Hijri and Bangla labels follow the interface language instead of always using Arabic`() {
+        // The same day as the English assertions above, on the same screen, rendered for a Bengali
+        // interface. The Ramadan table reuses the shared Hijri formatter, so it follows the language
+        // selector like the Calendar screen rather than the device's own locale.
+        val bengali = java.util.Locale.forLanguageTag("bn")
+        val state = ready(factory.create(inputs(mapOf(available("2024-03-11"))), bengali))
+
+        val row = state.rows.first()
+        assertEquals("১ রমজান ১৪৪৫ AH", row.hijriLabel)
+        assertEquals("২৭ ফাল্গুন ১৪৩০", row.banglaLabel)
+        assertTrue(
+            "the Bengali Gregorian label carries no Bengali script: ${row.gregorianLabel}",
+            row.gregorianLabel.any { character -> character.code in 0x0980..0x09FF },
+        )
+
+        // Nothing on the row, and nothing in the window heading, is left in Arabic script: the English
+        // and Bengali interfaces must never show an Arabic month name or Arabic-Indic numerals.
+        listOfNotNull(row.gregorianLabel, row.banglaLabel, row.hijriLabel, state.rangeLabel).forEach { label ->
+            assertTrue(
+                "Arabic script survived in a Bengali Ramadan row: $label",
+                label.none { character -> character.code in 0x0600..0x06FF },
+            )
+        }
+    }
+
+    @Test
     fun `the Hijri adjustment moves the Hijri labels in the table`() {
         val state = ready(
             factory.create(

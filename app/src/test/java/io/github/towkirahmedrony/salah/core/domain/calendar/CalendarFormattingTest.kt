@@ -131,21 +131,57 @@ class CalendarFormattingTest {
     }
 
     @Test
-    fun `the Hijri mode renders Arabic month names and Arabic-Indic numerals`() {
+    fun `the Hijri date is rendered in the chosen language, with Arabic only for an Arabic locale`() {
         val date = HijriDate(
             year = 1445,
             month = HijriMonth.RAMADAN,
             day = 1,
             source = HijriDateSource.ESTIMATED_UMM_AL_QURA,
         )
-        // Ramadan in Arabic script, with Arabic-Indic digits for the day and the year.
+        // English and Bengali — the two languages the app supports — render a Latin month name with
+        // Western digits and a Bengali month name with Bengali digits, and neither carries Arabic script.
+        assertEquals("1 Ramadan 1445", formatting.hijri(date, english))
+        assertEquals("Ramadan 1445", formatting.hijriMonth(date, english))
+        assertEquals("১ রমজান ১৪৪৫", formatting.hijri(date, bangla))
+        assertEquals("রমজান ১৪৪৫", formatting.hijriMonth(date, bangla))
+        assertTrue(
+            "the English Hijri string still carries Arabic script: ${formatting.hijri(date, english)}",
+            formatting.hijri(date, english).none { character -> character.code in ARABIC_SCRIPT },
+        )
+        assertTrue(
+            "the Bengali Hijri string carries no Bengali script: ${formatting.hijri(date, bangla)}",
+            formatting.hijri(date, bangla).any { character -> character.code in BENGALI_SCRIPT },
+        )
+        assertTrue(
+            "the Bengali Hijri string still carries Arabic script: ${formatting.hijri(date, bangla)}",
+            formatting.hijri(date, bangla).none { character -> character.code in ARABIC_SCRIPT },
+        )
+
+        // Arabic-Indic output is still selectable, but only for a genuinely Arabic locale, which the app
+        // no longer chooses for the Hijri mode.
         assertEquals("١ رَمَضان ١٤٤٥", formatting.hijri(date, arabic))
         assertEquals("رَمَضان ١٤٤٥", formatting.hijriMonth(date, arabic))
         assertEquals("١٤٤٥", formatting.numerals(1445, arabic))
         assertTrue(formatting.isArabic(arabic))
         assertTrue(!formatting.isArabic(english))
 
-        // Every Hijri month carries an Arabic name, and it is not a transliteration of the Latin one.
+        // Every Hijri month carries a name in all three scripts, and the English and Bengali names are
+        // free of Arabic script — so no Arabic month name can leak into an English or Bengali grid.
+        HijriMonth.entries.forEach { month ->
+            assertTrue(month.englishName.isNotBlank())
+            assertTrue(month.bengaliName.isNotBlank())
+            assertNotEquals(month.englishName, month.bengaliName)
+            assertTrue(
+                "${month.name}'s English name carries Arabic script: ${month.englishName}",
+                month.englishName.none { character -> character.code in ARABIC_SCRIPT },
+            )
+            assertTrue(
+                "${month.name}'s Bengali name carries Arabic script: ${month.bengaliName}",
+                month.bengaliName.none { character -> character.code in ARABIC_SCRIPT },
+            )
+        }
+
+        // Every Hijri month carries an Arabic name too, and it is not a transliteration of the Latin one.
         HijriMonth.entries.forEach { month ->
             assertTrue(month.arabicName.isNotBlank())
             assertNotEquals(month.englishName, month.arabicName)
@@ -157,14 +193,25 @@ class CalendarFormattingTest {
     }
 
     @Test
-    fun `the grid locale follows the selected calendar system, not the device`() {
+    fun `the grid locale follows the calendar mode and the chosen language, not the device`() {
         // The Gregorian grid follows the stored date language...
         assertEquals(english, formatting.gridLocale(CalendarSystem.GREGORIAN, DateLanguagePreference.ENGLISH))
         assertEquals(bangla.language, formatting.gridLocale(CalendarSystem.GREGORIAN, DateLanguagePreference.BANGLA).language)
-        // ...while the Bangla and Hijri grids carry their own script whatever the date language is.
+        // ...the Bangla grid pins Bengali whatever the date language is...
         assertEquals(bangla.language, formatting.gridLocale(CalendarSystem.BANGLA, DateLanguagePreference.ENGLISH).language)
-        assertEquals(arabic.language, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.ENGLISH).language)
-        assertEquals(arabic.language, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.BANGLA).language)
+        // ...and the Hijri grid follows the interface language like the Gregorian one, rather than always
+        // rendering in Arabic. `SYSTEM` follows the interface locale the caller passes.
+        assertEquals(
+            english.language,
+            formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.SYSTEM, english).language,
+        )
+        assertEquals(
+            bangla.language,
+            formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.SYSTEM, bangla).language,
+        )
+        // An explicit date language still wins, in either direction.
+        assertEquals(english, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.ENGLISH))
+        assertEquals(bangla.language, formatting.gridLocale(CalendarSystem.HIJRI, DateLanguagePreference.BANGLA).language)
     }
 
     @Test

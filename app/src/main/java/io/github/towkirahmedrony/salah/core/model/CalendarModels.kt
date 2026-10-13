@@ -52,8 +52,11 @@ data class BanglaDate(
  *
  * Each month carries its name in three scripts for the same reason `BanglaMonth` carries two: a month
  * name is part of the *conversion result* the Hijri calendar mode renders, so it cannot depend on the
- * device's locale data. `arabicName` is what the Hijri calendar mode shows, since that mode presents
- * the Islamic calendar in its own script; see docs/CALENDAR_IMPLEMENTATION.md.
+ * device's locale data. Which of the three is shown follows the interface language (or an explicit
+ * date-language preference): a Bengali interface reads `রমজান`, an English one `Ramadan`, and
+ * `arabicName` is used only when the rendering locale is genuinely Arabic. The Hijri calendar mode is
+ * therefore localised like every other calendar label rather than always written in Arabic script; see
+ * docs/CALENDAR_IMPLEMENTATION.md.
  */
 enum class HijriMonth(val englishName: String, val bengaliName: String, val arabicName: String) {
     MUHARRAM("Muharram", "মুহাররম", "مُحَرَّم"),

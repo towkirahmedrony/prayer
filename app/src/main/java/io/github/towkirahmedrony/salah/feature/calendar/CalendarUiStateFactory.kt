@@ -26,8 +26,10 @@ import java.util.Locale
  * day numbers and the year now change with the mode, not only which chip is highlighted.
  *
  * **Two locales, deliberately.** The grid and its heading use [CalendarFormatting.gridLocale], which
- * gives each calendar mode its own script (Latin/Bengali/Arabic). The selected-day date *list* shows
- * all three calendars at once, so it uses one script chosen by the stored date language
+ * renders the Gregorian and Hijri grids in the interface language (or the stored date language) and
+ * pins Bengali only for the Bangla mode — so the Hijri grid is `Ramadan 1445` in English and
+ * `রমজান ১৪৪৫` in Bengali rather than always Arabic. The selected-day date *list* shows all three
+ * calendars at once, so it uses one script chosen by the stored date language
  * ([CalendarFormatting.localeFor]). See docs/CALENDAR_IMPLEMENTATION.md.
  *
  * [systemLocale] is a parameter rather than a `Locale.getDefault()` call inside the method so a test
@@ -86,8 +88,8 @@ class CalendarUiStateFactory(
     }
 
     /**
-     * The month heading in the selected calendar system — `October 2026`, `আশ্বিন ১৪৩১` or
-     * `رَمَضان ١٤٤٥` — rendered in [gridLocale], which for a Gregorian grid is the interface language
+     * The month heading in the selected calendar system — `October 2026`, `আশ্বিন ১৪৩১` or the Hijri
+     * month (`Ramadan 1445` / `রমজান ১৪৪৫`) — rendered in [gridLocale], which is the interface language
      * unless the stored date language overrides it.
      *
      * Derived from the month's own first convertible day, so the heading is the system's month and
@@ -207,8 +209,9 @@ class CalendarUiStateFactory(
         }
         val isToday = cell.date == month.today
         val isSelected = cell.date == selected
-        // The day number is the one the *selected system* uses, so the same cell reads `14`, `৩০` or
-        // `٣٠` depending on the mode. A day the system cannot convert falls back to its Gregorian day
+        // The day number is the one the *selected system* uses, written in the interface language's
+        // numerals: under the Hijri mode that is the Hijri day of month, so the same cell reads `14` in
+        // English and `১৪` in Bengali. A day the system cannot convert falls back to its Gregorian day
         // number, which keeps the grid complete while the card states why the conversion is missing.
         val dayNumber = dayNumberIn(cell, system) ?: cell.date.dayOfMonth
         return CalendarCell(

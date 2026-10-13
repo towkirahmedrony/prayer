@@ -138,8 +138,10 @@ and the rule is:
   Bengali weekday headers and Bengali day numbers.
 * An **explicit** `DateLanguagePreference.BANGLA`/`ENGLISH` still wins, because that setting is a
   deliberate statement about the dates themselves rather than about the words around them.
-* The **Bangla** and **Hijri** grid modes ignore both, because those modes present a calendar in its own
-  script (Bengali and Arabic respectively). Only the Gregorian grid defers.
+* The **Bangla** grid mode is the only one that pins its script, because that mode presents the
+  Bangladeshi civil calendar in its own Bengali month names (`বৈশাখ`) rather than an alternative
+  rendering of a Gregorian month. The **Gregorian and Hijri** grids both defer, so a Bengali interface
+  shows the Hijri month as `রমজান ১৪৪৫` and an English one as `Ramadan 1445` — see §12.
 * The **underlying dates do not change**: the Gregorian day is still the identity used by prayer times
   and by Ramadan, the displayed month is still built from the same Gregorian anchor, and switching
   language selects nothing and navigates nowhere.
@@ -169,7 +171,9 @@ Changing the interface language triggers no recalculation of the prayer schedule
 
 * **Day numbers and Bangla/Hijri dates** use the explicit digit tables in `CalendarFormatting`
   (`BanglaNumerals`, `ArabicNumerals`), not a platform formatter, so they are identical on every device
-  regardless of how complete its locale data is.
+  regardless of how complete its locale data is. The table is chosen by the **rendering locale**, so a
+  Hijri date in an English or Bengali interface uses that language's digits — Arabic-Indic digits appear
+  only for a genuinely Arabic locale, which this app never selects.
 * **Gregorian month names, weekday names and word order** come from the platform's CLDR data via
   `java.time` with the chosen locale, which is the project's existing convention for Gregorian
   formatting.
@@ -195,8 +199,10 @@ Changing the interface language triggers no recalculation of the prayer schedule
 | `DataStoreUserPreferencesRepositoryTest` | Default is `SYSTEM`; the chosen language survives repository recreation; an unknown stored value falls back; a language write adds exactly one key and rewrites nothing else |
 | `SettingsViewModelTest` | The selector opens on the stored value; choosing Bengali/English stores the right identifier; the choice is restored on a new view model; a failed write is reported as `LanguageSaveFailed` with the stored language unchanged; a language change leaves the theme, the calculation settings and every calendar setting alone and reschedules nothing |
 | `SettingsCategoryTest` | The General category is a visible row on the overview and opens a declared destination; both languages are offered under stable identifiers |
-| `CalendarFormattingTest` | Bangla and Arabic-Indic numerals replace every decimal digit; a Bengali Gregorian heading and date carry Bengali digits and no Western one; the substitution is idempotent; English output is unchanged |
-| `CalendarUiStateFactoryTest` | A Bengali interface renders the Gregorian grid's heading, weekday header and day numbers in Bengali with the same days, month, selection and Ramadan data; an explicit date language still wins; the Bangla mode's heading is Bengali in both; the language changes no calendar system, line or source |
+| `CalendarFormattingTest` | Bangla and Arabic-Indic numerals replace every decimal digit; a Bengali Gregorian heading and date carry Bengali digits and no Western one; the substitution is idempotent; English output is unchanged; the Hijri date and month strings follow the rendering locale (English `Ramadan 1445`, Bengali `রমজান ১৪৪৫`, Arabic only for `ar`) and `gridLocale` defers for both the Gregorian and the Hijri mode |
+| `CalendarUiStateFactoryTest` | A Bengali interface renders the Gregorian grid's heading, weekday header and day numbers in Bengali with the same days, month, selection and Ramadan data; an explicit date language still wins; the Bangla mode's heading is Bengali in both; the language changes no calendar system, line or source; the Hijri grid, its weekday headers and both date cards render in English or Bengali with **no Arabic-script character anywhere** (§12) |
+| `CalendarViewModelTest` | Selecting Hijri shows the Hijri month in the interface language; a language change re-renders the same month span, days and selection without touching a stored calendar setting; a stored language is read back by a fresh view model |
+| `RamadanUiStateFactoryTest` | The Ramadan table's Hijri and Bangla date labels follow the rendering locale, with no Arabic script in a Bengali row |
 | `LocalizationResourcesTest` | Every `calendar_*` key has a non-blank Bengali value; the shared loading/error/retry and out-of-range strings exist in Bengali; the navigation labels are written in Bengali script; the Home and selector keys exist in both languages; no Bengali key is an orphan the English default does not define; a translated Calendar string keeps its English format arguments. Since the Home audit (§10) it also pins **every** string the Home composition tree can render — non-missing, non-blank, in Bengali script, with matching format arguments — and it reads the Home composables' own sources to assert that none of them renders a hardcoded sentence (a literal containing a space). Since the Tools/Settings audit (§11) it does the same for every key under `tools_`, `settings_`, `method_`, `asr_`, `high_latitude_`, `time_format_`, `notification(s)_`, `location_`, `qibla_` and `ramadan_`: presence, non-blank, Bengali script and matching format arguments, plus a scan of those six packages' composables for a hardcoded sentence, and it checks that the Tools page's own copy and the Settings category names exist in both languages |
 | `DeviceClockCalendarRepositoryTest` | Today's date lines are written in the interface language for the same day, with no Western digit left in the Gregorian date; an explicit date language still wins over the interface language; the default (`SYSTEM` + device locale) is unchanged |
 
@@ -411,4 +417,77 @@ No Gradle task is run locally (the project's Android build runs only in CI). The
 statically — resource references, format arguments, prefix completeness and the composable scan were all
 re-run over the real files — and the pushed commit's GitHub Actions run is the authoritative
 `testDebugUnitTest` / `lintDebug` / `assembleDebug` result, reported with the change.
+
+## 12. The Hijri calendar audit
+
+The Calendar screen, the Ramadan table and Home's date line all show Hijri dates, and all three rendered
+them in **Arabic script** regardless of the selected language: `رَمَضان ١٤٤٥`, Arabic weekday headers and
+Arabic-Indic day numbers, in an English or Bengali interface whose every other label was in the selected
+language. (`رَمَضان` in this historical description is the bug being quoted, not a value the app
+produces any more.)
+
+### The root cause
+
+Not a missing translation and not a missing resource. `HijriMonth` already carried `englishName`,
+`bengaliName` and `arabicName`, and `CalendarFormatting.hijri` / `hijriMonth` already composed their
+string from a locale, mapping `bn` to the Bengali name and everything else to the English one. The bug
+was one line of *locale selection*: the grid locale for the Hijri mode was pinned to `Locale("ar")`,
+and the numeral table was chosen from the same value. So the mode asked a language-aware formatter for
+Arabic and got Arabic.
+
+`AppLanguage` was the right input and was already stored, but it reached the *side-by-side date list*
+only; the grid never consulted it. Home's date line already followed the interface language through
+`DeviceClockCalendarRepository.interfaceLanguage`, so two screens disagreed about the language of the
+same month.
+
+### The fix
+
+* `CalendarFormatting.gridLocale(system, dateLanguage, systemDefault)` now defers for Hijri exactly as it
+does for Gregorian, and takes the interface language as `systemDefault`. Only the Bangla mode stays
+pinned, because its month names are that calendar's own.
+* `hijriMonthName` maps the rendering locale to the month's name in that script — Bengali for `bn`,
+Arabic for `ar`, English otherwise — and `numerals` picks the matching digit table, so an English Hijri
+grid can neither show a Bengali year in Latin digits nor an English month over Arabic-Indic ones.
+* The interface language is passed in as a parameter from every entry point rather than read from the
+device inside the formatter: `CalendarViewModel` → `CalendarUiStateFactory` (already), the repository's
+`observeToday()` (already), and `RamadanViewModel` → `RamadanUiStateFactory`, which previously used the
+factory's own default and so followed the device's locale.
+* No new preference and no language check in any composable. `AppLanguage` remains the single source of
+truth, and the screens that *display* dates now agree with the screens that display text.
+
+### What deliberately did not change
+
+* **The calculation.** The Hijri conversion, the ±2-day adjustment, the Ramadan window and every value
+keyed off a Gregorian `LocalDate` are untouched: this is a rendering change, and `HijriCalendarTest` and
+`CalendarMonthResolverTest` pass unmodified.
+* **The independence of language and calendar system.** Choosing Bengali still does not switch the grid
+to the Bangla civil calendar, move the displayed month, reselect a day or rewrite a stored setting.
+* **The Arabic that is meant to be Arabic.** The traditional `المواقيت` heading, Quranic text and du'as
+are religious content rather than date labels and are not translated here (§10). Arabic-script *output*
+is also still supported and tested for a genuinely Arabic locale, so nothing was removed from the
+formatter.
+* **The UI.** No layout, spacing, colour or component changed, and no feature was removed.
+
+### Tests added or updated
+
+| Test | Change |
+|------|--------|
+| `CalendarFormattingTest` | The Hijri case now pins exact English and Bengali strings, asserts neither contains Arabic script, asserts the `ar` locale still produces Arabic, and covers `gridLocale` per mode. Every `HijriMonth` is checked for a non-blank English and Bengali name with no Arabic script in either. |
+| `CalendarUiStateFactoryTest` | The Hijri grid case asserts `Ramadan 1445` and Western day numbers in English; new cases cover the Bengali Hijri grid and both date cards in both languages; a shared `assertNoArabicScript` helper checks the heading, the weekday headers, every cell and both cards. |
+| `CalendarViewModelTest` | The Hijri case asserts the interface language; a new case changes the language mid-session and pins the unchanged month span, days and selection; a new case reads the stored language back on a fresh view model. |
+| `RamadanUiStateFactoryTest` | A new Bengali-rendering case over the same day as the English one, asserting the Hijri and Bangla row labels and that nothing on the row or in the window heading is in Arabic script. |
+
+No test was deleted, weakened or made conditional, and no assertion was relaxed to accommodate the
+change. The Ramadan *view model*'s pass-through of `AppLanguage` to the factory has no unit test of its
+own (there is no `RamadanViewModelTest` in the source set, and the view model has seven collaborators);
+the pass-through is covered by inspection, and the behaviour it feeds is covered by the factory test
+above.
+
+### Verification
+
+No Gradle task is run locally (the project's Android build runs only in CI). The changes were checked
+statically: every Arabic-script literal remaining in `app/src/main` and `app/src/test` was enumerated,
+and each one is either an intentional table (`HijriMonth.arabicName`, `ArabicNumerals`), a KDoc example,
+or a test that deliberately passes an Arabic locale. The pushed commit's GitHub Actions run is the
+authoritative `testDebugUnitTest` / `lintDebug` / `assembleDebug` result, reported with the change.
 
