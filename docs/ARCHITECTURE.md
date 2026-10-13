@@ -23,8 +23,9 @@ Implemented:
   division → district → upazila picker and a request-based device fix; a Bangladesh-only policy with
   an explicit boundary tolerance; area resolution from a coordinate; location provenance and
   freshness. Manual entry needs no permission and no network, and works offline.
-- Navigation: Home, Prayer, Calendar, Ramadan, Settings (bottom bar) plus a Qibla destination
-  reached from Home.
+- Navigation: Home, Calendar, Tools, Settings (bottom bar), with the Prayer timetable, the Qibla
+  compass and Ramadan reached from Tools and from Home's daily tools. See
+  `docs/BOTTOM_NAVIGATION.md`.
 - **Prayer notifications:** reminders scheduled at the calculated prayer times by `AlarmManager`,
   with per-prayer sound, vibration and advance-reminder settings, a global master switch, a separate
   sunrise reminder, notification channels, exact-alarm fallback, and recovery after reboot, clock,
@@ -457,20 +458,25 @@ data source.
   explicit light/dark overrides.
 - `core/designsystem/SalahGlyphs.kt`: icons drawn with Compose `Canvas`, so no icon library
   dependency exists.
-- `navigation/SalahDestination`: the four bottom-bar destinations — `home`, `prayer`, `calendar`,
-  `settings` — plus `qibla`, `tools`, `ramadan`, `location`, `calendar_settings` and
+- `navigation/SalahDestination`: the four bottom-bar destinations — `home`, `calendar`, `tools`,
+  `settings` — plus `prayer`, `qibla`, `ramadan`, `location`, `calendar_settings` and
   `notifications`. Every route has a real screen behind it in `SalahNavHost`, and
-  `feature/common/PlannedFeatureScreen` is now unreferenced. `prayer` is the live prayer-period and
-  timetable screen: it is in the bottom bar and is also where Home's “View all” and “View details”
-  lead, and it renders from the same `HomeViewModel` and the same schedule as Home's prayer
-  content. `tools` and `ramadan` are reached from Home's daily tools; `location` is reached from
-  Home's location label and from Settings; `notifications` is reached from Settings and is not in
-  the bottom bar, because it is configuration rather than a place the user works.
-  `calendar_settings` is reached from the Calendar screen and holds the one place a date can be
-  affected from. `qibla` is a real screen reached from the Home screen's Islamic tools, and is not
-  in the bottom bar because it is a tool rather than a place the user dwells.
+  `feature/common/PlannedFeatureScreen` is now unreferenced. `bottomBarDestinations` is the bar's item
+  list in declaration order and `SalahApp` renders it, so the bar cannot show a destination the graph
+  does not declare and the order is written down once. `prayer` is the live prayer-period and
+  timetable screen: it left the bar when `tools` took that place, it renders from the same
+  `HomeViewModel` and the same schedule as Home's prayer content, and it is reached from the `tools`
+  screen's first row and from Home's “View all” and “View details”. `tools` is a bottom-bar
+  destination whose rows come from `ToolsEntry` — one `SalahDestination` member each, so no route
+  string is spelled in the feature package — and `qibla` and `ramadan` are its rows as well as Home's
+  daily tools; `location` is reached from Home's location label and from Settings; `notifications` is
+  reached from Settings and is not in the bottom bar, because it is configuration rather than a place
+  the user works. `calendar_settings` is reached from the Calendar screen and holds the one place a
+  date can be affected from.
 - Navigation state is saved/restored per destination (`saveState`/`restoreState`,
-  `launchSingleTop`), so returning to Home keeps its state.
+  `launchSingleTop`), so returning to Home keeps its state. The bar's items and the Tools screen's
+  rows both open with `launchSingleTop`, so a repeated tap cannot stack a second copy of a screen;
+  a Tools row deliberately saves no state, so back returns to the Tools list.
 
 ## 9. Testing strategy
 
@@ -495,6 +501,7 @@ data source.
 | Month layout | `GregorianCalendarGridTest` | Seven cells per row, day order, padding, four different week starts, leap and century years, year transitions, extreme months |
 | Date rendering | `CalendarFormattingTest` | Bangla numerals, the language preference choosing the locale, composed Bangla/Hijri strings that cannot mix scripts, the platform formatter for Gregorian dates |
 | Calendar screen state | `CalendarUiStateFactoryTest` | Today vs selection vs both, three resolved date lines with the Hijri source, out-of-range stated rather than blanked, no window → no range, the adjustment moving the Hijri date and Ramadan number together |
+| Bottom navigation and destination reachability | `SalahBottomNavigationTest`, `SettingsCategoryTest` | The bar is exactly Home, Calendar, Tools, Settings in that order; `prayer` left the bar but kept its route and resolves back from it; every destination's route is unique and round-trips through `fromRoute`; every Tools row opens a declared destination of its own that is not the Tools screen or a bottom-bar tab; every category likewise; and Home, Calendar, Settings, Prayer, Qibla and Ramadan all remain reachable |
 | Ramadan reminders | `RamadanReminderPlanTest` | Sehri as a lead-in only, Iftar at Maghrib plus an optional lead-in, nothing outside Ramadan, switches and master switch, unique slots and request codes, a Ramadan end leaving nothing behind, inherited sound/vibration, lead-time clamping |
 | Ramadan reminders, scheduled | `RamadanReminderCoordinatorTest` | What the alarm registry holds after a reconciliation: the Sehri lead-in at the calculated Fajr and Iftar at the calculated Maghrib, the Hijri offset deciding which days are in Ramadan (both directions) and the day that leaves Ramadan being cancelled, the last day of Ramadan keeping its reminders while the following day schedules none and then cancels them, one switch affecting only its own alarms, the master switch and a missing location leaving none, and repetition not duplicating an alarm |
 | Notification planning | `PrayerNotificationPlannerTest` | Enabled/disabled, master switch, past events, advance reminders, sunrise separated from prayers, missing schedule, duplicates, deterministic order, cancellation set |

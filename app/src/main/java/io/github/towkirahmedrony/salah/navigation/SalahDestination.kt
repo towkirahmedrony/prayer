@@ -9,13 +9,19 @@ import io.github.towkirahmedrony.salah.R
  * Each route has an explicit entry in the app navigation graph. UI labels are string resources so
  * the bottom bar and destination screens use the app's localized names consistently.
  *
- * The bottom bar shows Home, Prayer, Calendar and Settings. Qibla and Ramadan are available from
- * the Home screen's daily tools.
+ * The bottom bar shows Home, Calendar, Tools and Settings. Qibla and Ramadan are available from the
+ * Tools screen and from the Home screen's daily tools; the Prayer screen is reached from Tools and
+ * from Home's "View all" and "View details".
  *
  * Settings is an overview of categories rather than a list of every preference, so each category is
  * a destination of its own: the four declared below, plus prayer notifications, location and the
  * calendar's own preferences, which already had screens. Nothing here is in the bottom bar —
  * configuration is not a place the user works.
+ *
+ * **[bottomBarDestinations] is the bottom bar.** The items, their order and their labels all come from
+ * this enum, so the bar cannot list a destination the graph does not declare, and moving a feature off
+ * the bar is a change to one flag here rather than a deletion of its route: `prayer` left the bar when
+ * Tools took its place, and every entry point into it still navigates to the same route.
  */
 enum class SalahDestination(
     val route: String,
@@ -24,8 +30,14 @@ enum class SalahDestination(
 ) {
     HOME("home", R.string.nav_home),
 
-    /** Live prayer-period and timetable screen, also available from the bottom bar. */
-    PRAYER("prayer", R.string.nav_prayer),
+    /**
+     * Live prayer-period and timetable screen.
+     *
+     * No longer a bottom-bar item — Tools took that place — but still a screen, still on its original
+     * route, and still the target of Home's "View all" and "View details" and of the Tools screen's
+     * prayer-times entry. Removing the tab reorganised the bar; it did not remove a destination.
+     */
+    PRAYER("prayer", R.string.nav_prayer, inBottomBar = false),
 
     CALENDAR("calendar", R.string.nav_calendar),
 
@@ -38,8 +50,14 @@ enum class SalahDestination(
      */
     CALENDAR_SETTINGS("calendar_settings", R.string.calendar_settings_title, inBottomBar = false),
 
-    /** Secondary tools remain reachable from the Home screen rather than occupying a tab. */
-    TOOLS("tools", R.string.nav_tools, inBottomBar = false),
+    /**
+     * The Tools destination: a landing screen for the tools that are not places the user dwells.
+     *
+     * A bottom-bar item as well as a screen, so the utilities that used to be reachable only from
+     * Home's daily tools now have a fixed entry point. It holds no data of its own — every row opens a
+     * destination declared here.
+     */
+    TOOLS("tools", R.string.nav_tools),
 
     RAMADAN("ramadan", R.string.nav_ramadan, inBottomBar = false),
     SETTINGS("settings", R.string.nav_settings),
@@ -81,6 +99,12 @@ enum class SalahDestination(
     ;
 
     companion object {
+        /**
+         * The bottom bar, in the order it draws: Home, Calendar, Tools, Settings.
+         *
+         * Declaration order rather than a second hand-written list, and `SalahBottomNavigationTest`
+         * pins it, so a destination gaining `inBottomBar` cannot appear at the end by accident.
+         */
         val bottomBarDestinations: List<SalahDestination>
             get() = entries.filter { it.inBottomBar }
 

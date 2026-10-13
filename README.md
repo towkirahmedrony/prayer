@@ -46,9 +46,9 @@ without an account.
 | **Ramadan calendar** — estimated window, daily table with Ramadan day number, Gregorian, Bangla and Hijri dates, Sehri end, Fajr, Iftar and Maghrib, and the provenance of the times | **Implemented, offline** |
 | **Sehri and Iftar reminders** — scheduled from the same calculated Fajr and Maghrib through the existing notification subsystem, only on the days the calendar places inside Ramadan | **Implemented, offline** |
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
-| Navigation: Home, Prayer, Calendar (with its settings), Ramadan, Settings, Notifications, Qibla | Implemented (every destination is a real screen; nothing renders `PlannedFeatureScreen`) |
+| Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla and Ramadan reached from Tools and from Home, and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate and the Qibla feature | Implemented (635 test methods) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the bottom navigation and the Settings structure | Implemented (688 `@Test` methods in `app/src/test`) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
@@ -187,6 +187,7 @@ The calculation engine and its pinned version are explained in
 │   ├── src/main/assets/location/              generated bd_areas.tsv + bd_boundary.tsv
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
+├── docs/BOTTOM_NAVIGATION.md                  the four bottom-bar destinations, the Tools screen, back-stack rules
 ├── docs/CALENDAR_SYSTEM.md                    Gregorian, Bangladesh Bangla, Hijri, Ramadan, Sehri/Iftar
 ├── docs/LOCATION_SYSTEM.md                    setup flow, GPS/manual selection, country policy, dataset, limits
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows

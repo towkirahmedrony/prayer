@@ -23,13 +23,20 @@ import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
 /**
  * The navigation graph.
  *
- * Home, Prayer, Calendar (with its settings), Ramadan, Tools, Settings with its category screens,
- * prayer-notification settings and the Qibla compass are implemented.
+ * The four bottom-bar destinations — Home, Calendar, Tools and Settings, in `SalahDestination`'s order —
+ * are declared here with Calendar's settings, Ramadan, the Prayer timetable, Settings' category screens,
+ * prayer-notification settings and the Qibla compass.
  *
- * Every configuration screen is reached by a single `navigate` and left by `popBackStack`, so back
- * always returns to the screen that opened it — the Settings overview, the Calendar screen or Ramadan —
- * and no screen has to know which one it was. Nothing writes to a back stack of its own: the graph's is
- * the only one, so a repeated visit cannot leave a duplicate copy of a screen behind.
+ * Every secondary screen is reached by a single `navigate` and left by `popBackStack`, so back always
+ * returns to the screen that opened it — the Settings overview, the Calendar screen, Ramadan, Home or
+ * Tools — and no screen has to know which one it was. Nothing writes to a back stack of its own: the
+ * graph's is the only one, so a repeated visit cannot leave a duplicate copy of a screen behind.
+ *
+ * **Where the Prayer screen is reached from.** Not from the bar: its row on Tools and Home's "View all"
+ * and "View details" lead here. Home's two links go through [navigateTo], which pops back to Home, keeps
+ * a single instance and restores the state that destination had; Tools goes through [navigateToTool],
+ * which is the same single-instance guarantee without Home's state juggling, because a tool is opened
+ * *from* Tools and back should return there.
  */
 @Composable
 fun SalahNavHost(
@@ -68,7 +75,7 @@ fun SalahNavHost(
         }
 
         composable(SalahDestination.TOOLS.route) {
-            ToolsScreen(onNavigate = { route -> navController.navigate(route) })
+            ToolsScreen(onOpenTool = { entry -> navController.navigateToTool(entry.destination.route) })
         }
 
         composable(SalahDestination.RAMADAN.route) {
@@ -126,5 +133,19 @@ private fun NavHostController.navigateTo(route: String) {
         }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/**
+ * Opens a tool from the Tools screen and leaves Tools underneath it.
+ *
+ * Deliberately not [navigateTo]: a tool is not a top-level destination, so nothing is popped and no
+ * state is saved or restored — back returns to the Tools list the user tapped from, which is the one
+ * thing they can reasonably expect. `launchSingleTop` is what keeps two taps on the same row from
+ * stacking two copies of the screen behind them.
+ */
+private fun NavHostController.navigateToTool(route: String) {
+    navigate(route) {
+        launchSingleTop = true
     }
 }

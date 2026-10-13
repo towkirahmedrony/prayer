@@ -23,7 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
@@ -95,14 +95,9 @@ private fun AppShell() {
                 contentColor = Color.White,
                 tonalElevation = 0.dp,
             ) {
-                val destinations: List<SalahDestination> = listOf(
-                    SalahDestination.HOME,
-                    SalahDestination.PRAYER,
-                    SalahDestination.CALENDAR,
-                    SalahDestination.SETTINGS,
-                )
-
-                destinations.forEach { dest ->
+                // The items, their order and their labels come from the destination enum, so the bar
+                // cannot show a tab the graph does not declare and reordering it is one edit there.
+                SalahDestination.bottomBarDestinations.forEach { dest ->
                     val selected = currentRoute == dest.route
                     NavigationBarItem(
                         selected = selected,
@@ -117,10 +112,12 @@ private fun AppShell() {
                         },
                         icon = {
                             val tint = if (selected) Color.White else Color.White.copy(alpha = 0.8f)
+                            // Prayer's lantern moved with the feature: it now marks the prayer-times
+                            // row on Tools, and Tools carries Salah's own Tasbih mark here.
                             when (dest) {
                                 SalahDestination.HOME -> DomeGlyph(tint = tint)
-                                SalahDestination.PRAYER -> LanternGlyph(tint = tint)
                                 SalahDestination.CALENDAR -> CalendarGlyph(tint = tint)
+                                SalahDestination.TOOLS -> TasbihGlyph(tint = tint)
                                 SalahDestination.SETTINGS -> GearGlyph(tint = tint)
                                 else -> DomeGlyph(tint = tint)
                             }

@@ -82,6 +82,19 @@
     <string name="prohibited_kind_sunset_setting">Sunset setting</string>
     <string name="home_shortcuts_title">Islamic tools</string>
 
+    <!--
+      The Tools destination.
+
+      tools_subtitle and tools_unavailable_note are explanatory sentences, so they stay in English
+      under the same policy as the rest of the app's explanatory wording: a loose translation would
+      change what the screen claims is and is not available (see app/lint.xml). nav_tools is the
+      screen's heading and is translated, because it names the screen rather than explaining it.
+    -->
+    <string name="tools_subtitle">Prayer and worship tools available in Salah.</string>
+    <string name="tools_prayer_times_title">Prayer times</string>
+    <string name="tools_prayer_times_description">The current prayer period and today\'s full timetable</string>
+    <string name="tools_unavailable_note">Quran, Dua and Tasbih are not part of Salah yet, so they are not listed here. Every tool above opens a real screen.</string>
+
     <!-- Calculation methods (names of the conventions the local engine implements) -->
     <string name="method_karachi">University of Islamic Sciences, Karachi</string>
     <string name="method_karachi_hint">Fajr 18\u00b0, Isha 18\u00b0</string>
