@@ -124,12 +124,19 @@ for part of every day, and the header could name one civil day while the times b
 
 ### 3.2 Fix — one shared source of the day zone
 
-**New:** `core/domain/location/LocationDayZone.kt` (`:45`).
+**New:** `core/domain/location/LocationDayZone.kt` (`:41`).
 
-- `zone: Flow<ZoneId>` (`:66`) — re-emits when the stored location changes; consumers that must *react* (the
+- `zone: Flow<ZoneId>` (`:53`) — re-emits when the stored location changes; consumers that must *react* (the
   calendar repository restarts its wait for the next local midnight on it) collect this.
-- `current(): ZoneId` (`:76`) — the zone right now; reads the device's zone **fresh** on each call while no
+- `current(): ZoneId` (`:65`) — the zone right now, **without suspending**. It reads the device's zone when no
   location is configured, so a device time-zone change still takes effect.
+- It projects `StartupSnapshot.storedLocation` rather than the location repository's cold flow, because a screen
+  may need the answer *synchronously while it is being constructed* — the Calendar screen picks the month to open
+  on before it can collect anything — and a cold DataStore flow cannot answer without a dispatch. The start-up
+  snapshot is the same read of the same repository, already published hot for exactly that purpose and already
+  guaranteed complete by the location gate before any location-dependent screen can exist. An earlier revision of
+  this fix used a collector-fed holder instead and was caught by CI: the Calendar screen still opened on the
+  device's day, because its constructor read the zone before the collector had run.
 - The answer is the configured location's own `zoneId` — the same zone the schedule is calculated and displayed
   in — falling back to the device's zone only when no location is configured. **`Asia/Dhaka` is not hardcoded in
   any UI component**; it is what the location model already carries for an area selection or an adopted device
@@ -137,7 +144,10 @@ for part of every day, and the header could name one civil day while the times b
   `data/location/DataStoreLocationRepository.kt:113` and `feature/location/LocationViewModel.kt:287`). A
   manually entered location carries the zone the user supplied, unchanged.
 
-**Wired:** one binding, `di/SalahModules.kt` (`single { LocationDayZone(locationSource = get<LocationRepository>().location, scope = get()) }`), injected into `DeviceClockCalendarRepository` and `CalendarViewModel`. Both therefore resolve the day from the same instance and cannot diverge from each other.
+**Wired:** one binding, `di/SalahModules.kt:150`
+(`single { LocationDayZone(storedLocation = get<StartupSnapshot>().storedLocation) }`), injected into
+`DeviceClockCalendarRepository` and `CalendarViewModel`. Both therefore resolve the day from the same instance and
+cannot diverge from each other.
 
 **Changed consumers:**
 - `data/calendar/DeviceClockCalendarRepository.kt` — `dayZone` parameter; `zoneNow()` (`:227`);
