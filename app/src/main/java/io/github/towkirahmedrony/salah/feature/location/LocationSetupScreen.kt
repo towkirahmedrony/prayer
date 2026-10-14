@@ -25,6 +25,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +60,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronDownGlyph
+import io.github.towkirahmedrony.salah.feature.location.map.MapPickerScreen
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
@@ -112,6 +115,19 @@ fun LocationSetupScreen(
         viewModel.start()
     }
 
+    // The map picker is offered on the first launch too, as a full-screen overlay rather than a navigation
+    // destination: while setup is required the shell shows no navigation graph, so there is no route to
+    // navigate to. It is the same screen and the same view model the navigation route uses, so the first
+    // launch and every later change share one implementation, one country check and one write path.
+    var isMapPickerOpen by rememberSaveable { mutableStateOf(false) }
+    if (isMapPickerOpen) {
+        MapPickerScreen(
+            onBack = { isMapPickerOpen = false },
+            onConfirmed = { isMapPickerOpen = false },
+        )
+        return
+    }
+
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
@@ -143,6 +159,7 @@ fun LocationSetupScreen(
         onSelectUpazila = viewModel::selectUpazila,
         onSaveSelection = viewModel::saveSelectedArea,
         onDismissMessage = viewModel::dismissMessage,
+        onOpenMapPicker = { isMapPickerOpen = true },
     )
 }
 
@@ -163,6 +180,7 @@ private fun SetupContent(
     onSelectUpazila: (String) -> Unit,
     onSaveSelection: () -> Unit,
     onDismissMessage: () -> Unit,
+    onOpenMapPicker: () -> Unit,
 ) {
     Column(
         modifier = modifier
@@ -223,6 +241,17 @@ private fun SetupContent(
             onSelectUpazila = onSelectUpazila,
             onSaveSelection = onSaveSelection,
         )
+
+        // The third way to choose a location, offered beside the area picker. It stores the exact point
+        // chosen rather than an administrative centre, and needs a connection only for the map tiles.
+        Spacer(modifier = Modifier.height(14.dp))
+        OutlinedButton(
+            onClick = onOpenMapPicker,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isLoading,
+        ) {
+            Text(text = stringResource(R.string.location_map_open))
+        }
 
         Spacer(modifier = Modifier.height(18.dp))
         Text(

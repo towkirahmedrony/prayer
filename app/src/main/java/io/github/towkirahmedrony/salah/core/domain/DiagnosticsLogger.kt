@@ -176,4 +176,19 @@ object SalahDiagnosticEvents {
      * attached to the last one so a threshold that is systematically too tight can be recognised.
      */
     const val LOCATION_LOCALITY_UNRESOLVED = "location_locality_unresolved"
+
+    /**
+     * A map picker looked up the address of a selected point and found one. Logged with the components
+     * that were present, never with the coordinates.
+     */
+    const val LOCATION_MAP_GEOCODER_RESOLVED = "location_map_geocoder_resolved"
+
+    /**
+     * A map picker's address lookup did not return a usable result.
+     *
+     * Logged with a reason code — `network`, `timeout`, `rate_limited`, `http_<code>`, `malformed`,
+     * `no_address` — because the four mean different things to a reader of the log, and the coordinates
+     * are still valid and still saved regardless: address resolution is never a prerequisite.
+     */
+    const val LOCATION_MAP_GEOCODER_UNAVAILABLE = "location_map_geocoder_unavailable"
 }

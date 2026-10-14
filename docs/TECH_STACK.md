@@ -37,6 +37,7 @@ Pinned Android and Kotlin libraries (not covered by the BOM):
 | `io.insert-koin:koin-android`, `koin-androidx-compose` | `4.2.2` |
 | `org.jetbrains.kotlinx:kotlinx-coroutines(-android/-test)` | `1.11.0` |
 | `junit:junit` | `4.13.2` |
+| `org.maplibre.gl:android-sdk` | `13.5.3` (see §3.12) |
 
 Verification performed when this configuration was written (all stable releases, no
 `1.+`-style dynamic versions, no alpha/beta/RC/EAP):
@@ -175,6 +176,45 @@ of 21 (class-file major version 65) and cannot be loaded by this project's JDK 1
 (class-file version 61), which reproduces an `UnsupportedClassVersionError`. `0.0.5` is the newest
 release published for a JVM target the project can run. Upgrading it requires moving the toolchain
 to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
+
+### 3.12 Map rendering: MapLibre Native, pinned to `13.5.3`
+
+The location picker renders a real map with **MapLibre Native for Android**
+(`org.maplibre.gl:android-sdk:13.5.3`, Maven Central). It is the latest stable release; the 13.7 line is
+published as a pre-release and is not used. Its own `minSdk` is 23, below this project's 26, and its
+compiled-against API level is well under this project's `compileSdk` of 37.
+
+The SDK is a View-based map and is embedded with `AndroidView`, with MapLibre's lifecycle forwarded from
+a `DisposableEffect` — the SDK documents no first-party Compose API, and the separate MapLibre Compose
+project states that its API is not yet stable, so the stable View API is what this project builds on.
+
+**Why not the Google Maps SDK.** It needs an API key for rendering and its terms meter map loads, which
+is a recurring cost and a credential for a feature that must work for every user of a Bangladesh-only
+app. MapLibre renders OpenStreetMap-derived data with no key, and the tile source stays a build-time
+value ([§3.13](#313-map-picker-configuration)) rather than something baked into the SDK. The full
+comparison, the providers, their licences and their operating limits are in
+[`MAP_PICKER.md`](MAP_PICKER.md).
+
+The map is the only part of this project that fetches anything over the network; a nomap tile provider's
+terms are the subject of §3.13 and `MAP_PICKER.md`, and no map tiles are bundled, so no offline-map claim
+is made.
+
+### 3.13 Map picker configuration
+
+The tile style, the geocoding endpoint and the geocoding `User-Agent` are resolved at build time from
+Gradle properties into `BuildConfig` fields. Nothing is written into the source, and no key is committed:
+
+| Property | `BuildConfig` field | Default |
+|---|---|---|
+| `salah.map.styleUrl` | `MAP_STYLE_URL` | `https://tiles.openfreemap.org/styles/liberty` |
+| `salah.map.darkStyleUrl` | `MAP_DARK_STYLE_URL` | `https://tiles.openfreemap.org/styles/dark` |
+| `salah.geocoder.baseUrl` | `GEOCODER_BASE_URL` | `https://nominatim.openstreetmap.org` |
+| `salah.geocoder.userAgent` | `GEOCODER_USER_AGENT` | `Salah/0.1.0 (https://github.com/towkirahmedrony/prayer)` |
+
+Any of them can be overridden per build, for example
+`./gradlew assembleDebug -Psalah.map.styleUrl=https://…`, so a release can point at a self-hosted or
+paid provider — or at a keyed URL carrying the key as a query parameter supplied by the build — without a
+code change. The defaults need no key, which is why the app builds and runs with no configuration at all.
 
 ### 3.11 Build and release configuration
 

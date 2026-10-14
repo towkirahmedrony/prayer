@@ -84,6 +84,8 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun LocationScreen(
     onBack: () -> Unit,
+    /** Opens the interactive map picker, the third way to choose a location. */
+    onOpenMapPicker: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LocationViewModel = koinViewModel(),
 ) {
@@ -128,6 +130,7 @@ fun LocationScreen(
         onToggleManualCoordinates = viewModel::toggleManualCoordinates,
         onManualFormChange = viewModel::onManualFormChange,
         onSaveManualLocation = viewModel::saveManualLocation,
+        onOpenMapPicker = onOpenMapPicker,
         onBack = onBack,
     )
 }
@@ -166,6 +169,7 @@ private fun LocationContent(
     onToggleManualCoordinates: () -> Unit,
     onManualFormChange: ((LocationFormState) -> LocationFormState) -> Unit,
     onSaveManualLocation: () -> Unit,
+    onOpenMapPicker: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -265,6 +269,16 @@ private fun LocationContent(
                     enabled = state.canChooseArea,
                 ) {
                     Text(text = stringResource(R.string.location_action_select_manually))
+                }
+                // The map picker sits beside the area picker rather than replacing it: an area selection
+                // stores a published administrative centre, this stores the exact point chosen, and both
+                // are legitimate — the map needs a connection for tiles, the area picker never does.
+                OutlinedButton(
+                    onClick = onOpenMapPicker,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isLoading,
+                ) {
+                    Text(text = stringResource(R.string.location_map_open))
                 }
             }
         }

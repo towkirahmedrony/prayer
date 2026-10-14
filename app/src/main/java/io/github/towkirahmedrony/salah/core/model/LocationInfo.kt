@@ -28,6 +28,19 @@ enum class LocationOrigin {
      * surfaced through `LocationFreshness`.
      */
     DEVICE_GPS,
+
+    /**
+     * Chosen by pointing at a real map and confirming the pin's position.
+     *
+     * **Distinct from both of the above, and for a different reason than they are distinct from each
+     * other.** An [AREA_SELECTION] stores the published centre of an administrative unit, so it is a
+     * real coordinate that may be minutes from the user; a [DEVICE_GPS] record stores an observation
+     * with an accuracy and a time; this stores *the point itself* — exactly the coordinates the user
+     * placed and confirmed. Its `label` is the address the reverse geocoder resolved for that point when
+     * one was available, and the administrative hierarchy composed from the bundled dataset when it was
+     * not, so the record is self-describing either way. See `docs/MAP_PICKER.md`.
+     */
+    MAP_SELECTION,
 }
 
 /**

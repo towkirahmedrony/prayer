@@ -709,4 +709,38 @@
     <string name="location_setup_made_for">Made for Muslims in Bangladesh</string>
     <string name="location_setup_area_note">A chosen area saves that area\'s published reference coordinates, not your exact position.</string>
 
+    <!--
+      The map-based location picker.
+
+      Everything that makes a claim here says what was actually verified: the boundary lines distinguish a
+      strict containment check from the tolerance band, and the address lines distinguish an address the
+      provider published from one that is simply unknown. No string promises offline map detail — the tiles
+      need a connection — and none claims a religious timetable from an address.
+    -->
+    <string name="location_source_map">Selected on map</string>
+    <string name="location_map_title">Pick on map</string>
+    <string name="location_map_open">Choose on map</string>
+    <string name="location_map_selected_title">Selected location</string>
+    <string name="location_map_use_gps">My location</string>
+    <string name="location_map_confirm">Use this location</string>
+    <string name="location_map_outside_title">This point is outside Bangladesh</string>
+    <string name="location_map_outside_body">Salah supports locations in Bangladesh only. Move the map so the marker is inside the country, or choose a location by area instead. Nothing has been saved.</string>
+    <string name="location_map_boundary_verified">Confirmed inside Bangladesh using the bundled national boundary.</string>
+    <string name="location_map_boundary_tolerance">Just outside the bundled border line, accepted because that line is simplified. Prayer times use these coordinates either way.</string>
+    <string name="location_map_boundary_unverified">The bundled boundary is unavailable, so this point could only be checked against the country\'s bounding box.</string>
+    <string name="location_map_address_loading">Looking up the address…</string>
+    <string name="location_map_address_unknown">No address is published for this place. The coordinates below are what will be saved.</string>
+    <string name="location_map_address_unavailable">The address could not be looked up. The coordinates below are what will be saved.</string>
+    <string name="location_map_place_label">Place</string>
+    <string name="location_map_locality_label">Locality / neighbourhood</string>
+    <string name="location_map_road_label">Road</string>
+    <string name="location_map_coordinates_label">Coordinates</string>
+    <string name="location_map_loading">Loading map…</string>
+    <string name="location_map_unavailable_title">The map could not be loaded</string>
+    <string name="location_map_unavailable_body">Map tiles need an internet connection. You can still confirm the selected coordinates, or choose a location by area without a map.</string>
+    <string name="location_map_zoom_in">Zoom in</string>
+    <string name="location_map_zoom_out">Zoom out</string>
+    <string name="location_map_attribution">© OpenStreetMap contributors · tiles by OpenFreeMap</string>
+    <string name="location_map_message_saved">Location saved. Prayer times and reminders have been recalculated for it.</string>
+    <string name="location_map_message_outside">That point is outside Bangladesh, so it was not saved. Move the marker inside the country to continue.</string>
 </resources>

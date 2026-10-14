@@ -753,4 +753,31 @@
     <string name="prohibited_convention_title">কনফিগার করা নিয়ম</string>
     <string name="prohibited_convention_not_reviewed">এই সীমাগুলো সালাহর নিজের নথিভুক্ত নীতি, এবং সেভাবেই দেখানো হয়েছে। কোনো যোগ্য পর্যালোচক এগুলো নিশ্চিত করেননি, এবং মিনিটের মান পণ্ডিতদের বিভিন্ন নিয়মে আলাদা হয়।</string>
     <string name="prohibited_convention_reviewed">একজন যোগ্য পর্যালোচক এই সীমাগুলো নিশ্চিত করেছেন, সাথে তাদের জন্য নথিভুক্ত রেফারেন্সসহ।</string>
+    <!-- মানচিত্রভিত্তিক অবস্থান নির্বাচক -->
+    <string name="location_source_map">মানচিত্রে নির্বাচিত</string>
+    <string name="location_map_title">মানচিত্রে বেছে নিন</string>
+    <string name="location_map_open">মানচিত্রে অবস্থান বেছে নিন</string>
+    <string name="location_map_selected_title">নির্বাচিত অবস্থান</string>
+    <string name="location_map_use_gps">আমার অবস্থান</string>
+    <string name="location_map_confirm">এই অবস্থান ব্যবহার করুন</string>
+    <string name="location_map_outside_title">এই বিন্দুটি বাংলাদেশের বাইরে</string>
+    <string name="location_map_outside_body">সালাহ শুধু বাংলাদেশের অবস্থান সমর্থন করে। মানচিত্র সরিয়ে চিহ্নটি দেশের ভিতরে আনুন, অথবা বদলে এলাকা বেছে নিন। কিছুই সংরক্ষণ করা হয়নি।</string>
+    <string name="location_map_boundary_verified">বান্ডল করা জাতীয় সীমানা দিয়ে বাংলাদেশের ভিতরে নিশ্চিত করা হয়েছে।</string>
+    <string name="location_map_boundary_tolerance">বান্ডল করা সীমারেখার ঠিক বাইরে, সীমারেখা সরলীকৃত হওয়ায় গৃহীত। যাই হোক, নামাজের সময় এই স্থানাঙ্ক থেকেই হিসাব হবে।</string>
+    <string name="location_map_boundary_unverified">বান্ডল করা সীমানা পাওয়া যায়নি, তাই এই বিন্দুটি কেবল দেশের বাউন্ডিং বক্সের সাথে যাচাই করা গেছে।</string>
+    <string name="location_map_address_loading">ঠিকানা খোঁজা হচ্ছে…</string>
+    <string name="location_map_address_unknown">এই স্থানের জন্য কোনো ঠিকানা প্রকাশিত নেই। নিচের স্থানাঙ্কই সংরক্ষিত হবে।</string>
+    <string name="location_map_address_unavailable">ঠিকানা খোঁজা যায়নি। নিচের স্থানাঙ্কই সংরক্ষিত হবে।</string>
+    <string name="location_map_place_label">স্থান</string>
+    <string name="location_map_locality_label">এলাকা / পাড়া</string>
+    <string name="location_map_road_label">সড়ক</string>
+    <string name="location_map_coordinates_label">স্থানাঙ্ক</string>
+    <string name="location_map_loading">মানচিত্র লোড হচ্ছে…</string>
+    <string name="location_map_unavailable_title">মানচিত্র লোড করা যায়নি</string>
+    <string name="location_map_unavailable_body">মানচিত্রের টাইলের জন্য ইন্টারনেট সংযোগ দরকার। তবুও আপনি নির্বাচিত স্থানাঙ্ক নিশ্চিত করতে পারেন, অথবা মানচিত্র ছাড়াই এলাকা বেছে নিতে পারেন।</string>
+    <string name="location_map_zoom_in">জুম ইন</string>
+    <string name="location_map_zoom_out">জুম আউট</string>
+    <string name="location_map_attribution">© OpenStreetMap অবদানকারী · টাইল: OpenFreeMap</string>
+    <string name="location_map_message_saved">অবস্থান সংরক্ষিত হয়েছে। এর জন্য নামাজের সময় ও রিমাইন্ডার পুনরায় হিসাব করা হয়েছে।</string>
+    <string name="location_map_message_outside">ওই বিন্দুটি বাংলাদেশের বাইরে, তাই সংরক্ষণ করা হয়নি। চালিয়ে যেতে চিহ্নটি দেশের ভিতরে আনুন।</string>
 </resources>

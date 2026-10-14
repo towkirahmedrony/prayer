@@ -126,6 +126,34 @@ class DataStoreLocationRepository(
         ),
     )
 
+    override suspend fun saveMapLocation(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        countryCode: String?,
+        area: BangladeshAreaRef?,
+        datasetVersion: String?,
+    ): Boolean = store(
+        validated = LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            // Bangladesh's single zone, not the device's: a map selection is only offered for points the
+            // country policy accepts. See LocationRepository.saveMapLocation.
+            timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+            origin = LocationOrigin.MAP_SELECTION,
+            // No accuracy and no acquisition time: a picked point is not an observation. Passing null
+            // here is also what removes any accuracy or timestamp left by a previous device fix, so a
+            // stored map point can never inherit a fix's certainty claim.
+            countryCode = countryCode,
+            area = area,
+            // Never set from this path: a locality is stored only when the resolver verified it against
+            // the district it was attributed to, and a picked point has no accuracy for that decision.
+            locality = null,
+            datasetVersion = datasetVersion,
+        ),
+    )
+
     override suspend fun clearLocation() {
         // Only the location keys are removed: user preferences such as the theme are kept.
         dataStore.edit { preferences ->

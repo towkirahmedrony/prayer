@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarSettingsScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
 import io.github.towkirahmedrony.salah.feature.home.PrayerScreen
 import io.github.towkirahmedrony.salah.feature.location.LocationScreen
+import io.github.towkirahmedrony.salah.feature.location.map.MapPickerScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
@@ -117,7 +118,20 @@ fun SalahNavHost(
         }
 
         composable(SalahDestination.LOCATION.route) {
-            LocationScreen(onBack = { navController.popBackStack() })
+            LocationScreen(
+                onBack = { navController.popBackStack() },
+                onOpenMapPicker = { navController.navigate(SalahDestination.MAP_PICKER.route) },
+            )
+        }
+
+        // The map picker. Popping on confirmation returns to the location screen it was opened from, which
+        // is also the screen that shows the stored location — so the result of the save is visible
+        // immediately, in the place the user started from.
+        composable(SalahDestination.MAP_PICKER.route) {
+            MapPickerScreen(
+                onBack = { navController.popBackStack() },
+                onConfirmed = { navController.popBackStack() },
+            )
         }
 
         composable(SalahDestination.NOTIFICATIONS.route) {

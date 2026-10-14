@@ -105,5 +105,41 @@ interface LocationRepository {
         datasetVersion: String,
     ): Boolean
 
+    /**
+     * Validates and stores a location chosen by pointing at a map and confirming the pin.
+     *
+     * A fourth method rather than a variant of the three above, because this is the only path that
+     * stores the point the user picked *as such*: [saveManualLocation] records an asserted position,
+     * [saveAreaLocation] stores an administrative centre, and [saveDeviceLocation] an observation — but
+     * this stores {latitude, longitude} exactly as placed on the map. The origin is therefore
+     * [io.github.towkirahmedrony.salah.core.model.LocationOrigin.MAP_SELECTION], which is what lets the
+     * screens say where the position came from.
+     *
+     * **No time zone parameter, for the same reason as [saveAreaLocation].** A map selection is only
+     * offered for points inside Bangladesh, so the zone is Bangladesh's single zone rather than the
+     * device's; accepting a zone here would allow a combination the picker cannot produce.
+     *
+     * **No accuracy and no acquisition time.** A map point is not an observation: it has no reported
+     * accuracy and no time, and storing one would be a claim the picker never made. A locality is
+     * likewise not stored from this path — the geocoded place name travels in [label], and a stored
+     * `locality` requires a district the resolver verified, which a picked point does not have.
+     *
+     * @param label the display name to store: the resolved address when one was available, or the
+     *   administrative name composed for the resolved area when it was not.
+     * @param countryCode the country the point was verified to be in, or `null` when only the coarse or
+     *   tolerant check ran — never `BD` unless the bundled boundary strictly contained the point.
+     * @param area the administrative area the point was attributed to offline, when one could be.
+     * @param datasetVersion the version of the bundled dataset the [area] ids were resolved against.
+     * @return `true` when the input was valid and stored, `false` when it was rejected.
+     */
+    suspend fun saveMapLocation(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        countryCode: String?,
+        area: BangladeshAreaRef?,
+        datasetVersion: String?,
+    ): Boolean
+
     suspend fun clearLocation()
 }

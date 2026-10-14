@@ -26,20 +26,29 @@
 
         ACCESS_COARSE_LOCATION
         ACCESS_FINE_LOCATION  The Qibla screen can ask the device for a position instead of
-                              making the user type coordinates. Both are declared so that the
+                              making the user type coordinates, and the map picker can centre
+                              itself on the user's position. Both are declared so that the
                               Android 12+ runtime dialog can offer "Approximate" and "Precise"
-                              and the user keeps that choice; Salah works with either, and manual
-                              coordinates work with neither. Asked for only when the user taps the
-                              button on the Qibla screen — see docs/QIBLA_COMPASS.md section 4.
+                              and the user keeps that choice; Salah works with either, and both
+                              manual coordinates and map selection work with neither. Asked for
+                              only when the user taps the relevant button — see
+                              docs/QIBLA_COMPASS.md section 4 and docs/MAP_PICKER.md.
+
+        INTERNET              The map picker renders map tiles and can resolve the address of a
+                              selected point. Both are conveniences layered on a location that
+                              works without them: the coordinates, the country check and the
+                              stored location are all offline, and every other feature
+                              (prayer times, the Qibla bearing, the calendars) is unchanged and
+                              still needs no network. See docs/MAP_PICKER.md for the tile and
+                              geocoding providers and their terms.
 
       Deliberately NOT requested:
-        * no ACCESS_BACKGROUND_LOCATION — the Qibla screen needs a position only while it is in
-          front of the user, and a background grant would be a permission without a purpose;
+        * no ACCESS_BACKGROUND_LOCATION — the Qibla screen and the map picker need a position only
+          while they are in front of the user, and a background grant would be a permission
+          without a purpose;
         * no FOREGROUND_SERVICE permission — no long-running service exists (see section 5 of the
           notifications doc, which explains why long-form background Azan playback is not
-          implemented);
-        * no INTERNET permission — every feature is offline, including the Qibla bearing, which is
-          pure spherical trigonometry over a stored position.
+          implemented).
     -->
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -48,6 +57,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
       Hardware is declared optional, not required.

@@ -25,4 +25,5 @@ fun LocationOrigin.sourceLabelRes(): Int = when (this) {
     LocationOrigin.DEVICE_GPS -> R.string.location_source_gps
     LocationOrigin.AREA_SELECTION -> R.string.location_source_area
     LocationOrigin.MANUAL_ENTRY -> R.string.location_source_manual
+    LocationOrigin.MAP_SELECTION -> R.string.location_source_map
 }

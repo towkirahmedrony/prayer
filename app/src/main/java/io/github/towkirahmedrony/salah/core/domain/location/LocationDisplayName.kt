@@ -79,6 +79,13 @@ object LocationDisplayName {
         // stored label outranks every fact.
         if (origin == LocationOrigin.MANUAL_ENTRY) return typed
 
+        // A map selection's stored label is the address that was resolved for the point the user chose
+        // — the place name, neighbourhood or road — and it is more specific than any administrative area
+        // the bundled dataset can name. So it is kept when it exists, and the composition below is used
+        // only when the reverse geocoder returned nothing and the save path wrote the administrative
+        // name instead (see `MapPickerViewModel` and docs/MAP_PICKER.md).
+        if (origin == LocationOrigin.MAP_SELECTION && typed.isNotBlank()) return typed
+
         val deepest = locality?.name?.takeIf { it.isNotBlank() }
             ?: area?.upazilaName?.takeIf { it.isNotBlank() }
             ?: area?.districtName?.takeIf { it.isNotBlank() }

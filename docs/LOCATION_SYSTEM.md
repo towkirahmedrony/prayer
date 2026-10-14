@@ -15,14 +15,19 @@ Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md) (layers and ports),
 ## 1. What this is
 
 Salah ties prayer times, the Qibla bearing, the Ramadan timetable and prayer reminders to **one stored
-location**. That location can be obtained two ways:
+location**. That location can be obtained three ways:
 
-- a **device fix** from the platform's location provider, requested on demand; or
+- a **device fix** from the platform's location provider, requested on demand;
 - a **manual choice** of a Bangladeshi administrative area (division → district → upazila/thana), or
-  a hand-typed coordinate and IANA zone.
+  a hand-typed coordinate and IANA zone; or
+- a **map selection**: an interactive map, with the chosen point confirmed and stored as
+  `LocationOrigin.MAP_SELECTION`. It stores the exact point picked (not an administrative centre) and
+  the address resolved for it when one was available. See [`MAP_PICKER.md`](MAP_PICKER.md).
 
-Both are stored locally and both work offline. The bundled geography is what makes the manual picker
-possible and what lets a device fix be attributed to a named area without a network call.
+All are stored locally, and all of them work offline for the parts that matter: the map needs a
+connection for its tiles, but the coordinates, the country check and the save do not. The bundled
+geography is what makes the manual picker possible and what lets a device fix **and a map point** be
+attributed to a named area without a network call.
 
 The domain code lives in `core/domain/location` and is Android-free; the Android adapters live in
 `data/location` and `data/qibla`. See [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.
@@ -122,8 +127,11 @@ Salah reads the location permission state; it never prompts outside a user actio
   the dialog: a first request is a `REQUEST`, an ordinary denial is still a `REQUEST`, and a denial the
   system will no longer re-prompt for becomes `OPEN_APP_SETTINGS` — avoiding a button that would
   silently do nothing.
-- **Manual selection needs no permission and no network** and stays usable whatever the permission
-  answer. There is **no** background-location permission, and no `INTERNET` permission at all.
+- **Manual selection needs no permission** and stays usable whatever the permission answer, and so does
+  map selection: dragging the map and confirming a point ask for nothing. There is **no**
+  background-location permission. `INTERNET` is declared for exactly two things — the map picker's tiles
+  and its optional address lookup — and every other feature, including the whole calculation chain, still
+  runs with the radio off. See [`MAP_PICKER.md`](MAP_PICKER.md) §7.
 
 ## 5. The bundled dataset: sources, version and licences
 
@@ -339,7 +347,9 @@ district, because a selection that stops at a division cannot be saved.
 
 ## 9. Offline operation and persistence
 
-Nothing in the location system needs a network, and Salah declares no `INTERNET` permission.
+Nothing in the location system **needs** a network. The map picker uses one for map tiles and for the
+optional address of a selected point, and neither is a prerequisite for choosing or storing a location:
+see [`MAP_PICKER.md`](MAP_PICKER.md) §6 and §7.
 
 - **Stored location:** `DataStoreLocationRepository` keeps the location in the same DataStore as the
   other preferences. The stored value carries its origin, accuracy, acquisition time, country code, the

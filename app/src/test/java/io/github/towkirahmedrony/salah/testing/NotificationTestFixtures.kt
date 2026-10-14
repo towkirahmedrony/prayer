@@ -274,6 +274,28 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
         return true
     }
 
+    override suspend fun saveMapLocation(
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        countryCode: String?,
+        area: BangladeshAreaRef?,
+        datasetVersion: String?,
+    ): Boolean {
+        val created = LocationInfo.create(
+            label = label,
+            latitude = latitude,
+            longitude = longitude,
+            timeZoneId = BangladeshLocationPolicy.TIME_ZONE_ID,
+            origin = LocationOrigin.MAP_SELECTION,
+            countryCode = countryCode,
+            area = area,
+            datasetVersion = datasetVersion,
+        ) ?: return false
+        state.value = created
+        return true
+    }
+
     override suspend fun clearLocation() {
         state.value = null
     }
