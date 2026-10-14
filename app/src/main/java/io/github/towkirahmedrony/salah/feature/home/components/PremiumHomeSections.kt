@@ -293,7 +293,6 @@ fun CurrentPrayerHeroCard(
 fun TodayPrayerTimesSection(
     rows: List<PrayerRow>,
     onViewAll: () -> Unit,
-    currentPrayer: PrayerName? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -321,8 +320,12 @@ fun TodayPrayerTimesSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // The current-prayer marker comes from the shared state, not from this composable choosing
+            // a prayer: [PrayerRow.isCurrent] is resolved once in HomeUiStateFactory, and the Prayer
+            // screen reads the very same flag, so the two strips cannot select different prayers.
+            val hasActivePeriod = rows.any { it.isCurrent }
             rows.forEach { row ->
-                val isSelected = currentPrayer?.let { row.prayer == it } ?: row.isNext
+                val isSelected = if (hasActivePeriod) row.isCurrent else row.isNext
                 TodayPrayerCard(row = row, isSelected = isSelected, modifier = Modifier.weight(1f))
             }
         }

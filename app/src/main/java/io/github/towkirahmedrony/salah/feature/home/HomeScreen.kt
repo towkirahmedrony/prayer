@@ -110,7 +110,6 @@ private fun HomeContent(
         item(key = "prayer-times") {
             TodayPrayerTimesSection(
                 rows = state.prayerRows,
-                currentPrayer = state.currentPrayer.prayer,
                 // `View all` opens the prayer timetable this strip is a summary of: the `prayer`
                 // destination renders the same live period and the day's full timetable for the
                 // saved location. It used to open Calendar, which shows months of dates and no

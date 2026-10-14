@@ -105,6 +105,14 @@ class HomeUiStateFactory(
             countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
         )
 
+        // The open period is resolved exactly once. The hero card and the current-prayer marker on the
+        // prayer rows are both projections of this one result, so the Home and Prayer screens cannot
+        // disagree about which prayer is current — the defect where the Prayer timetable highlighted
+        // the *next* prayer (tomorrow's Fajr after Isha) is fixed by reading this value instead of
+        // independently re-selecting from the list.
+        val currentStatus = currentPrayerResolver.resolve(schedule, now, nextDayFajr)
+        val currentPrayerName = (currentStatus as? CurrentPrayerStatus.Active)?.period?.prayer
+
         return HomeUiState.Ready(
             gregorianDate = gregorian?.formattedDate,
             weekday = calendar?.weekdayLabel,
@@ -132,9 +140,7 @@ class HomeUiStateFactory(
             ),
             timetableNote = scheduleState.asTimetableNote(),
             currentPrayer = currentPrayerSection(
-                schedule = schedule,
-                now = now,
-                nextDayFajr = nextDayFajr,
+                status = currentStatus,
                 next = nextPrayerSection,
                 scheduleState = scheduleState,
                 timeFormatter = timeFormatter,
@@ -148,6 +154,7 @@ class HomeUiStateFactory(
                     timeLabel = entry?.let { timeFormatter.format(it.time) },
                     adjustmentMinutes = entry?.adjustmentMinutes ?: 0,
                     isNext = nextPrayer?.prayer == prayer,
+                    isCurrent = currentPrayerName == prayer,
                     endTimeLabel = end?.let { timeFormatter.format(it.time) },
                     endsNextDay = end?.isNextDay == true,
                 )
@@ -181,15 +188,11 @@ class HomeUiStateFactory(
      * the resolver's reason when the schedule itself is fine but cannot describe this moment.
      */
     private fun currentPrayerSection(
-        schedule: PrayerSchedule?,
-        now: ZonedDateTime,
-        nextDayFajr: ZonedDateTime?,
+        status: CurrentPrayerStatus,
         next: NextPrayerSection,
         scheduleState: PrayerScheduleState,
         timeFormatter: DateTimeFormatter,
-    ): CurrentPrayerSection = when (
-        val status = currentPrayerResolver.resolve(schedule, now, nextDayFajr)
-    ) {
+    ): CurrentPrayerSection = when (status) {
         is CurrentPrayerStatus.Active -> {
             val period = status.period
             val boundary = period.endsWith

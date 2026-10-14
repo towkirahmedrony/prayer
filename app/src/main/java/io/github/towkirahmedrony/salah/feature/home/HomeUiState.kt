@@ -159,7 +159,17 @@ data class PrayerRow(
     val timeLabel: String?,
     /** Manual correction already applied to [timeLabel]; `0` when the time is unadjusted. */
     val adjustmentMinutes: Int = 0,
+    /** True when this is the next prayer to begin. */
     val isNext: Boolean,
+    /**
+     * True when this prayer's period is the one that is open at the moment the screen is showing.
+     *
+     * Resolved once in [HomeUiStateFactory] from the same [CurrentPrayerSection] the hero card renders,
+     * so the current-prayer indicator on Home and on the Prayer screen can never name two different
+     * prayers. It is `false` for every row while no period is open (the morning between sunrise and
+     * Dhuhr), which is a fact about the timetable rather than a missing marker.
+     */
+    val isCurrent: Boolean = false,
     /**
      * Formatted time this prayer's period ends, or `null` when it cannot be resolved (for
      * example Isha, while tomorrow's Fajr has not been calculated yet). Never invented.

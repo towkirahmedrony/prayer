@@ -338,11 +338,16 @@ fun TimetableCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
+        // The same authoritative current-prayer marker Home's strip uses: while a period is open the
+        // open prayer is highlighted, and only when nothing is open does the highlight fall back to
+        // the next prayer. Reading `row.isNext` alone highlighted tomorrow's Fajr after Isha, which is
+        // what made this screen disagree with Home.
+        val hasActivePeriod = state.currentPrayer.prayer != null
         state.prayerRows.forEachIndexed { index, row ->
             TimeRow(
                 label = stringResource(row.prayer.labelRes()),
                 time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
-                highlighted = row.isNext,
+                highlighted = if (hasActivePeriod) row.isCurrent else row.isNext,
                 adjustmentMinutes = row.adjustmentMinutes,
                 endTime = row.endTimeLabel,
                 endsNextDay = row.endsNextDay,

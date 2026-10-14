@@ -38,6 +38,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -637,5 +638,129 @@ class HomeUiStateFactoryTest {
         assertEquals("local-adhan-kotlin", state.provenance.providerId)
         assertTrue(state.provenance.offlineReady)
         assertNotNull(state.provenance.observedAtLabel)
+    }
+
+    // --- The shared current-prayer indicator -----------------------------------------------------
+    //
+    // Home and the Prayer screen both render one `HomeUiState.Ready`; the current-prayer marker is
+    // resolved once in HomeUiStateFactory and carried on `PrayerRow.isCurrent`, which is what the two
+    // timetables highlight. These tests pin that the marker follows the *open period* rather than the
+    // next prayer, across every interval, at a boundary, after Isha and across local midnight — the
+    // cases where the Prayer screen used to highlight tomorrow's Fajr while Isha was still current.
+
+    @Test
+    fun `each open prayer interval marks exactly its own prayer as current`() {
+        val schedule = completeSchedule()
+        val expectations = listOf(
+            "Fajr" to (LocalTime.of(4, 39) to PrayerName.FAJR),
+            "Dhuhr" to (LocalTime.of(11, 46) to PrayerName.DHUHR),
+            "Asr" to (LocalTime.of(15, 58) to PrayerName.ASR),
+            "Maghrib" to (LocalTime.of(17, 36) to PrayerName.MAGHRIB),
+            "Isha" to (LocalTime.of(18, 51) to PrayerName.ISHA),
+        )
+
+        for ((label, expectation) in expectations) {
+            val (at, expected) = expectation
+            val state = ready(
+                location = location,
+                settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+                scheduleState = PrayerScheduleState.Available(schedule, origin),
+                now = date.atTime(at).atZone(zone),
+                nextDaySchedule = completeSchedule(date.plusDays(1)),
+            )
+
+            assertTrue("$label: a period is open", state.currentPrayer.isActive)
+            assertEquals("$label: the hero card", expected, state.currentPrayer.prayer)
+            assertEquals(
+                "$label: exactly one row is marked current",
+                listOf(expected),
+                state.prayerRows.filter { it.isCurrent }.map { it.prayer },
+            )
+        }
+    }
+
+    @Test
+    fun `after Isha the current marker is Isha, not the next day's Fajr`() {
+        // The reported symptom: Isha is the open period, but the timetable highlighted Fajr.
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(20, 0).atZone(zone),
+            nextDaySchedule = completeSchedule(date.plusDays(1)),
+        )
+
+        assertEquals(PrayerName.ISHA, state.currentPrayer.prayer)
+        assertEquals(PrayerName.FAJR, state.nextPrayer.prayer)
+        assertEquals(
+            "only Isha is current",
+            listOf(PrayerName.ISHA),
+            state.prayerRows.filter { it.isCurrent }.map { it.prayer },
+        )
+        assertTrue(
+            "tomorrow's Fajr is the next prayer",
+            state.prayerRows.first { it.prayer == PrayerName.FAJR }.isNext,
+        )
+        assertFalse(
+            "tomorrow's Fajr must not be marked current",
+            state.prayerRows.first { it.prayer == PrayerName.FAJR }.isCurrent,
+        )
+        assertFalse(state.prayerRows.first { it.prayer == PrayerName.ISHA }.isNext)
+    }
+
+    @Test
+    fun `at a prayer boundary the current and next markers agree`() {
+        // Exactly at Asr: the period is half-open `[start, end)`, so Asr has opened and Maghrib is next.
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(15, 58).atZone(zone),
+            nextDaySchedule = completeSchedule(date.plusDays(1)),
+        )
+
+        assertEquals(PrayerName.ASR, state.currentPrayer.prayer)
+        assertEquals(PrayerName.MAGHRIB, state.nextPrayer.prayer)
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.ASR }.isCurrent)
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.MAGHRIB }.isNext)
+        assertFalse("the prayer that just opened is not the next one", state.prayerRows.first { it.prayer == PrayerName.ASR }.isNext)
+    }
+
+    @Test
+    fun `at midnight the carried-over Isha stays current and the new day's Fajr is next`() {
+        val nextDate = date.plusDays(1)
+        val state = ready(
+            location = location,
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            // The schedule in hand is the *new* local day's, which is what a date rollover selects.
+            scheduleState = PrayerScheduleState.Available(completeSchedule(nextDate), origin),
+            now = nextDate.atTime(0, 30).atZone(zone),
+        )
+
+        // The period still open is yesterday's Isha, closed by the new day's own Fajr.
+        assertEquals(PrayerName.ISHA, state.currentPrayer.prayer)
+        assertTrue(state.currentPrayer.isActive)
+        assertNull("yesterday's Isha start is not on today's schedule", state.currentPrayer.startTime)
+        assertFalse("the closing Fajr is now on this schedule", state.currentPrayer.endsNextDay)
+        // ...and the new day's Fajr is the next prayer, not the current one.
+        assertEquals(PrayerName.FAJR, state.nextPrayer.prayer)
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.ISHA }.isCurrent)
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.FAJR }.isNext)
+        assertFalse(state.prayerRows.first { it.prayer == PrayerName.FAJR }.isCurrent)
+    }
+
+    @Test
+    fun `between periods no row is current and the highlight falls back to the next prayer`() {
+        // 09:00: sunrise has passed and Dhuhr has not opened, so no period is open.
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            now = date.atTime(9, 0).atZone(zone),
+        )
+
+        assertFalse(state.currentPrayer.isActive)
+        assertNull(state.currentPrayer.prayer)
+        assertTrue("no prayer is current between periods", state.prayerRows.none { it.isCurrent })
+        assertTrue(state.prayerRows.first { it.prayer == PrayerName.DHUHR }.isNext)
     }
 }
