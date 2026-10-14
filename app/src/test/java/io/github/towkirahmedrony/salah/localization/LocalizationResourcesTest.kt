@@ -551,14 +551,15 @@ class LocalizationResourcesTest {
         )
 
         /**
-         * The Tools/Settings keys that legitimately carry no Bengali word: a bare placeholder, a
-         * coordinate separator, and `English` — the language's own name, which is written the same in
-         * both languages and must not be transliterated.
+         * The Tools/Settings keys that legitimately carry no Bengali word: bare placeholders (a
+         * timestamp, a degree reading), a coordinate separator, and `English` — the language's own
+         * name, which is written the same in both languages and must not be transliterated.
          */
         val TOOLS_SETTINGS_LATIN_ONLY = setOf(
             "settings_language_english",
             "qibla_location_updated",
             "qibla_coordinates",
+            "qibla_bearing_value_degrees",
         )
 
         /**

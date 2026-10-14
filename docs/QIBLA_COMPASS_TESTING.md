@@ -206,10 +206,10 @@ screens' Islamic tools.
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
 | C1 | Dial tracks the device | Hold the device flat and rotate slowly through a full turn | The dial rotates smoothly in the opposite sense to the device; the turn value decreases toward zero as you come onto the bearing |
-| C2 | Alignment | Rotate until the turn reaches zero | "Facing the Qibla" appears within 5°, and the dial ring highlights |
+| C2 | Alignment | Rotate until the turn reaches zero | "Facing the Qibla" appears within 5° with "Within 5°" under it, and a green ring appears inside the dial's gold band |
 | C3 | Wraparound | Approach the bearing from below 0° | The turn reads a few degrees, **not** several hundred — the case the signed shortest difference exists for |
 | C4 | Screen rotation | With the device flat, rotate the screen to landscape | The heading must **not** shift by 90°. This is the `SensorFrames` mapping; a 90° jump here means the frame is wrong |
-| C5 | Tilt | Tilt the device toward vertical | Past about 40° the dial and the turn are replaced by the hold-flat message |
+| C5 | Tilt | Tilt the device toward vertical | Past about 40° the turn is replaced by the bearing with its reference frame, a bold hold-flat warning appears under the readings, and the dial's arrow is drawn unrotated rather than following the unusable heading |
 | C6 | Metal and magnets | Bring the device near a speaker, a magnet or a car dashboard | The heading deviates. If accuracy drops to low, the calibration note appears |
 | C7 | Calibration | Follow the figure-eight instruction | The accuracy improves and the note stops appearing. Dismiss it and confirm it stays dismissed for the session |
 | C8 | Sensor absence | Run on a device with no magnetometer, if one is available | The status reads "No compass sensor"; the bearing is still displayed and stated to be exact; the dial does not animate |
@@ -219,7 +219,7 @@ screens' Islamic tools.
 
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
-| L1 | Precise permission | Tap **Allow location access** and choose "Precise" | A fix arrives; the position, accuracy and timestamp are shown; the sensor list reports the chosen family |
+| L1 | Precise permission | Tap **Allow location access** and choose "Precise" | A fix arrives; the position's label and source appear on the heading line and its coordinates, age and accuracy in the Location card; the sensor card names the chosen family |
 | L2 | Approximate permission | Revoke location, then tap and choose "Approximate" | A fix arrives and a bearing is produced; the approximate-location note is shown; the bearing is within a fraction of a degree of the precise result |
 | L3 | Permission denied | Revoke location and tap again, denying | The permission-denied state with the manual-entry route; entering coordinates still yields a bearing |
 | L4 | Location services off | Turn off device location entirely, then tap | The location-unavailable state with a route to system location settings |

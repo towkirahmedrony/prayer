@@ -257,9 +257,7 @@
       prevent. The Qibla screen's own heading therefore reads Bengali too, which is consistent with the
       tile that opens it.
     -->
-    <string name="qibla_section_compass">কম্পাস</string>
     <string name="qibla_section_location">অবস্থান</string>
-    <string name="qibla_section_sensor">কম্পাস সেন্সর</string>
     <string name="qibla_section_limits">নির্ভুলতা ও সীমাবদ্ধতা</string>
 
     <string name="qibla_status_initial">এখনও অবস্থান নেই</string>
@@ -272,11 +270,7 @@
     <string name="qibla_status_calibration_recommended">ক্যালিব্রেশন প্রয়োজন</string>
     <string name="qibla_status_operational">কম্পাস চালু</string>
 
-    <string name="qibla_bearing_label">কিবলার দিক</string>
-    <string name="qibla_heading_label">ডিভাইসের দিক</string>
-    <string name="qibla_distance_label">কাবার দূরত্ব</string>
     <string name="qibla_sensor_detected">সেন্সর</string>
-    <string name="qibla_sensor_magnetic_accuracy">চৌম্বকীয় নির্ভুলতা</string>
     <string name="qibla_sensor_rotation_vector">রোটেশন ভেক্টর (ফিউজড)</string>
     <string name="qibla_sensor_geomagnetic">জিওম্যাগনেটিক রোটেশন ভেক্টর</string>
     <string name="qibla_sensor_accelerometer_magnetic">অ্যাক্সিলেরোমিটার ও চৌম্বক ক্ষেত্র</string>
@@ -593,18 +587,20 @@
       Qibla: the whole screen, including its headings, readings, error explanations, sensor and
       accuracy labels, the manual-coordinate form, its messages and its accessibility descriptions.
     -->
-    <string name="qibla_intro">কিবলার দিক সংরক্ষিত স্থানাঙ্ক থেকে এই ডিভাইসেই হিসাব করা হয়। এতে কোনো নেটওয়ার্ক বা অ্যাকাউন্ট লাগে না।</string>
     <string name="qibla_turn_unknown">কিবলার দিক দেখতে একটি অবস্থান নির্ধারণ করুন।</string>
-    <string name="qibla_turn_needs_compass">দিক জানা আছে। এই ডিভাইসে লাইভ কম্পাস নেই, তাই আলাদা কম্পাসের সাথে এই দিকটি ব্যবহার করুন।</string>
-    <string name="qibla_turn_hold_flat">ডায়াল ব্যবহার করতে ডিভাইসটি সমতলভাবে ধরে রাখুন।</string>
     <string name="qibla_turn_aligned">কিবলার দিকে মুখ করে আছেন</string>
     <string name="qibla_turn_right">ডান দিকে %1$s° ঘুরুন</string>
     <string name="qibla_turn_left">বাম দিকে %1$s° ঘুরুন</string>
     <string name="qibla_aligned_tolerance">%1$s° এর মধ্যে</string>
     <string name="qibla_bearing_value">প্রকৃত উত্তরের সাপেক্ষে %1$s°</string>
+    <string name="qibla_bearing_value_degrees">%1$s°</string>
+    <string name="qibla_heading_caption">ডিভাইসের দিক %1$s</string>
     <string name="qibla_heading_true">প্রকৃত উত্তরের সাপেক্ষে %1$s°</string>
     <string name="qibla_heading_magnetic_only">চৌম্বক উত্তরের সাপেক্ষে %1$s°</string>
     <string name="qibla_distance_value">%1$s কিমি</string>
+    <string name="qibla_metric_qibla">কিবলা</string>
+    <string name="qibla_metric_distance">দূরত্ব</string>
+    <string name="qibla_metric_accuracy">নির্ভুলতা</string>
     <string name="qibla_dial_description">কিবলা ডায়াল। প্রকৃত উত্তরের সাপেক্ষে দিক %1$s°; ডিভাইসের দিক প্রকৃত উত্তরের সাপেক্ষে %2$s°।</string>
     <string name="qibla_dial_description_no_heading">কিবলা ডায়াল। প্রকৃত উত্তরের সাপেক্ষে দিক %1$s°। এখনও ডিভাইসের দিক পাওয়া যায়নি।</string>
     <string name="qibla_dial_description_no_bearing">কিবলা ডায়াল। এখনও কোনো দিক হিসাব করা হয়নি।</string>
@@ -634,7 +630,7 @@
     <string name="qibla_msg_failed">অবস্থান সরবরাহকারী কোনো অবস্থান দিতে পারেনি।</string>
     <string name="qibla_msg_outside_country">ওই অবস্থানটি বাংলাদেশের বাইরে, তাই আপনার সংরক্ষিত অবস্থান রাখা হয়েছে।</string>
     <string name="qibla_msg_not_attributed">ওই অবস্থানটি বাংলাদেশের কোনো এলাকার সাথে মেলানো যায়নি, তাই আপনার সংরক্ষিত অবস্থান রাখা হয়েছে।</string>
-    <string name="qibla_limits_body">দিকটি সংরক্ষিত স্থানাঙ্কের উপর নিখুঁত গোলীয় ত্রিকোণমিতি। ডায়াল যা দেখায় তা নির্ভর করে ডিভাইসের উপর: ম্যাগনেটোমিটারের গুণ, কাছের চুম্বক ও ধাতু, ডিভাইস কতটা সমতলভাবে ধরা, এবং চৌম্বক-নতি মডেলের নির্ভুলতা। সালাহ দিকটিকে প্রকৃত উত্তরে ঠিক একবার সংশোধন করে এবং কখনও অসংশোধিত দিককে মিল হিসেবে দেখায় না। ডায়ালটিকে বাইরে কয়েক ডিগ্রি নির্ভুল ধরে নিন, আর বড় ধাতব বস্তুর কাছে কম।</string>
+    <string name="qibla_limits_body">দিকটি সংরক্ষিত স্থানাঙ্কের উপর নিখুঁত গোলীয় ত্রিকোণমিতি, প্রকৃত উত্তর থেকে ঘড়ির কাঁটার দিকে মাপা, এবং এটি এই ডিভাইসেই নেটওয়ার্ক ছাড়া হিসাব করা হয়। ডায়াল যা দেখায় তা নির্ভর করে ডিভাইসের উপর: ম্যাগনেটোমিটারের গুণ, কাছের চুম্বক ও ধাতু, ডিভাইস কতটা সমতলভাবে ধরা, এবং চৌম্বক-নতি মডেলের নির্ভুলতা। সালাহ দিকটিকে প্রকৃত উত্তরে ঠিক একবার সংশোধন করে এবং কখনও অসংশোধিত দিককে মিল হিসেবে দেখায় না। ডায়ালটিকে বাইরে কয়েক ডিগ্রি নির্ভুল ধরে নিন, আর বড় ধাতব বস্তুর কাছে কম।</string>
     <string name="qibla_kaaba_source">কাবার রেফারেন্স: %1$s</string>
 
     <!--

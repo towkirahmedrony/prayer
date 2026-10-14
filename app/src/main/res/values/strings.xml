@@ -483,12 +483,12 @@
     <string name="notification_title_iftar_advance">Iftar in %1$s</string>
     <string name="notification_body_iftar_advance">Iftar is at %1$s, the calculated Maghrib time.</string>
 
-    <!-- Qibla compass -->
-    <string name="qibla_intro">The Qibla bearing is calculated on this device from the stored coordinates. It needs no network and no account.</string>
-
-    <string name="qibla_section_compass">Compass</string>
+    <!--
+      Qibla compass. The screen states each fact once: the heading line carries the position and the
+      compass status, the readings under the dial carry the bearing, the distance and the accuracy,
+      and the two cards below carry the location's detail and the sensor's limits.
+    -->
     <string name="qibla_section_location">Location</string>
-    <string name="qibla_section_sensor">Compass sensor</string>
     <string name="qibla_section_limits">Accuracy and limits</string>
 
     <string name="qibla_status_initial">No location yet</string>
@@ -502,20 +502,23 @@
     <string name="qibla_status_operational">Compass active</string>
 
     <string name="qibla_turn_unknown">Set a location to see the Qibla direction.</string>
-    <string name="qibla_turn_needs_compass">Bearing known. This device has no live compass, so use the bearing with a separate compass.</string>
-    <string name="qibla_turn_hold_flat">Hold the device flat to use the dial.</string>
     <string name="qibla_turn_aligned">Facing the Qibla</string>
     <string name="qibla_turn_right">Turn right %1$s°</string>
     <string name="qibla_turn_left">Turn left %1$s°</string>
     <string name="qibla_aligned_tolerance">Within %1$s°</string>
 
-    <string name="qibla_bearing_label">Qibla bearing</string>
+    <!-- The dial's headline when there is no turn to state, and the reading under it. -->
     <string name="qibla_bearing_value">%1$s° from true north</string>
-    <string name="qibla_heading_label">Device heading</string>
+    <string name="qibla_bearing_value_degrees">%1$s°</string>
+    <string name="qibla_heading_caption">Device heading %1$s</string>
     <string name="qibla_heading_true">%1$s° from true north</string>
     <string name="qibla_heading_magnetic_only">%1$s° from magnetic north</string>
-    <string name="qibla_distance_label">Distance to the Kaaba</string>
     <string name="qibla_distance_value">%1$s km</string>
+
+    <!-- The three readings under the dial: the bearing, the distance, the compass accuracy. -->
+    <string name="qibla_metric_qibla">Qibla</string>
+    <string name="qibla_metric_distance">Distance</string>
+    <string name="qibla_metric_accuracy">Accuracy</string>
 
     <!-- Spoken description of the dial, for a screen reader: a Canvas has no text of its own. -->
     <string name="qibla_dial_description">Qibla dial. Bearing %1$s° from true north; device heading %2$s° from true north.</string>
@@ -528,7 +531,6 @@
 
     <string name="qibla_sensor_unavailable">This device has no magnetometer-backed sensor, so Salah cannot show which way the device is pointing. The bearing above is still exact — use it with a separate compass or the sun.</string>
     <string name="qibla_sensor_detected">Sensor</string>
-    <string name="qibla_sensor_magnetic_accuracy">Magnetic accuracy</string>
     <string name="qibla_sensor_rotation_vector">Rotation vector (fused)</string>
     <string name="qibla_sensor_geomagnetic">Geomagnetic rotation vector</string>
     <string name="qibla_sensor_accelerometer_magnetic">Accelerometer and magnetic field</string>
@@ -593,7 +595,7 @@
     <string name="qibla_msg_not_attributed">That position could not be matched to a Bangladeshi area, so your saved location was kept.</string>
     <string name="qibla_message_dismiss">Dismiss</string>
 
-    <string name="qibla_limits_body">The bearing is exact spherical trigonometry over the stored coordinates. What the dial shows depends on the device: magnetometer quality, nearby magnets and metal, how flat the device is held, and the accuracy of the magnetic-declination model. Salah corrects the heading to true north exactly once and never presents an uncorrected heading as aligned. Treat the dial as good to a few degrees outdoors, and less near large metal objects.</string>
+    <string name="qibla_limits_body">The bearing is exact spherical trigonometry over the stored coordinates, measured clockwise from true north, and it is calculated on this device without a network. What the dial shows depends on the device: magnetometer quality, nearby magnets and metal, how flat the device is held, and the accuracy of the magnetic-declination model. Salah corrects the heading to true north exactly once and never presents an uncorrected heading as aligned. Treat the dial as good to a few degrees outdoors, and less near large metal objects.</string>
     <string name="qibla_kaaba_source">Kaaba reference: %1$s</string>
 
     <!-- Location: setup, management and the division / district / upazila picker -->

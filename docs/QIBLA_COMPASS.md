@@ -432,6 +432,31 @@ so the screen cannot keep nagging. On a device whose sensor reports `UNRELIABLE`
 being calibratable, Salah shows the sensor's own claim rather than second-guessing it — and the
 dismissal is the escape hatch.
 
+### 6.3 The screen's layout
+
+The screen is one reading followed by its detail, so that the two questions a user opens it with —
+*where should I face* and *can I trust this* — are answered before any scrolling:
+
+| Where | What it carries |
+|---|---|
+| Heading | the screen's name, the stored position's label and **how it was obtained**, and one status pill (the reducer's phase) |
+| The reading | the turn, the alignment statement, or — when no turn can be stated — the bearing **with its reference frame**; then the dial; then the device heading under it |
+| Readings | three equal columns: the bearing, the distance to the Kaaba, and the platform's own accuracy label |
+| Note | **at most one** sentence, for the first condition that applies: the calculation's refusal, no sensor, tilt, or no declination |
+| Cards | calibration (only when advised and not dismissed), Location with its actions and the manual form behind a disclosure, and the sensor with the dial's limits |
+
+Two rules keep it from growing back into the layout this replaced. **Each fact appears once** — the
+position's name and source on the heading line and its coordinates, age and accuracy in the Location
+card; the accuracy as a reading and the sensor that produces it in the last card — and **nothing that
+is a state is also a number**: an absent sensor, a tilt, an unknown declination and a refused
+calculation are sentences, never a value the dial does not have. The compass accuracy is the only
+accuracy shown, it is the platform's own report, and it is shown in exactly one place.
+
+The dial itself is drawn as one canvas: a gold band and a fixed pointer that belong to the device, and
+a rose, ticks, cardinals, an arrow and a Kaaba marker that belong to the world and are rotated by the
+heading in a single `rotate` block. The arrow's tip and the marker sit on the band, so the marker —
+not the arrow's length — is what marks the bearing.
+
 ---
 
 ## 7. Accuracy, honestly

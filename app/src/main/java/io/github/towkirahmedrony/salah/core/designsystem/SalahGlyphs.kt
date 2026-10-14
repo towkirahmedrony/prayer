@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -294,6 +295,44 @@ fun SlidersGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modif
 }
 
 /**
+ * A ruler: a scale with tick marks, for a distance.
+ *
+ * Drawn on the diagonal because a horizontal ruler reads as a progress bar at this size, and the
+ * diagonal is what makes it recognisable next to the compass needle it sits beside on the Qibla
+ * screen.
+ */
+@Composable
+fun RulerGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.6f, cap = StrokeCap.Round)
+    rotate(degrees = DIAGONAL_DEGREES, pivot = Offset(12f, 12f)) {
+        drawRoundRect(
+            color = tint,
+            topLeft = Offset(3.6f, 8.6f),
+            size = Size(16.8f, 6.8f),
+            cornerRadius = CornerRadius(1.6f, 1.6f),
+            style = stroke,
+        )
+        listOf(7.0f, 10.2f, 13.4f, 16.6f).forEach { x ->
+            drawLine(tint, Offset(x, 8.6f), Offset(x, 12f), strokeWidth = 1.3f)
+        }
+    }
+}
+
+/**
+ * A check mark: an affirmative answer, used where a reading is confirmed good rather than merely
+ * present.
+ */
+@Composable
+fun CheckGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val check = Path().apply {
+        moveTo(4.6f, 12.6f)
+        lineTo(9.8f, 17.8f)
+        lineTo(19.4f, 6.4f)
+    }
+    drawPath(check, tint, style = Stroke(width = 2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
+
+/**
  * A broadcast mark: a dot with two waves leaving it on each side.
  *
  * Used where a screen offers to ask the device for its own position, so the two ways of giving Salah
@@ -316,3 +355,6 @@ fun SignalGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifi
         }
     }
 }
+
+/** The angle the ruler is drawn on, so its own length leaves the 24-unit box on the diagonal. */
+private const val DIAGONAL_DEGREES = -40f

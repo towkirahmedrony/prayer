@@ -386,7 +386,11 @@ screen:
 A few strings are deliberately **not** translated or transliterated: `settings_language_english` stays
 `English` (a language's name is written in its own script), the Arabic `home_prayer_times_arabic`
 heading stays Arabic, `app_name` stays `Salah`, and the astronomical coordinates and IANA time-zone ids
-(`Asia/Dhaka`) stay in Latin because they are values rather than words.
+(`Asia/Dhaka`) stay in Latin because they are values rather than words. The pure-placeholder strings
+are in the same class and translate to themselves: `qibla_location_updated` (`%1$s`), `qibla_coordinates`
+(`%1$s°, %2$s°`) and `qibla_bearing_value_degrees` (`%1$s°`), which carry a number and a degree sign
+rather than a word for a translator to choose. `LocalizationResourcesTest` lists them by name as the
+only Tools/Settings keys allowed to hold no Bengali script.
 
 ### How a new screen adds strings
 
