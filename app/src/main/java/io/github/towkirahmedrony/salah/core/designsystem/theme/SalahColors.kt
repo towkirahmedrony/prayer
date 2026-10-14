@@ -22,42 +22,143 @@ val TextDark = Color(0xFF14241D)
 val TextMuted = Color(0xFF5E6D66)
 val OutlineMuted = Color(0xFFE2E0D8)
 
+/**
+ * The boundary colour of a control that is not focused: an unfocused text field, an unselected chip.
+ *
+ * Deliberately *not* [OutlineMuted]. Material gives the palette two line roles — `outline` for the
+ * boundary of a control and `outlineVariant` for a decorative rule — and Salah had mapped both to the
+ * same cream-grey hairline. That hairline measures about **1.2:1** against the card, so every control
+ * that outlines itself with `outline` (the calendar's view chips, the location form's unfocused text
+ * fields) was drawing a boundary a user could not see, in either theme. WCAG asks for 3:1 on the parts
+ * of a control that identify it, so `outline` is now a tone that clears that against both the canvas
+ * and the card, while `outlineVariant` keeps the soft hairline for dividers, where a low-contrast rule
+ * is the intent. The two roles are no longer the same value.
+ */
+val OutlineControl = Color(0xFF7E8E86)
+
+/** [OutlineControl] for the dark scheme: the same job against a nearly-black canvas. */
+val OutlineControlDark = Color(0xFF6E8078)
+
+/**
+ * The calendar's "observance" accent — `tertiary`.
+ *
+ * A warm terracotta rather than Material's baseline plum. The palette is green, gold and cream, and
+ * `tertiary` is the one role Salah left undefined, so the year's observances were marked with the
+ * baseline's pink (#7D5260 in light, #EFB8C8 in dark) — a colour that appears nowhere else in the app
+ * and reads as a stray. Terracotta is distinct from the gold Ramadan marker it sits beside, and clears
+ * 3:1 against the card in both themes, which a marker of this size has to.
+ */
+val Terracotta = Color(0xFFB4552D)
+val OnTerracotta = Color(0xFFFFFFFF)
+val TerracottaContainer = Color(0xFFF6DFD5)
+val OnTerracottaContainer = Color(0xFF3B1507)
+val TerracottaDark = Color(0xFFE29A78)
+val OnTerracottaDark = Color(0xFF4C1B08)
+val TerracottaContainerDark = Color(0xFF6B2A11)
+val OnTerracottaContainerDark = Color(0xFFFFDBCB)
+
+/**
+ * Salah's light colour scheme.
+ *
+ * **Every role Material's components read is stated here.** A `lightColorScheme` call fills whatever
+ * it is not given with Material's own baseline palette — lavender surfaces, a plum `tertiary`, a
+ * violet `surfaceTint` — and those values are light but wrong for Salah: a dropdown menu painted
+ * `surfaceContainer` came out #F3EDF7 (Material's lavender) rather than Salah's card, and the
+ * calendar's observance marker came out pink. So the full set is declared, and the surface tiers are
+ * derived from Salah's own paper tones: `surface` is the card white, the containers step down towards
+ * the cream canvas, and `surfaceContainerHighest` is where Material puts an unselected control's fill.
+ *
+ * `on*` roles are stated with their container, never guessed, so a component that reads a pair gets a
+ * readable pair. `SalahColorSchemeTest` asserts the contrast of each of them.
+ */
 internal val SalahLightColorScheme = lightColorScheme(
     primary = ForestGreenPrimary,
     onPrimary = Color.White,
     primaryContainer = MintContainer,
     onPrimaryContainer = ForestGreenDark,
+    inversePrimary = Color(0xFF7EDBB6),
     secondary = GoldAccent,
     onSecondary = Color.White,
     secondaryContainer = MintLight,
     onSecondaryContainer = ForestGreenDark,
+    tertiary = Terracotta,
+    onTertiary = OnTerracotta,
+    tertiaryContainer = TerracottaContainer,
+    onTertiaryContainer = OnTerracottaContainer,
     background = WarmCanvas,
     onBackground = TextDark,
     surface = CardSurfaceWhite,
     onSurface = TextDark,
     surfaceVariant = MintLight,
     onSurfaceVariant = TextMuted,
-    outline = OutlineMuted,
+    surfaceTint = ForestGreenPrimary,
+    inverseSurface = Color(0xFF2C3631),
+    inverseOnSurface = Color(0xFFEDF1EE),
+    error = Color(0xFFB3261E),
+    onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
+    outline = OutlineControl,
     outlineVariant = OutlineMuted,
+    scrim = Color(0xFF000000),
+    surfaceDim = Color(0xFFE3E0D7),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFDFBF7),
+    surfaceContainerLow = Color(0xFFFAF8F2),
+    surfaceContainer = Color(0xFFF6F4ED),
+    surfaceContainerHigh = Color(0xFFF1EFE8),
+    surfaceContainerHighest = Color(0xFFECE9E1),
 )
 
+/**
+ * Salah's dark colour scheme.
+ *
+ * **A dark palette, not an inversion.** The greens are re-pitched for a dark canvas rather than
+ * darkened: `primary` becomes a light mint that carries text and glyphs, with a deep green as its
+ * `onPrimary`. Gold stays gold — Salah's secondary does not need to change value to be read on a dark
+ * surface — and the surface tiers rise from a near-black canvas to the tone an unselected control sits
+ * on, so a card, a menu and a text field are three distinguishable darks rather than one.
+ *
+ * Like the light scheme, the full role set is declared, so no component can fall back to Material's
+ * baseline violet. See [SalahLightColorScheme] for why that matters.
+ */
 internal val SalahDarkColorScheme = darkColorScheme(
     primary = Color(0xFF7EDBB6),
     onPrimary = Color(0xFF003827),
     primaryContainer = Color(0xFF133E31),
     onPrimaryContainer = Color(0xFFAEF3D3),
+    inversePrimary = ForestGreenPrimary,
     secondary = GoldAccent,
     onSecondary = Color(0xFF261D00),
     secondaryContainer = Color(0xFF332D1B),
     onSecondaryContainer = GoldAccent,
+    tertiary = TerracottaDark,
+    onTertiary = OnTerracottaDark,
+    tertiaryContainer = TerracottaContainerDark,
+    onTertiaryContainer = OnTerracottaContainerDark,
     background = Color(0xFF0F1714),
     onBackground = Color(0xFFE1E5E2),
     surface = Color(0xFF16221E),
     onSurface = Color(0xFFE1E5E2),
     surfaceVariant = Color(0xFF1F2F2A),
     onSurfaceVariant = Color(0xFFA1AEA7),
-    outline = Color(0xFF2D3E37),
+    surfaceTint = Color(0xFF7EDBB6),
+    inverseSurface = Color(0xFFE1E5E2),
+    inverseOnSurface = Color(0xFF16221E),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    outline = OutlineControlDark,
     outlineVariant = Color(0xFF23322C),
+    scrim = Color(0xFF000000),
+    surfaceDim = Color(0xFF0F1714),
+    surfaceBright = Color(0xFF35423D),
+    surfaceContainerLowest = Color(0xFF0A110E),
+    surfaceContainerLow = Color(0xFF16221E),
+    surfaceContainer = Color(0xFF1B2823),
+    surfaceContainerHigh = Color(0xFF26332E),
+    surfaceContainerHighest = Color(0xFF313E39),
 )
 
 /**

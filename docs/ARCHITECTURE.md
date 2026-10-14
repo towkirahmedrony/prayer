@@ -454,8 +454,10 @@ data source.
 ## 8. Design system and navigation
 
 - `core/designsystem/theme`: emerald primary, warm ivory background, brass accent, slate for solar
-  information; light and dark schemes; `SalahTheme` also flips system-bar icon colours for the
-  explicit light/dark overrides.
+  information; light and dark schemes — each declaring the **full** Material 3 role set, so no component
+  falls back to Material's baseline lavender/plum — plus the fixed `SalahAccents` (brand green surface,
+  theme-appropriate gold). `SalahTheme` resolves the mode, supplies the accents, and flips the
+  system-bar icon colours from the *resolved* theme. See `docs/THEME_SYSTEM.md`.
 - `core/designsystem/SalahGlyphs.kt`: icons drawn with Compose `Canvas`, so no icon library
   dependency exists.
 - `navigation/SalahDestination`: the four bottom-bar destinations — `home`, `calendar`, `tools`,

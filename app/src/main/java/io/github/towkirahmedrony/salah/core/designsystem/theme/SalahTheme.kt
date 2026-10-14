@@ -41,13 +41,24 @@ private val SalahTypography = Typography().let { base ->
 }
 
 /**
- * The accent colours Material's scheme does not carry.
+ * The colours a Salah screen needs that Material's scheme does not carry.
  *
- * Material gives every role a container/content pair, but Salah needs gold for exactly one thing:
- * the row of the Ramadan table that is today. Gold is already the app's secondary colour, and this
- * keeps it out of the shared scheme so it cannot leak onto a control that should have stayed green.
- * The content colour always sits on the container: a dark green in light mode and the muted gold the
- * dark scheme already uses, so the highlighted row keeps a readable contrast in both.
+ * Material gives every role a container/content pair, but Salah has three things the scheme cannot
+ * express, because they are *fixed* rather than themed or because they are a hue the scheme has no role
+ * for:
+ *
+ *  - the **Ramadan row** that is today. Gold is already the app's secondary colour, and this keeps it
+ *    out of the shared scheme so it cannot leak onto a control that should have stayed green. The
+ *    content colour always sits on the container: a dark green in light mode and the muted gold the
+ *    dark scheme already uses, so the highlighted row keeps a readable contrast in both.
+ *  - the **brand green surface** — the next-prayer hero, the bottom bar, the brand header — with the
+ *    white drawn on it. This pair is deliberately identical in both themes: it is the app's identity,
+ *    not a themed surface, exactly like white type on a brand-coloured button. The two values live here
+ *    together so the pairing is declared once and cannot drift apart across screens.
+ *  - the **gold used as text**. One gold cannot serve both themes: the mid gold that reads on a dark
+ *    canvas is unreadable on cream, and the dark gold that reads on cream is too dim on a dark canvas.
+ *    So the accent carries the value that is legible on the theme it belongs to, and the screens ask for
+ *    "the gold" rather than picking one of the two constants themselves.
  */
 @Immutable
 data class SalahAccents(
@@ -55,12 +66,59 @@ data class SalahAccents(
     val ramadanToday: Color,
     /** Text and times drawn on [ramadanToday]. */
     val onRamadanToday: Color,
+    /** Fill of the brand's own green surface. Fixed in both themes; see the class documentation. */
+    val brandSurface: Color,
+    /** Text, icons and glyphs drawn on [brandSurface]. Fixed in both themes. */
+    val onBrandSurface: Color,
+    /** The gold used for text, small marks and brand type, legible on the active theme's canvas. */
+    val goldText: Color,
 )
 
 /** The theme's [SalahAccents]. Provided by [SalahTheme]; the default is the light pairing. */
-val LocalSalahAccents = staticCompositionLocalOf {
-    SalahAccents(ramadanToday = GoldMuted, onRamadanToday = ForestGreenDark)
+val LocalSalahAccents = staticCompositionLocalOf { salahAccents(darkTheme = false) }
+
+/**
+ * The accents of the given theme, as a plain value.
+ *
+ * A function of the boolean rather than a branch inside the composable so the pairings are a decision a
+ * test can assert on: `SalahColorSchemeTest` measures both `goldText` values against their own canvas
+ * and the brand pair against itself.
+ */
+internal fun salahAccents(darkTheme: Boolean): SalahAccents = if (darkTheme) {
+    // The dark scheme's own secondary container is already a deep gold, so the Ramadan highlight reuses
+    // it and only the text colour is the muted gold rather than the scheme's brighter one.
+    SalahAccents(
+        ramadanToday = SalahDarkColorScheme.secondaryContainer,
+        onRamadanToday = GoldMuted,
+        brandSurface = ForestGreenPrimary,
+        onBrandSurface = Color.White,
+        goldText = GoldMuted,
+    )
+} else {
+    SalahAccents(
+        ramadanToday = GoldMuted,
+        onRamadanToday = ForestGreenDark,
+        brandSurface = ForestGreenPrimary,
+        onBrandSurface = Color.White,
+        goldText = GoldText,
+    )
 }
+
+/**
+ * Whether [themeMode] means the dark scheme, given what the device currently reports.
+ *
+ * Split out from the composable because it is the *only* place the three modes are interpreted, and it
+ * is the mapping the settings screen's choice passes through: `SYSTEM` follows the device, and the two
+ * explicit modes override it in both directions, so choosing Dark on a light phone works and choosing
+ * Light on a dark phone works. Reading `isSystemInDarkTheme()` anywhere else would be a second,
+ * competing answer to this question.
+ */
+internal fun resolveDarkTheme(themeMode: ThemeMode, systemInDarkTheme: Boolean): Boolean =
+    when (themeMode) {
+        ThemeMode.SYSTEM -> systemInDarkTheme
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
 
 /**
  * Applies the Salah design system.
@@ -76,11 +134,7 @@ fun SalahTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val darkTheme = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
+    val darkTheme = resolveDarkTheme(themeMode, systemInDarkTheme = isSystemInDarkTheme())
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -93,18 +147,7 @@ fun SalahTheme(
         }
     }
 
-    val accents = if (darkTheme) {
-        // The dark scheme's own secondary container is already a deep gold, so the highlight reuses
-        // it and only the text colour is the muted gold rather than the scheme's brighter one.
-        SalahAccents(
-            ramadanToday = SalahDarkColorScheme.secondaryContainer,
-            onRamadanToday = GoldMuted,
-        )
-    } else {
-        SalahAccents(ramadanToday = GoldMuted, onRamadanToday = ForestGreenDark)
-    }
-
-    CompositionLocalProvider(LocalSalahAccents provides accents) {
+    CompositionLocalProvider(LocalSalahAccents provides salahAccents(darkTheme)) {
         MaterialTheme(
             colorScheme = if (darkTheme) SalahDarkColorScheme else SalahLightColorScheme,
             typography = SalahTypography,

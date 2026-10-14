@@ -64,7 +64,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
-import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldAccent
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.abs
@@ -241,9 +241,17 @@ private fun SetupContent(
     }
 }
 
-/** The app's mark and name, centred, as on the design. */
+/**
+ * The app's mark and name, centred, as on the design.
+ *
+ * The gold of the wordmark is the theme's accent rather than the brand's mid gold, because this screen's
+ * canvas is the theme's: the mid gold measures about **2.4:1** on the cream canvas — under the 3:1 floor
+ * even for type at this size — while the accent carries the value that is legible on whichever canvas is
+ * active. In light mode that is a deeper gold; on the dark canvas, the muted one.
+ */
 @Composable
 private fun Branding(modifier: Modifier = Modifier) {
+    val accents = LocalSalahAccents.current
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -255,13 +263,13 @@ private fun Branding(modifier: Modifier = Modifier) {
             text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp),
             fontWeight = FontWeight.Bold,
-            color = GoldAccent,
+            color = accents.goldText,
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = stringResource(R.string.app_tagline),
             style = MaterialTheme.typography.bodySmall,
-            color = GoldAccent,
+            color = accents.goldText,
         )
     }
 }
@@ -635,7 +643,10 @@ private const val MAP_TILT_DEGREES: Float = -18f
 private fun BangladeshMapArt(modifier: Modifier = Modifier) {
     val outline = MaterialTheme.colorScheme.primary
     val markFill = MaterialTheme.colorScheme.surface
-    val gold = GoldAccent
+    // The ornaments are gold on the canvas, so they take the theme's gold rather than the fixed mid
+    // gold the light design was drawn with: on the dark canvas the fixed gold is the one tone that stays
+    // readable, and on the cream canvas the accent's deeper gold is the readable one.
+    val gold = LocalSalahAccents.current.goldText
 
     Canvas(modifier = modifier) {
         // Scale against the *tilted* extent, not the upright one: rotating a shape taller than it is

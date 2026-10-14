@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,7 +24,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.theme.ForestGreenPrimary
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
@@ -101,9 +101,16 @@ private fun AppShell() {
 
     Scaffold(
         bottomBar = {
+            // The bar is Salah's own green with Salah's own white on it, and both come from the theme's
+            // accents rather than being named here: the pairing is fixed in both themes by design — a brand
+            // surface with white type, like a brand-coloured button — and declaring it once is what keeps
+            // the bar and the next-prayer hero from drifting apart. The item colours are set through
+            // NavigationBarItem's own `colors`, which is also what makes LocalContentColor the tint the
+            // glyphs read below, instead of each icon restating the same white.
+            val accents = LocalSalahAccents.current
             NavigationBar(
-                containerColor = ForestGreenPrimary,
-                contentColor = Color.White,
+                containerColor = accents.brandSurface,
+                contentColor = accents.onBrandSurface,
                 tonalElevation = 0.dp,
             ) {
                 // The items, their order and their labels come from the destination enum, so the bar
@@ -122,7 +129,9 @@ private fun AppShell() {
                             }
                         },
                         icon = {
-                            val tint = if (selected) Color.White else Color.White.copy(alpha = 0.8f)
+                            // The tint comes from the item's own colours below, so the selected and
+                            // unselected states are decided in one place instead of twice.
+                            val tint = LocalContentColor.current
                             // Prayer's lantern moved with the feature: it now marks the prayer-times
                             // row on Tools, and Tools carries Salah's own Tasbih mark here.
                             when (dest) {
@@ -133,14 +142,13 @@ private fun AppShell() {
                                 else -> DomeGlyph(tint = tint)
                             }
                         },
-                        label = {
-                            Text(
-                                text = stringResource(dest.labelRes),
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.8f),
-                            )
-                        },
+                        label = { Text(text = stringResource(dest.labelRes)) },
                         colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.White.copy(alpha = 0.15f),
+                            selectedIconColor = accents.onBrandSurface,
+                            selectedTextColor = accents.onBrandSurface,
+                            indicatorColor = accents.onBrandSurface.copy(alpha = 0.15f),
+                            unselectedIconColor = accents.onBrandSurface.copy(alpha = 0.8f),
+                            unselectedTextColor = accents.onBrandSurface.copy(alpha = 0.8f),
                         ),
                     )
                 }
