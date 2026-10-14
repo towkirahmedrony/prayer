@@ -31,7 +31,6 @@ import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
 import io.github.towkirahmedrony.salah.feature.home.SolarRow
 
-@Composable
 /**
  * The Home header: the brand mark, the app's name and the two icon buttons beside it.
  *
