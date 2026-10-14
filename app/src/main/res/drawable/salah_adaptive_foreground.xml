@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground layer, converted from docs/artwork/salah_icon_foreground.svg
+  (gold crescent, star and mihrab arch with the artwork's gradients and drop shadow).
+
+  The 0.86 scale keeps every mark inside the Android launcher safe zone: the unscaled art
+  reaches r≈358 of the 512-unit half-canvas, and 358 x 0.86 ≈ 308 < 341 (the 66dp safe circle
+  of the 108dp canvas), so no launcher mask — circle or squircle — can clip the arch.
+
+  Referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -6,7 +16,7 @@
     android:viewportWidth="1024"
     android:viewportHeight="1024">
 
-    <!-- Adaptive Icon Safe Zone-এর ভেতর নিখুঁতভাবে রাখার জন্য হালকা স্কেলিং গ্রুপ -->
+    <!-- Keep the artwork inside the adaptive icon safe zone. -->
     <group
         android:pivotX="512"
         android:pivotY="512"

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Theme.Salah for Android 12+ (API 31+), light configuration: the base theme from
+  values/themes.xml plus the native system-splash screen.
+
+  Why the splash lives here rather than in values/themes.xml: the windowSplashScreen*
+  attributes only exist on API 31+, and the resource matcher weighs the UI-mode (night)
+  qualifier above the platform-version qualifier — so a splash declared only in
+  values-v31 would be shadowed by values-night/themes.xml on a dark-mode device.
+  values-v31 + values-night-v31 cover every combination; API < 31 keeps the plain
+  themes from values/ and values-night/.
+
+  The icon is a dedicated vector (drawable/salah_splash_icon.xml, 240dp frame built from
+  the foreground artwork), never an adaptive-icon XML. The green icon background keeps the
+  ivory and gold marks legible on the ivory window. The theme itself continues into the
+  app unchanged — no post-splash theme swap, no animation, no artificial delay, and no
+  second in-app splash screen. On API < 31 the system shows only the window background,
+  which is the same colour, so nothing from an older logo can flash first.
+-->
+<resources>
+
+    <style name="Theme.Salah" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="android:windowBackground">@color/salah_window_background</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:windowSplashScreenBackground">@color/salah_window_background</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/salah_splash_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/salah_splash_icon_background</item>
+    </style>
+
+</resources>

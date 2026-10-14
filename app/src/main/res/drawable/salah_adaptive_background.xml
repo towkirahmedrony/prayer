@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon background layer, converted 1:1 from docs/artwork/salah_icon_background.svg
+  (deep-green radial gradient, authored at 1024x1024). Full-bleed: the launcher masks the shape.
+
+  Referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml.
+  A vector keeps the gradient crisp at every density, so no PNG per density is needed.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"

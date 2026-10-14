@@ -35,6 +35,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.CrescentGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahShortcutTile
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
@@ -87,7 +88,7 @@ fun BrandHeader(modifier: Modifier = Modifier) {
                         color = scheme.onPrimary.copy(alpha = 0.85f),
                     )
                 }
-                CrescentGlyph(tint = scheme.onPrimary.copy(alpha = 0.9f))
+                SalahBrandLogo(size = 36.dp)
             }
         }
     }

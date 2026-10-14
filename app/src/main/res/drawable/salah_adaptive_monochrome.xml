@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monochrome layer for Android 12+ themed icons (API 33+), converted from
+  docs/artwork/salah_icon_monochrome.svg: the same marks in solid white, no gradients and
+  no shadow — the system tints this layer with the launcher's theme colour and masks it with
+  the same shape as the coloured layers, so it carries the same 0.86 safe-zone scale.
+
+  Referenced by res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+
+    <!-- Keep the artwork inside the adaptive icon safe zone, as in the foreground layer. -->
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+
+        <!-- চাঁদ: বাইরের ও ভেতরের ফ্যাসেট -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 451.5 334.0 A 107.74 107.74 0 1 0 614.5 456.0 A 103.80 103.80 0 0 1 451.5 334.0 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 451.5 334.0 A 103.80 103.80 0 0 0 614.5 456.0 A 101.12 101.12 0 0 1 451.5 334.0 Z" />
+
+        <!-- চার কোণা তারা ও এর হাইলাইট -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 511.5 391.0 Q 515.3 404.7 529.0 408.5 Q 515.3 412.3 511.5 426.0 Q 507.7 412.3 494.0 408.5 Q 507.7 404.7 511.5 391.0 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillAlpha="0.38"
+            android:pathData="M 511.5 391.0 Q 515.3 404.7 529.0 408.5 L 511.5 408.5 L 494.0 408.5 Q 507.7 404.7 511.5 391.0 Z" />
+
+        <!-- বাইরের চিকন খিলান (Outer Thin Pointed Arch) -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 308.8 796.5 L 308.8 476.0 C 308.8 367.5, 377.5 291.5, 511.5 224.0 C 645.5 291.5, 714.2 367.5, 714.2 476.0 L 714.2 796.5 L 707.2 796.5 L 707.2 476.0 C 707.2 371.5, 639.5 297.5, 511.5 232.8 C 383.5 297.5, 315.8 371.5, 315.8 476.0 L 315.8 796.5 Z" />
+
+        <!-- ভেতরের মোটা মেহরাব খিলান (Inner Thick Mihrab Arch) -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 332.0 798.5 L 332.0 472.0 C 332.0 371.5, 395.0 305.5, 511.5 251.8 C 628.0 305.5, 691.0 371.5, 691.0 472.0 L 691.0 798.5 L 649.2 798.5 L 649.2 596.0 C 649.2 572.5, 635.8 558.2, 619.5 548.0 C 641.5 522.0, 649.5 493.5, 649.5 464.0 C 649.5 386.5, 597.5 335.5, 511.5 296.0 C 425.5 335.5, 373.5 386.5, 373.5 464.0 C 373.5 493.5, 381.5 522.0, 403.5 548.0 C 387.2 558.2, 373.8 572.5, 373.8 596.0 L 373.8 798.5 Z" />
+    </group>
+</vector>

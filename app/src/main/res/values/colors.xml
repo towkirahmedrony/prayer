@@ -3,5 +3,10 @@
     <!-- Brand palette used before Compose takes over the window. -->
     <color name="salah_window_background">#FBF8F1</color>
     <color name="salah_window_background_dark">#0F1512</color>
-    <color name="ic_launcher_background">#0B6B4F</color>
+
+    <!--
+      Android 12+ splash icon backdrop: the deep green from the middle stop of the Salah
+      artwork's gradient (docs/artwork/salah_icon_background.svg), so the ivory and gold
+      marks stay legible against the light window background. -->
+    <color name="salah_splash_icon_background">#053428</color>
 </resources>

@@ -44,7 +44,7 @@ fun HomeTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CrescentGlyph(tint = ForestGreenPrimary, modifier = Modifier.size(28.dp))
+            SalahBrandLogo(size = 28.dp)
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(

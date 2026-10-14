@@ -59,7 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronDownGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.OctagramGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
@@ -248,18 +248,15 @@ private fun Branding(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OctagramGlyph(tint = GoldAccent, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp),
-                fontWeight = FontWeight.Bold,
-                color = GoldAccent,
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            OctagramGlyph(tint = GoldAccent, modifier = Modifier.size(16.dp))
-        }
+        // The shared Salah logo — the same artwork as the launcher and splash icon.
+        SalahBrandLogo(size = 56.dp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 28.sp),
+            fontWeight = FontWeight.Bold,
+            color = GoldAccent,
+        )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = stringResource(R.string.app_tagline),
