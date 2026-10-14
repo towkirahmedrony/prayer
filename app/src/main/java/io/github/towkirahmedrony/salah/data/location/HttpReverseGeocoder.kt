@@ -73,7 +73,9 @@ class HttpReverseGeocoder(
                 "&lat=${point.latitude}&lon=${point.longitude}",
         )
         val connection = url.openConnection() as HttpURLConnection
-        try {
+        // `return` on the `try`: the block's value is the parsed result, and the `finally` still runs on
+        // every path, including the early return for a non-200 status and the rethrow of a cancellation.
+        return try {
             connection.requestMethod = "GET"
             connection.connectTimeout = connectTimeoutMillis
             connection.readTimeout = readTimeoutMillis
