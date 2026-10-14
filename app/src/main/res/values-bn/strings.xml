@@ -258,6 +258,7 @@
       tile that opens it.
     -->
     <string name="qibla_section_location">অবস্থান</string>
+    <string name="qibla_location_line">%1$s · %2$s</string>
     <string name="qibla_section_limits">নির্ভুলতা ও সীমাবদ্ধতা</string>
 
     <string name="qibla_status_initial">এখনও অবস্থান নেই</string>

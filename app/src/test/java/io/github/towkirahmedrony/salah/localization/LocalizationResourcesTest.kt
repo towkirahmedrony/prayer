@@ -559,6 +559,7 @@ class LocalizationResourcesTest {
             "settings_language_english",
             "qibla_location_updated",
             "qibla_coordinates",
+            "qibla_location_line",
             "qibla_bearing_value_degrees",
         )
 

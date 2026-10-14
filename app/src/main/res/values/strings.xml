@@ -489,6 +489,8 @@
       and the two cards below carry the location's detail and the sensor's limits.
     -->
     <string name="qibla_section_location">Location</string>
+    <!-- The position and how it was obtained, joined on the heading line. -->
+    <string name="qibla_location_line">%1$s · %2$s</string>
     <string name="qibla_section_limits">Accuracy and limits</string>
 
     <string name="qibla_status_initial">No location yet</string>

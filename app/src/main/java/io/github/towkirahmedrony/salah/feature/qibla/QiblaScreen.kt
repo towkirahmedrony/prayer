@@ -261,8 +261,14 @@ private fun QiblaHeader(state: QiblaUiState) {
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = "${location.location.label} · " +
+                        // The join is a resource, not a concatenation in code: the separator and the
+                        // order of the two facts are properties of the language, and a template
+                        // would freeze them into Kotlin.
+                        text = stringResource(
+                            R.string.qibla_location_line,
+                            location.location.label,
                             stringResource(location.location.origin.sourceLabelRes()),
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
