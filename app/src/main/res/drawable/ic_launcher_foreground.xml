@@ -1,22 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
 
-    <!-- Crescent -->
-    <path
-        android:fillColor="#E9C46A"
-        android:fillType="evenOdd"
-        android:pathData="M54,28 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M56.5,28 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <!-- Adaptive Icon Safe Zone-এর ভেতর নিখুঁতভাবে রাখার জন্য হালকা স্কেলিং গ্রুপ -->
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
 
-    <!-- Dome -->
-    <path
-        android:fillColor="#FBF8F1"
-        android:pathData="M54,39 C45,39 38,46.5 38,56 L38,72 L70,72 L70,56 C70,46.5 63,39 54,39 Z" />
+        <!-- চাঁদ ও তারার ড্রপ শ্যাডো লেয়ার -->
+        <group android:translateY="8">
+            <path
+                android:fillColor="#40010D09"
+                android:pathData="M 451.5 334.0 A 107.74 107.74 0 1 0 614.5 456.0 A 101.12 101.12 0 0 1 451.5 334.0 Z" />
+            <path
+                android:fillColor="#40010D09"
+                android:pathData="M 511.5 391.0 Q 515.3 404.7 529.0 408.5 Q 515.3 412.3 511.5 426.0 Q 507.7 412.3 494.0 408.5 Q 507.7 404.7 511.5 391.0 Z" />
+        </group>
 
-    <!-- Base -->
-    <path
-        android:fillColor="#C7EFDC"
-        android:pathData="M30,72 L78,72 L78,79 L30,79 Z" />
+        <!-- বাঁকা চাঁদ: বাইরের 3D Bevel ফ্যাসেট -->
+        <path android:pathData="M 451.5 334.0 A 107.74 107.74 0 1 0 614.5 456.0 A 103.80 103.80 0 0 1 451.5 334.0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="415"
+                    android:startY="365"
+                    android:endX="535"
+                    android:endY="528">
+                    <item android:offset="0.0" android:color="#FFF6E2B8" />
+                    <item android:offset="0.32" android:color="#FFEAD09E" />
+                    <item android:offset="0.52" android:color="#FFDCC08E" />
+                    <item android:offset="0.75" android:color="#FFCFA97B" />
+                    <item android:offset="1.0" android:color="#FFC19E71" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- বাঁকা চাঁদ: ভেতরের 3D Bevel ফ্যাসেট -->
+        <path android:pathData="M 451.5 334.0 A 103.80 103.80 0 0 0 614.5 456.0 A 101.12 101.12 0 0 1 451.5 334.0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="420"
+                    android:startY="380"
+                    android:endX="525"
+                    android:endY="512">
+                    <item android:offset="0.0" android:color="#FFD0B082" />
+                    <item android:offset="0.35" android:color="#FFD7B88B" />
+                    <item android:offset="0.55" android:color="#FFE2C899" />
+                    <item android:offset="0.80" android:color="#FFEED8AD" />
+                    <item android:offset="1.0" android:color="#FFF5E3B8" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- চার কোণা তারা -->
+        <path android:pathData="M 511.5 391.0 Q 515.3 404.7 529.0 408.5 Q 515.3 412.3 511.5 426.0 Q 507.7 412.3 494.0 408.5 Q 507.7 404.7 511.5 391.0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="511.5"
+                    android:startY="391"
+                    android:endX="511.5"
+                    android:endY="426">
+                    <item android:offset="0.0" android:color="#FFFAE6C6" />
+                    <item android:offset="0.48" android:color="#FFF0D4AC" />
+                    <item android:offset="1.0" android:color="#FFC7A67B" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- তারার উপরের হাইলাইট ফ্যাসেট -->
+        <path
+            android:fillColor="#FFF7E4"
+            android:fillAlpha="0.38"
+            android:pathData="M 511.5 391.0 Q 515.3 404.7 529.0 408.5 L 511.5 408.5 L 494.0 408.5 Q 507.7 404.7 511.5 391.0 Z" />
+
+        <!-- মেহরাব খিলানের ড্রপ শ্যাডো লেয়ার (চাঁদের উপরের কোণার ওপর প্রাকৃতিক ছায়া ফেলবে) -->
+        <group android:translateY="8">
+            <path
+                android:fillColor="#48010D09"
+                android:pathData="M 308.8 796.5 L 308.8 476.0 C 308.8 367.5, 377.5 291.5, 511.5 224.0 C 645.5 291.5, 714.2 367.5, 714.2 476.0 L 714.2 796.5 L 707.2 796.5 L 707.2 476.0 C 707.2 371.5, 639.5 297.5, 511.5 232.8 C 383.5 297.5, 315.8 371.5, 315.8 476.0 L 315.8 796.5 Z" />
+            <path
+                android:fillColor="#48010D09"
+                android:pathData="M 332.0 798.5 L 332.0 472.0 C 332.0 371.5, 395.0 305.5, 511.5 251.8 C 628.0 305.5, 691.0 371.5, 691.0 472.0 L 691.0 798.5 L 649.2 798.5 L 649.2 596.0 C 649.2 572.5, 635.8 558.2, 619.5 548.0 C 641.5 522.0, 649.5 493.5, 649.5 464.0 C 649.5 386.5, 597.5 335.5, 511.5 296.0 C 425.5 335.5, 373.5 386.5, 373.5 464.0 C 373.5 493.5, 381.5 522.0, 403.5 548.0 C 387.2 558.2, 373.8 572.5, 373.8 596.0 L 373.8 798.5 Z" />
+        </group>
+
+        <!-- বাইরের চিকন খিলান (Outer Thin Pointed Arch) -->
+        <path android:pathData="M 308.8 796.5 L 308.8 476.0 C 308.8 367.5, 377.5 291.5, 511.5 224.0 C 645.5 291.5, 714.2 367.5, 714.2 476.0 L 714.2 796.5 L 707.2 796.5 L 707.2 476.0 C 707.2 371.5, 639.5 297.5, 511.5 232.8 C 383.5 297.5, 315.8 371.5, 315.8 476.0 L 315.8 796.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="511.5"
+                    android:startY="224"
+                    android:endX="511.5"
+                    android:endY="797">
+                    <item android:offset="0.0" android:color="#FFF9E7C3" />
+                    <item android:offset="0.16" android:color="#FFECDBAF" />
+                    <item android:offset="0.32" android:color="#FFEFDDB7" />
+                    <item android:offset="0.52" android:color="#FFD8C090" />
+                    <item android:offset="0.76" android:color="#FFCAAE7E" />
+                    <item android:offset="1.0" android:color="#FFBF9E71" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <!-- ভেতরের মোটা মেহরাব খিলান (Inner Thick Mihrab Arch) -->
+        <path android:pathData="M 332.0 798.5 L 332.0 472.0 C 332.0 371.5, 395.0 305.5, 511.5 251.8 C 628.0 305.5, 691.0 371.5, 691.0 472.0 L 691.0 798.5 L 649.2 798.5 L 649.2 596.0 C 649.2 572.5, 635.8 558.2, 619.5 548.0 C 641.5 522.0, 649.5 493.5, 649.5 464.0 C 649.5 386.5, 597.5 335.5, 511.5 296.0 C 425.5 335.5, 373.5 386.5, 373.5 464.0 C 373.5 493.5, 381.5 522.0, 403.5 548.0 C 387.2 558.2, 373.8 572.5, 373.8 596.0 L 373.8 798.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="511.5"
+                    android:startY="252"
+                    android:endX="511.5"
+                    android:endY="799">
+                    <item android:offset="0.0" android:color="#FFFDF9ED" />
+                    <item android:offset="0.25" android:color="#FFFAF3E3" />
+                    <item android:offset="0.50" android:color="#FFF3EBD6" />
+                    <item android:offset="0.75" android:color="#FFECDEC3" />
+                    <item android:offset="1.0" android:color="#FFEADAB9" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+    </group>
 </vector>
