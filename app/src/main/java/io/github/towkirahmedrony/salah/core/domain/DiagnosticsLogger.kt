@@ -162,4 +162,18 @@ object SalahDiagnosticEvents {
 
     /** A device position was attributed to an administrative area. */
     const val LOCATION_AREA_RESOLVED = "location_area_resolved"
+
+    /**
+     * A device position was matched to a named locality. Logged with the kind of place and the distance.
+     */
+    const val LOCATION_LOCALITY_RESOLVED = "location_locality_resolved"
+
+    /**
+     * A device position could not be matched to a named locality.
+     *
+     * Logged with a reason code — `no_layer`, `no_district`, `not_precise_enough`, `too_far` — because
+     * the four mean different things: only two of them are worth acting on, and a distance in metres is
+     * attached to the last one so a threshold that is systematically too tight can be recognised.
+     */
+    const val LOCATION_LOCALITY_UNRESOLVED = "location_locality_unresolved"
 }

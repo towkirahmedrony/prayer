@@ -9,6 +9,7 @@ import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixAdoption
 import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixAdoptionPolicy
 import io.github.towkirahmedrony.salah.core.domain.location.DeviceFixRejectionReason
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
@@ -34,6 +35,7 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaStateReducer
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -314,10 +316,18 @@ class QiblaViewModel(
         val point = GeoPoint(latitude = acquired.latitude, longitude = acquired.longitude)
         val dataset = runCatching { areaCatalog.dataset() }.getOrNull()
 
-        when (val adoption = DeviceFixAdoptionPolicy.decide(point, dataset)) {
+        when (val adoption = DeviceFixAdoptionPolicy.decide(point, acquired.accuracyMetres, dataset)) {
             is DeviceFixAdoption.Accepted -> {
                 val saved = locations.saveDeviceLocation(
-                    label = adoption.reference.label,
+                    // The same display policy the location screen uses, so a fix adopted here is named the
+                    // same way one confirmed there would be — including the locality, when the fix was
+                    // accurate enough to establish one.
+                    label = LocationDisplayName.of(
+                        origin = LocationOrigin.DEVICE_GPS,
+                        storedLabel = adoption.reference.label,
+                        area = adoption.reference,
+                        locality = adoption.locality,
+                    ),
                     latitude = point.latitude,
                     longitude = point.longitude,
                     // A fix adopted as a Bangladeshi area is stored in Bangladesh's single zone, the same
@@ -328,6 +338,7 @@ class QiblaViewModel(
                     acquiredAtEpochMillis = acquired.acquiredAtEpochMillis,
                     countryCode = adoption.countryCode,
                     area = adoption.reference,
+                    locality = adoption.locality,
                     datasetVersion = adoption.datasetVersion,
                 )
 

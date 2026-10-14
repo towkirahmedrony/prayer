@@ -27,6 +27,12 @@ import kotlinx.coroutines.withContext
  * parses into something unusable is returned as it is — `BangladeshLocationDataset.isUsable` and
  * `LocationSetup` then decide what to tell the user. Nothing throws into the UI, and nothing falls back
  * to a hand-written list of places.
+ *
+ * **The locality layer is optional in a way the other two are not.** `bd_localities.tsv` adds the
+ * neighbourhood names inside the city corporations; without it a location can still be chosen, stored and
+ * described, only less precisely. So a missing locality file is logged and treated as an empty layer
+ * rather than making the whole dataset unreadable — but the two files the app cannot work without are
+ * still both required, and the log says which one was absent.
  */
 class AssetBangladeshAreaCatalog(
     private val context: Context,
@@ -57,10 +63,18 @@ class AssetBangladeshAreaCatalog(
             return null
         }
 
+        val localities = readAsset(LOCALITIES_ASSET, required = false)
+        if (localities == null) {
+            // Reported once, at load, rather than at every fix: the consequence is a coarser name, not a
+            // broken location, so this is a warning and the dataset is still returned.
+            logger.warn(SalahDiagnosticEvents.LOCATION_DATASET_UNAVAILABLE, mapOf("localityLayer" to false))
+        }
+
         val dataset = BangladeshLocationDataset.parse(
             version = VERSION,
             areasText = areas,
             boundaryText = boundary,
+            localitiesText = localities.orEmpty(),
         )
         logger.info(
             SalahDiagnosticEvents.LOCATION_DATASET_LOADED,
@@ -69,6 +83,7 @@ class AssetBangladeshAreaCatalog(
                 "divisions" to dataset.divisions.size,
                 "districts" to dataset.districts.size,
                 "upazilas" to dataset.upazilas.size,
+                "localities" to dataset.localities.size,
                 "rings" to dataset.boundaryRings.size,
                 "rejected" to dataset.rejectedLines.size,
                 "usable" to dataset.isUsable,
@@ -77,14 +92,16 @@ class AssetBangladeshAreaCatalog(
         return dataset
     }
 
-    private fun readAsset(name: String): String? = try {
+    private fun readAsset(name: String, required: Boolean = true): String? = try {
         context.assets.open(name).bufferedReader().use { it.readText() }
     } catch (error: Exception) {
-        logger.error(
-            SalahDiagnosticEvents.LOCATION_DATASET_UNAVAILABLE,
-            error,
-            mapOf("asset" to name),
-        )
+        if (required) {
+            logger.error(
+                SalahDiagnosticEvents.LOCATION_DATASET_UNAVAILABLE,
+                error,
+                mapOf("asset" to name),
+            )
+        }
         null
     }
 
@@ -97,6 +114,9 @@ class AssetBangladeshAreaCatalog(
 
         /** The generated national boundary file. */
         const val BOUNDARY_ASSET: String = "$ASSET_DIRECTORY/bd_boundary.tsv"
+
+        /** The generated locality layer: the named neighbourhoods inside the city corporations. */
+        const val LOCALITIES_ASSET: String = "$ASSET_DIRECTORY/bd_localities.tsv"
 
         /**
          * The dataset version reported to the app and stored with a selected area.

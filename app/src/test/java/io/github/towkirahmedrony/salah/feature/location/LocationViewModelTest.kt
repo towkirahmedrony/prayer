@@ -21,7 +21,9 @@ import io.github.towkirahmedrony.salah.testing.FakePrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.testing.FakePrayerScheduleRepository
 import io.github.towkirahmedrony.salah.testing.FakeUserPreferencesRepository
 import io.github.towkirahmedrony.salah.testing.RecordingLogger
+import io.github.towkirahmedrony.salah.testing.localityRow
 import io.github.towkirahmedrony.salah.testing.syntheticDataset
+import io.github.towkirahmedrony.salah.testing.syntheticLocalities
 import io.github.towkirahmedrony.salah.testing.testSchedule
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -488,7 +490,77 @@ class LocationViewModelTest {
         assertEquals("Home", locations.location.first()?.label)
     }
 
+    // --- A named locality -------------------------------------------------------
+
+    @Test
+    fun `a fix accurate enough is stored under the neighbourhood it matched`() = runTest(mainDispatcher) {
+        val provider = FakeLocationProvider().apply { fixAt(KUSHTIA_CENTRE) }
+        val viewModel = viewModel(
+            provider = provider,
+            catalog = FakeBangladeshAreaCatalog(datasetWithLocality()),
+        )
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.useCurrentLocation(saveOnArrival = true)
+        runCurrent()
+
+        assertEquals(LocationMessage.Saved, states.settled().message)
+        val saved = requireNotNull(locations.location.first()) { "the fix must be stored" }
+
+        // The name is the neighbourhood's, qualified by the district — not the city corporation or the
+        // upazila the administrative layer could name on its own.
+        assertEquals("Test Bazar", saved.locality?.name)
+        assertEquals("BD1001", saved.locality?.districtId)
+        assertEquals("Test Bazar, Kushtia", saved.label)
+
+        // And the locality did not replace the administrative hierarchy: both are recorded, because they
+        // say different things and the upazila is what the rest of the app means by "the area".
+        assertEquals("BD1001001", saved.area?.upazilaId)
+        assertEquals("Kumarkhali", saved.area?.upazilaName)
+    }
+
+    @Test
+    fun `an approximate fix is stored by area only, never by neighbourhood`() = runTest(mainDispatcher) {
+        // What an approximate permission produces: a fix whose reported accuracy is wider than the
+        // neighbourhood it is standing in. Salah names the area it can prove and says nothing about the
+        // street, rather than translating coarse accuracy into a confident local name.
+        val provider = FakeLocationProvider().apply {
+            fixAt(KUSHTIA_CENTRE, accuracyMetres = 3_000.0)
+        }
+        val viewModel = viewModel(
+            provider = provider,
+            catalog = FakeBangladeshAreaCatalog(datasetWithLocality()),
+        )
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.useCurrentLocation(saveOnArrival = true)
+        runCurrent()
+
+        assertEquals(LocationMessage.Saved, states.settled().message)
+        val saved = requireNotNull(locations.location.first()) { "the fix must still be stored" }
+        assertNull("a ±3 km fix cannot establish a neighbourhood", saved.locality)
+        assertEquals("Kumarkhali, Kushtia", saved.label)
+        // The fix itself is not discarded: the reduced precision costs the name, not the location.
+        assertEquals(3_000.0, requireNotNull(saved.accuracyMetres), 0.000001)
+    }
+
     // --- Harness ---------------------------------------------------------------
+
+    /**
+     * The miniature dataset plus one named locality at the point every device-fix test uses.
+     *
+     * Put at Kushtia's own centre so the case that is about the neighbourhood is not also a case about
+     * distance, and in district BD1001 so the verified-district gate is satisfied by construction.
+     */
+    private fun datasetWithLocality() = syntheticDataset(
+        localities = syntheticLocalities(
+            localityRow("QUARTER", KUSHTIA, "Test Bazar", KUSHTIA_CENTRE.latitude, KUSHTIA_CENTRE.longitude),
+        ),
+    )
 
     private fun TestScope.viewModel(
         provider: LocationProvider = FakeLocationProvider(),

@@ -132,7 +132,10 @@ derivation is auditable and repeatable:
 
 - `app/src/main/assets/location/bd_areas.tsv` — the hierarchy, names and coordinates.
 - `app/src/main/assets/location/bd_boundary.tsv` — the simplified national boundary.
-- `tools/generate_bd_location_dataset.py` — the generator.
+- `app/src/main/assets/location/bd_localities.tsv` — the named urban localities and the district each
+  one was verified to lie in (§8).
+- `tools/generate_bd_location_dataset.py` — the generator for the hierarchy and the boundary.
+- `tools/generate_bd_locality_dataset.py` — the generator for the locality layer.
 
 **Sources.**
 
@@ -143,6 +146,12 @@ derivation is auditable and repeatable:
    Intergovernmental Organisations (CC BY 3.0 IGO)**, http://creativecommons.org/licenses/by/3.0/igo/.
 2. **`nuhil/bangladesh-geocode`** (MIT). Used **only** for the Bangla name of a unit, joined by name.
    Licence: MIT, https://github.com/nuhil/bangladesh-geocode.
+3. **OpenStreetMap**, queried through the Overpass API. Used **only** for the locality layer: the name
+   (English, and the matching Bangla name is in the source but not shipped), its kind and its point.
+   Licence: **Open Database License (ODbL) 1.0**, https://www.openstreetmap.org/copyright. The generated
+   file is a Derivative Database of OpenStreetMap data and is offered under the ODbL; the asset's own
+   header states that, the `(c) OpenStreetMap contributors` attribution it requires, and the timestamp
+   of the data it was extracted from.
 
 **Version.** The dataset identifies itself as `BGD-COD-AB v03 (2023-05-21)`, the value of
 `AssetBangladeshAreaCatalog.VERSION` shown in the UI and stored with a selected area. The generator
@@ -154,8 +163,9 @@ happens to contain.
 
 **Format.** Tab-separated text with `#` comments, seven columns per data row
 (`level, id, parent_id, name, bn_name, latitude, longitude`) and three for the boundary
-(`ring_index, latitude, longitude`). The parser is `BangladeshLocationDataset` (pure Kotlin, no JSON or
-CSV dependency).
+(`ring_index, latitude, longitude`). The locality file follows the same shape with five columns
+(`kind, district_id, name, latitude, longitude`). The parser is `BangladeshLocationDataset` (pure
+Kotlin, no JSON or CSV dependency).
 
 **Size and coverage (measured from the shipped files).**
 
@@ -167,7 +177,9 @@ CSV dependency).
 | Upazilas with no Bangla name (English name shown instead) | 69 |
 | Boundary rings | 13 |
 | Boundary points | 1 676 |
-| `bd_areas.tsv` / `bd_boundary.tsv` size | ≈ 45 KB / ≈ 37 KB |
+| Named localities | 1 216 |
+| Districts carrying a locality layer | 33 of 64 |
+| `bd_areas.tsv` / `bd_boundary.tsv` / `bd_localities.tsv` size | ≈ 45 KB / ≈ 37 KB / ≈ 59 KB |
 
 **Bangla names.** The Bangla join is best-effort and never guessed: an exact match first, then a
 similarity match **within the same district** at a high threshold, and otherwise **no Bangla name at
@@ -178,7 +190,12 @@ Salah invented.
 source's *own* geometry (every published centre must fall inside its own boundary) and reports
 failures rather than dropping them. That is a check of the source against itself. Salah has **not**
 compared these coordinates against any independent dataset, and makes no claim that they are
-externally verified beyond what OCHA publishes. See §6 and §12.
+externally verified beyond what OCHA publishes. The locality generator performs a stronger check of a
+different kind: it joins every locality to the district whose **polygon contains it**, in the source's
+geometry, and drops (with a printed count) any locality that falls in no district of that dataset —
+none did; 141 rows without an English name, one unusable name and 55 duplicates were dropped, and
+those counts are recorded in the asset's header, so the loss from the extract to the shipped file is
+visible in the repository rather than recovered from memory. See §6 and §12.
 
 ## 6. Representative coordinates vs precise GPS coordinates
 
@@ -254,17 +271,87 @@ never shown as an upazila-level one.
 This is **not** reverse geocoding: no address is produced, no street is named, and nothing is sent
 anywhere. The area name is presented as approximate, and the user can always select the area manually.
 
+### 8.1 The locality layer: why it exists
+
+Inside the twelve **city corporations** the administrative dataset has no unit smaller than the
+corporation: COD-AB's third level is 495 upazilas **plus 12 city corporations**, so a fix anywhere in
+Dhaka resolves, at its deepest, to *Dhaka North* or *Dhaka South City Corporation* — correct, and no
+more useful than saying which half of the city the phone was in. That is what made a Salah location
+read as a generic name.
+
+Salah therefore ships a second, finer layer — **named localities**: `place=suburb`, `place=quarter` and
+`place=neighbourhood` names from OpenStreetMap, each joined to the district that **contains** its point
+(point-in-polygon against the COD-AB ADM2 geometry, not proximity to a district centre). It is 1 216
+rows covering 33 districts — Dhaka 730, Cumilla 108, Khulna 82, Narayanganj 60 — and it is optional by
+design: a missing or empty layer changes a name, never whether a location can be chosen or stored.
+
+`LocalityResolver.resolve(point, accuracyMetres, districtId, dataset)` decides whether a position may
+be named after one:
+
+1. **The district gate.** Only localities whose *verified* district equals the district the
+   administrative resolver attributed the position to are candidates. A place one side of a border is
+   therefore never offered for a position on the other side, whatever its distance.
+2. **The precision gate.** The reported accuracy must be known and positive, and
+   `distance + accuracy <= MATCH_METRES` (**2 000 m**) — the whole accuracy circle has to fit inside
+   the match radius. An approximate permission, or a fix with no reported accuracy, produces
+   `NotPreciseEnough` and the name is withheld rather than guessed. This is how an approximate
+   permission is represented honestly: it is not refused, it is answered with a coarser, still true,
+   name.
+3. Otherwise the nearest locality in that district inside the radius is matched, with its distance
+   carried on the result; beyond it, `Unmatched` with the distance to the nearest one, or `null` when
+   that district has no locality rows at all.
+
+Matching is nearest-point, **not** containment: the layer publishes points, not boundaries. What it
+claims is therefore "the nearest named place, within two kilometres, in the district this position was
+verified to be in, and precise enough to be standing there" — and the matched name is recorded beside
+the area, never instead of it. A locality is never presented as an administrative thana or ward; the
+district is what anchors it administratively.
+
+### 8.2 How a location's display name is decided
+
+`LocationDisplayName` is the single function that turns a stored location into the name every screen
+shows (`HomeUiStateFactory` for Home and Prayer, the Qibla location line, and both save paths):
+
+1. a **manually typed** name is returned unchanged — it is the user's own words and outranks any fact
+   the app holds;
+2. otherwise the deepest *verified* fact is used — the locality when there is one, else the
+   upazila/thana, else the district — qualified by the district name;
+3. the district qualifier is **dropped when the deeper name already contains it**, which is the rule
+   that turns the twelve `"X City Corporation, X"` labels into one clean name instead of a repeated one;
+4. with no facts at all, the stored label is returned unchanged.
+
+It is composed from the record's *parts*, not from the stored label, so a location written by an earlier
+build is shown under the current rule with no migration, and the label written at save time is produced
+by the same function. The possible results, in the order the policy can produce them:
+
+| What the record holds | Shown |
+|---|---|
+| locality verified in the resolved district | `Mirpur, Dhaka` |
+| upazila/thana inside the district | `Savar, Dhaka` |
+| city corporation named after its district | `Dhaka South City Corporation` |
+| district only | `Dhaka` |
+| locality with no resolved district | `Mirpur` |
+| typed coordinates | as typed |
+| nothing usable | the stored label, unchanged |
+
+There is no case in which a division alone reaches this function: `BangladeshAreaRef` always carries a
+district, because a selection that stops at a division cannot be saved.
+
 ## 9. Offline operation and persistence
 
 Nothing in the location system needs a network, and Salah declares no `INTERNET` permission.
 
 - **Stored location:** `DataStoreLocationRepository` keeps the location in the same DataStore as the
   other preferences. The stored value carries its origin, accuracy, acquisition time, country code, the
-  area hierarchy (ids and names) and the dataset version. A location written by an earlier build simply
-  lacks the newer keys and reads as a manual entry with unknown freshness — an existing location is
-  preserved, not migrated destructively.
-- **Geography:** `AssetBangladeshAreaCatalog` reads the two assets once per process (≈ 83 KB total,
-  a few milliseconds to parse) and caches the parsed dataset.
+  area hierarchy (ids and names), the matched locality (name, verified district id and kind) and the
+  dataset version. A location written by an earlier build simply lacks the newer keys and reads as a
+  manual entry with unknown freshness, with no locality — an existing location is preserved, not
+  migrated destructively. Both the hierarchy and the locality are written and removed **as a set**, so a
+  name can never be left attached to coordinates it was not matched against.
+- **Geography:** `AssetBangladeshAreaCatalog` reads the assets once per process (≈ 142 KB total, a few
+  milliseconds to parse) and caches the parsed dataset. The locality file is read *optionally*: missing
+  it is logged as a warning and yields an empty layer, because the two files the app cannot work
+  without are the hierarchy and the boundary.
 - **Failure is a value.** A missing or unreadable asset returns `null` and is logged; a dataset that
   parses into something unusable is returned as it is, and `LocationSetup` decides what to tell the
   user. Nothing throws into the UI, and nothing falls back to a hand-written list of "popular" places.
@@ -290,15 +377,31 @@ Nothing in the location system needs a network, and Salah declares no `INTERNET`
 Run with `./gradlew testDebugUnitTest` (the same command CI runs).
 
 - `BangladeshLocationDatasetTest` — the parser: accepted and refused rows, blank Bangla names,
-  duplicate ids, boundary ring grouping, a ring too small to enclose being dropped, and malformed
-  boundary lines being recorded.
+  duplicate ids, boundary ring grouping, a ring too small to enclose being dropped, malformed
+  boundary lines being recorded, and the locality layer's own rules — a row naming a district this
+  build does not define, an unknown kind, a blank name or a bad coordinate are all refused, and a row
+  repeated for the same district is collapsed rather than kept twice.
+- `LocalityResolverTest` — the locality rules on synthetic geometry and on the shipped file: a
+  precise fix matches its locality, the nearest in the district wins, a locality in *another* district
+  is never matched however close, an accuracy circle that does not fit the radius withholds the name
+  while still reporting the distance, an unknown or non-positive accuracy is `NotPreciseEnough`, no
+  district means no claim, a district without locality rows reports nothing to measure, the resolver is
+  deterministic, and the bundled layer names Mirpur, Dhanmondi and Uttara for Dhaka and leaves a
+  district whose localities are all far away with its administrative answer.
+- `LocationDisplayNameTest` — the naming policy: the locality is paired with its district, the city
+  corporation does not repeat its district, an upazila that does not contain the district name keeps
+  both, a district-level match is the district, a typed name is never replaced, and a record with no
+  facts keeps its stored label.
 - `BundledDatasetIntegrityTest` — loads the **real** shipped assets and checks the measured coverage
-  (8 / 64 / 507), that **no** line is rejected, that the number of data lines equals the number of
-  parsed areas (so no row can silently disappear), that ids are unique and parents resolve at the
-  correct level, that every coordinate is plausible and every representative centre is strictly inside
-  the bundled boundary, that the boundary parses into valid rings, and that the repaired Shahrasti row
-  keeps its identity, parent and coordinates. This is the strict gate that keeps a malformed shipped
-  file from reaching a release; runtime parsing stays lenient by design.
+  (8 / 64 / 507 / 1 216 localities), that **no** line is rejected, that the number of data lines equals
+  the number of parsed areas and localities (so no row can silently disappear), that ids are unique and
+  parents resolve at the correct level, that every coordinate is plausible, that every representative
+  centre **and every locality point** is strictly inside the bundled boundary, that every locality names
+  a district that exists, that no locality is duplicated, that Dhaka carries at least 500 localities and
+  the neighbourhoods the feature exists for are in the shipped file, that the boundary parses into
+  valid rings, and that the repaired Shahrasti row keeps its identity, parent and coordinates. This is
+  the strict gate that keeps a malformed shipped file from reaching a release; runtime parsing stays
+  lenient by design.
 - `BangladeshLocationPolicyTest` — the boundary classification: clearly inside, clearly outside,
   just outside within the tolerance, beyond the tolerance, and unreadable boundary; against both a
   synthetic square and the real boundary, including a regression case for an Indian city inside the
@@ -316,8 +419,15 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   stored on confirmation, a fix asked for on first launch is stored on arrival, a fix outside
   Bangladesh is refused and stores nothing on **either** path, a declined permission and a timeout
   each leave their message and the manual option, a second tap during a fix starts one request, the
-  cascade drops a child its new parent cannot keep, and a confirmed selection stores the chosen
-  area's published centre with `AREA_SELECTION` provenance while a partial one is refused.
+  cascade drops a child its new parent cannot keep, a confirmed selection stores the chosen
+  area's published centre with `AREA_SELECTION` provenance while a partial one is refused, a precise
+  fix is stored under the neighbourhood it matched with the hierarchy still intact beside it, and an
+  approximate fix is stored by area only — never by a neighbourhood it is not accurate enough to name.
+- `DeviceFixAdoptionPolicyTest` — the Qibla write path, including that an accepted fix carries the
+  locality its accuracy supports and that the same position at an approximate accuracy is adopted
+  without one.
+- `DataStoreLocationRepositoryTest` — the locality round-trips, a write without one clears it, and a
+  store from a build that predates the layer reads as no locality rather than as a bad one.
 - `DeviceFixAdoptionPolicyTest` — the Qibla write-path decision (adopted vs preserved, and why).
 - `LocationPermissionPolicyTest` — the permission affordance decision.
 - `LocationFreshnessTest`, `GeoMathTest`, `LocationInfoTest`, `DataStoreLocationRepositoryTest` —
@@ -334,6 +444,25 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
 - **Area resolution is nearest-centre, not point-in-polygon.** An area name can name a neighbouring
   unit when a fix sits near a shared boundary, and a fix far from every centre is left unresolved. The
   UI says the name is approximate.
+- **The locality layer is OpenStreetMap data: urban, uneven, and informal.** Coverage is concentrated
+  where mappers are — Dhaka carries 730 of the 1 216 rows and 31 of the 64 districts have none — so a
+  position in a town without a layer keeps its administrative name, which is the intended fallback.
+  The names are what people call those places; they are **not** an official thana, ward or union
+  inventory, and Salah never presents one as such. Regenerating the layer re-extracts live OSM data, so
+  the row count and the data timestamp in the asset header will change; the integrity test asserts the
+  coverage the shipped file actually has and must be updated deliberately with it.
+- **Locality matching is nearest-point within 2 km, not containment.** Two kilometres is chosen for the
+  scale of the units, and the district gate plus the accuracy gate remove the obvious ways to be wrong,
+  but a place just outside the radius is not named and a place just inside it is. The name is stored
+  beside the position's own coordinates, never instead of them, so prayer times and the Qibla bearing
+  remain computed from the fix itself.
+- **A fix with no reported accuracy is never named after a neighbourhood.** `NotPreciseEnough` is the
+  honest answer, and it costs the user a finer name rather than risking a false one; the administrative
+  area is stored either way.
+- **ODbL attribution is carried in the asset header**, which ships in the APK, and the derived file is
+  offered under the ODbL. If the app's own distribution terms ever change, the locality layer is the
+  one dependency of that change — it is separable from the CC BY 3.0 IGO and MIT data the rest of the
+  location system is built on.
 - **A selected area stores a representative centre**, so its times can differ from the user's own
   position by a minute or two.
 - **The location screens have not been verified on a physical device.** The picker's TalkBack semantics,

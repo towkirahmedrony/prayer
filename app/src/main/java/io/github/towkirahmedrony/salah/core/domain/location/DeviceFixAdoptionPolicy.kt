@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.location
 
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 
 /** Why a device fix must not replace the location Salah already has stored. */
 enum class DeviceFixRejectionReason {
@@ -35,6 +36,15 @@ sealed interface DeviceFixAdoption {
         val reference: BangladeshAreaRef,
         val countryCode: String,
         val datasetVersion: String,
+        /**
+         * The named locality the fix was matched to, when one could be matched at its accuracy.
+         *
+         * Carried here rather than left to the caller so the two entry points that adopt a fix
+         * silently — this policy — and the one that shows it for confirmation produce the same record,
+         * including the name. A fix that could only be attributed to an area keeps `null` and is stored
+         * with the area's name, which is a coarser answer and still a true one.
+         */
+        val locality: BangladeshLocalityRef? = null,
     ) : DeviceFixAdoption
 
     /** The fix must not replace the stored location. [distanceMetres] is set when it was measured. */
@@ -65,13 +75,25 @@ sealed interface DeviceFixAdoption {
  * requires avoiding — and the user can still change the location from the location screen, where the
  * same fix is shown for confirmation.
  *
- * Pure and synchronous: it takes the point and the already-parsed dataset and returns a value, so the
- * decision is directly testable with no device, no permission and no coroutine.
+ * Pure and synchronous: it takes the point, the fix's reported accuracy and the already-parsed dataset
+ * and returns a value, so the decision is directly testable with no device, no permission and no
+ * coroutine.
  */
 object DeviceFixAdoptionPolicy {
 
-    /** Decides the outcome for [point] against [dataset], which may be `null` when it did not load. */
-    fun decide(point: GeoPoint, dataset: BangladeshLocationDataset?): DeviceFixAdoption {
+    /**
+     * Decides the outcome for [point] against [dataset], which may be `null` when it did not load.
+     *
+     * @param accuracyMetres the fix's reported horizontal accuracy, or `null` when the provider did not
+     *   report one. It does not affect whether the fix is adopted — that is the country and area rule —
+     *   but it does decide whether a locality may be named for it, because a fix accurate only to a
+     *   kilometre or two cannot be attributed to a neighbourhood.
+     */
+    fun decide(
+        point: GeoPoint,
+        accuracyMetres: Double?,
+        dataset: BangladeshLocationDataset?,
+    ): DeviceFixAdoption {
         if (!point.isFinite) {
             return DeviceFixAdoption.Rejected(DeviceFixRejectionReason.DATASET_UNAVAILABLE)
         }
@@ -80,7 +102,7 @@ object DeviceFixAdoptionPolicy {
         }
 
         return when (val check = BangladeshLocationPolicy.check(point, dataset.boundaryRings)) {
-            BangladeshCheck.Inside -> adopt(point, dataset)
+            BangladeshCheck.Inside -> adopt(point, accuracyMetres, dataset)
             is BangladeshCheck.WithinBoundaryTolerance ->
                 DeviceFixAdoption.Rejected(DeviceFixRejectionReason.OUTSIDE_BANGLADESH, check.distanceMetres)
             is BangladeshCheck.Outside ->
@@ -90,12 +112,17 @@ object DeviceFixAdoptionPolicy {
         }
     }
 
-    private fun adopt(point: GeoPoint, dataset: BangladeshLocationDataset): DeviceFixAdoption =
+    private fun adopt(
+        point: GeoPoint,
+        accuracyMetres: Double?,
+        dataset: BangladeshLocationDataset,
+    ): DeviceFixAdoption =
         when (val resolution = AreaResolver.resolve(point, dataset)) {
             is AreaResolution.Suggested -> DeviceFixAdoption.Accepted(
                 reference = resolution.suggestion.reference,
                 countryCode = BangladeshLocationPolicy.COUNTRY_CODE,
                 datasetVersion = dataset.version,
+                locality = localityFor(point, accuracyMetres, resolution.suggestion.reference, dataset),
             )
 
             is AreaResolution.Unresolved -> DeviceFixAdoption.Rejected(
@@ -106,4 +133,20 @@ object DeviceFixAdoptionPolicy {
             AreaResolution.DatasetUnavailable ->
                 DeviceFixAdoption.Rejected(DeviceFixRejectionReason.DATASET_UNAVAILABLE)
         }
+
+    /**
+     * The locality to record with an accepted fix, or `null` when none can be established.
+     *
+     * Deliberately not a rejection condition: the administrative area is already sufficient to describe
+     * the location, and refusing a verified fix because the finer name is unavailable would throw away a
+     * valid position to avoid a coarser label.
+     */
+    private fun localityFor(
+        point: GeoPoint,
+        accuracyMetres: Double?,
+        reference: BangladeshAreaRef,
+        dataset: BangladeshLocationDataset,
+    ): BangladeshLocalityRef? =
+        (LocalityResolver.resolve(point, accuracyMetres, reference.districtId, dataset)
+            as? LocalityResolution.Matched)?.suggestion?.reference
 }

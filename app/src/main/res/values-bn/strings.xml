@@ -237,6 +237,7 @@
     <string name="location_division_label">বিভাগ</string>
     <string name="location_district_label">জেলা</string>
     <string name="location_upazila_label">উপজেলা / থানা</string>
+    <string name="location_locality_label">এলাকা</string>
     <string name="location_time_zone_label">সময় অঞ্চল</string>
     <string name="location_accuracy_label">নির্ভুলতা</string>
 

@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityKind
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +42,10 @@ import java.time.Instant
  * location whose area is unknown, and is validated from its coordinates instead. That is why the
  * location screen can be opened on a device that has been running Salah since before areas existed,
  * and why nothing is migrated destructively.
+ *
+ * The locality keys added for the neighbourhood layer are the same story a third time: absent from an
+ * older store, read as "no locality was established", and written or removed as a set so a locality can
+ * never survive beside a coordinate it does not belong to.
  */
 class DataStoreLocationRepository(
     private val dataStore: DataStore<Preferences>,
@@ -76,6 +82,7 @@ class DataStoreLocationRepository(
         acquiredAtEpochMillis: Long?,
         countryCode: String?,
         area: BangladeshAreaRef?,
+        locality: BangladeshLocalityRef?,
         datasetVersion: String?,
     ): Boolean = store(
         validated = LocationInfo.create(
@@ -93,6 +100,7 @@ class DataStoreLocationRepository(
                 ?.let { Instant.ofEpochMilli(it) },
             countryCode = countryCode,
             area = area,
+            locality = locality,
             datasetVersion = datasetVersion,
         ),
     )
@@ -136,6 +144,9 @@ class DataStoreLocationRepository(
             preferences.remove(Keys.DISTRICT_NAME)
             preferences.remove(Keys.UPAZILA_ID)
             preferences.remove(Keys.UPAZILA_NAME)
+            preferences.remove(Keys.LOCALITY_NAME)
+            preferences.remove(Keys.LOCALITY_DISTRICT_ID)
+            preferences.remove(Keys.LOCALITY_KIND)
         }
     }
 
@@ -183,6 +194,21 @@ class DataStoreLocationRepository(
                 validated.datasetVersion?.let { preferences[Keys.DATASET_VERSION] = it }
                     ?: preferences.remove(Keys.DATASET_VERSION)
             }
+
+            // Written as a set or removed as a set, exactly like the hierarchy above: a locality without
+            // the district that verified it could not be checked against a position, and a district with
+            // no locality name is not a locality. A manual selection or a manual entry therefore clears
+            // it rather than leaving the previous user's neighbourhood attached to a different position.
+            val locality = validated.locality
+            if (locality == null) {
+                preferences.remove(Keys.LOCALITY_NAME)
+                preferences.remove(Keys.LOCALITY_DISTRICT_ID)
+                preferences.remove(Keys.LOCALITY_KIND)
+            } else {
+                preferences[Keys.LOCALITY_NAME] = locality.name
+                preferences[Keys.LOCALITY_DISTRICT_ID] = locality.districtId
+                preferences[Keys.LOCALITY_KIND] = locality.kind.name
+            }
         }
         return true
     }
@@ -209,6 +235,7 @@ class DataStoreLocationRepository(
             acquiredAt = this[Keys.ACQUIRED_AT_EPOCH_MILLIS]?.let { Instant.ofEpochMilli(it) },
             countryCode = this[Keys.COUNTRY_CODE],
             area = readArea(),
+            locality = readLocality(),
             datasetVersion = this[Keys.DATASET_VERSION],
         )
     }
@@ -235,6 +262,22 @@ class DataStoreLocationRepository(
         )
     }
 
+    /**
+     * Rebuilds the stored locality, or `null` when the store holds none.
+     *
+     * All three parts are required: a name with no district could not be checked against the position it
+     * describes, and an unrecognised kind is a value written by a build that knew a locality this one does
+     * not, which is reported as no locality rather than downgraded to a plausible one.
+     */
+    private fun Preferences.readLocality(): BangladeshLocalityRef? {
+        val name = this[Keys.LOCALITY_NAME] ?: return null
+        val districtId = this[Keys.LOCALITY_DISTRICT_ID] ?: return null
+        val kind = this[Keys.LOCALITY_KIND]
+            ?.let { stored -> BangladeshLocalityKind.entries.firstOrNull { it.name == stored } }
+            ?: return null
+        return BangladeshLocalityRef(name = name, districtId = districtId, kind = kind)
+    }
+
     private object Keys {
         val LABEL = stringPreferencesKey("location_label")
         val LATITUDE = doublePreferencesKey("location_latitude")
@@ -251,5 +294,8 @@ class DataStoreLocationRepository(
         val DISTRICT_NAME = stringPreferencesKey("location_district_name")
         val UPAZILA_ID = stringPreferencesKey("location_upazila_id")
         val UPAZILA_NAME = stringPreferencesKey("location_upazila_name")
+        val LOCALITY_NAME = stringPreferencesKey("location_locality_name")
+        val LOCALITY_DISTRICT_ID = stringPreferencesKey("location_locality_district_id")
+        val LOCALITY_KIND = stringPreferencesKey("location_locality_kind")
     }
 }

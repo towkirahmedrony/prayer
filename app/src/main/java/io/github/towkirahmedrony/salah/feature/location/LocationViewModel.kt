@@ -11,8 +11,11 @@ import io.github.towkirahmedrony.salah.core.domain.location.BangladeshCheck
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.location.LocalityResolution
+import io.github.towkirahmedrony.salah.core.domain.location.LocalityResolver
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationAcquisitionResult
@@ -21,7 +24,9 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -243,11 +248,23 @@ class LocationViewModel(
             )
         }
 
+        // The locality is resolved against the district the administrative pass attributed this position
+        // to, so a name can only be attached to a position for which the same dataset also established
+        // the district it belongs to. It is best-effort by design: failing to match one is not a
+        // rejection, it is a coarser (and still correct) answer.
+        val locality = resolveLocality(
+            point = point,
+            accuracyMetres = fix.accuracyMetres,
+            resolution = resolution,
+            dataset = dataset,
+        )
+
         val accepted = PendingDeviceFix(
             point = point,
             accuracyMetres = fix.accuracyMetres,
             acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
             resolution = resolution,
+            locality = locality,
             countryCode = if (verified) BangladeshLocationPolicy.COUNTRY_CODE else null,
             isCountryVerified = verified,
             isWithinBoundaryTolerance = withinTolerance,
@@ -262,6 +279,53 @@ class LocationViewModel(
         }
 
         transient.update { it.copy(pendingFix = accepted, message = null) }
+    }
+
+    /**
+     * The named locality this position is in, or `null` when none could be established.
+     *
+     * Never throws and never blocks: it is a lookup in the already-parsed dataset. The three outcomes are
+     * logged distinctly because they are not equivalent — an approximate fix and a district with no
+     * locality data are both "no name", but only one of them is about the user's location at all.
+     */
+    private fun resolveLocality(
+        point: GeoPoint,
+        accuracyMetres: Double?,
+        resolution: AreaResolution,
+        dataset: BangladeshLocationDataset?,
+    ): BangladeshLocalityRef? {
+        val districtId = (resolution as? AreaResolution.Suggested)?.suggestion?.reference?.districtId
+        return when (val outcome = LocalityResolver.resolve(point, accuracyMetres, districtId, dataset)) {
+            is LocalityResolution.Matched -> {
+                logger.info(
+                    SalahDiagnosticEvents.LOCATION_LOCALITY_RESOLVED,
+                    mapOf(
+                        "kind" to outcome.suggestion.reference.kind.name,
+                        "distanceMetres" to outcome.suggestion.distanceMetres.toInt(),
+                    ),
+                )
+                outcome.suggestion.reference
+            }
+
+            LocalityResolution.NotPreciseEnough -> {
+                logger.info(
+                    SalahDiagnosticEvents.LOCATION_LOCALITY_UNRESOLVED,
+                    mapOf("reason" to "not_precise_enough", "accuracyMetres" to accuracyMetres?.toInt()),
+                )
+                null
+            }
+
+            is LocalityResolution.Unmatched -> {
+                logger.info(
+                    SalahDiagnosticEvents.LOCATION_LOCALITY_UNRESOLVED,
+                    mapOf(
+                        "reason" to if (districtId == null) "no_district" else "too_far",
+                        "nearestDistanceMetres" to outcome.nearestDistanceMetres?.toInt(),
+                    ),
+                )
+                null
+            }
+        }
     }
 
     /** Saves the fix the user confirmed, then brings the notification schedule up to date. */
@@ -279,7 +343,11 @@ class LocationViewModel(
      */
     private suspend fun saveDeviceFix(fix: PendingDeviceFix) {
         val saved = locations.saveDeviceLocation(
-            label = fix.suggestedArea?.label ?: DEVICE_LABEL,
+            // Composed by the shared policy rather than concatenated here, so the name written into the
+            // record is the same one every screen will show, and a matched locality is what makes the
+            // name specific: "Mirpur, Dhaka" instead of the city corporation the administrative layer
+            // could name on its own.
+            label = fix.displayName,
             latitude = fix.point.latitude,
             longitude = fix.point.longitude,
             // The country is fixed and has one zone, so a device fix is stored in Bangladesh's zone
@@ -289,6 +357,7 @@ class LocationViewModel(
             acquiredAtEpochMillis = fix.acquiredAtEpochMillis,
             countryCode = fix.countryCode,
             area = fix.suggestedArea,
+            locality = fix.locality,
             datasetVersion = fix.suggestedArea?.let { datasetSlot.value.dataset?.version },
         )
         if (!saved) {
@@ -357,7 +426,15 @@ class LocationViewModel(
             val saved = locations.saveAreaLocation(
                 latitude = area.latitude,
                 longitude = area.longitude,
-                label = reference.label,
+                // The same policy the device path uses, so a selected city corporation is not written as
+                // "Gazipur City Corporation, Gazipur" — a fact stated twice — while a selected upazila is
+                // still qualified by its district.
+                label = LocationDisplayName.of(
+                    origin = LocationOrigin.AREA_SELECTION,
+                    storedLabel = reference.label,
+                    area = reference,
+                    locality = null,
+                ),
                 reference = reference,
                 datasetVersion = dataset.version,
             )
@@ -547,6 +624,7 @@ class LocationViewModel(
             origin = location.origin,
             countryCode = location.countryCode,
             area = location.area,
+            locality = location.locality,
             timeZoneId = location.timeZoneId,
             point = point,
             accuracyText = LocationFormatting.accuracy(location.accuracyMetres),

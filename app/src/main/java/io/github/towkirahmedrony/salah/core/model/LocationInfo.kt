@@ -79,6 +79,21 @@ data class LocationInfo(
     val area: BangladeshAreaRef? = null,
 
     /**
+     * The named locality the position was matched to, when one could be matched and verified.
+     *
+     * Distinct from [area] on purpose, and never a substitute for it: the area is the administrative
+     * hierarchy the dataset publishes, while a locality is an informal place name — Mirpur, Uttara,
+     * Dhanmondi — whose containing district was verified against those same administrative boundaries.
+     * A record can therefore carry both ("Mirpur, Dhaka") or only the area, and the absence of a
+     * locality is a real state: a rural position, an approximate fix, or a district whose locality
+     * layer has no entry near the user.
+     *
+     * `null` also means "not established" for a record written before localities existed, which the
+     * display policy handles by falling back to the administrative name rather than re-deriving one.
+     */
+    val locality: BangladeshLocalityRef? = null,
+
+    /**
      * The dataset version the [area] ids were chosen from, or `null` when no dataset was involved.
      *
      * Stored so a later build can tell that the bundled geography has changed since the user made
@@ -117,6 +132,7 @@ data class LocationInfo(
             acquiredAt: Instant? = null,
             countryCode: String? = null,
             area: BangladeshAreaRef? = null,
+            locality: BangladeshLocalityRef? = null,
             datasetVersion: String? = null,
         ): LocationInfo? {
             val cleanLabel = label.trim()
@@ -137,6 +153,7 @@ data class LocationInfo(
                 // blank: an empty string would read as "a country was recorded" without recording one.
                 countryCode = countryCode?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(),
                 area = area,
+                locality = locality,
                 datasetVersion = datasetVersion,
             )
         }

@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityKind
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -203,6 +207,99 @@ class DataStoreLocationRepositoryTest {
         val stored = requireNotNull(recreated.location.first())
         assertEquals("Dhaka", stored.label)
         assertEquals(23.8103, stored.latitude, 1e-9)
+    }
+
+    @Test
+    fun `a device fix round trips with the locality it was matched to`() = runTest {
+        val saved = repository.saveDeviceLocation(
+            label = "Mirpur, Dhaka",
+            latitude = 23.8124,
+            longitude = 90.3641,
+            timeZoneId = "Asia/Dhaka",
+            accuracyMetres = 18.5,
+            acquiredAtEpochMillis = 1_000L,
+            area = BangladeshAreaRef(
+                divisionId = "BD30",
+                divisionName = "Dhaka",
+                districtId = "BD3026",
+                districtName = "Dhaka",
+                upazilaId = "BD30262500",
+                upazilaName = "Dhaka North City Corporation",
+            ),
+            locality = BangladeshLocalityRef(
+                name = "Mirpur",
+                districtId = "BD3026",
+                kind = BangladeshLocalityKind.SUBURB,
+            ),
+            datasetVersion = "test-dataset",
+        )
+
+        assertTrue(saved)
+
+        val stored = requireNotNull(repository.location.first())
+        val locality = requireNotNull(stored.locality) { "the locality must survive the write" }
+        assertEquals("Mirpur", locality.name)
+        assertEquals("BD3026", locality.districtId)
+        assertEquals(BangladeshLocalityKind.SUBURB, locality.kind)
+        // The locality is recorded *beside* the hierarchy, not instead of it.
+        assertEquals("BD30262500", stored.area?.upazilaId)
+    }
+
+    @Test
+    fun `a write without a locality clears one an earlier fix recorded`() = runTest {
+        // A locality describes the coordinates it was matched against. Leaving one behind while storing
+        // a different position would attach a neighbourhood the user has left to where they are now —
+        // the same rule the hierarchy is written and removed as a set by.
+        repository.saveDeviceLocation(
+            label = "Mirpur, Dhaka",
+            latitude = 23.8124,
+            longitude = 90.3641,
+            timeZoneId = "Asia/Dhaka",
+            accuracyMetres = 18.5,
+            acquiredAtEpochMillis = 1_000L,
+            locality = BangladeshLocalityRef(
+                name = "Mirpur",
+                districtId = "BD3026",
+                kind = BangladeshLocalityKind.SUBURB,
+            ),
+        )
+        assertNotNull(repository.location.first()?.locality)
+
+        repository.saveManualLocation(
+            label = "Office",
+            latitude = 23.7461,
+            longitude = 90.3742,
+            timeZoneId = "Asia/Dhaka",
+        )
+
+        val stored = requireNotNull(repository.location.first())
+        assertNull("a typed location has no matched neighbourhood", stored.locality)
+
+        // And a device fix that matched nothing clears it too.
+        repository.saveDeviceLocation(
+            label = "GPS location",
+            latitude = 23.7461,
+            longitude = 90.3742,
+            timeZoneId = "Asia/Dhaka",
+            accuracyMetres = 4_000.0,
+            acquiredAtEpochMillis = 2_000L,
+        )
+        assertNull(repository.location.first()?.locality)
+    }
+
+    @Test
+    fun `a store written before localities existed reads as no locality`() = runTest {
+        // The migration case for the new keys: no version is needed, because "no locality recorded" is
+        // exactly what such a store contains, and the display policy falls back to the hierarchy.
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("location_label")] = "Dhaka"
+            preferences[doublePreferencesKey("location_latitude")] = 23.8103
+            preferences[doublePreferencesKey("location_longitude")] = 90.4125
+            preferences[stringPreferencesKey("location_time_zone_id")] = "Asia/Dhaka"
+            preferences[stringPreferencesKey("location_origin")] = LocationOrigin.DEVICE_GPS.name
+        }
+
+        assertNull(requireNotNull(repository.location.first()).locality)
     }
 
     @Test

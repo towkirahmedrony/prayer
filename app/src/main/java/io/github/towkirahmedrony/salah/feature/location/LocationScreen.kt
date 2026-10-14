@@ -482,6 +482,14 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
             label = stringResource(R.string.location_upazila_label),
             value = stored.area?.upazilaName ?: stringResource(R.string.location_area_unknown),
         )
+        // Only when a locality was actually established: an empty row would suggest Salah looked and
+        // found nothing, which is not the same as a record that predates the locality layer.
+        stored.locality?.let { locality ->
+            LocationDetailRow(
+                label = stringResource(R.string.location_locality_label),
+                value = locality.name,
+            )
+        }
         LocationDetailRow(
             label = stringResource(R.string.location_time_zone_label),
             value = stored.timeZoneId,

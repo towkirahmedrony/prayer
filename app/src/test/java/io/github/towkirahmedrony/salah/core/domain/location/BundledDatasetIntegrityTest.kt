@@ -26,6 +26,7 @@ class BundledDatasetIntegrityTest {
     }
     private val areasText: String = File(directory, BundledDataset.AREAS_FILE).readText()
     private val boundaryText: String = File(directory, BundledDataset.BOUNDARY_FILE).readText()
+    private val localitiesText: String = File(directory, BundledDataset.LOCALITIES_FILE).readText()
     private val dataset: BangladeshLocationDataset = BundledDataset.load(version = "test-bundled")
 
     @Test
@@ -123,6 +124,60 @@ class BundledDatasetIntegrityTest {
     }
 
     @Test
+    fun `the bundled locality layer is complete, joinable and inside the country`() {
+        val dataLines = dataLineCount(localitiesText)
+        assertEquals("locality file has $dataLines data lines", 1_216, dataLines)
+        assertEquals(
+            "a locality vanished between the file and the parsed layer",
+            dataLines,
+            dataset.localities.size,
+        )
+        assertTrue("the locality layer must be present", dataset.hasLocalities)
+
+        // Every row joins to a district this build actually has: the file's district column is the
+        // verified containment, and an unknown id there would make the row unreachable at runtime — the
+        // parser refuses it, which is why the rejected-lines assertion above is the first line of defence.
+        val districtIds = dataset.districts.map { it.id }.toSet()
+        val orphaned = dataset.localities.filter { it.districtId !in districtIds }
+        assertTrue("localities naming an unknown district: $orphaned", orphaned.isEmpty())
+
+        // The names and coordinates are usable: no blanks, no two rows describing the same place in the
+        // same district as the same kind, and every point inside the country the areas are checked against.
+        val blankNames = dataset.localities.filter { it.name.isBlank() }
+        assertTrue("localities with no name: $blankNames", blankNames.isEmpty())
+
+        val keys = dataset.localities.map { Triple(it.districtId, it.kind, it.name) }
+        assertEquals("duplicate localities", keys.size, keys.toSet().size)
+
+        val implausible = dataset.localities.filter { locality ->
+            val point = GeoPoint(locality.latitude, locality.longitude)
+            !point.isFinite ||
+                !BangladeshLocationPolicy.isWithinCoarseBounds(point) ||
+                !GeoMath.isInsideAny(point, dataset.boundaryRings)
+        }
+        assertTrue("localities outside the country: $implausible", implausible.isEmpty())
+    }
+
+    @Test
+    fun `the bundled locality layer covers the cities it exists for`() {
+        // Coverage is urban by construction — the layer is the named places inside the twelve city
+        // corporations and other towns — so this asserts the shape it must have, not an exact count.
+        val byDistrict = dataset.localities.groupBy { it.districtId }
+        val dhaka = requireNotNull(byDistrict["BD3026"]) { "the Dhaka district has no locality layer" }
+        assertTrue("Dhaka must carry a real neighbourhood layer, had ${dhaka.size}", dhaka.size >= 500)
+        assertTrue(
+            "at least 25 districts carry localities, had ${byDistrict.size}",
+            byDistrict.size >= 25,
+        )
+
+        // The names the whole feature exists for, present in the shipped file.
+        val dhakaNames = dhaka.map { it.name }.toSet()
+        for (expected in listOf("Mirpur", "Uttara", "Dhanmondi", "Gulshan", "Farmgate")) {
+            assertTrue("$expected is missing from the Dhaka layer", expected in dhakaNames)
+        }
+    }
+
+    @Test
     fun `the strict validation pass reports no problem at all`() {
         val problems = integrityProblems()
 
@@ -159,6 +214,29 @@ class BundledDatasetIntegrityTest {
             }
             if (!GeoMath.isInsideAny(point, dataset.boundaryRings)) {
                 problems += "centre of ${area.id} is outside the boundary"
+            }
+        }
+
+        val localityDataLines = dataLineCount(localitiesText)
+        if (localityDataLines != dataset.localities.size) {
+            problems +=
+                "locality data lines ($localityDataLines) != parsed localities (${dataset.localities.size})"
+        }
+        if (!dataset.hasLocalities) problems += "the bundled locality layer is empty"
+
+        val localityIds = dataset.localities.map { Triple(it.districtId, it.kind, it.name) }
+        if (localityIds.size != localityIds.toSet().size) problems += "duplicate localities"
+        for (locality in dataset.localities) {
+            if (locality.districtId !in districtIds) {
+                problems += "locality ${locality.name} names an unknown district ${locality.districtId}"
+            }
+            if (locality.name.isBlank()) problems += "a locality in ${locality.districtId} has no name"
+            val localityPoint = GeoPoint(locality.latitude, locality.longitude)
+            if (!localityPoint.isFinite || !BangladeshLocationPolicy.isWithinCoarseBounds(localityPoint)) {
+                problems += "implausible coordinate for locality ${locality.name}"
+            }
+            if (!GeoMath.isInsideAny(localityPoint, dataset.boundaryRings)) {
+                problems += "locality ${locality.name} is outside the boundary"
             }
         }
 

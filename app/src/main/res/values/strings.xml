@@ -637,6 +637,8 @@
     <string name="location_division_label">Division</string>
     <string name="location_district_label">District</string>
     <string name="location_upazila_label">Upazila / Thana</string>
+    <!-- A named locality (Mirpur, Uttara) matched from the bundled place-name layer, shown only when one was established. It is not an administrative level, so it is not labelled as one. -->
+    <string name="location_locality_label">Locality</string>
     <string name="location_area_unknown">Not resolved</string>
     <string name="location_time_zone_label">Time zone</string>
     <string name="location_accuracy_label">Accuracy</string>

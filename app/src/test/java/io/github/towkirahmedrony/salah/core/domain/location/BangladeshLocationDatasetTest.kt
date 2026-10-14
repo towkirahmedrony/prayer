@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.core.domain.location
 
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaLevel
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -227,8 +228,102 @@ class BangladeshLocationDatasetTest {
         assertTrue(dataset.districtsOf("BD1001").isEmpty())
     }
 
-    private fun parse(areas: String, boundary: String): BangladeshLocationDataset =
-        BangladeshLocationDataset.parse(version = "test", areasText = areas, boundaryText = boundary)
+    // --- The locality layer -----------------------------------------------------
+
+    @Test
+    fun `a locality row is parsed with the district that contains it and the kind of place it is`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = SQUARE_BOUNDARY,
+            localities = LOCALITIES,
+        )
+
+        assertTrue(dataset.rejectedLines.isEmpty())
+        assertEquals(2, dataset.localities.size)
+        assertTrue(dataset.hasLocalities)
+
+        val centre = requireNotNull(dataset.localities.firstOrNull { it.name == "Centre Bazar" })
+        assertEquals("BD1001", centre.districtId)
+        assertEquals(BangladeshLocalityKind.QUARTER, centre.kind)
+        assertEquals(23.86, centre.latitude, 1e-9)
+        assertEquals(89.24, centre.longitude, 1e-9)
+
+        assertEquals(listOf("Centre Bazar", "Nearby Para"), dataset.localitiesOf("BD1001").map { it.name })
+        assertTrue("another district has no rows", dataset.localitiesOf("BD1002").isEmpty())
+        assertTrue("an unknown district has no rows", dataset.localitiesOf("BD9999").isEmpty())
+        assertTrue("a missing district has no rows", dataset.localitiesOf(null).isEmpty())
+    }
+
+    @Test
+    fun `a locality row naming a district the dataset does not define is rejected`() {
+        // It could never be verified against a resolved position, so it is refused rather than kept as an
+        // entry no lookup can reach.
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = SQUARE_BOUNDARY,
+            localities = row("SUBURB", "BD9999", "Elsewhere", "23.86", "89.24"),
+        )
+
+        assertTrue(dataset.localities.isEmpty())
+        assertEquals(1, dataset.rejectedLines.size)
+    }
+
+    @Test
+    fun `a locality row with an unknown kind, a blank name or a bad coordinate is rejected`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = SQUARE_BOUNDARY,
+            localities = listOf(
+                row("WARD", "BD1001", "Unknown Kind", "23.86", "89.24"),
+                row("QUARTER", "BD1001", "", "23.86", "89.24"),
+                row("QUARTER", "BD1001", "Bad Coordinate", "north", "89.24"),
+                row("QUARTER", "BD1001", "Out Of Range", "91.0", "89.24"),
+                row("QUARTER", "BD1001", "Too Few Columns", "23.86"),
+            ).joinToString("\n"),
+        )
+
+        assertTrue(dataset.localities.isEmpty())
+        assertEquals(5, dataset.rejectedLines.size)
+    }
+
+    @Test
+    fun `a locality repeated for the same district and kind is collapsed`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = SQUARE_BOUNDARY,
+            localities = listOf(
+                row("QUARTER", "BD1001", "Centre Bazar", "23.86", "89.24"),
+                row("QUARTER", "BD1001", "Centre Bazar", "23.861", "89.241"),
+            ).joinToString("\n"),
+        )
+
+        assertEquals(1, dataset.localities.size)
+        assertTrue("the duplicate is a collapse, not a refusal", dataset.rejectedLines.isEmpty())
+    }
+
+    @Test
+    fun `a locality file with only comments yields no rows and a still-usable dataset`() {
+        val dataset = parse(
+            areas = SAMPLE_AREAS,
+            boundary = SQUARE_BOUNDARY,
+            localities = "# the locality layer was not generated for this build\n\n",
+        )
+
+        assertTrue(dataset.localities.isEmpty())
+        assertTrue("the locality layer is optional, so the dataset stays usable", dataset.isUsable)
+        assertTrue(dataset.rejectedLines.isEmpty())
+    }
+
+    private fun parse(
+        areas: String,
+        boundary: String,
+        localities: String = "",
+    ): BangladeshLocationDataset = BangladeshLocationDataset.parse(
+        version = "test",
+        areasText = areas,
+        boundaryText = boundary,
+        localitiesText = localities,
+    )
 
     private fun row(vararg fields: String): String = fields.joinToString("\t")
 
@@ -238,6 +333,12 @@ class BangladeshLocationDatasetTest {
             "0\t22.0\t90.5",
             "0\t26.0\t90.5",
             "0\t26.0\t88.5",
+        ).joinToString("\n")
+
+        /** Two named places in Kushtia, in the bundled locality format. */
+        val LOCALITIES: String = listOf(
+            "QUARTER\tBD1001\tCentre Bazar\t23.860\t89.240",
+            "NEIGHBOURHOOD\tBD1001\tNearby Para\t23.868\t89.240",
         ).joinToString("\n")
 
         val SAMPLE_AREAS: String = listOf(

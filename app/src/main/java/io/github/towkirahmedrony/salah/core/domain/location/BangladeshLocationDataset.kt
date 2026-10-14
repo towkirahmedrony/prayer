@@ -3,6 +3,8 @@ package io.github.towkirahmedrony.salah.core.domain.location
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaLevel
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocality
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityKind
 
 /**
  * Salah's bundled Bangladesh geography: every division, district and upazila/thana, with the
@@ -24,6 +26,15 @@ import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
  * dataset's p-codes, and a unit whose Bangla name could not be joined keeps `null` instead of a
  * transliteration Salah made up. When the dataset cannot be read at all the app says so; it never
  * falls back to a hand-written list of "popular" places.
+ *
+ * **The locality layer is a second source, held here on purpose.** `bd_localities.tsv` is derived from
+ * OpenStreetMap (ODbL) rather than from COD-AB, and it is a different kind of fact — a named place, not
+ * an administrative unit. It lives in this class because the two are read, cached and consumed together:
+ * [LocalityResolver] can only accept a locality whose verified district matches the district the
+ * administrative layer resolved for the same position, so splitting them would mean two reads of one
+ * geography and a rule that needs both in hand anyway. It is optional: a dataset without localities is
+ * still usable ([BangladeshLocality] is never required to choose or to describe a location), and a
+ * missing or malformed locality layer degrades to the administrative names rather than failing.
  */
 class BangladeshLocationDataset private constructor(
     /** The datum these areas came from, e.g. `COD-AB BGD v03 (2023-05-21)`. Shown in the UI. */
@@ -32,9 +43,14 @@ class BangladeshLocationDataset private constructor(
     private val childrenByParentId: Map<String, List<BangladeshArea>>,
     /** The national boundary, as one or more closed rings. Empty when it could not be read. */
     val boundaryRings: List<List<GeoPoint>>,
+    /** Every named locality, ordered by district and then by name. */
+    val localities: List<BangladeshLocality>,
     /** Lines the parser refused, kept so the failure is visible in tests and diagnostics. */
     val rejectedLines: List<String>,
 ) {
+
+    private val localitiesByDistrictId: Map<String, List<BangladeshLocality>> =
+        localities.groupBy { it.districtId }
 
     /** Every area, ordered by level and then by name. */
     val areas: List<BangladeshArea> = areasById.values.sortedWith(
@@ -58,6 +74,19 @@ class BangladeshLocationDataset private constructor(
 
     /** The area with [id], or `null` when the dataset does not contain it. */
     fun area(id: String?): BangladeshArea? = id?.let { areasById[it] }
+
+    /**
+     * The localities verified as belonging to [districtId], or none when the layer has no entry for it.
+     *
+     * Keyed by the verified district rather than searched by distance: a locality in another district
+     * is not a candidate at all, however close it is, which is what stops a fix on one side of a
+     * district border being named after a place on the other side.
+     */
+    fun localitiesOf(districtId: String?): List<BangladeshLocality> =
+        districtId?.let { localitiesByDistrictId[it] }.orEmpty()
+
+    /** True when the locality layer carries at least one entry. */
+    val hasLocalities: Boolean get() = localities.isNotEmpty()
 
     fun districtsOf(divisionId: String): List<BangladeshArea> = childrenOf(divisionId)
         .filter { it.level == BangladeshAreaLevel.DISTRICT }
@@ -102,7 +131,7 @@ class BangladeshLocationDataset private constructor(
 
     override fun toString(): String =
         "BangladeshLocationDataset(version=$version, areas=${areasById.size}, " +
-            "rings=${boundaryRings.size}, rejected=${rejectedLines.size})"
+            "localities=${localities.size}, rings=${boundaryRings.size}, rejected=${rejectedLines.size})"
 
     companion object {
         private const val LEVEL_COUNT = 3
@@ -116,8 +145,11 @@ class BangladeshLocationDataset private constructor(
         /** The header of the generated boundary file. */
         const val BOUNDARY_COLUMNS = 3
 
+        /** The header of the generated locality file. */
+        const val LOCALITY_COLUMNS = 5
+
         /**
-         * Parses the two bundled files.
+         * Parses the bundled files.
          *
          * Lines starting with `#` and blank lines are comments; everything else must have exactly the
          * documented number of tab-separated fields with usable values, or it is rejected and recorded.
@@ -129,6 +161,7 @@ class BangladeshLocationDataset private constructor(
             version: String,
             areasText: String,
             boundaryText: String,
+            localitiesText: String = "",
         ): BangladeshLocationDataset {
             val rejected = mutableListOf<String>()
             val areas = mutableListOf<BangladeshArea>()
@@ -145,6 +178,11 @@ class BangladeshLocationDataset private constructor(
             }
 
             val distinct = areas.distinctBy { it.id }
+            val knownDistrictIds = distinct
+                .filter { it.level == BangladeshAreaLevel.DISTRICT }
+                .map { it.id }
+                .toSet()
+            val localities = parseLocalities(localitiesText, knownDistrictIds, rejected)
             val rings = parseBoundary(boundaryText, rejected)
 
             return BangladeshLocationDataset(
@@ -152,7 +190,63 @@ class BangladeshLocationDataset private constructor(
                 areasById = distinct.associateBy { it.id },
                 childrenByParentId = distinct.groupBy { it.parentId },
                 boundaryRings = rings,
+                localities = localities,
                 rejectedLines = rejected,
+            )
+        }
+
+        /**
+         * Parses the locality file.
+         *
+         * A locality is only accepted when the district it claims to be in is one this dataset
+         * actually defines: a row naming a district the administrative layer does not contain could
+         * never be verified against a resolved position, so it is refused and recorded rather than kept
+         * as an unusable entry. Points are rejected for the same reasons areas are — an unknown kind, a
+         * blank name, a non-numeric or out-of-range coordinate — so a corrupt line cannot contribute a
+         * locality with no name or a coordinate in the wrong hemisphere.
+         */
+        private fun parseLocalities(
+            text: String,
+            knownDistrictIds: Set<String>,
+            rejected: MutableList<String>,
+        ): List<BangladeshLocality> {
+            val parsed = mutableListOf<BangladeshLocality>()
+            for (rawLine in text.lineSequence()) {
+                val line = rawLine.trim()
+                if (line.isEmpty() || line.startsWith("#")) continue
+                val locality = parseLocality(line, knownDistrictIds)
+                if (locality == null) {
+                    if (rejected.size < MAX_RETAINED_REJECTIONS) rejected += line
+                } else {
+                    parsed += locality
+                }
+            }
+            return parsed
+                .distinctBy { Triple(it.districtId, it.kind, it.name) }
+                .sortedWith(compareBy({ it.districtId }, { it.name }))
+        }
+
+        private fun parseLocality(
+            line: String,
+            knownDistrictIds: Set<String>,
+        ): BangladeshLocality? {
+            val fields = line.split('\t')
+            if (fields.size != LOCALITY_COLUMNS) return null
+
+            val kind = BangladeshLocalityKind.ofDatasetValue(fields[0]) ?: return null
+            val districtId = fields[1].trim().takeIf { it.isNotEmpty() } ?: return null
+            if (districtId !in knownDistrictIds) return null
+            val name = fields[2].trim().takeIf { it.isNotEmpty() } ?: return null
+            val latitude = fields[3].trim().toDoubleOrNull() ?: return null
+            val longitude = fields[4].trim().toDoubleOrNull() ?: return null
+            if (!GeoPoint(latitude, longitude).isFinite) return null
+
+            return BangladeshLocality(
+                districtId = districtId,
+                kind = kind,
+                name = name,
+                latitude = latitude,
+                longitude = longitude,
             )
         }
 

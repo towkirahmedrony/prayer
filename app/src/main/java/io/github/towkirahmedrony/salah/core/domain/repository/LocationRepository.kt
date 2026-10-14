@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.repository
 
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import kotlinx.coroutines.flow.Flow
 
@@ -36,7 +37,10 @@ interface LocationRepository {
      * them would lose that distinction at the call site, and `LocationOrigin`, `accuracyMetres` and
      * `acquiredAt` exist precisely so it survives storage.
      *
-     * @param accuracyMetres reported horizontal accuracy, or `null` when the provider gave none.
+     * @param accuracyMetres reported horizontal accuracy, or `null` when the provider gave none. It is
+     *   also the input that decides whether a locality may be named at all: a position that is only
+     *   accurate to a kilometre or two cannot be attributed to a neighbourhood, and the resolver reports
+     *   that instead of naming one.
      * @param acquiredAtEpochMillis when the fix was obtained, or `null` (or a non-positive value)
      *   when the platform did not record one. A fix with no time is stored with no acquisition time,
      *   so it ages as unknown rather than being silently presented as a current reading.
@@ -59,6 +63,16 @@ interface LocationRepository {
 
         /** The administrative area the fix was attributed to, when it could be resolved. */
         area: BangladeshAreaRef? = null,
+
+        /**
+         * The named locality the fix was matched to, when one could be matched and verified.
+         *
+         * Written by the device-fix path only. A manually selected area stores no locality: the area's
+         * coordinate is the published centre of an administrative unit the user chose, not a position the
+         * device observed, so naming the locality around that centre would describe the dataset's point
+         * rather than the user.
+         */
+        locality: BangladeshLocalityRef? = null,
 
         /** The dataset the [area] ids came from, or `null` when none was involved. */
         datasetVersion: String? = null,

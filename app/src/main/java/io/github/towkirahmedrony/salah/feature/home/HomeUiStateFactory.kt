@@ -5,6 +5,7 @@ import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerStatus
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
@@ -120,7 +121,10 @@ class HomeUiStateFactory(
             banglaSection = calendar?.bangla?.toSection() ?: pendingSection(CalendarSystem.BANGLA),
             hijriSection = calendar?.hijri?.toSection() ?: pendingSection(CalendarSystem.HIJRI),
             location = LocationSection(
-                label = location?.label,
+                // Composed by the shared policy rather than read from the stored string, so Home, the
+                // Qibla screen and the location screen describe one stored location the same way, and a
+                // record written by an earlier build is shown under the current rule.
+                label = location?.let { stored -> LocationDisplayName.of(stored) },
                 latitude = location?.latitude,
                 longitude = location?.longitude,
                 timeZoneId = location?.timeZoneId,

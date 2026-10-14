@@ -50,6 +50,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.RulerGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaBearing
@@ -266,7 +267,9 @@ private fun QiblaHeader(state: QiblaUiState) {
                         // would freeze them into Kotlin.
                         text = stringResource(
                             R.string.qibla_location_line,
-                            location.location.label,
+                            // The shared display policy, not the stored string, so this line names the
+                            // location exactly as Home and the location screen do.
+                            LocationDisplayName.of(location.location),
                             stringResource(location.location.origin.sourceLabelRes()),
                         ),
                         style = MaterialTheme.typography.bodyMedium,

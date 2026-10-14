@@ -133,11 +133,19 @@ object BundledDataset {
             version = version,
             areasText = File(directory, AREAS_FILE).readText(),
             boundaryText = File(directory, BOUNDARY_FILE).readText(),
+            localitiesText = File(directory, LOCALITIES_FILE).readText(),
         )
     }
 
+    /** The real locality layer on its own, for a test that wants the shipped file's own text. */
+    fun localitiesText(): String = File(
+        requireNotNull(directory()) { "the bundled location directory could not be found" },
+        LOCALITIES_FILE,
+    ).readText()
+
     const val AREAS_FILE: String = "bd_areas.tsv"
     const val BOUNDARY_FILE: String = "bd_boundary.tsv"
+    const val LOCALITIES_FILE: String = "bd_localities.tsv"
 
     private const val SEARCH_DEPTH = 5
 }
@@ -148,8 +156,16 @@ object BundledDataset {
  * The square boundary spans the coordinates of every area, so a point inside it is "in Bangladesh"
  * and a point a degree away is not. One upazila deliberately has **no** Bangla name, so the
  * "unmatched name keeps the English one" path is covered by the miniature as well as by the real data.
+ *
+ * The locality layer is **empty by default** and supplied per test through [localities]. That default is
+ * deliberate: most cases are about the administrative hierarchy, and a test that suddenly started
+ * matching a neighbourhood because the fixture grew one would be asserting a different thing. A test that
+ * is about localities passes its own rows, whose geometry it can see in the test itself.
  */
-fun syntheticDataset(version: String = "test-v1"): BangladeshLocationDataset {
+fun syntheticDataset(
+    version: String = "test-v1",
+    localities: String = "",
+): BangladeshLocationDataset {
     val areas = """
         DIVISION	BD10	BD	Khulna	খুলনা	22.80	89.30
         DIVISION	BD20	BD	Rajshahi	রাজশাহী	24.37	88.60
@@ -175,5 +191,24 @@ fun syntheticDataset(version: String = "test-v1"): BangladeshLocationDataset {
         version = version,
         areasText = areas,
         boundaryText = boundary,
+        localitiesText = localities,
     )
 }
+
+/**
+ * Localities for [syntheticDataset], as a caller-writable block.
+ *
+ * Written as a helper rather than a constant so a test can say which district each row belongs to in the
+ * same breath as the expectation it is about: the district column is the *verified* containment, and a
+ * test that gets it wrong would be testing the wrong gate.
+ */
+fun syntheticLocalities(vararg rows: String): String = rows.joinToString("\n")
+
+/** One locality row in the bundled tab-separated format. */
+fun localityRow(
+    kind: String,
+    districtId: String,
+    name: String,
+    latitude: Double,
+    longitude: Double,
+): String = listOf(kind, districtId, name, latitude.toString(), longitude.toString()).joinToString("\t")

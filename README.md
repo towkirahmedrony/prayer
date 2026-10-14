@@ -31,6 +31,8 @@ without an account.
 | Location from the device on request (approximate or precise) with timeouts, permission and service states | Implemented |
 | Manual coordinates that need no permission and no network, stored in the existing location repository | Implemented |
 | **Bundled Bangladesh administrative dataset** — 8 divisions, 64 districts and 507 upazilas/thanas with published reference coordinates, plus the simplified national boundary | **Implemented, offline** |
+| **Named locality layer** — 1 216 urban neighbourhoods from OpenStreetMap, each joined to the district that contains it, so a device fix in a city reads *Mirpur, Dhaka* rather than a whole city corporation | **Implemented, offline** |
+| **One location display-name policy** — the locality, the upazila/thana or the district, de-duplicated, composed once and shown the same way on Home, Prayer, Qibla and Location | **Implemented** |
 | **Division → district → upazila picker** for choosing a location by area, with no permission and no network | **Implemented** |
 | **Bangladesh-only location policy** with an explicit boundary tolerance, and a location the policy cannot place reported as unsupported rather than converted | **Implemented** |
 | Location provenance and freshness, so a saved position is never presented as a current one | Implemented |
@@ -184,7 +186,7 @@ The calculation engine and its pinned version are explained in
 │       ├── feature/{app,home,location,calendar,ramadan,settings,notifications,qibla,common}
 │       ├── navigation/                        destinations, nav host, app shell
 │       └── di/                                Koin container
-│   ├── src/main/assets/location/              generated bd_areas.tsv + bd_boundary.tsv
+│   ├── src/main/assets/location/              generated bd_areas.tsv, bd_boundary.tsv, bd_localities.tsv
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
 ├── docs/BOTTOM_NAVIGATION.md                  the four bottom-bar destinations, the Tools screen, back-stack rules
@@ -199,6 +201,7 @@ The calculation engine and its pinned version are explained in
 ├── docs/ARCHITECTURE.md                       structure, rules, extension points
 ├── gradle/libs.versions.toml                  version catalog
 ├── tools/generate_bd_location_dataset.py      dataset generator (documents the sources and the join)
+├── tools/generate_bd_locality_dataset.py      locality-layer generator (OpenStreetMap, joined to COD-AB districts)
 ├── build.gradle.kts  settings.gradle.kts  gradle.properties
 └── gradlew  gradle/wrapper/
 ```

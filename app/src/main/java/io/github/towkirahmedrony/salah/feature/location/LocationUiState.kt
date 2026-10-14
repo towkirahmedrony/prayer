@@ -4,11 +4,13 @@ import io.github.towkirahmedrony.salah.core.domain.location.AreaResolution
 import io.github.towkirahmedrony.salah.core.domain.location.AreaSelection
 import io.github.towkirahmedrony.salah.core.domain.location.AreaSuggestion
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
@@ -76,6 +78,15 @@ data class PendingDeviceFix(
     val acquiredAtEpochMillis: Long?,
     /** What could be said about which area this position is in. */
     val resolution: AreaResolution,
+
+    /**
+     * The named locality the position was matched to, or `null` when none could be established.
+     *
+     * Best-effort and independent of [resolution]: a fix can be attributed to a district and to no
+     * locality inside it (the usual case outside a city), and the screen then says which district it is
+     * in without implying it knows the neighbourhood.
+     */
+    val locality: BangladeshLocalityRef? = null,
     /**
      * The country code to store with this fix, or `null` when the boundary check could not run or did
      * not establish containment.
@@ -103,6 +114,20 @@ data class PendingDeviceFix(
 
     /** True when the area is a nearest-centre match rather than a surveyed position. */
     val isAreaApproximate: Boolean get() = suggestion != null
+
+    /**
+     * The name this fix would be stored under, composed by the shared display policy.
+     *
+     * The confirmation card is showing the user the record they are about to accept, so it shows the
+     * same name the rest of the app will use rather than the administrative hierarchy on its own.
+     */
+    val displayName: String
+        get() = LocationDisplayName.of(
+            origin = LocationOrigin.DEVICE_GPS,
+            storedLabel = LocationViewModel.DEVICE_LABEL,
+            area = suggestedArea,
+            locality = locality,
+        )
 
     /** The coordinates as they would be stored, for the advanced details line. */
     val coordinateText: String get() = LocationFormatting.coordinates(point)
@@ -135,6 +160,13 @@ data class StoredLocationUi(
     val origin: LocationOrigin,
     val countryCode: String?,
     val area: BangladeshAreaRef?,
+    /**
+     * The named locality verified as containing this location, when one was established.
+     *
+     * Kept beside [area] rather than folded into it, because the two say different things: the area is
+     * the administrative hierarchy the dataset publishes, and this is the informal place name inside it.
+     */
+    val locality: BangladeshLocalityRef?,
     val timeZoneId: String,
     val point: GeoPoint,
     val accuracyText: String?,

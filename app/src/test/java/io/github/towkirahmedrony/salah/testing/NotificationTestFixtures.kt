@@ -20,6 +20,7 @@ import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPo
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
+import io.github.towkirahmedrony.salah.core.model.BangladeshLocalityRef
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
@@ -230,6 +231,7 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
         acquiredAtEpochMillis: Long?,
         countryCode: String?,
         area: BangladeshAreaRef?,
+        locality: BangladeshLocalityRef?,
         datasetVersion: String?,
     ): Boolean {
         val created = LocationInfo.create(
@@ -244,6 +246,7 @@ class FakeLocationRepository(initial: LocationInfo? = null) : LocationRepository
                 ?.let { Instant.ofEpochMilli(it) },
             countryCode = countryCode,
             area = area,
+            locality = locality,
             datasetVersion = datasetVersion,
         ) ?: return false
         state.value = created
