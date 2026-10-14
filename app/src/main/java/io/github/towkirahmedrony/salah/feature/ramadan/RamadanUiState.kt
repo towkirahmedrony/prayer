@@ -31,13 +31,22 @@ sealed interface RamadanUiState {
         /** Hijri year of the window, or `null` when no window could be derived. */
         val hijriYear: Int?,
 
+        /**
+         * The screen's heading, for example `Ramadan 1448 AH` or `রমজান ১৪৪৮ AH`, already localised,
+         * or `null` when no window could be derived — the screen then falls back to the plain screen
+         * name. Composed here rather than in the layout because the year's numerals have to follow
+         * the interface language exactly as the table's dates do.
+         */
+        val titleLabel: String?,
+
         /** Estimated Gregorian range, already localised, or `null` when it is unavailable. */
         val rangeLabel: String?,
 
+        /** How many days the estimated window covers, or `null` when it is unavailable. */
+        val totalDays: Int?,
+
         /** Which Hijri source produced the range. Always an estimate. */
         val source: HijriDateSource?,
-
-        val totalDays: Int?,
 
         /** Ramadan day number for today, or `null` when today is not in Ramadan. */
         val todayDayNumber: Int?,
@@ -76,9 +85,10 @@ sealed interface RamadanMessage {
 /**
  * One day of the Ramadan table.
  *
- * Both Sehri and Iftar appear beside the prayer they come from, so the user can see *why* they are those
- * times rather than having to trust a bare figure. A `null` label means the schedule for that day has no
- * such time — never that it was zero.
+ * Sehri and Iftar carry the prayer they come from — [fajrLabel] and [maghribLabel] — so the rule is
+ * available to the screen and to any later reader of the state, even though the redesigned table
+ * states it once in prose instead of repeating the same clock time under every row. A `null` label
+ * means the schedule for that day has no such time — never that it was zero.
  */
 data class RamadanDayRow(
     val date: LocalDate,

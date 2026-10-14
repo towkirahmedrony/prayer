@@ -155,7 +155,6 @@
     <!-- Ramadan -->
     <string name="calendar_ramadan_title">রমজান ক্যালেন্ডার</string>
     <string name="calendar_ramadan_day">রমজানের %1$d নম্বর দিন</string>
-    <string name="ramadan_window_title">রমজানের সময়কাল</string>
     <string name="ramadan_schedule_title">দৈনিক সেহরি ও ইফতার</string>
     <string name="ramadan_column_day">দিন</string>
     <string name="calendar_sehri_end">সেহরির শেষ সময়</string>
@@ -714,25 +713,17 @@
       Ramadan: the Ramadan screen and the Sehri/Iftar timetable it draws. The reminder controls it
       shares with the notification screen come from `notifications_*` above.
     -->
-    <string name="ramadan_intro">নিচের রমজান সময়কাল এই ডিভাইসের হিজরি হিসাব থেকে অনুমান করা। সেহরি ও ইফতারের সময় হোম স্ক্রিনে দেখানো একই হিসাব করা নামাজের সময়।</string>
+    <string name="ramadan_window_summary">%1$s • %2$d দিন (আনুমানিক)</string>
     <string name="ramadan_window_unavailable">এই ডিভাইসের হিজরি সারণি আজকের কাছাকাছি কোনো রমজান কভার করে না, তাই সালাহ অনুমান করা তারিখ দেওয়ার বদলে কোনো রমজানের তারিখ দেখায় না।</string>
-    <string name="ramadan_hijri_year">হিজরি %1$d সাল</string>
-    <string name="ramadan_day_count">এই সময়কালে %1$d দিন, হিসাব অনুযায়ী।</string>
     <string name="ramadan_estimate_note">শুরু ও শেষ উম্মুল কুরার হিসাব থেকে অনুমান করা। স্থানীয় চাঁদ দেখা এগুলো এক দিন সরিয়ে দিতে পারে, এবং সালাহ দাবি করে না যে কোনো কর্তৃপক্ষ এগুলো নিশ্চিত করেছে।</string>
     <string name="ramadan_adjustment_note">এতে আপনার %1$s দিনের হিজরি সমন্বয় ধরা আছে।</string>
     <string name="ramadan_open_calendar">ক্যালেন্ডার খুলুন</string>
-    <string name="ramadan_reminders_title">সেহরি ও ইফতারের রিমাইন্ডার</string>
-    <string name="ramadan_reminders_body">নামাজের মতো একই রিমাইন্ডার ব্যবস্থা দিয়ে নির্ধারিত। এগুলো কেবল ক্যালেন্ডার যেসব দিনকে রমজানের মধ্যে রাখে সেগুলোর জন্যই নির্ধারিত হয়, এবং রমজান শেষ হলে বা আপনি বন্ধ করলে বাতিল হয়।</string>
-    <string name="ramadan_sehri_rule">হিসাব করা ফজরের আগে চলে, যা সেহরির শেষ সময়ের জন্য সালাহর ব্যবহার করা রেফারেন্স।</string>
-    <string name="ramadan_iftar_rule">হিসাব করা মাগরিবে চলে, যা ইফতারের জন্য সালাহর ব্যবহার করা রেফারেন্স।</string>
-    <string name="ramadan_reminders_shared">শব্দ, কম্পন ও মাস্টার সুইচ নামাজের রিমাইন্ডারগুলোর সাথে ভাগ করা।</string>
+    <string name="ramadan_reminders_card_title">রিমাইন্ডার</string>
+    <string name="ramadan_reminder_at_time">সময়মতো</string>
     <string name="ramadan_message_updated">সময়সূচি হালনাগাদ হয়েছে।</string>
     <string name="ramadan_message_no_schedule">কোনো সময়সূচি হিসাব করা যায়নি, তাই কোনো রিমাইন্ডার নির্ধারিত হয়নি।</string>
-    <string name="ramadan_schedule_source">সময় যেখান থেকে: %1$s</string>
-    <string name="ramadan_sehri_iftar_rule">সেহরি শেষ হয় হিসাব করা ফজরে এবং ইফতার হলো হিসাব করা মাগরিব। সালাহ কোনোটিতেই বাড়তি সময় যোগ করে না। পালনের জন্য প্রাসঙ্গিক স্থানীয় ধর্মীয় কর্তৃপক্ষ বা আপনার বিশ্বস্ত কোনো সময়সূচি অনুসরণ করুন।</string>
+    <string name="ramadan_schedule_source_rule">%1$s থেকে সময় নেওয়া। সেহরি শেষ হয় ফজরে, ইফতার হয় মাগরিবে; পালনের জন্য আপনার বিশ্বস্ত সময়সূচি অনুসরণ করুন।</string>
     <string name="ramadan_days_without_schedule">এই দিনগুলোর %1$d দিনের জন্য কোনো সময়সূচি হিসাব করা যায়নি, তাই সেগুলোর কোনো সময় দেখানো হচ্ছে না।</string>
-    <string name="ramadan_fajr_time">ফজর %1$s</string>
-    <string name="ramadan_maghrib_time">মাগরিব %1$s</string>
     <string name="ramadan_day_no_schedule">এই দিনের জন্য কোনো সময়সূচি নেই।</string>
 
     <!-- The prayer screen (`feature_prayer_*`) and the planned-destination screen (`wip_*`). -->

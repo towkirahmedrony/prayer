@@ -7,6 +7,9 @@ import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
+import io.github.towkirahmedrony.salah.core.model.HijriDate
+import io.github.towkirahmedrony.salah.core.model.HijriDateSource
+import io.github.towkirahmedrony.salah.core.model.HijriMonth
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
@@ -54,6 +57,7 @@ class RamadanUiStateFactory(
         return RamadanUiState.Ready(
             phase = window?.phase(inputs.today) ?: RamadanPhase.FAR_AWAY,
             hijriYear = window?.hijriYear,
+            titleLabel = window?.let { range -> hijriYearLabel(range.hijriYear, range.source, locale) },
             rangeLabel = window?.let { range ->
                 "${formatting.gregorian(range.start, locale)} – ${formatting.gregorian(range.end, locale)}"
             },
@@ -73,6 +77,22 @@ class RamadanUiStateFactory(
             hijriAdjustmentDays = inputs.calendarSettings.hijriAdjustmentDays,
             message = null,
         )
+    }
+
+    /**
+     * The heading's Hijri year, for example `Ramadan 1448 AH` or `রমজান ১৪৪৮ AH`.
+     *
+     * Built from the shared Hijri formatter so the year is written in the interface language's own
+     * numerals (Bengali on a Bengali interface) exactly as the table's dates are. The era marker is
+     * the same `AH` the rows use, so the heading and the table cannot disagree about what calendar
+     * they are in.
+     */
+    private fun hijriYearLabel(year: Int, source: HijriDateSource, locale: Locale): String {
+        val monthAndYear = formatting.hijriMonth(
+            HijriDate(year = year, month = HijriMonth.RAMADAN, day = 1, source = source),
+            locale,
+        )
+        return "$monthAndYear ${CalendarFormatting.HIJRI_ERA}"
     }
 
     private fun rowOf(

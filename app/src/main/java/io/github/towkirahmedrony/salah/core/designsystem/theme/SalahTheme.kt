@@ -9,7 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +38,28 @@ private val SalahTypography = Typography().let { base ->
         titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
         labelLarge = base.labelLarge.copy(letterSpacing = 0.6.sp),
     )
+}
+
+/**
+ * The accent colours Material's scheme does not carry.
+ *
+ * Material gives every role a container/content pair, but Salah needs gold for exactly one thing:
+ * the row of the Ramadan table that is today. Gold is already the app's secondary colour, and this
+ * keeps it out of the shared scheme so it cannot leak onto a control that should have stayed green.
+ * The content colour always sits on the container: a dark green in light mode and the muted gold the
+ * dark scheme already uses, so the highlighted row keeps a readable contrast in both.
+ */
+@Immutable
+data class SalahAccents(
+    /** Fill of the Ramadan table's "today" row. */
+    val ramadanToday: Color,
+    /** Text and times drawn on [ramadanToday]. */
+    val onRamadanToday: Color,
+)
+
+/** The theme's [SalahAccents]. Provided by [SalahTheme]; the default is the light pairing. */
+val LocalSalahAccents = staticCompositionLocalOf {
+    SalahAccents(ramadanToday = GoldMuted, onRamadanToday = ForestGreenDark)
 }
 
 /**
@@ -67,12 +93,25 @@ fun SalahTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = if (darkTheme) SalahDarkColorScheme else SalahLightColorScheme,
-        typography = SalahTypography,
-        shapes = SalahShapes,
-        content = content,
-    )
+    val accents = if (darkTheme) {
+        // The dark scheme's own secondary container is already a deep gold, so the highlight reuses
+        // it and only the text colour is the muted gold rather than the scheme's brighter one.
+        SalahAccents(
+            ramadanToday = SalahDarkColorScheme.secondaryContainer,
+            onRamadanToday = GoldMuted,
+        )
+    } else {
+        SalahAccents(ramadanToday = GoldMuted, onRamadanToday = ForestGreenDark)
+    }
+
+    CompositionLocalProvider(LocalSalahAccents provides accents) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) SalahDarkColorScheme else SalahLightColorScheme,
+            typography = SalahTypography,
+            shapes = SalahShapes,
+            content = content,
+        )
+    }
 }
 
 private fun Context.findActivity(): Activity? {

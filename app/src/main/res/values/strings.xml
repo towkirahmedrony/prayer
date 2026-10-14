@@ -284,28 +284,19 @@
     <string name="occasion_eid_al_fitr">Eid al-Fitr (1 Shawwal)</string>
 
     <!-- Ramadan screen -->
-    <string name="ramadan_intro">The Ramadan window below is estimated from this device\'s Hijri calculation. Sehri and Iftar times are the same calculated prayer times the Home screen shows.</string>
-    <string name="ramadan_window_title">Ramadan window</string>
+    <string name="ramadan_window_summary">%1$s • %2$d days (Estimated)</string>
     <string name="ramadan_window_unavailable">This device\'s Hijri table does not cover a Ramadan near today, so Salah shows no Ramadan dates rather than estimated ones.</string>
-    <string name="ramadan_hijri_year">Hijri year %1$d</string>
-    <string name="ramadan_day_count">%1$d days in this window, as the calculation gives it.</string>
     <string name="ramadan_estimate_note">The start and end are estimates from the Umm al-Qura calculation. Local moon sighting may move them, and Salah does not claim that any authority has confirmed them.</string>
     <string name="ramadan_adjustment_note">Includes your Hijri adjustment of %1$s day(s).</string>
     <string name="ramadan_open_calendar">Open the calendar</string>
-    <string name="ramadan_reminders_title">Sehri and Iftar reminders</string>
-    <string name="ramadan_reminders_body">Scheduled by the same reminder system as the prayers. They are only ever scheduled for the days the calendar places inside Ramadan, and they are cancelled when Ramadan ends or when you switch them off.</string>
-    <string name="ramadan_sehri_rule">Runs before the calculated Fajr, which is the reference Salah uses for the end of Sehri.</string>
-    <string name="ramadan_iftar_rule">Runs at the calculated Maghrib, which is the reference Salah uses for Iftar.</string>
-    <string name="ramadan_reminders_shared">Sound, vibration and the master switch are shared with the prayer reminders.</string>
+    <string name="ramadan_reminders_card_title">Reminders</string>
+    <string name="ramadan_reminder_at_time">At time</string>
     <string name="ramadan_message_updated">Schedule updated.</string>
     <string name="ramadan_message_no_schedule">No timetable could be calculated, so no reminder was scheduled.</string>
     <string name="ramadan_schedule_title">Daily Sehri and Iftar</string>
-    <string name="ramadan_schedule_source">Times from: %1$s</string>
-    <string name="ramadan_sehri_iftar_rule">Sehri ends at the calculated Fajr and Iftar is the calculated Maghrib. Salah adds no buffer to either. For observance, follow the relevant local religious authority or a timetable you trust.</string>
+    <string name="ramadan_schedule_source_rule">Times from %1$s. Sehri ends at Fajr and Iftar is Maghrib; for observance, follow a timetable you trust.</string>
     <string name="ramadan_days_without_schedule">No timetable could be calculated for %1$d of these days, so no times are shown for them.</string>
     <string name="ramadan_column_day">Day</string>
-    <string name="ramadan_fajr_time">Fajr %1$s</string>
-    <string name="ramadan_maghrib_time">Maghrib %1$s</string>
     <string name="ramadan_day_no_schedule">No timetable for this day.</string>
 
     <!-- Shared states -->

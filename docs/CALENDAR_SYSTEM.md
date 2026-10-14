@@ -262,7 +262,8 @@ Consequences, each asserted in `RamadanCalendarTest` and `HijriCalendarTest`:
 
 - **Nothing is hard-coded.** There is no Ramadan date in the source tree; changing the offset or the Hijri
   year changes the range.
-- **An estimated range is always said to be estimated.** The screens carry an "Estimated" badge and the
+- **An estimated range is always said to be estimated.** The screens mark the range as estimated — the
+  Ramadan heading in its summary line, the Calendar card with an "Estimated" badge — and carry the
   sentence that the range comes from the Umm al-Qura calculation rather than from an announcement by
   Bangladesh's religious authorities, and that moon sighting may move the start and end by a day.
 - **No range means no dates.** When the table does not cover a Ramadan near today, the screens show an

@@ -93,6 +93,7 @@ class RamadanUiStateFactoryTest {
         assertEquals(0, state.daysWithoutSchedule)
         assertEquals(30, state.totalDays)
         assertEquals(1445, state.hijriYear)
+        assertEquals("Ramadan 1445 AH", state.titleLabel)
         assertEquals("11 March 2024 – 9 April 2024", state.rangeLabel)
         assertEquals(HijriDateSource.ESTIMATED_UMM_AL_QURA, state.source)
         assertNull(state.message)
@@ -191,6 +192,7 @@ class RamadanUiStateFactoryTest {
 
         assertTrue(state.rows.isEmpty())
         assertNull(state.hijriYear)
+        assertNull(state.titleLabel)
         assertNull(state.rangeLabel)
         assertNull(state.source)
         assertNull(state.totalDays)
@@ -221,6 +223,8 @@ class RamadanUiStateFactoryTest {
         val row = state.rows.first()
         assertEquals("১ রমজান ১৪৪৫ AH", row.hijriLabel)
         assertEquals("২৭ ফাল্গুন ১৪৩০", row.banglaLabel)
+        // The heading carries the same Hijri year in the same numerals as the rows.
+        assertEquals("রমজান ১৪৪৫ AH", state.titleLabel)
         assertTrue(
             "the Bengali Gregorian label carries no Bengali script: ${row.gregorianLabel}",
             row.gregorianLabel.any { character -> character.code in 0x0980..0x09FF },
@@ -228,7 +232,13 @@ class RamadanUiStateFactoryTest {
 
         // Nothing on the row, and nothing in the window heading, is left in Arabic script: the English
         // and Bengali interfaces must never show an Arabic month name or Arabic-Indic numerals.
-        listOfNotNull(row.gregorianLabel, row.banglaLabel, row.hijriLabel, state.rangeLabel).forEach { label ->
+        listOfNotNull(
+            row.gregorianLabel,
+            row.banglaLabel,
+            row.hijriLabel,
+            state.rangeLabel,
+            state.titleLabel,
+        ).forEach { label ->
             assertTrue(
                 "Arabic script survived in a Bengali Ramadan row: $label",
                 label.none { character -> character.code in 0x0600..0x06FF },
