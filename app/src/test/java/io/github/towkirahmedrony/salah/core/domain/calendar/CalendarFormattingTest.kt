@@ -97,6 +97,31 @@ class CalendarFormattingTest {
     }
 
     @Test
+    fun `a compact Gregorian date is the same day in fewer words`() {
+        val date = LocalDate.of(2024, 4, 14)
+
+        // The form a list of days is read in: no year, because the heading of the list states it, and
+        // the month abbreviated by the locale's own data rather than by Salah.
+        assertEquals("14 Apr", formatting.gregorianDayMonth(date, english))
+        assertEquals("14 Apr 2024", formatting.gregorianDayMonthYear(date, english))
+        // It is the same day the long form states — the short form drops the year, not the day.
+        assertTrue(formatting.gregorian(date, english).startsWith("14 "))
+
+        // And it is localised by the same rule as the long form, which is the property a reader on a
+        // Bengali interface depends on and the one an abbreviation must not be allowed to skip.
+        val banglaDayMonth = formatting.gregorianDayMonth(date, bangla)
+        assertTrue(
+            "the Bengali compact date carries no Bengali script: $banglaDayMonth",
+            banglaDayMonth.any { character -> character.code in 0x0980..0x09FF },
+        )
+        assertTrue(
+            "the Bengali compact date kept its Western digits: $banglaDayMonth",
+            banglaDayMonth.none { character -> character in '0'..'9' },
+        )
+        assertNotEquals(formatting.gregorianDayMonth(date, english), banglaDayMonth)
+    }
+
+    @Test
     fun `weekday column labels are the locale's own abbreviations`() {
         // java.time's DayOfWeek starts on Monday; the *grid's* first column comes from the locale's
         // WeekFields, which is a different question and is covered in GregorianCalendarGridTest.

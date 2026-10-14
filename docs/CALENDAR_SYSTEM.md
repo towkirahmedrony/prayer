@@ -262,16 +262,39 @@ Consequences, each asserted in `RamadanCalendarTest` and `HijriCalendarTest`:
 
 - **Nothing is hard-coded.** There is no Ramadan date in the source tree; changing the offset or the Hijri
   year changes the range.
-- **An estimated range is always said to be estimated.** The screens mark the range as estimated — the
-  Ramadan heading in its summary line, the Calendar card with an "Estimated" badge — and carry the
-  sentence that the range comes from the Umm al-Qura calculation rather than from an announcement by
-  Bangladesh's religious authorities, and that moon sighting may move the start and end by a day.
+- **An estimated range is always said to be estimated.** The Ramadan screen says it in the one sentence
+   under its range line, and the Calendar card carries its own "Estimated" badge. The Ramadan range line
+   itself has no second "(Estimated)" marker beside it: stating the same thing twice in two forms is what
+   made the heading taller than the information it carried. The sentence names the Umm al-Qura
+   calculation, says the range is not an announcement by Bangladesh's religious authorities, and says
+   moon sighting may move the start and end.
 - **No range means no dates.** When the table does not cover a Ramadan near today, the screens show an
   honest "no reliable range" state rather than estimated dates, and the daily table has no rows.
 - **The window and the day numbers come from one value.** `CalendarMonth` and the Ramadan inputs carry the
   window, so a day's Ramadan number can never disagree with the range displayed beside it.
 - **The Ramadan *start date* is not treated as official.** Salah reports an estimated window and the day
-  numbers within it; it does not claim that the first day of fasting in Bangladesh is decided.
+   numbers within it; it does not claim that the first day of fasting in Bangladesh is decided.
+
+### 6.1 How the Ramadan screen is laid out
+
+The screen is a heading, one card of reminders and one card of timetable, and nothing else.
+
+- **The days are grouped into the three traditional stages** — the first ten days, the middle ten, and
+  everything from day 21 — each under one small heading (`RamadanStage`, drawn as *Rahmah*, *Maghfirah*
+  and *Najat*). This is a partition of the *same* dates: no date, no Hijri conversion and no prayer time
+  changes because of it, and `RamadanStage.ofDayNumber` knows only where a stage **begins**. The last
+  stage therefore runs to the end of the month, day 29 or day 30, and the range on a heading is read off
+  the rows under it rather than from a boundary of its own. Both lengths are pinned by
+  `RamadanStageTest` and by `RamadanUiStateFactoryTest`.
+- **A row is labelled by its own Gregorian date** (`19 Feb`), not by a repeated "Ramadan day 3". The
+  Ramadan day number is still on the row — it is the day of the Hijri date printed beneath the Gregorian
+  one — and the stage heading states the days that stage covers. One fact, one place.
+- **No Bangla calendar date on this screen.** The Bangla date belongs to the Calendar screen; a Ramadan
+  list states the Gregorian date and the Hijri date, which is what a reader counting the fast needs. The
+  conversion (`BanglaCalendar`) and every other screen that shows it are untouched.
+- **The heading states the window once**: its range and day count, today's Ramadan day when today is
+  inside the window (or the phase sentence when it is not), and the estimate sentence. Nothing on it
+  repeats a date or a day number the table below already carries.
 
 ---
 
@@ -380,7 +403,14 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
   Maghrib for Iftar), so the Ramadan reminders reuse the existing channels and the user's existing choices
   instead of adding new ones.
 - **The master switch and the switches on the notifications screen both apply**, and the switches are
-  persisted settings with real effect, not decorative controls.
+   persisted settings with real effect, not decorative controls.
+- **A reminder switch is legible in both of its states.** Both the Ramadan card and the reminder
+   settings draw `SalahSwitch`, whose colours come from `salahSwitchPalette`: an *unchecked* switch was
+   inheriting Material's baseline `surfaceContainerHighest`/`outline` pair, which measures about 1.3:1
+   against Salah's cards in both themes — visible as a barely-there control. The off track is now the
+   scheme's muted tone and the on track its primary, each ≥ 3:1 against the card, with a thumb that
+   contrasts against its own track and a dimmed-but-visible disabled state.
+   `SalahSwitchPaletteTest` asserts those ratios for the light and the dark scheme.
 - **Lead times** are the offered choices 5/10/15/20/30 minutes for Sehri and 0/5/10/15/20/30 for Iftar,
   where `0` means "at Iftar only". A value outside the offered set is clamped to the nearest choice.
 - **Boot, clock, time-zone and date changes** are handled by the existing receivers, unchanged.
@@ -443,7 +473,9 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 | `DeviceClockCalendarRepositoryTest` | the device day in the device's zone; the verified/unverified source flags; the date language; the rollover at local midnight; the Hijri month boundary at midnight; DST; out-of-range reporting for both converters; a month laid out with real Bangla/Hijri dates and Ramadan day numbers; the Ramadan window and its movement with the offset |
 | `CalendarUiStateFactoryTest` | today vs the selection vs both; three resolved date lines and the Hijri source; out-of-range stated rather than blanked; no window → no range; weekday headers labelling the columns the grid lays out; the Bangla and Hijri views laying out their own month, heading, weekday names and numerals; the Hijri view in an English and in a Bengali interface with no Arabic-script label anywhere; the adjustment moving the Hijri date and the Ramadan day number together |
 | `CalendarViewModelTest` | selecting a mode changing the displayed month immediately; the choice persisted; the stored mode restored on open; month navigation moving one month of the selected system; the selection staying inside the displayed month; the Hijri month following the interface language, including a mid-session language change and a stored language read back on a fresh view model |
-| `RamadanUiStateFactoryTest` | one row per day with day numbers; Sehri/Iftar columns equal to Fajr/Maghrib; a missing Fajr; missing schedules counted once and shown per row; provenance; no window → no rows; the Hijri adjustment; the Hijri and Bangla labels following the rendering language; today marked by date; the location's zone |
+| `RamadanUiStateFactoryTest` | one row per day with day numbers; Sehri/Iftar columns equal to Fajr/Maghrib; a missing Fajr; missing schedules counted once and shown per row; provenance; no window → no rows; the Hijri adjustment; each row labelled by its own Gregorian date; the three traditional stages grouped, with the last one ending on day 29 or day 30 according to the window; the Hijri label and the Gregorian date following the rendering language; today marked by date; the location's zone |
+| `RamadanStageTest` | the three stages and their boundaries; every day of a 29-day and of a 30-day month in exactly one stage, in day order; the last stage having no upper bound of its own |
+| `SalahSwitchPaletteTest` | the switch colours of both themes: the off and on tracks ≥ 3:1 against the card, each thumb against its own track, off and on drawn as different fills, and a disabled off track that is dimmed rather than the card's own colour |
 | `RamadanReminderPlanTest` | Sehri planned as a lead-in only; Iftar at Maghrib plus an optional lead-in; nothing outside Ramadan; switches and master switch; unique slots and request codes; a Ramadan end leaving nothing behind; inherited sound/vibration; a passed Fajr; lead-time clamping |
 | `RamadanReminderCoordinatorTest` | what the coordinator actually registers: the Sehri lead-in at the calculated Fajr and Iftar at the calculated Maghrib for both window days and nothing else; the Hijri offset moving which days are in Ramadan, in both directions, and the day that leaves Ramadan being cancelled; the last day of Ramadan keeping its reminders while the day after schedules none, and those reminders going on the next day; one switch cancelling only its own alarms; the master switch and a missing location leaving nothing; repeating a reconciliation not duplicating an alarm |
 | `DataStoreUserPreferencesRepositoryTest` | calendar preferences persisted and restored; the adjustment clamped on write and read; unknown names falling back; calendar, prayer and theme preferences not overwriting each other |

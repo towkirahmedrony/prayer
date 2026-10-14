@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.ramadan
 
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanStage
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
@@ -94,7 +95,9 @@ class RamadanUiStateFactoryTest {
         assertEquals(30, state.totalDays)
         assertEquals(1445, state.hijriYear)
         assertEquals("Ramadan 1445 AH", state.titleLabel)
-        assertEquals("11 March 2024 – 9 April 2024", state.rangeLabel)
+        // The range is stated in the same compact Gregorian form the rows use, so the heading and the
+        // table name their months the same way.
+        assertEquals("11 Mar 2024 – 9 Apr 2024", state.rangeLabel)
         assertEquals(HijriDateSource.ESTIMATED_UMM_AL_QURA, state.source)
         assertNull(state.message)
     }
@@ -201,19 +204,76 @@ class RamadanUiStateFactoryTest {
     }
 
     @Test
-    fun `each row carries the Gregorian, Bangla and Hijri dates of its own day`() {
+    fun `each row carries the Gregorian and Hijri dates of its own day`() {
         val state = ready(factory.create(inputs(mapOf(available("2024-03-11"))), english))
 
         val row = state.rows.first()
-        assertEquals("11 March 2024", row.gregorianLabel)
-        // 14 February is 1 Falgun 1430, so 11 March is its 27th day.
-        assertEquals("27 Falgun 1430", row.banglaLabel)
+        // The row's label is its own Gregorian date, in the compact form a list of days is read in — not
+        // a "Ramadan day 1" caption, which is why the year is stated once, in the heading's range.
+        assertEquals("11 Mar", row.gregorianLabel)
         assertEquals("1 Ramadan 1445 AH", row.hijriLabel)
         assertTrue(row.isToday.not())
     }
 
     @Test
-    fun `the Hijri and Bangla labels follow the interface language instead of always using Arabic`() {
+    fun `the day's label is its real Gregorian date, one per row`() {
+        val state = ready(factory.create(inputs(emptyMap()), english))
+
+        assertEquals("11 Mar", state.rows.first().gregorianLabel)
+        assertEquals("12 Mar", state.rows[1].gregorianLabel)
+        assertEquals("31 Mar", state.rows[20].gregorianLabel)
+        // The window ends on 9 April, and the last row says so rather than repeating its day number.
+        assertEquals("9 Apr", state.rows.last().gregorianLabel)
+        assertEquals(30, state.rows.size)
+    }
+
+    @Test
+    fun `the window is grouped into Ramadan's three traditional stages`() {
+        val state = ready(factory.create(inputs(emptyMap()), english))
+
+        assertEquals(
+            listOf(RamadanStage.RAHMAH, RamadanStage.MAGHFIRAH, RamadanStage.NAJAT),
+            state.stageGroups.map { it.stage },
+        )
+        // Each heading states the days it actually covers, read off its own rows.
+        assertEquals(
+            listOf(1 to 10, 11 to 20, 21 to 30),
+            state.stageGroups.map { group -> group.firstDayNumber to group.lastDayNumber },
+        )
+        assertEquals(listOf(10, 10, 10), state.stageGroups.map { it.rows.size })
+        // Every day of the window is in exactly one stage, in order, and the grouping is what `rows` is
+        // derived from rather than a second list that could disagree with it.
+        assertEquals(state.rows, state.stageGroups.flatMap { it.rows })
+        assertEquals(
+            (1..30).toList(),
+            state.stageGroups.flatMap { group -> group.rows.map { it.ramadanDayNumber } },
+        )
+    }
+
+    @Test
+    fun `a twenty-nine day Ramadan ends the last stage on day twenty-nine`() {
+        // The window decides how long Ramadan is; nothing in the grouping knows the number 29 or 30. The
+        // last stage therefore simply holds the nine days a short Ramadan has left after day 20.
+        val shortWindow = RamadanWindow(
+            hijriYear = 1445,
+            start = window.start,
+            end = window.start.plusDays(28),
+            source = HijriDateSource.ESTIMATED_UMM_AL_QURA,
+        )
+        val state = ready(factory.create(inputs(emptyMap(), window = shortWindow), english))
+
+        assertEquals(29, state.totalDays)
+        assertEquals(29, state.rows.size)
+        assertEquals(
+            listOf(1 to 10, 11 to 20, 21 to 29),
+            state.stageGroups.map { group -> group.firstDayNumber to group.lastDayNumber },
+        )
+        assertEquals(listOf(10, 10, 9), state.stageGroups.map { it.rows.size })
+        assertEquals(29, state.stageGroups.last().rows.last().ramadanDayNumber)
+    }
+
+    @Test
+    fun `the Hijri label and the Gregorian date follow the interface language`() {
         // The same day as the English assertions above, on the same screen, rendered for a Bengali
         // interface. The Ramadan table reuses the shared Hijri formatter, so it follows the language
         // selector like the Calendar screen rather than the device's own locale.
@@ -222,19 +282,23 @@ class RamadanUiStateFactoryTest {
 
         val row = state.rows.first()
         assertEquals("১ রমজান ১৪৪৫ AH", row.hijriLabel)
-        assertEquals("২৭ ফাল্গুন ১৪৩০", row.banglaLabel)
         // The heading carries the same Hijri year in the same numerals as the rows.
         assertEquals("রমজান ১৪৪৫ AH", state.titleLabel)
+        // The compact date goes through the same digit table as the long one, so shortening it cannot
+        // leave Western digits behind on a Bengali interface.
         assertTrue(
             "the Bengali Gregorian label carries no Bengali script: ${row.gregorianLabel}",
             row.gregorianLabel.any { character -> character.code in 0x0980..0x09FF },
+        )
+        assertTrue(
+            "the Bengali Gregorian label kept its Western digits: ${row.gregorianLabel}",
+            row.gregorianLabel.none { character -> character in '0'..'9' },
         )
 
         // Nothing on the row, and nothing in the window heading, is left in Arabic script: the English
         // and Bengali interfaces must never show an Arabic month name or Arabic-Indic numerals.
         listOfNotNull(
             row.gregorianLabel,
-            row.banglaLabel,
             row.hijriLabel,
             state.rangeLabel,
             state.titleLabel,

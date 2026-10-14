@@ -15,6 +15,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronLeftGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.theme.salahSwitchPalette
 
 /**
  * A bordered surface used for every Home section, so the screen reads as one system.
@@ -222,5 +225,50 @@ fun SalahSkeletonBlock(
             .height(height)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
+
+/**
+ * The switch Salah draws for a reminder.
+ *
+ * A thin wrapper over Material's `Switch`: it keeps every behaviour of the framework control — the
+ * toggle gesture, the 48dp touch target, the switch role and the on/off state description a screen
+ * reader announces — and replaces only the six colours it is painted with, because the baseline ones do
+ * not survive Salah's palette. See [io.github.towkirahmedrony.salah.core.designsystem.theme.SalahSwitchPalette]
+ * for exactly which colours and why: the off track is the scheme's muted tone rather than a default
+ * container, so *off* is as visible as *on* on both the light and the dark card.
+ *
+ * It is a design-system component rather than a private composable per screen because there is more than
+ * one place a Sehri or Iftar reminder is switched: the Ramadan page's reminder card and the full reminder
+ * settings the card's gear opens. Both draw the same control, so both must be the same control.
+ */
+@Composable
+fun SalahSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val palette = salahSwitchPalette(MaterialTheme.colorScheme)
+
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = palette.checkedThumb,
+            checkedTrackColor = palette.checkedTrack,
+            checkedBorderColor = palette.checkedBorder,
+            uncheckedThumbColor = palette.uncheckedThumb,
+            uncheckedTrackColor = palette.uncheckedTrack,
+            uncheckedBorderColor = palette.uncheckedBorder,
+            disabledCheckedThumbColor = palette.disabledCheckedThumb,
+            disabledCheckedTrackColor = palette.disabledCheckedTrack,
+            disabledCheckedBorderColor = palette.disabledCheckedBorder,
+            disabledUncheckedThumbColor = palette.disabledUncheckedThumb,
+            disabledUncheckedTrackColor = palette.disabledUncheckedTrack,
+            disabledUncheckedBorderColor = palette.disabledUncheckedBorder,
+        ),
     )
 }

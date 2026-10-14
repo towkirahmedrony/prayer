@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.ramadan
 
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanStage
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.HijriDateSource
@@ -51,7 +52,14 @@ sealed interface RamadanUiState {
         /** Ramadan day number for today, or `null` when today is not in Ramadan. */
         val todayDayNumber: Int?,
 
-        val rows: List<RamadanDayRow>,
+        /**
+         * The window's days, grouped into the three traditional stages of Ramadan, in day order.
+         *
+         * The grouping is derived from the window's own length, so a 29-day and a 30-day Ramadan both
+         * work and the last stage simply holds whatever remains after day 20. Empty when no window could
+         * be derived — the screen then shows no dates at all rather than an empty table.
+         */
+        val stageGroups: List<RamadanStageGroup>,
 
         /** How many of [rows] have no schedule, so the screen can say so once instead of per row. */
         val daysWithoutSchedule: Int,
@@ -70,8 +78,31 @@ sealed interface RamadanUiState {
 
         val hijriAdjustmentDays: Int,
         val message: RamadanMessage?,
-    ) : RamadanUiState
+    ) : RamadanUiState {
+        /**
+         * Every day of [stageGroups] in day order.
+         *
+         * A view of the grouping rather than a second copy of the days: the rows are built once and the
+         * grouping is a lens on them, so a screen that does not need the stages (and the tests that
+         * assert the table's own facts) cannot drift from the screen that draws them.
+         */
+        val rows: List<RamadanDayRow> get() = stageGroups.flatMap(RamadanStageGroup::rows)
+    }
 }
+
+/**
+ * One traditional stage of Ramadan and the days that fall in it.
+ *
+ * [firstDayNumber] and [lastDayNumber] are read off the rows themselves, so the header's day range is
+ * the range the table actually shows. That is what makes the last stage 21–29 or 21–30 without the
+ * header ever being told which: the window decides how many days Ramadan has, and the header follows.
+ */
+data class RamadanStageGroup(
+    val stage: RamadanStage,
+    val firstDayNumber: Int,
+    val lastDayNumber: Int,
+    val rows: List<RamadanDayRow>,
+)
 
 /** Transient feedback after a reminder action, set only from a real reconciliation result. */
 sealed interface RamadanMessage {
@@ -93,10 +124,21 @@ sealed interface RamadanMessage {
 data class RamadanDayRow(
     val date: LocalDate,
     val ramadanDayNumber: Int,
+    /**
+     * Compact Gregorian date of the day, for example `19 Feb`.
+     *
+     * This is the row's label — the Gregorian date is what identifies a day in a calendar. The year is
+     * not repeated here because the heading already states the window's own years, and the row's Ramadan
+     * day is carried once, by [hijriLabel], rather than spelled out again as a second number.
+     */
     val gregorianLabel: String,
-    /** `null` when the date is outside the verified Bangladesh-calendar range. */
-    val banglaLabel: String?,
-    /** `null` when the platform's Hijri table does not cover this date. */
+    /**
+     * The Hijri date of the day, for example `1 Ramadan 1445 AH`, or `null` when the platform's Hijri
+     * table does not cover this date.
+     *
+     * The Ramadan day number is read out of this date, which is why the row carries no separate
+     * `Ramadan day 3`-style label. It is the same number in the calendar the observance is counted in.
+     */
     val hijriLabel: String?,
     /** Sehri end: the calculated Fajr. */
     val sehriEndLabel: String?,

@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,8 +36,10 @@ import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanStage
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
 import io.github.towkirahmedrony.salah.feature.common.messageRes
@@ -47,20 +48,37 @@ import org.koin.androidx.compose.koinViewModel
 /**
  * The Ramadan screen: the estimated window, the Sehri and Iftar timetable, and the reminders.
  *
- * The screen is three purposeful blocks and nothing else — a heading that states which Ramadan this
- * is and how long it runs, one card for the reminders, and one card for the day-by-day timetable.
- * The window used to be a card of its own that repeated the heading, and the table used to repeat
- * the source prayer beside every time; both are gone, so each fact now appears exactly once.
+ * The screen is three purposeful blocks and nothing else — a heading that states which Ramadan this is
+ * and how long it runs, one card for the reminders, and one card for the day-by-day timetable. The
+ * window used to be a card of its own that repeated the heading, and the table used to repeat the source
+ * prayer beside every time; both are gone, so each fact now appears exactly once.
  *
- * Three honesty rules still shape it, and each one is visible in the layout:
+ * ## How the month is laid out
  *
- *  1. **The window is an estimate.** It is derived from the platform's Hijri table, so the heading
- *     carries "(Estimated)" beside the range and one sentence says local moon sighting may move it.
- *     Salah never claims an authority has confirmed it.
+ * The timetable is grouped by Ramadan's three traditional stages — the first ten days, the middle ten,
+ * and the rest — each under its own small heading. The grouping is a reading aid over the same dates:
+ * the days, their times and their Hijri dates are exactly what the window and the schedules produced.
+ * The last stage is open-ended, so a 29-day Ramadan shows nine days under it and a 30-day one ten; no
+ * stage is told in advance how long Ramadan is.
+ *
+ * A day is labelled by its own **Gregorian date** (`19 Feb`) rather than by a repeated "Ramadan day N".
+ * The Ramadan day number is still there — it is the day of the Hijri date printed under the Gregorian
+ * one — and the stage heading states the day range it covers, so the number is legible without a second
+ * copy of it on every row. The Bangla calendar date is deliberately absent: this list is about Ramadan
+ * and its Gregorian dates, and the Bangla calendar remains a Calendar-screen feature.
+ *
+ * ## The three honesty rules that shape it
+ *
+ * Each one is still visible in the layout:
+ *
+ *  1. **The window is an estimate.** It is derived from the platform's Hijri table, so one sentence
+ *     beside the range says it is an estimate and that local moon sighting may move it. Salah never
+ *     claims an authority has confirmed it. The sentence appears once — the range line does not also
+ *     repeat the word.
  *  2. **The times are the existing prayer times.** Sehri is the calculated Fajr and Iftar the
- *     calculated Maghrib, and the table says so once, in words, under its own title, instead of
- *     printing the same clock time twice under every row. The source of the times is named too, so
- *     nothing is presented as a separate Sehri/Iftar timetable Salah has not integrated.
+ *     calculated Maghrib, and the table says so once, in words, under its own title, instead of printing
+ *     the same clock time twice under every row. The source of the times is named too, so nothing is
+ *     presented as a separate Sehri/Iftar timetable Salah has not integrated.
  *  3. **No schedule means no table.** With no location, or on a day the engine cannot calculate, the
  *     screen says so; it does not fill in a plausible-looking time.
  */
@@ -105,11 +123,17 @@ fun RamadanScreen(
 }
 
 /**
- * The heading: which Ramadan this is, how long it runs, where today stands, and the one entry point
- * to the Calendar screen.
+ * The heading: which Ramadan this is, its range, where today stands in it, and the one entry point to
+ * the Calendar screen.
  *
- * [state] is `null` while the window is still loading or could not be built, and the heading then
- * falls back to the screen's own name — the screen never invents a year or a range to fill the gap.
+ * The block is deliberately four short lines at most. It states the window once — as a range plus a day
+ * count — and never repeats a date the table below already carries: the range used to be printed beside
+ * a status line that restated the same period, and the "(Estimated)" marker duplicated the sentence that
+ * explains what "estimated" means. Removing that duplication is what brings the timetable back above the
+ * fold on a phone.
+ *
+ * [state] is `null` while the window is still loading or could not be built, and the heading then falls
+ * back to the screen's own name — the screen never invents a year or a range to fill the gap.
  */
 @Composable
 private fun RamadanHeader(
@@ -117,17 +141,6 @@ private fun RamadanHeader(
     onOpenCalendar: () -> Unit,
 ) {
     val calendarDescription = stringResource(R.string.ramadan_open_calendar)
-    val subtitle = if (state == null) {
-        null
-    } else {
-        val range = state.rangeLabel
-        val days = state.totalDays
-        when {
-            range == null -> null
-            days == null -> range
-            else -> stringResource(R.string.ramadan_window_summary, range, days)
-        }
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -149,14 +162,6 @@ private fun RamadanHeader(
             }
         }
 
-        if (subtitle != null) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
         if (state != null) {
             RamadanStatus(state = state)
         }
@@ -164,12 +169,12 @@ private fun RamadanHeader(
 }
 
 /**
- * Where today stands against the window: its Ramadan day when it is inside, the phase when it is not,
- * and the one line that says the whole range is an estimate.
+ * Where today stands against the window: the range it covers, the Ramadan day today is on when it is
+ * inside, the phase sentence when it is not, and the one line that says the range is an estimate.
  *
- * Only one of the day and the phase sentence is ever drawn, because they say the same kind of thing.
- * The estimate sentence is not optional: the range comes from a calculation no authority has
- * confirmed, and the screen must not present it as though one had.
+ * The range and the Ramadan day are different facts and each is drawn once. The estimate sentence is not
+ * optional, but it is the only place the estimate is stated: the range line used to carry an
+ * "(Estimated)" beside it as well, saying the same thing twice in two words' worth of space.
  */
 @Composable
 private fun RamadanStatus(state: RamadanUiState.Ready) {
@@ -178,6 +183,17 @@ private fun RamadanStatus(state: RamadanUiState.Ready) {
         SalahUnavailableNote(text = stringResource(R.string.ramadan_window_unavailable))
         return
     }
+
+    val totalDays = state.totalDays
+    Text(
+        text = if (totalDays == null) {
+            rangeLabel
+        } else {
+            stringResource(R.string.ramadan_window_summary, rangeLabel, totalDays)
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
     val dayNumber = state.todayDayNumber
     if (dayNumber != null) {
@@ -200,12 +216,6 @@ private fun RamadanStatus(state: RamadanUiState.Ready) {
         )
     }
 
-    Text(
-        text = stringResource(R.string.ramadan_estimate_note),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-
     if (state.hijriAdjustmentDays != 0) {
         Text(
             text = stringResource(
@@ -216,6 +226,12 @@ private fun RamadanStatus(state: RamadanUiState.Ready) {
             color = MaterialTheme.colorScheme.primary,
         )
     }
+
+    Text(
+        text = stringResource(R.string.ramadan_estimate_note),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -347,6 +363,12 @@ private fun RemindersCard(
  * the reminder settings screen, so the same setting could be changed from two places with the card
  * being the only one without the surrounding context. The card's gear is the single way through to
  * the control.
+ *
+ * The switch is [SalahSwitch] rather than Material's own, because the baseline switch colours do not
+ * survive Salah's palette: an off switch was drawn in colours that matched the card it sat on. The
+ * control still *is* a Material switch — same gesture, same touch target, same announced state — and the
+ * state it shows is the stored preference *and* the master switch, so a switch can never read as on
+ * while the reminder is silenced by the master.
  */
 @Composable
 private fun ReminderRow(
@@ -377,7 +399,7 @@ private fun ReminderRow(
                 },
             )
         }
-        Switch(
+        SalahSwitch(
             checked = enabled && masterEnabled,
             onCheckedChange = enabledChange,
             enabled = masterEnabled,
@@ -386,11 +408,17 @@ private fun ReminderRow(
 }
 
 /**
- * The day-by-day timetable: one header row, one row per Ramadan day, and today's row highlighted.
+ * The day-by-day timetable: one header row, the days grouped under Ramadan's three stages, and today's
+ * row highlighted.
  *
- * The card states both the rule and the provenance once, in prose. Every row then carries only what
- * is unique to it, so the columns can be read straight down: no clock time is printed twice, and no
- * date representation is repeated in a second place on the same screen.
+ * The card states both the rule and the provenance once, in prose. Every row then carries only what is
+ * unique to it, so the columns can be read straight down: no clock time is printed twice, and no date
+ * representation is repeated in a second place on the same screen.
+ *
+ * The grouping is a heading per stage and nothing more — no nested card per stage, because a card inside
+ * a card adds a border and a padding for every group and turns a thirty-row list into a stack of
+ * panels. The stages are drawn as tinted label rows in the table's own column, which is what makes the
+ * transition between them obvious while keeping the list one continuous surface.
  */
 @Composable
 private fun ScheduleCard(state: RamadanUiState.Ready) {
@@ -407,7 +435,7 @@ private fun ScheduleCard(state: RamadanUiState.Ready) {
                 SalahUnavailableNote(text = stringResource(R.string.notifications_schedule_no_location))
             }
 
-            state.rows.isEmpty() -> {
+            state.stageGroups.isEmpty() -> {
                 Spacer(modifier = Modifier.height(8.dp))
                 SalahUnavailableNote(text = stringResource(R.string.ramadan_window_unavailable))
             }
@@ -435,18 +463,70 @@ private fun ScheduleCard(state: RamadanUiState.Ready) {
                 Spacer(modifier = Modifier.height(10.dp))
                 TableHeader()
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                state.rows.forEachIndexed { index, row ->
-                    val previousIsToday = index > 0 && state.rows[index - 1].isToday
-                    // No rule hugs the highlighted row: a divider against the gold block would read
-                    // as an edge of the block rather than as a separator between two plain rows.
-                    if (index > 0 && !row.isToday && !previousIsToday) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                state.stageGroups.forEachIndexed { groupIndex, group ->
+                    // The gap before a stage heading is what separates the stages: it is larger than the
+                    // spacing between rows, so the list reads as three passages rather than one.
+                    if (groupIndex > 0) {
+                        Spacer(modifier = Modifier.height(14.dp))
                     }
-                    DayRow(row = row)
+                    StageHeader(group = group)
+                    group.rows.forEachIndexed { index, row ->
+                        val previousIsToday = index > 0 && group.rows[index - 1].isToday
+                        // No rule hugs the highlighted row: a divider against the gold block would read
+                        // as an edge of the block rather than as a separator between two plain rows.
+                        if (index > 0 && !row.isToday && !previousIsToday) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                        DayRow(row = row)
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * The heading of one stage: its name, and the Ramadan days it covers.
+ *
+ * Both facts come from the group, so the heading cannot disagree with the rows under it — the range is
+ * read off the days that are actually there. That is what lets the last stage read `Days 21–29` in one
+ * year and `Days 21–30` in the next without the heading being told which; there is no "day 29" or "day
+ * 30" anywhere in this screen, only the days the window produced.
+ */
+@Composable
+private fun StageHeader(group: RamadanStageGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(group.stage.labelRes()),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = stringResource(
+                R.string.ramadan_stage_range,
+                group.firstDayNumber,
+                group.lastDayNumber,
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** The stage's name, resolved by the screen so the label follows the interface language. */
+private fun RamadanStage.labelRes(): Int = when (this) {
+    RamadanStage.RAHMAH -> R.string.ramadan_stage_rahmah
+    RamadanStage.MAGHFIRAH -> R.string.ramadan_stage_maghfirah
+    RamadanStage.NAJAT -> R.string.ramadan_stage_najat
 }
 
 @Composable
@@ -456,7 +536,7 @@ private fun TableHeader() {
         verticalAlignment = Alignment.Bottom,
     ) {
         Text(
-            text = stringResource(R.string.ramadan_column_day),
+            text = stringResource(R.string.ramadan_column_date),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(DAY_COLUMN_WEIGHT),
@@ -479,11 +559,13 @@ private fun TableHeader() {
 }
 
 /**
- * One Ramadan day: its number and dates on the left, the two times on the right.
+ * One Ramadan day: its date on the left, the two times on the right.
  *
- * The three date representations are joined into one wrapped line instead of three stacked ones.
- * They are one fact — "which day is this" — and stacking them made every row four lines tall, which
- * is what made a thirty-day table feel longer than it needed to.
+ * The date is the Gregorian one (`19 Feb`) and it is the row's label, because a list of days in a
+ * calendar is read by its dates. The line under it is the day's Hijri date, which is where the Ramadan
+ * day number lives: `1 Ramadan 1445 AH` and "Ramadan day 1" are the same number, so printing both would
+ * be one fact in two lines and thirty rows of it. The Bangla calendar date is not drawn at all — this is
+ * a Ramadan list, and the Bangla calendar's own screen is where that date belongs.
  */
 @Composable
 private fun DayRow(row: RamadanDayRow) {
@@ -492,8 +574,6 @@ private fun DayRow(row: RamadanDayRow) {
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val contentColor = if (row.isToday) accents.onRamadanToday else onSurface
     val mutedColor = if (row.isToday) accents.onRamadanToday else onSurfaceVariant
-
-    val dates = listOfNotNull(row.gregorianLabel, row.banglaLabel, row.hijriLabel).joinToString(" · ")
 
     Row(
         modifier = Modifier
@@ -505,17 +585,21 @@ private fun DayRow(row: RamadanDayRow) {
     ) {
         Column(modifier = Modifier.weight(DAY_COLUMN_WEIGHT).padding(end = 8.dp)) {
             Text(
-                text = stringResource(R.string.calendar_ramadan_day, row.ramadanDayNumber),
+                text = row.gregorianLabel,
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor,
                 fontWeight = FontWeight.SemiBold,
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = dates,
-                style = MaterialTheme.typography.bodySmall,
-                color = mutedColor,
-            )
+            // A day outside the platform's Hijri table has no Hijri date, and the row then shows only
+            // the date it really has rather than a Ramadan number it cannot back up.
+            row.hijriLabel?.let { hijri ->
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = hijri,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = mutedColor,
+                )
+            }
             if (!row.hasSchedule) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -566,7 +650,7 @@ private fun sourceLabel(source: PrayerTimeSource?, providerId: String?): String 
 /** Renders a signed day count, so an adjustment never reads as an unsigned offset. */
 private fun signedDays(days: Int): String = if (days > 0) "+$days" else days.toString()
 
-/** The day column is the widest: it carries the number and up to three dates. */
+/** The date column is the widest: it carries a Gregorian date and, under it, a Hijri one. */
 private const val DAY_COLUMN_WEIGHT = 1.5f
 
 /** The two time columns are equal so the times line up down the table. */

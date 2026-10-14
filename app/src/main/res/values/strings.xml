@@ -284,9 +284,9 @@
     <string name="occasion_eid_al_fitr">Eid al-Fitr (1 Shawwal)</string>
 
     <!-- Ramadan screen -->
-    <string name="ramadan_window_summary">%1$s • %2$d days (Estimated)</string>
+    <string name="ramadan_window_summary">%1$s • %2$d days</string>
     <string name="ramadan_window_unavailable">This device\'s Hijri table does not cover a Ramadan near today, so Salah shows no Ramadan dates rather than estimated ones.</string>
-    <string name="ramadan_estimate_note">The start and end are estimates from the Umm al-Qura calculation. Local moon sighting may move them, and Salah does not claim that any authority has confirmed them.</string>
+    <string name="ramadan_estimate_note">Estimated from the Umm al-Qura calculation; local moon sighting may move the start and end.</string>
     <string name="ramadan_adjustment_note">Includes your Hijri adjustment of %1$s day(s).</string>
     <string name="ramadan_open_calendar">Open the calendar</string>
     <string name="ramadan_reminders_card_title">Reminders</string>
@@ -294,10 +294,15 @@
     <string name="ramadan_message_updated">Schedule updated.</string>
     <string name="ramadan_message_no_schedule">No timetable could be calculated, so no reminder was scheduled.</string>
     <string name="ramadan_schedule_title">Daily Sehri and Iftar</string>
-    <string name="ramadan_schedule_source_rule">Times from %1$s. Sehri ends at Fajr and Iftar is Maghrib; for observance, follow a timetable you trust.</string>
+    <string name="ramadan_schedule_source_rule">Times from %1$s. Sehri ends at Fajr and Iftar is Maghrib.</string>
     <string name="ramadan_days_without_schedule">No timetable could be calculated for %1$d of these days, so no times are shown for them.</string>
-    <string name="ramadan_column_day">Day</string>
+    <string name="ramadan_column_date">Date</string>
     <string name="ramadan_day_no_schedule">No timetable for this day.</string>
+    <!-- The three traditional stages of Ramadan, as headings over the days of the timetable. -->
+    <string name="ramadan_stage_rahmah">Rahmah</string>
+    <string name="ramadan_stage_maghfirah">Maghfirah</string>
+    <string name="ramadan_stage_najat">Najat</string>
+    <string name="ramadan_stage_range">Days %1$d–%2$d</string>
 
     <!-- Shared states -->
     <string name="state_loading">Loading…</string>

@@ -1,9 +1,9 @@
 package io.github.towkirahmedrony.salah.feature.ramadan
 
-import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanStage
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
@@ -32,10 +32,24 @@ import java.util.Locale
  * and the reminder cannot disagree. Sehri and Iftar go through
  * [RamadanCalendar.sehriEndOf] and [RamadanCalendar.iftarOf], so the rule itself has exactly one
  * definition.
+ *
+ * Two decisions this class also owns:
+ *
+ *  - **Which day is which in the Gregorian calendar.** A row is labelled with its own Gregorian date in
+ *    the compact form the list is read in (`19 Feb`), not with a repeated `Ramadan day 3`; the Ramadan
+ *    day number reaches the reader through the row's Hijri date, which is the same number counted in the
+ *    calendar the observance uses.
+ *  - **How the month is divided.** The window's days are grouped into Ramadan's three traditional stages
+ *    ([RamadanStage]), a partition of the very same dates. Nothing about the dates, the Hijri conversion
+ *    or the times changes because of it, and the last group simply takes whatever the window has left
+ *    after day 20 — which is why a 29-day and a 30-day Ramadan are both correct here.
+ *
+ * The page no longer renders a Bangla calendar date. That is a decision about this screen only: the
+ * Bangla conversion ([io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar]) and the
+ * Calendar screen that shows it are untouched.
  */
 class RamadanUiStateFactory(
     private val formatting: CalendarFormatting = CalendarFormatting(),
-    private val banglaCalendar: BanglaCalendar = BanglaCalendar(),
     private val hijriCalendar: HijriCalendar = HijriCalendar(),
 ) {
 
@@ -59,12 +73,15 @@ class RamadanUiStateFactory(
             hijriYear = window?.hijriYear,
             titleLabel = window?.let { range -> hijriYearLabel(range.hijriYear, range.source, locale) },
             rangeLabel = window?.let { range ->
-                "${formatting.gregorian(range.start, locale)} – ${formatting.gregorian(range.end, locale)}"
+                // The two ends in the same compact form the rows use, so the heading and the table name
+                // months the same way; the year is stated on both ends because a window can cross one.
+                "${formatting.gregorianDayMonthYear(range.start, locale)} – " +
+                    formatting.gregorianDayMonthYear(range.end, locale)
             },
             source = window?.source,
             totalDays = window?.dayCount,
             todayDayNumber = window?.dayNumber(inputs.today),
-            rows = rows,
+            stageGroups = stageGroupsOf(rows),
             daysWithoutSchedule = rows.count { !it.hasSchedule },
             timeSource = origin?.source,
             timeSourceProviderId = origin?.providerId,
@@ -118,8 +135,7 @@ class RamadanUiStateFactory(
         return RamadanDayRow(
             date = date,
             ramadanDayNumber = inputs.window?.dayNumber(date) ?: 0,
-            gregorianLabel = formatting.gregorian(date, locale),
-            banglaLabel = banglaCalendar.convert(date)?.let { formatting.bangla(it, locale) },
+            gregorianLabel = formatting.gregorianDayMonth(date, locale),
             hijriLabel = hijriLabelOf(date, inputs, locale),
             sehriEndLabel = sehriEnd?.let(timeFormatter::format),
             fajrLabel = schedule?.timeOf(PrayerName.FAJR)?.let(timeFormatter::format),
@@ -130,6 +146,29 @@ class RamadanUiStateFactory(
             unavailable = state?.unavailabilityReason(),
         )
     }
+
+    /**
+     * The window's rows split into Ramadan's three traditional stages, in day order.
+     *
+     * `groupBy` returns its groups in the order their first element was seen, and the rows are already in
+     * day order, so the stages come out Rahmah → Maghfirah → Najat without this function sorting
+     * anything. A stage with no days is simply absent — a window is never asked to invent a group for
+     * days it does not have.
+     *
+     * The day range on each group is taken from the rows in it rather than from the stage's own
+     * boundaries, because the last stage has no boundary to state: a 29-day Ramadan ends it on day 29 and
+     * a 30-day one on day 30.
+     */
+    private fun stageGroupsOf(rows: List<RamadanDayRow>): List<RamadanStageGroup> =
+        rows.groupBy { row -> RamadanStage.ofDayNumber(row.ramadanDayNumber) }
+            .map { (stage, stageRows) ->
+                RamadanStageGroup(
+                    stage = stage,
+                    firstDayNumber = stageRows.first().ramadanDayNumber,
+                    lastDayNumber = stageRows.last().ramadanDayNumber,
+                    rows = stageRows,
+                )
+            }
 
     /**
      * The Hijri date of [date], or `null` outside the platform's table.

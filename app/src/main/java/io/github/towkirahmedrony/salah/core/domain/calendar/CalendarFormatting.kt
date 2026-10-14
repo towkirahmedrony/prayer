@@ -137,6 +137,30 @@ class CalendarFormatting {
         locale,
     )
 
+    /**
+     * Compact localised Gregorian date, for example `19 Feb` or `১৯ ফেব`.
+     *
+     * The day and the abbreviated month only, for a list where the year is already established by the
+     * heading and would otherwise be repeated on every row. It is the same platform formatter and the
+     * same [localizeDigits] step as [gregorian], so the short form differs from the long one in length
+     * alone and never in script: a Bengali entry cannot come out with Western digits because it is short.
+     */
+    fun gregorianDayMonth(date: LocalDate, locale: Locale): String = localizeDigits(
+        date.format(DateTimeFormatter.ofPattern(DAY_MONTH_PATTERN, locale).withLocale(locale)),
+        locale,
+    )
+
+    /**
+     * Compact localised Gregorian date with its year, for example `19 Feb 2026`.
+     *
+     * Used where two dates are stated side by side — a range — and the year has to be visible without
+     * either end being written out in full.
+     */
+    fun gregorianDayMonthYear(date: LocalDate, locale: Locale): String = localizeDigits(
+        date.format(DateTimeFormatter.ofPattern(DAY_MONTH_YEAR_PATTERN, locale).withLocale(locale)),
+        locale,
+    )
+
     /** Localised weekday name, for example `Sunday` or `রবিবার`. */
     fun weekday(date: LocalDate, locale: Locale): String =
         date.format(DateTimeFormatter.ofPattern(WEEKDAY_PATTERN, locale).withLocale(locale))
@@ -215,6 +239,8 @@ class CalendarFormatting {
         const val HIJRI_ERA = "AH"
 
         private const val GREGORIAN_PATTERN = "d MMMM yyyy"
+        private const val DAY_MONTH_PATTERN = "d MMM"
+        private const val DAY_MONTH_YEAR_PATTERN = "d MMM yyyy"
         private const val WEEKDAY_PATTERN = "EEEE"
         private const val MONTH_PATTERN = "MMMM yyyy"
     }

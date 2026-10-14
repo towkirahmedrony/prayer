@@ -44,6 +44,7 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
+import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
@@ -652,7 +653,9 @@ private fun RamadanReminderRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+        // The same switch the Ramadan page draws. These are the same two reminders the Ramadan card
+        // switches, and an off state has to be as visible on this screen as it is on that one.
+        SalahSwitch(checked = enabled, onCheckedChange = onEnabledChange)
     }
 
     Row(
