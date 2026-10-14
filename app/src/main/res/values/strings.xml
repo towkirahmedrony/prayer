@@ -235,6 +235,8 @@
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_go_to_today">Go to today</string>
     <string name="calendar_cell_description">Date %1$s</string>
+    <string name="calendar_legend_ramadan">Ramadan day</string>
+    <string name="calendar_legend_occasion">Observance</string>
 
     <!-- Calendar: Ramadan summary -->
     <string name="calendar_ramadan_title">Ramadan</string>

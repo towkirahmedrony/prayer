@@ -351,6 +351,8 @@
     <string name="calendar_hijri_source_calculated">এই ডিভাইসের উম্মুল কুরা ক্যালেন্ডার থেকে অনুমান করা — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
     <string name="calendar_hijri_source_adjusted">উম্মুল কুরা ক্যালেন্ডার থেকে অনুমান করে আপনার হিজরি সমন্বয় অনুযায়ী সরানো — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
     <string name="calendar_cell_description">তারিখ %1$s</string>
+    <string name="calendar_legend_ramadan">রমজানের দিন</string>
+    <string name="calendar_legend_occasion">পালনীয় দিন</string>
 
     <string name="calendar_ramadan_range">আনুমানিক রমজান: %1$s</string>
     <string name="calendar_ramadan_unavailable">এই সময়ের জন্য এই ডিভাইসে নির্ভরযোগ্য কোনো রমজান সময়কাল পাওয়া যায়নি, তাই একটি অনুমান করা সময়কাল দেখানোর বদলে কিছুই দেখানো হচ্ছে না।</string>
