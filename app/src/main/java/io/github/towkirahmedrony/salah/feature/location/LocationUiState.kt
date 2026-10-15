@@ -7,6 +7,8 @@ import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
@@ -161,6 +163,15 @@ data class StoredLocationUi(
     val countryCode: String?,
     val area: BangladeshAreaRef?,
     /**
+     * [area]'s three levels, each in the language the screen is rendering in, resolved through the
+     * bundled dataset when it still knows the ids and falling back to the names stored with the record.
+     * `null` at a level means the record has no value for it, which is what the screen shows as
+     * "unknown". Kept as three values rather than one label so each row keeps its own "unknown" answer.
+     */
+    val divisionDisplayName: String?,
+    val districtDisplayName: String?,
+    val upazilaDisplayName: String?,
+    /**
      * The named locality verified as containing this location, when one was established.
      *
      * Kept beside [area] rather than folded into it, because the two say different things: the area is
@@ -215,7 +226,11 @@ data class LocationUiState(
     val districtOptions: List<BangladeshArea> = emptyList(),
     /** The upazilas of the selected district, or none before one is chosen. */
     val upazilaOptions: List<BangladeshArea> = emptyList(),
-    /** The chosen areas' names, deepest first, or `null` while the selection is incomplete. */
+    /**
+     * The chosen areas' names, deepest first, in the current language, or `null` while the selection is
+     * incomplete. Resolved through the dataset so the names follow the active language rather than the
+     * English names stored with a reference.
+     */
     val selectionSummary: String? = null,
     /** The chosen area's published coordinate, which is what a manual save would store. */
     val selectionCoordinateText: String? = null,
@@ -241,10 +256,30 @@ data class LocationUiState(
     val manualForm: LocationFormState = LocationFormState(),
     /** The last message, until it is dismissed. */
     val message: LocationMessage? = null,
+    /**
+     * The language the picker's location *names* are shown and searched in.
+     *
+     * Set by the screens from the resources they are rendering with, so it tracks
+     * `AppLanguage` — including "follow the device" — exactly as `stringResource` does. Everything
+     * that is a label rather than a place name comes from the string resources instead; this is only
+     * about the dataset's own Bangla and English names.
+     */
+    val nameLanguage: LocationNameLanguage = LocationNameLanguage.ENGLISH,
+    /** The search field's current text, before normalization. */
+    val searchQuery: String = "",
+    /** The results for [searchQuery], best match first. Empty while the query is blank or matched nothing. */
+    val searchResults: List<LocationSearchResult> = emptyList(),
+    /** True while a search is queued (debouncing) or running. */
+    val isSearching: Boolean = false,
+    /** True when the last search could not run — the dataset is unreadable, or the search failed. */
+    val searchFailed: Boolean = false,
 ) {
     /** True when a manual selection can be started at all. */
     val canChooseArea: Boolean get() = isDatasetUsable
 
     /** True when the stored location is outside Bangladesh and must be replaced. */
     val isStoredLocationUnsupported: Boolean get() = stored?.isKnownOutsideSupportedCountry == true
+
+    /** True when the search field holds anything worth searching for. */
+    val hasSearchQuery: Boolean get() = searchQuery.isNotBlank()
 }

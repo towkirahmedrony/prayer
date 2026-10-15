@@ -4,22 +4,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-// Map picker configuration, resolved at build time into `BuildConfig` so no URL or key is written into
-// the source. The defaults are key-free public services (OpenFreeMap for the map style, OSM Nominatim for
-// reverse geocoding); each can be overridden with a Gradle property — for example
-// `-Psalah.map.styleUrl=https://…` or `salah.geocoder.baseUrl=…` in `gradle.properties` — so a release
-// can point at a self-hosted or paid provider without a code change. See docs/MAP_PICKER.md.
-val mapStyleUrl: String = providers.gradleProperty("salah.map.styleUrl")
-    .getOrElse("https://tiles.openfreemap.org/styles/liberty")
-val mapDarkStyleUrl: String = providers.gradleProperty("salah.map.darkStyleUrl")
-    .getOrElse("https://tiles.openfreemap.org/styles/dark")
-val geocoderBaseUrl: String = providers.gradleProperty("salah.geocoder.baseUrl")
-    .getOrElse("https://nominatim.openstreetmap.org")
-// The reverse-geocoding provider's usage policy requires the app to identify itself with a real
-// User-Agent, so this is a build-time constant rather than a default HTTP client's.
-val geocoderUserAgent: String = providers.gradleProperty("salah.geocoder.userAgent")
-    .getOrElse("Salah/0.1.0 (https://github.com/towkirahmedrony/prayer)")
-
 android {
     namespace = "io.github.towkirahmedrony.salah"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -33,14 +17,6 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
-
-        // The map style the picker loads, the geocoder it queries, and the User-Agent it identifies
-        // itself with. Values, never secrets: the defaults need no key, and an override for a keyed
-        // provider is expected to carry the key in the URL, supplied by the build rather than committed.
-        buildConfigField("String", "MAP_STYLE_URL", "\"$mapStyleUrl\"")
-        buildConfigField("String", "MAP_DARK_STYLE_URL", "\"$mapDarkStyleUrl\"")
-        buildConfigField("String", "GEOCODER_BASE_URL", "\"$geocoderBaseUrl\"")
-        buildConfigField("String", "GEOCODER_USER_AGENT", "\"$geocoderUserAgent\"")
     }
 
     buildTypes {
@@ -123,10 +99,6 @@ dependencies {
 
     // Local astronomical prayer-time engine (Adhan Kotlin). Runs on-device, offline.
     implementation(libs.adhan.kotlin)
-
-    // Map rendering for the location picker. The SDK is a View-based map wrapped in `AndroidView`; the
-    // selection, validation and persistence built on it are pure Kotlin and unit-tested without it.
-    implementation(libs.maplibre.android.sdk)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

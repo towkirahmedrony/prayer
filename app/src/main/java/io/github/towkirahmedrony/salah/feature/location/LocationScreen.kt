@@ -32,6 +32,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +59,9 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavail
 import io.github.towkirahmedrony.salah.core.domain.location.AreaResolution
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
+import io.github.towkirahmedrony.salah.core.domain.location.nameIn
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionAction
@@ -84,8 +88,6 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun LocationScreen(
     onBack: () -> Unit,
-    /** Opens the interactive map picker, the third way to choose a location. */
-    onOpenMapPicker: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LocationViewModel = koinViewModel(),
 ) {
@@ -95,6 +97,12 @@ fun LocationScreen(
         viewModel.start()
         viewModel.refreshPermissionState()
     }
+
+    // The language the dataset's place names render in and the search matches against — taken from the
+    // same resources every label here resolves through (`currentNameLanguage`), and handed to the view
+    // model because the dataset's names are data rather than strings.
+    val nameLanguage = currentNameLanguage()
+    LaunchedEffect(nameLanguage) { viewModel.setLanguage(nameLanguage) }
 
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -130,7 +138,9 @@ fun LocationScreen(
         onToggleManualCoordinates = viewModel::toggleManualCoordinates,
         onManualFormChange = viewModel::onManualFormChange,
         onSaveManualLocation = viewModel::saveManualLocation,
-        onOpenMapPicker = onOpenMapPicker,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        onSelectSearchResult = viewModel::selectSearchResult,
+        nameLanguage = nameLanguage,
         onBack = onBack,
     )
 }
@@ -169,7 +179,9 @@ private fun LocationContent(
     onToggleManualCoordinates: () -> Unit,
     onManualFormChange: ((LocationFormState) -> LocationFormState) -> Unit,
     onSaveManualLocation: () -> Unit,
-    onOpenMapPicker: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSelectSearchResult: (LocationSearchResult) -> Unit,
+    nameLanguage: LocationNameLanguage,
     onBack: () -> Unit,
 ) {
     Column(
@@ -270,16 +282,6 @@ private fun LocationContent(
                 ) {
                     Text(text = stringResource(R.string.location_action_select_manually))
                 }
-                // The map picker sits beside the area picker rather than replacing it: an area selection
-                // stores a published administrative centre, this stores the exact point chosen, and both
-                // are legitimate — the map needs a connection for tiles, the area picker never does.
-                OutlinedButton(
-                    onClick = onOpenMapPicker,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.isLoading,
-                ) {
-                    Text(text = stringResource(R.string.location_map_open))
-                }
             }
         }
 
@@ -298,6 +300,9 @@ private fun LocationContent(
                 onSelectUpazila = onSelectUpazila,
                 onSaveSelection = onSaveSelection,
                 onCloseAreaPicker = onCloseAreaPicker,
+                onSearchQueryChanged = onSearchQueryChanged,
+                onSelectSearchResult = onSelectSearchResult,
+                nameLanguage = nameLanguage,
             )
         }
 
@@ -486,15 +491,15 @@ private fun StoredLocationCard(stored: StoredLocationUi) {
         )
         LocationDetailRow(
             label = stringResource(R.string.location_division_label),
-            value = stored.area?.divisionName ?: stringResource(R.string.location_area_unknown),
+            value = stored.divisionDisplayName ?: stringResource(R.string.location_area_unknown),
         )
         LocationDetailRow(
             label = stringResource(R.string.location_district_label),
-            value = stored.area?.districtName ?: stringResource(R.string.location_area_unknown),
+            value = stored.districtDisplayName ?: stringResource(R.string.location_area_unknown),
         )
         LocationDetailRow(
             label = stringResource(R.string.location_upazila_label),
-            value = stored.area?.upazilaName ?: stringResource(R.string.location_area_unknown),
+            value = stored.upazilaDisplayName ?: stringResource(R.string.location_area_unknown),
         )
         // Only when a locality was actually established: an empty row would suggest Salah looked and
         // found nothing, which is not the same as a record that predates the locality layer.
@@ -682,6 +687,9 @@ private fun AreaPickerSection(
     onSelectUpazila: (String) -> Unit,
     onSaveSelection: () -> Unit,
     onCloseAreaPicker: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSelectSearchResult: (LocationSearchResult) -> Unit,
+    nameLanguage: LocationNameLanguage,
 ) {
     SalahSectionCard {
         Text(
@@ -700,12 +708,26 @@ private fun AreaPickerSection(
             )
         }
 
+        // Search above the three levels, for the same reason it is above the setup screen's dropdowns:
+        // it finds a name without opening three lists, and choosing a result fills the levels below so
+        // there is still exactly one selection on screen. It needs a dataset to search, so it appears
+        // only once one has been read.
+        if (state.isDatasetUsable) {
+            Spacer(modifier = Modifier.height(12.dp))
+            LocationSearchField(
+                state = state,
+                onQueryChange = onSearchQueryChanged,
+                onSelectResult = onSelectSearchResult,
+            )
+        }
+
         AreaLevelList(
             title = stringResource(R.string.location_picker_step_division),
             emptyMessage = null,
             options = state.divisionOptions,
             selectedId = state.selection.divisionId,
             onSelect = onSelectDivision,
+            nameLanguage = nameLanguage,
         )
 
         AreaLevelList(
@@ -714,6 +736,7 @@ private fun AreaPickerSection(
             options = state.districtOptions,
             selectedId = state.selection.districtId,
             onSelect = onSelectDistrict,
+            nameLanguage = nameLanguage,
         )
 
         AreaLevelList(
@@ -722,6 +745,7 @@ private fun AreaPickerSection(
             options = state.upazilaOptions,
             selectedId = state.selection.upazilaId,
             onSelect = onSelectUpazila,
+            nameLanguage = nameLanguage,
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -762,8 +786,10 @@ private fun AreaPickerSection(
  *
  * A list rather than a dropdown, because a district has at most a few dozen upazilas and every one of
  * them being visible is what makes "the area is not there" a verifiable observation rather than a
- * suspicion about a search box. Rows are radio buttons so the current choice is unmistakable, and the
- * Bangla name is shown beside the English one whenever the dataset has it.
+ * suspicion about a search box — the search above narrows the field, but this level still shows the
+ * full set for the chosen parent. Rows are radio buttons so the current choice is unmistakable, and
+ * each name is shown in the interface language, falling back to the English name where the dataset
+ * has no Bangla one.
  */
 @Composable
 private fun AreaLevelList(
@@ -772,6 +798,7 @@ private fun AreaLevelList(
     options: List<BangladeshArea>,
     selectedId: String?,
     onSelect: (String) -> Unit,
+    nameLanguage: LocationNameLanguage,
 ) {
     Spacer(modifier = Modifier.height(12.dp))
     Text(
@@ -812,7 +839,8 @@ private fun AreaLevelList(
                 RadioButton(selected = selected, onClick = null)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = area.labelledName,
+                    // The active language's name: Bangla where the dataset has one, English otherwise.
+                    text = area.nameIn(nameLanguage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

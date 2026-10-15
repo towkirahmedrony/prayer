@@ -25,16 +25,15 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +59,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronDownGlyph
-import io.github.towkirahmedrony.salah.feature.location.map.MapPickerScreen
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
@@ -68,6 +66,9 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSection
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
+import io.github.towkirahmedrony.salah.core.domain.location.nameIn
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.abs
@@ -115,18 +116,12 @@ fun LocationSetupScreen(
         viewModel.start()
     }
 
-    // The map picker is offered on the first launch too, as a full-screen overlay rather than a navigation
-    // destination: while setup is required the shell shows no navigation graph, so there is no route to
-    // navigate to. It is the same screen and the same view model the navigation route uses, so the first
-    // launch and every later change share one implementation, one country check and one write path.
-    var isMapPickerOpen by rememberSaveable { mutableStateOf(false) }
-    if (isMapPickerOpen) {
-        MapPickerScreen(
-            onBack = { isMapPickerOpen = false },
-            onConfirmed = { isMapPickerOpen = false },
-        )
-        return
-    }
+    // The language the dataset's place names render in and the search matches against, taken from the
+    // same resources every label on this screen resolves through (see `currentNameLanguage`). The view
+    // model needs it explicitly because the dataset's names are data, not strings: a change — including
+    // a change made while this screen is open — re-runs any query already typed.
+    val nameLanguage = currentNameLanguage()
+    LaunchedEffect(nameLanguage) { viewModel.setLanguage(nameLanguage) }
 
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -159,7 +154,9 @@ fun LocationSetupScreen(
         onSelectUpazila = viewModel::selectUpazila,
         onSaveSelection = viewModel::saveSelectedArea,
         onDismissMessage = viewModel::dismissMessage,
-        onOpenMapPicker = { isMapPickerOpen = true },
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        onSelectSearchResult = viewModel::selectSearchResult,
+        nameLanguage = nameLanguage,
     )
 }
 
@@ -180,7 +177,9 @@ private fun SetupContent(
     onSelectUpazila: (String) -> Unit,
     onSaveSelection: () -> Unit,
     onDismissMessage: () -> Unit,
-    onOpenMapPicker: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSelectSearchResult: (LocationSearchResult) -> Unit,
+    nameLanguage: LocationNameLanguage,
 ) {
     Column(
         modifier = modifier
@@ -240,18 +239,10 @@ private fun SetupContent(
             onSelectDistrict = onSelectDistrict,
             onSelectUpazila = onSelectUpazila,
             onSaveSelection = onSaveSelection,
+            onSearchQueryChanged = onSearchQueryChanged,
+            onSelectSearchResult = onSelectSearchResult,
+            nameLanguage = nameLanguage,
         )
-
-        // The third way to choose a location, offered beside the area picker. It stores the exact point
-        // chosen rather than an administrative centre, and needs a connection only for the map tiles.
-        Spacer(modifier = Modifier.height(14.dp))
-        OutlinedButton(
-            onClick = onOpenMapPicker,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !state.isLoading,
-        ) {
-            Text(text = stringResource(R.string.location_map_open))
-        }
 
         Spacer(modifier = Modifier.height(18.dp))
         Text(
@@ -397,6 +388,9 @@ private fun ChooseLocationManuallyCard(
     onSelectDistrict: (String) -> Unit,
     onSelectUpazila: (String) -> Unit,
     onSaveSelection: () -> Unit,
+    onSearchQueryChanged: (String) -> Unit,
+    onSelectSearchResult: (LocationSearchResult) -> Unit,
+    nameLanguage: LocationNameLanguage,
     modifier: Modifier = Modifier,
 ) {
     SalahSectionCard(modifier = modifier) {
@@ -432,7 +426,20 @@ private fun ChooseLocationManuallyCard(
             // The read is a local file parse that finishes in milliseconds, and both levels below
             // wait on it, so a placeholder of the first field's shape is enough.
             SalahSkeletonBlock(height = 56.dp, modifier = Modifier.fillMaxWidth())
+            SalahSkeletonBlock(height = 56.dp, modifier = Modifier.fillMaxWidth())
         } else {
+            // Search sits above the dropdowns rather than replacing them: it is the fast path to a name
+            // the user already knows, the dropdowns remain the way to see what a level actually holds,
+            // and a chosen result fills the dropdowns below so both always show one selection. Offered
+            // only when there is a dataset to search — with none, the field could only fail.
+            if (state.isDatasetUsable) {
+                LocationSearchField(
+                    state = state,
+                    onQueryChange = onSearchQueryChanged,
+                    onSelectResult = onSelectSearchResult,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             AreaDropdownField(
                 label = stringResource(R.string.location_division_label),
                 selected = state.divisionOptions.firstOrNull { area -> area.id == state.selection.divisionId },
@@ -440,6 +447,7 @@ private fun ChooseLocationManuallyCard(
                 enabled = state.isDatasetUsable,
                 emptyMessage = null,
                 onSelect = onSelectDivision,
+                nameLanguage = nameLanguage,
             )
             Spacer(modifier = Modifier.height(12.dp))
             AreaDropdownField(
@@ -449,6 +457,7 @@ private fun ChooseLocationManuallyCard(
                 enabled = state.isDatasetUsable && state.selection.divisionId != null,
                 emptyMessage = stringResource(R.string.location_picker_needs_division),
                 onSelect = onSelectDistrict,
+                nameLanguage = nameLanguage,
             )
             Spacer(modifier = Modifier.height(12.dp))
             AreaDropdownField(
@@ -458,6 +467,7 @@ private fun ChooseLocationManuallyCard(
                 enabled = state.isDatasetUsable && state.selection.districtId != null,
                 emptyMessage = stringResource(R.string.location_picker_needs_district),
                 onSelect = onSelectUpazila,
+                nameLanguage = nameLanguage,
             )
         }
 
@@ -503,13 +513,16 @@ private fun AreaDropdownField(
     enabled: Boolean,
     emptyMessage: String?,
     onSelect: (String) -> Unit,
+    nameLanguage: LocationNameLanguage,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = selected?.name.orEmpty(),
+            // The active language's name: the Bangla one where the dataset has it, the English one
+            // otherwise — the same value the menu below shows for this area.
+            value = selected?.nameIn(nameLanguage).orEmpty(),
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
@@ -560,7 +573,7 @@ private fun AreaDropdownField(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = area.labelledName,
+                                text = area.nameIn(nameLanguage),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

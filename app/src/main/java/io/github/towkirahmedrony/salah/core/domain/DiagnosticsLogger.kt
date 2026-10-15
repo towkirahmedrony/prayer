@@ -178,17 +178,9 @@ object SalahDiagnosticEvents {
     const val LOCATION_LOCALITY_UNRESOLVED = "location_locality_unresolved"
 
     /**
-     * A map picker looked up the address of a selected point and found one. Logged with the components
-     * that were present, never with the coordinates.
+     * A manual location search could not be run. Logged with the failure reason — never with the query,
+     * which would say what the user typed — because a search reads the bundled dataset in memory and
+     * the only realistic failures are an unreadable dataset and a parser exception.
      */
-    const val LOCATION_MAP_GEOCODER_RESOLVED = "location_map_geocoder_resolved"
-
-    /**
-     * A map picker's address lookup did not return a usable result.
-     *
-     * Logged with a reason code — `network`, `timeout`, `rate_limited`, `http_<code>`, `malformed`,
-     * `no_address` — because the four mean different things to a reader of the log, and the coordinates
-     * are still valid and still saved regardless: address resolution is never a prerequisite.
-     */
-    const val LOCATION_MAP_GEOCODER_UNAVAILABLE = "location_map_geocoder_unavailable"
+    const val LOCATION_SEARCH_FAILED = "location_search_failed"
 }

@@ -47,7 +47,13 @@ class BangladeshLocationDatasetTest {
 
         val bheramara = requireNotNull(dataset.area("BD1001002"))
         assertNull(bheramara.banglaName)
-        assertEquals("Bheramara", bheramara.labelledName)
+        assertEquals("Bheramara", bheramara.nameIn(LocationNameLanguage.ENGLISH))
+        // With no Bangla name to show, Bangla display falls back to the English one rather than
+        // guessing a transliteration — there is no name *in* Bangla, so the English name is what a
+        // Bangla search would reach as a fallback.
+        assertEquals("Bheramara", bheramara.nameIn(LocationNameLanguage.BANGLA))
+        assertNull(bheramara.nameInOrNull(LocationNameLanguage.BANGLA))
+        assertEquals("Bheramara", bheramara.alternateNameIn(LocationNameLanguage.BANGLA))
     }
 
     @Test

@@ -14,8 +14,13 @@ import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
+import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSearch
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
 import io.github.towkirahmedrony.salah.core.domain.location.LocalityResolution
 import io.github.towkirahmedrony.salah.core.domain.location.LocalityResolver
+import io.github.towkirahmedrony.salah.core.domain.location.hierarchyOf
+import io.github.towkirahmedrony.salah.core.domain.location.locationNameOf
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationAcquisitionResult
@@ -29,6 +34,8 @@ import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.feature.common.LocationFormState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -84,10 +91,18 @@ class LocationViewModel(
         val permissionState: LocationPermissionState = LocationPermissionState.DENIED,
         val isManualFormOpen: Boolean = false,
         val manualForm: LocationFormState = LocationFormState(),
+        val nameLanguage: LocationNameLanguage = LocationNameLanguage.ENGLISH,
+        val searchQuery: String = "",
+        val searchResults: List<LocationSearchResult> = emptyList(),
+        val isSearching: Boolean = false,
+        val searchFailed: Boolean = false,
     )
 
     private val datasetSlot = MutableStateFlow(DatasetSlot(isLoading = true, dataset = null))
     private val transient = MutableStateFlow(Transient())
+
+    /** The in-flight search, held so a newer keystroke can cancel the obsolete one. */
+    private var searchJob: Job? = null
 
     val uiState: StateFlow<LocationUiState> = combine(
         datasetSlot,
@@ -128,6 +143,10 @@ class LocationViewModel(
                 ),
             )
         }
+        // A search typed before the read finished is still waiting on it: it was held in the
+        // `isSearching` state rather than failed, and this is what completes it — or reports the
+        // failure now that "unfinished" and "unreadable" are finally distinguishable.
+        runSearch()
     }
 
     // Device location --------------------------------------------------------
@@ -388,10 +407,25 @@ class LocationViewModel(
         transient.update { it.copy(isPickerOpen = true, message = null) }
     }
 
-    /** Closes the picker and forgets the partial selection, so it never half-applies. */
+    /**
+     * Closes the picker and forgets the partial selection, so it never half-applies.
+     *
+     * The search field is cleared with it: a query belongs to one opening of the picker, and carrying
+     * one over would reopen the screen on results the user has already acted on. The stored location
+     * is untouched — cancelling a selection is not choosing a new one.
+     */
     fun closeAreaPicker() {
+        searchJob?.cancel()
+        searchJob = null
         transient.update {
-            it.copy(isPickerOpen = false, selection = AreaSelection.EMPTY)
+            it.copy(
+                isPickerOpen = false,
+                selection = AreaSelection.EMPTY,
+                searchQuery = "",
+                searchResults = emptyList(),
+                isSearching = false,
+                searchFailed = false,
+            )
         }
     }
 
@@ -405,6 +439,116 @@ class LocationViewModel(
 
     fun selectUpazila(areaId: String) = updateSelection { selection, dataset ->
         selection.selectUpazila(areaId, dataset)
+    }
+
+    /**
+     * Applies a search result to the hierarchy the dropdowns show.
+     *
+     * The ids go through the same [AreaSelection] guards as a dropdown tap: each level is selected
+     * parent-first, and a level the result does not carry leaves the selection at that point — a
+     * district result keeps the division and clears any upazila chosen under the previous district,
+     * because [AreaSelection.selectDistrict] does that itself. Nothing is written to the repository
+     * here; confirming remains an explicit save.
+     */
+    fun selectSearchResult(result: LocationSearchResult) = updateSelection { selection, dataset ->
+        var updated = selection
+        result.divisionId?.let { id -> updated = updated.selectDivision(id, dataset) }
+        result.districtId?.let { id -> updated = updated.selectDistrict(id, dataset) }
+        result.upazilaId?.let { id -> updated = updated.selectUpazila(id, dataset) }
+        updated
+    }
+
+    /**
+     * The language the picker's location names are displayed and searched in.
+     *
+     * Supplied by the screens from the resources they render with — the one place that knows whether
+     * `AppLanguage` resolved to Bangla or English, including "follow the device". Changing it re-runs
+     * an in-flight query in the new language rather than leaving results from the old one.
+     */
+    fun setLanguage(language: LocationNameLanguage) {
+        val changed = transient.value.nameLanguage != language
+        transient.update { it.copy(nameLanguage = language) }
+        if (changed) runSearch()
+    }
+
+    /**
+     * Keeps the search field's text and schedules a search for it.
+     *
+     * Typing does not search synchronously: a fast typist would run a search per keystroke, and each
+     * one would be obsolete before it finished. [runSearch] debounces, cancels the previous attempt and
+     * only ever publishes results for the query that is current when it completes.
+     */
+    fun onSearchQueryChanged(query: String) {
+        transient.update { it.copy(searchQuery = query) }
+        runSearch()
+    }
+
+    /**
+     * Runs the current query after [SEARCH_DEBOUNCE], replacing whatever the previous keystroke left.
+     *
+     * Cancelling the previous job is what makes obsolete work stop rather than land out of order: a
+     * slow search for "ku" must not overwrite the results for "kushtia" that were requested after it.
+     * The search itself is an in-memory scan of the bundled dataset — no network, no index to build.
+     */
+    private fun runSearch() {
+        searchJob?.cancel()
+        searchJob = null
+
+        val query = transient.value.searchQuery
+        if (query.isBlank()) {
+            transient.update {
+                it.copy(searchResults = emptyList(), isSearching = false, searchFailed = false)
+            }
+            return
+        }
+
+        val slot = datasetSlot.value
+        if (slot.dataset == null && !slot.isLoading) {
+            // Loaded and unusable: there is nothing to search, and waiting would never resolve.
+            transient.update {
+                it.copy(searchResults = emptyList(), isSearching = false, searchFailed = true)
+            }
+            return
+        }
+        // Either already searched below or — while the dataset read is still running — held in the
+        // searching state until `loadDataset` calls back.
+        val language = transient.value.nameLanguage
+        transient.update { it.copy(isSearching = true, searchFailed = false) }
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MILLIS)
+            val current = datasetSlot.value
+            val dataset = current.dataset
+            if (dataset == null && current.isLoading) {
+                // Still reading: leave the searching state up and let `loadDataset`'s own `runSearch`
+                // finish this query once the dataset exists, rather than failing a search that was only
+                // ever waiting for a local file.
+                return@launch
+            }
+            if (dataset == null || !dataset.isUsable) {
+                transient.update {
+                    it.copy(searchResults = emptyList(), isSearching = false, searchFailed = true)
+                }
+                return@launch
+            }
+            val results = try {
+                LocationSearch.search(dataset, query, language)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                logger.error(
+                    SalahDiagnosticEvents.LOCATION_SEARCH_FAILED,
+                    error,
+                    mapOf("reason" to "search_threw"),
+                )
+                transient.update {
+                    it.copy(searchResults = emptyList(), isSearching = false, searchFailed = true)
+                }
+                return@launch
+            }
+            transient.update {
+                it.copy(searchResults = results, isSearching = false, searchFailed = false)
+            }
+        }
     }
 
     /** Saves the chosen hierarchy, using the selected area's published coordinate. */
@@ -447,8 +591,20 @@ class LocationViewModel(
                 SalahDiagnosticEvents.LOCATION_SAVED,
                 mapOf("origin" to "area_selection", "level" to area.level.name),
             )
+            // The picker closes with a clean search field, exactly as closing it by hand would: the
+            // query belonged to the selection that was just confirmed.
+            searchJob?.cancel()
+            searchJob = null
             transient.update {
-                it.copy(isPickerOpen = false, selection = AreaSelection.EMPTY, message = LocationMessage.Saved)
+                it.copy(
+                    isPickerOpen = false,
+                    selection = AreaSelection.EMPTY,
+                    searchQuery = "",
+                    searchResults = emptyList(),
+                    isSearching = false,
+                    searchFailed = false,
+                    message = LocationMessage.Saved,
+                )
             }
             reconcileNotifications()
         }
@@ -575,6 +731,7 @@ class LocationViewModel(
     ): LocationUiState {
         val dataset = slot.dataset
         val selection = current.selection
+        val language = current.nameLanguage
         val reference = dataset?.let { selection.reference(it) }
         val resolvedArea = dataset?.let { selection.resolvedArea(it) }
 
@@ -590,12 +747,15 @@ class LocationViewModel(
                         "${readout.upazilas.size} upazilas, ${readout.boundaryRings.size} boundary rings"
                 }
             },
-            stored = stored?.let { describe(it, dataset) },
+            stored = stored?.let { describe(it, dataset, language) },
             selection = selection,
             divisionOptions = dataset?.divisions.orEmpty(),
             districtOptions = dataset?.let { selection.districts(it) }.orEmpty(),
             upazilaOptions = dataset?.let { selection.upazilas(it) }.orEmpty(),
-            selectionSummary = reference?.hierarchyLabel,
+            // Localized rather than the reference's stored English names: the hierarchy is shown in the
+            // language the picker is rendering in, falling back to the stored names for ids this
+            // dataset no longer contains.
+            selectionSummary = reference?.let { hierarchyOf(it, dataset, language) },
             selectionCoordinateText = resolvedArea?.let {
                 LocationFormatting.coordinates(GeoPoint(it.latitude, it.longitude))
             },
@@ -609,21 +769,39 @@ class LocationViewModel(
             // device fix seeded here would blur a declared position with an observed one.
             manualForm = current.manualForm.withStoredLocation(stored),
             message = current.message,
+            nameLanguage = language,
+            searchQuery = current.searchQuery,
+            searchResults = current.searchResults,
+            isSearching = current.isSearching,
+            searchFailed = current.searchFailed,
         )
     }
 
     private fun describe(
         location: LocationInfo,
         dataset: BangladeshLocationDataset?,
+        language: LocationNameLanguage,
     ): StoredLocationUi {
         val point = GeoPoint(latitude = location.latitude, longitude = location.longitude)
         val check = dataset?.let { BangladeshLocationPolicy.check(point, it.boundaryRings) }
         val outsideCoarseBounds = !BangladeshLocationPolicy.isWithinCoarseBounds(point)
+        val area = location.area
         return StoredLocationUi(
             location = location,
             origin = location.origin,
             countryCode = location.countryCode,
-            area = location.area,
+            area = area,
+            divisionDisplayName = area?.let {
+                locationNameOf(it.divisionId, it.divisionName, dataset, language)
+            },
+            districtDisplayName = area?.let {
+                locationNameOf(it.districtId, it.districtName, dataset, language)
+            },
+            // A fix resolved only as far as a district has no upazila at all, and that must stay
+            // "unknown" rather than acquiring the district's name.
+            upazilaDisplayName = area?.let {
+                locationNameOf(it.upazilaId, it.upazilaName, dataset, language)
+            },
             locality = location.locality,
             timeZoneId = location.timeZoneId,
             point = point,
@@ -639,6 +817,15 @@ class LocationViewModel(
     companion object {
         /** How long a single fix may take before the screen offers manual selection instead. */
         val GPS_TIMEOUT = 20.seconds
+
+        /**
+         * How long typing pauses before a search runs, in milliseconds.
+         *
+         * Long enough that a word typed at a normal speed is searched once, short enough that the
+         * results feel attached to the field. The dataset is in memory, so the search itself is
+         * milliseconds; this exists to cancel rather than to schedule.
+         */
+        const val SEARCH_DEBOUNCE_MILLIS: Long = 200L
 
         /** Stops the state flow shortly after the screen goes away. */
         private const val STOP_TIMEOUT_MILLIS = 5_000L

@@ -33,7 +33,7 @@ without an account.
 | **Bundled Bangladesh administrative dataset** — 8 divisions, 64 districts and 507 upazilas/thanas with published reference coordinates, plus the simplified national boundary | **Implemented, offline** |
 | **Named locality layer** — 1 216 urban neighbourhoods from OpenStreetMap, each joined to the district that contains it, so a device fix in a city reads *Mirpur, Dhaka* rather than a whole city corporation | **Implemented, offline** |
 | **One location display-name policy** — the locality, the upazila/thana or the district, de-duplicated, composed once and shown the same way on Home, Prayer, Qibla and Location | **Implemented** |
-| **Division → district → upazila picker** for choosing a location by area, with no permission and no network | **Implemented** |
+| **Division → district → upazila picker** for choosing a location by area, with a search over the same bundled dataset above it — Bangla or English, matched and ranked in the interface language — and with no permission and no network | **Implemented** |
 | **Bangladesh-only location policy** with an explicit boundary tolerance, and a location the policy cannot place reported as unsupported rather than converted | **Implemented** |
 | Location provenance and freshness, so a saved position is never presented as a current one | Implemented |
 | Compass calibration guidance from the platform's own accuracy signal, with a warm-up gate; no invented accuracy score | Implemented |
@@ -50,7 +50,7 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla and Ramadan reached from Tools and from Home, and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the bottom navigation and the Settings structure | Implemented (688 `@Test` methods in `app/src/test`) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the bottom navigation and the Settings structure | Implemented (862 `@Test` methods in `app/src/test`) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |

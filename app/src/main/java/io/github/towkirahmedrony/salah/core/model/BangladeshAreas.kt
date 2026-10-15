@@ -37,7 +37,9 @@ enum class BangladeshAreaLevel {
  * [name] is the dataset's English name and is always present. [banglaName] is joined from a second,
  * MIT-licensed source and is `null` for the units where the two sources spell the name differently
  * enough that no match could be made; those units display their English name rather than a guessed
- * transliteration.
+ * transliteration. *Which* of the two names a screen shows is decided by
+ * `core.domain.location.nameIn(area, language)` against the interface language — the two names are
+ * never concatenated, because a picker set to one language should read as that language.
  */
 data class BangladeshArea(
     val id: String,
@@ -49,8 +51,6 @@ data class BangladeshArea(
     val latitude: Double,
     val longitude: Double,
 ) {
-    /** The name to render, with the Bangla name alongside it when one is known. */
-    val labelledName: String get() = if (banglaName.isNullOrBlank()) name else "$name · $banglaName"
 }
 
 /**

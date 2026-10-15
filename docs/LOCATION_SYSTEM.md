@@ -15,19 +15,18 @@ Related documents: [`ARCHITECTURE.md`](ARCHITECTURE.md) (layers and ports),
 ## 1. What this is
 
 Salah ties prayer times, the Qibla bearing, the Ramadan timetable and prayer reminders to **one stored
-location**. That location can be obtained three ways:
+location**. That location can be obtained two ways:
 
 - a **device fix** from the platform's location provider, requested on demand;
-- a **manual choice** of a Bangladeshi administrative area (division → district → upazila/thana), or
-  a hand-typed coordinate and IANA zone; or
-- a **map selection**: an interactive map, with the chosen point confirmed and stored as
-  `LocationOrigin.MAP_SELECTION`. It stores the exact point picked (not an administrative centre) and
-  the address resolved for it when one was available. See [`MAP_PICKER.md`](MAP_PICKER.md).
+- a **manual choice** of a Bangladeshi administrative area (division → district → upazila/thana),
+  either through the hierarchical dropdowns or by **searching** the same bundled dataset by name in
+  the interface's language; or a hand-typed coordinate and IANA zone.
 
-All are stored locally, and all of them work offline for the parts that matter: the map needs a
-connection for its tiles, but the coordinates, the country check and the save do not. The bundled
-geography is what makes the manual picker possible and what lets a device fix **and a map point** be
-attributed to a named area without a network call.
+All are stored locally, and all of them work offline: nothing in the location system opens a network
+connection. The bundled geography is what makes the manual picker and its search possible, and what
+lets a device fix be attributed to a named area without a network call. A location written by an
+earlier build as `LocationOrigin.MAP_SELECTION` — the map picker this build no longer has — still
+reads and displays; no screen produces that origin any more.
 
 The domain code lives in `core/domain/location` and is Android-free; the Android adapters live in
 `data/location` and `data/qibla`. See [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.
@@ -106,7 +105,29 @@ they answer different questions: "pick an area" against "check and change the ar
 read `LocationUiState` and call the same `selectDivision` / `selectDistrict` / `selectUpazila` /
 `saveSelectedArea` actions, so the rules above are enforced once, in the view model and in
 `AreaSelection` — never in the layout. A level is offered only once its parent is chosen, and one
-whose parent has not been chosen is disabled rather than shown empty.
+whose parent has not been chosen is disabled rather than shown empty. Both screens show each name in
+the language the interface is rendering in: the dataset's Bangla name where one exists, its English
+name otherwise.
+
+**Search.** Both screens also offer a search field above the three levels (`LocationSearchField`),
+backed by `LocationSearch` — an in-memory scan of the same bundled dataset (divisions, districts,
+upazilas/thanas and the named localities), with no network call and no index to build. Input is
+debounced (200 ms) and a superseded query is cancelled, so only the current query's results are ever
+published. Ranking is exact match, then starts-with, then partial; within each band a name *in the
+requested language* is matched before a name reached through the other language, and the list is
+capped at 30 results so a short query returns the most specific matches rather than half the country.
+Query and candidate names are normalized identically — Unicode NFC, zero-width joiners stripped
+(Bangla keyboards insert them), the precomposed Bengali nukta letters `ড়/ঢ়/য়` folded to their
+base-plus-nukta spelling, whitespace collapsed and case folded — so `কুমিল্লা`-style Bangla input
+and English input both match, and repeated or surrounding spaces do not matter.
+
+Choosing a result feeds the same `AreaSelection` a dropdown tap uses: a result carries its ids and is
+applied parent-first, so a district result clears an upazila chosen under the previous district and an
+upazila result sets all three levels. A locality result sets division and district only — the dataset
+cannot express an upazila for an informal locality — so the upazila remains the user's to choose
+before anything can be saved. Nothing is written until the user confirms; results and their
+administrative context (`division → district`) are displayed in the active language
+(`LocationNameLanguage`, derived from the same resources the screen's labels resolve through).
 
 **Manual coordinates.** The Settings screen and the Qibla screen accept typed coordinates and an IANA
 zone. These are stored as entered; the country check is not applied to a typed coordinate (the Settings
@@ -127,11 +148,10 @@ Salah reads the location permission state; it never prompts outside a user actio
   the dialog: a first request is a `REQUEST`, an ordinary denial is still a `REQUEST`, and a denial the
   system will no longer re-prompt for becomes `OPEN_APP_SETTINGS` — avoiding a button that would
   silently do nothing.
-- **Manual selection needs no permission** and stays usable whatever the permission answer, and so does
-  map selection: dragging the map and confirming a point ask for nothing. There is **no**
-  background-location permission. `INTERNET` is declared for exactly two things — the map picker's tiles
-  and its optional address lookup — and every other feature, including the whole calculation chain, still
-  runs with the radio off. See [`MAP_PICKER.md`](MAP_PICKER.md) §7.
+- **Manual selection needs no permission** and stays usable whatever the permission answer — the
+  dropdowns and the search field ask for nothing. There is **no** background-location permission, and
+  **no `INTERNET` permission**: every feature, including the whole calculation chain, runs with the
+  radio off.
 
 ## 5. The bundled dataset: sources, version and licences
 
@@ -347,9 +367,8 @@ district, because a selection that stops at a division cannot be saved.
 
 ## 9. Offline operation and persistence
 
-Nothing in the location system **needs** a network. The map picker uses one for map tiles and for the
-optional address of a selected point, and neither is a prerequisite for choosing or storing a location:
-see [`MAP_PICKER.md`](MAP_PICKER.md) §6 and §7.
+Nothing in the location system **needs** a network. The search reads the same bundled files the
+dropdowns do, and the device-fix path asks the platform's own location provider.
 
 - **Stored location:** `DataStoreLocationRepository` keeps the location in the same DataStore as the
   other preferences. The stored value carries its origin, accuracy, acquisition time, country code, the
@@ -418,6 +437,14 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   tolerance not being reported as inside Bangladesh.
 - `AreaResolverTest`, `AreaSelectionTest`, `LocationSetupTest` — level selection, the hierarchy guards,
   attribution thresholds, and the setup gate for every reason.
+- `LocationSearchTest` — the search itself: each level matches by its English and its Bangla name,
+  partial matches, case and surrounding-space folding, repeated-space collapse, the no-Bangla-name
+  fallback, an English query under Bangla returning Bangla-rendered results, exact-above-prefix-above-
+  partial ordering, administrative context per result (including a repeated ancestor name collapsing to
+  one word), a name shared by a district and a locality in another district returned once each and told
+  apart by their context, locality results carrying no upazila, duplicate keys, blank and unmatched
+  queries, the result cap, and the normalization rules (zero-width joiners, both spellings of the
+  Bengali nukta letters).
 - `AppViewModelTest` — the gate the shell acts on, driven through the real `AppViewModel`: a fresh
   install is asked for a location, a stored usable one goes straight to the app, an outside-Bangladesh
   or unknown-area location is asked for again with its reason, an unreadable dataset is reported and
@@ -433,6 +460,13 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   area's published centre with `AREA_SELECTION` provenance while a partial one is refused, a precise
   fix is stored under the neighbourhood it matched with the hierarchy still intact beside it, and an
   approximate fix is stored by area only — never by a neighbourhood it is not accurate enough to name.
+  The search adds: results arrive after the debounce, a newer query cancels the previous one, clearing
+  the field clears the results, a chosen result fills the whole hierarchy and saving stores that area's
+  published centre (with the picker closed and the query cleared), switching language re-runs an open
+  query and re-renders its results, a result from another division replaces every level below it, a
+  district result clears the upazila chosen under the previous district, a query typed before the
+  dataset read finishes waits for it instead of failing, an unreadable dataset reports the failure, and
+  closing the picker after a search leaves the stored location untouched.
 - `DeviceFixAdoptionPolicyTest` — the Qibla write path, including that an accepted fix carries the
   locality its accuracy supports and that the same position at an approximate accuracy is adopted
   without one.
@@ -483,5 +517,19 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   but no emulator or screenshot comparison was run, so its spacing and proportions on a real device are
   unverified. The dropdown fields in particular have had no TalkBack review.
 - **69 of 507 upazilas have no Bangla name** and display their English name; no translation was guessed.
+  Under a Bangla interface their English name is also what search matches as a *fallback*, at a lower
+  rank than a same-language match.
+- **The search has no transliteration aliases.** It matches the names the dataset actually stores, in
+  both languages, with normalization of spacing, case and the Bengali nukta spellings — but "Cumilla"
+  and "Comilla" are two different stored strings, and a spelling the dataset does not hold is not
+  matched. Results are capped at 30; a query that broad produces the best-ranked 30, not every match.
+- **The locality layer has English names only**, so under a Bangla interface localities display their
+  English name and match through the fallback band; their context (district, division) is still shown
+  in Bangla. No Bangla locality name was invented.
+- **Only the manual picker follows the interface language for place names.** The label saved with a
+  location — and therefore Home's, the Prayer screen's and the Qibla screen's composed display name,
+  and the pending device-fix card's area line — is composed from the dataset's English names at save
+  time, exactly as before. The location screen's stored-hierarchy rows, the dropdowns, the lists and
+  the search results all resolve through `LocationNameLanguage` and do follow it.
 - The Bangla resource file remains partial for the explanatory strings that make accuracy claims (see
   `app/lint.xml`), so those strings appear in English under a Bangla device locale.

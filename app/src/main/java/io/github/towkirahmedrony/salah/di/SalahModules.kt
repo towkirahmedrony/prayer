@@ -12,7 +12,6 @@ import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGri
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
-import io.github.towkirahmedrony.salah.core.domain.location.ReverseGeocoder
 import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEngine
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanPlaybackManager
@@ -42,7 +41,6 @@ import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
-import io.github.towkirahmedrony.salah.data.location.HttpReverseGeocoder
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.data.notification.AndroidDiagnosticsLogger
 import io.github.towkirahmedrony.salah.data.notification.AndroidNotificationChannels
@@ -70,7 +68,6 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
 import io.github.towkirahmedrony.salah.feature.location.LocationViewModel
-import io.github.towkirahmedrony.salah.feature.location.map.MapPickerViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanUiStateFactory
@@ -80,7 +77,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
-import io.github.towkirahmedrony.salah.BuildConfig
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 import java.time.Clock
@@ -125,16 +121,6 @@ val salahModules = module {
     // their published reference coordinates, plus the national boundary the country policy checks
     // against. Read from assets and parsed once; see docs/LOCATION_SYSTEM.md section 5.
     single<BangladeshAreaCatalog> { AssetBangladeshAreaCatalog(androidContext(), get()) }
-    // Address resolution for the map picker, behind a port so the view model is testable with a fake and
-    // the endpoint is a build-time value rather than a literal in the source. It is the app's only network
-    // call, and it is optional to every flow that uses it. See docs/MAP_PICKER.md.
-    single<ReverseGeocoder> {
-        HttpReverseGeocoder(
-            baseUrl = BuildConfig.GEOCODER_BASE_URL,
-            userAgent = BuildConfig.GEOCODER_USER_AGENT,
-            logger = get(),
-        )
-    }
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
     }
@@ -317,19 +303,6 @@ val salahModules = module {
             coordinator = get(),
             logger = get(),
             clock = get(),
-        )
-    }
-    // The map picker: its own screen state, but the same repository write, the same country policy and the
-    // same notification reconciliation as every other way of choosing a location.
-    viewModel {
-        MapPickerViewModel(
-            locations = get(),
-            catalog = get(),
-            geocoder = get(),
-            locationProvider = get(),
-            permissionChecker = get(),
-            coordinator = get(),
-            logger = get(),
         )
     }
     viewModel {

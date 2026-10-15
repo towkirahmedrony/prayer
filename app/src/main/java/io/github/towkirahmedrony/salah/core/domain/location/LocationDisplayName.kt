@@ -83,7 +83,8 @@ object LocationDisplayName {
         // — the place name, neighbourhood or road — and it is more specific than any administrative area
         // the bundled dataset can name. So it is kept when it exists, and the composition below is used
         // only when the reverse geocoder returned nothing and the save path wrote the administrative
-        // name instead (see `MapPickerViewModel` and docs/MAP_PICKER.md).
+        // name instead. No screen writes this origin any more (the map picker was removed); the branch
+        // survives so a record stored by an earlier build still displays the label it was saved with.
         if (origin == LocationOrigin.MAP_SELECTION && typed.isNotBlank()) return typed
 
         val deepest = locality?.name?.takeIf { it.isNotBlank() }

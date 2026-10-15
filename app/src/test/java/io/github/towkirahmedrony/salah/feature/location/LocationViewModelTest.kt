@@ -1,8 +1,10 @@
 package io.github.towkirahmedrony.salah.feature.location
 
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
+import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
+import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationAcquisitionResult
@@ -34,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -548,6 +551,269 @@ class LocationViewModelTest {
         assertEquals(3_000.0, requireNotNull(saved.accuracyMetres), 0.000001)
     }
 
+    // --- Manual search ----------------------------------------------------------
+
+    @Test
+    fun `a search query returns results in the active language after the debounce`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.setLanguage(LocationNameLanguage.BANGLA)
+        viewModel.onSearchQueryChanged("কুমার")
+        runCurrent()
+        val queued = states.settled()
+        assertTrue("results arrive only after the debounce", queued.searchResults.isEmpty())
+        assertTrue("the field reports that a search is in flight", queued.isSearching)
+
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        val done = states.settled()
+        assertFalse(done.isSearching)
+        assertFalse(done.searchFailed)
+        assertEquals(listOf("area:BD1001001"), done.searchResults.map { it.key })
+        // The name is Bangla because the screen set Bangla — not because the query was written in it.
+        assertEquals("কুমারখালী", done.searchResults.single().displayName)
+    }
+
+    @Test
+    fun `a newer query cancels the search for the previous one`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.onSearchQueryChanged("kumarkhali")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS / 2)
+        runCurrent()
+        viewModel.onSearchQueryChanged("khulna")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        // Only the query that was current when the search ran has results: the half-finished one for
+        // "kumarkhali" was cancelled rather than landing after it.
+        val state = states.settled()
+        assertEquals(listOf("area:BD10"), state.searchResults.map { it.key })
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun `clearing the query clears the results`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.onSearchQueryChanged("kumarkhali")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+        assertEquals(1, states.settled().searchResults.size)
+
+        viewModel.onSearchQueryChanged("")
+        runCurrent()
+
+        val cleared = states.settled()
+        assertTrue(cleared.searchResults.isEmpty())
+        assertFalse(cleared.isSearching)
+        assertFalse(cleared.searchFailed)
+    }
+
+    @Test
+    fun `a chosen search result fills the hierarchy and saving stores that area`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.openAreaPicker()
+        viewModel.onSearchQueryChanged("kumarkhali")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        val found = states.settled()
+        assertTrue(found.isPickerOpen)
+        viewModel.selectSearchResult(found.searchResults.single())
+        runCurrent()
+
+        val selected = states.settled()
+        assertEquals("BD10", selected.selection.divisionId)
+        assertEquals("BD1001", selected.selection.districtId)
+        assertEquals("BD1001001", selected.selection.upazilaId)
+        assertTrue(selected.canSaveSelection)
+        assertEquals("Kumarkhali, Kushtia, Khulna", selected.selectionSummary)
+
+        viewModel.saveSelectedArea()
+        runCurrent()
+
+        val saved = requireNotNull(locations.location.first()) { "the selection must be stored" }
+        assertEquals(LocationOrigin.AREA_SELECTION, saved.origin)
+        assertEquals("BD1001001", saved.area?.upazilaId)
+        // The shared display policy's composition: deepest name qualified by its district (the
+        // division is carried in `area` but not repeated in the label).
+        assertEquals("Kumarkhali, Kushtia", saved.label)
+        // The published centre of the chosen upazila, not a device observation.
+        assertEquals(23.86, saved.latitude, 1e-9)
+        assertEquals(89.24, saved.longitude, 1e-9)
+
+        val closed = states.settled()
+        assertFalse("the picker closes on a confirmed save", closed.isPickerOpen)
+        assertEquals("the query belonged to the selection that was confirmed", "", closed.searchQuery)
+        assertTrue(closed.searchResults.isEmpty())
+    }
+
+    @Test
+    fun `changing the language re-runs an open query and re-renders the results`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.onSearchQueryChanged("kush")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+        val english = states.settled().searchResults
+        assertTrue(english.isNotEmpty())
+        assertEquals("Kushtia", english.first().displayName)
+
+        viewModel.setLanguage(LocationNameLanguage.BANGLA)
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        val bangla = states.settled()
+        assertTrue(bangla.searchResults.isNotEmpty())
+        // The same query now renders in Bangla: the district's own Bangla name, and a context line
+        // under it in Bangla too — display follows the language, not the typed text.
+        val district = bangla.searchResults.first { it.key == "area:BD1001" }
+        assertEquals("কুষ্টিয়া", district.displayName)
+        assertEquals(listOf("খুলনা"), district.contextNames)
+    }
+
+    @Test
+    fun `a search result switches divisions, and a district result clears the upazila below it`() =
+        runTest(mainDispatcher) {
+            val viewModel = viewModel()
+            val states = observe(viewModel)
+            viewModel.start()
+            runCurrent()
+
+            viewModel.selectDivision(KHULNA)
+            viewModel.selectDistrict(KUSHTIA)
+            viewModel.selectUpazila(KUMARKHALI)
+            runCurrent()
+
+            // A result in another division moves every level: its own division is selected first, so
+            // the previous division's district cannot survive the switch.
+            viewModel.onSearchQueryChanged("sherpur")
+            advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+            runCurrent()
+            viewModel.selectSearchResult(states.settled().searchResults.single())
+            runCurrent()
+
+            val moved = states.settled()
+            assertEquals("BD20", moved.selection.divisionId)
+            assertEquals("BD2001", moved.selection.districtId)
+            assertEquals("BD2001001", moved.selection.upazilaId)
+            assertTrue(moved.canSaveSelection)
+
+            // A district result carries no upazila, so the one chosen under the previous district is
+            // cleared and the save button goes back to waiting.
+            viewModel.onSearchQueryChanged("jashore")
+            advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+            runCurrent()
+            viewModel.selectSearchResult(states.settled().searchResults.single())
+            runCurrent()
+
+            val districtOnly = states.settled()
+            assertEquals("BD10", districtOnly.selection.divisionId)
+            assertEquals("BD1002", districtOnly.selection.districtId)
+            assertEquals(null, districtOnly.selection.upazilaId)
+            assertFalse(districtOnly.canSaveSelection)
+        }
+
+    @Test
+    fun `a search typed before the dataset is read waits for it instead of failing`() = runTest(mainDispatcher) {
+        val catalog = HeldCatalog(syntheticDataset())
+        val viewModel = viewModel(catalog = catalog)
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.onSearchQueryChanged("kumarkhali")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        val waiting = states.last()
+        assertTrue("the read is still running", waiting.isLoading)
+        assertTrue("held in the searching state", waiting.isSearching)
+        assertFalse("an unfinished read is not a failed search", waiting.searchFailed)
+
+        catalog.gate.complete(Unit)
+        runCurrent()
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+
+        val done = states.last()
+        assertEquals(listOf("area:BD1001001"), done.searchResults.map { it.key })
+        assertFalse(done.isSearching)
+        assertFalse(done.searchFailed)
+    }
+
+    @Test
+    fun `a search with no readable dataset reports the failure`() = runTest(mainDispatcher) {
+        val viewModel = viewModel(catalog = FakeBangladeshAreaCatalog(null))
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.onSearchQueryChanged("kushtia")
+        runCurrent()
+
+        val failed = states.last()
+        assertTrue("there is nothing to search and nothing to wait for", failed.searchFailed)
+        assertFalse(failed.isSearching)
+        assertTrue(failed.searchResults.isEmpty())
+    }
+
+    @Test
+    fun `closing the picker after a search leaves the stored location untouched`() = runTest(mainDispatcher) {
+        locations.set(
+            requireNotNull(
+                LocationInfo.create(
+                    label = "Home",
+                    latitude = 23.8103,
+                    longitude = 90.4125,
+                    timeZoneId = "Asia/Dhaka",
+                ),
+            ),
+        )
+        val viewModel = viewModel()
+        val states = observe(viewModel)
+        viewModel.start()
+        runCurrent()
+
+        viewModel.openAreaPicker()
+        viewModel.onSearchQueryChanged("kumarkhali")
+        advanceTimeBy(LocationViewModel.SEARCH_DEBOUNCE_MILLIS)
+        runCurrent()
+        viewModel.selectSearchResult(states.settled().searchResults.single())
+        runCurrent()
+
+        viewModel.closeAreaPicker()
+        runCurrent()
+
+        val closed = states.settled()
+        assertFalse(closed.isPickerOpen)
+        assertEquals(null, closed.selection.divisionId)
+        assertEquals("", closed.searchQuery)
+        assertTrue(closed.searchResults.isEmpty())
+        // Cancelling a selection is not choosing one: the stored location is exactly where it was.
+        val stored = locations.location.first()
+        assertEquals("Home", stored?.label)
+        assertEquals(23.8103, stored?.latitude ?: 0.0, 1e-9)
+    }
+
     // --- Harness ---------------------------------------------------------------
 
     /**
@@ -617,6 +883,19 @@ class LocationViewModelTest {
             calls++
             gate.await()
             return LocationAcquisitionResult.TimedOut
+        }
+    }
+
+    /** A catalog whose read waits on a gate, so "the dataset is still loading" is observable. */
+    private class HeldCatalog(
+        private val dataset: BangladeshLocationDataset,
+    ) : BangladeshAreaCatalog {
+
+        val gate = CompletableDeferred<Unit>()
+
+        override suspend fun dataset(): BangladeshLocationDataset? {
+            gate.await()
+            return dataset
         }
     }
 

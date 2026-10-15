@@ -333,6 +333,48 @@ fun CheckGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifie
 }
 
 /**
+ * A magnifier: the manual location search field's leading mark.
+ *
+ * A circle and a handle, drawn as strokes rather than as a filled lens, so at 16–20 dp it reads as an
+ * outline beside the field's text instead of a dark blob.
+ */
+@Composable
+fun SearchGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawCircle(
+        color = tint,
+        radius = 6.4f,
+        center = Offset(10.6f, 10.6f),
+        style = Stroke(width = 2f),
+    )
+    drawLine(
+        color = tint,
+        start = Offset(15.4f, 15.4f),
+        end = Offset(19.4f, 19.4f),
+        strokeWidth = 2f,
+        cap = StrokeCap.Round,
+    )
+}
+
+/** An X: the clear-search affordance, paired with its localized content description at the call site. */
+@Composable
+fun CloseGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawLine(
+        color = tint,
+        start = Offset(6.8f, 6.8f),
+        end = Offset(17.2f, 17.2f),
+        strokeWidth = 2.2f,
+        cap = StrokeCap.Round,
+    )
+    drawLine(
+        color = tint,
+        start = Offset(17.2f, 6.8f),
+        end = Offset(6.8f, 17.2f),
+        strokeWidth = 2.2f,
+        cap = StrokeCap.Round,
+    )
+}
+
+/**
  * A broadcast mark: a dot with two waves leaving it on each side.
  *
  * Used where a screen offers to ask the device for its own position, so the two ways of giving Salah

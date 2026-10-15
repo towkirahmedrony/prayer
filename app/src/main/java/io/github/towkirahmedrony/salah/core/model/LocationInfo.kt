@@ -32,13 +32,20 @@ enum class LocationOrigin {
     /**
      * Chosen by pointing at a real map and confirming the pin's position.
      *
-     * **Distinct from both of the above, and for a different reason than they are distinct from each
+     * **Legacy: no screen in this build can produce this origin.** The map picker it belonged to has
+     * been removed; the constant is kept because a location stored by an earlier build still carries it,
+     * and an enum that lost the value would fail to read that record — losing the user's location rather
+     * than describing it. Such a record keeps its behaviour: [LocationDisplayName] shows the stored label
+     * (the address that was resolved for the point) unchanged, and the location screen labels it "Selected
+     * on map".
+     *
+     * **Distinct from the other origins, and for a different reason than they are distinct from each
      * other.** An [AREA_SELECTION] stores the published centre of an administrative unit, so it is a
      * real coordinate that may be minutes from the user; a [DEVICE_GPS] record stores an observation
      * with an accuracy and a time; this stores *the point itself* — exactly the coordinates the user
      * placed and confirmed. Its `label` is the address the reverse geocoder resolved for that point when
      * one was available, and the administrative hierarchy composed from the bundled dataset when it was
-     * not, so the record is self-describing either way. See `docs/MAP_PICKER.md`.
+     * not, so the record is self-describing either way.
      */
     MAP_SELECTION,
 }

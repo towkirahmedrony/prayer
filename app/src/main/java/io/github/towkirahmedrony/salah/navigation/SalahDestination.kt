@@ -95,17 +95,6 @@ enum class SalahDestination(
      */
     LOCATION("location", R.string.nav_location, inBottomBar = false),
 
-    /**
-     * The interactive map picker.
-     *
-     * A destination of its own rather than a mode inside [LOCATION], because it owns a map's lifecycle —
-     * a render surface, a camera and a stream of address lookups — which has no business running while the
-     * location screen is merely being read. It is reached from the location screen and from the first-launch
-     * setup screen, both of which offer it beside the area picker rather than instead of it. Not in the
-     * bottom bar: choosing a location is configuration, like every other screen in this group.
-     */
-    MAP_PICKER("map_picker", R.string.location_map_title, inBottomBar = false),
-
     QIBLA("qibla", R.string.shortcut_qibla, inBottomBar = false),
     ;
 

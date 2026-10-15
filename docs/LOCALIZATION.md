@@ -93,7 +93,7 @@ MainActivity.setContent { SalahApp() }
 | Tools                      | Yes, in full                       | The Tools page and every screen it opens — Prayer, Qibla and Ramadan. See §11 |
 | Settings                   | Yes, in full                       | The overview and every category it opens: General, Appearance, Prayer times, Notifications & Adhan, Location, Calendar and About. See §11 |
 | Prayer notifications       | Yes, in full                       | A Settings category, also reached from the Calendar and Ramadan: the permission explanations, the schedule wording, each prayer's controls and the non-urgent status text |
-| Location                   | Yes, in full                       | A Settings category and the first-launch gate: the picker, the manual form, its validation and every provider/permission/error message |
+| Location                   | Yes, in full                       | A Settings category and the first-launch gate: the hierarchical picker, its search field (label, hint, clear action, searching/empty/error states), the manual form, its validation and every provider/permission/error message |
 | Qibla, Ramadan             | Yes, in full                       | The two other Tools destinations, including their explanatory paragraphs and error descriptions |
 | Work-in-progress destinations | Yes, in full                    | `wip_*` and `feature_prayer_*` |
 
@@ -105,6 +105,15 @@ wording — are completed now, so the partial policy no longer applies anywhere 
 longer suppresses `MissingTranslation` for `bn` (§8). The only strings that still exist solely in the
 default file are the three marked `translatable="false"` — `app_name` ("Salah"), the Arabic
 `home_prayer_times_arabic` heading and the `—` / `…` placeholders — which carry no words to translate.
+
+**Place names are data, not strings.** The bundled dataset stores an English name for every
+administrative area and, for most of them, a Bangla one. Which of the two a screen shows — and which
+the location search matches first — is decided by `LocationNameLanguage`, which the location screens
+derive from `LocalResources`, the same composition-local every `stringResource` on those screens
+resolves through. The two therefore cannot diverge: `AppLanguage.BANGLA` and a Bangla device locale
+under `AppLanguage.SYSTEM` both yield Bangla place names and Bangla string resources, and the
+placeholder, the result names and the administrative context all change together. See
+`docs/LOCATION_SYSTEM.md` §3 for the search behaviour itself.
 
 ## 6. App language vs. calendar system vs. date language
 
@@ -355,8 +364,9 @@ the test that now guards that (below) makes a pasted sentence a failure rather t
   high-latitude rule and the per-prayer minute corrections); Notifications & Adhan (the permission
   cards, the master switch, the schedule card, each prayer's sound/vibration/advance controls, the
   sunrise and Ramadan reminders, the Azan disclaimer and the limitations card); Location (the setup
-  screen, the management screen, the division/district/upazila picker, the manual form and every
-  validation, permission and provider message); Calendar (already translated); and About.
+  screen, the management screen, the division/district/upazila picker, the location search field and
+  its hint, clear, in-progress, empty and error states, the manual form and every validation,
+  permission and provider message); Calendar (already translated); and About.
 * **Shared surfaces** — the shared loading/error/retry strings, the back action, the notification
   channels and reminder content Android draws, and the planned-destination screen.
 
