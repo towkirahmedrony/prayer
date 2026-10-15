@@ -24,7 +24,6 @@ import io.github.towkirahmedrony.salah.core.designsystem.CalendarGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DomeGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
-import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
@@ -116,16 +115,15 @@ private fun AppShell() {
 
     Scaffold(
         bottomBar = {
-            // The bar is Salah's own green with Salah's own white on it, and both come from the theme's
-            // accents rather than being named here: the pairing is fixed in both themes by design — a brand
-            // surface with white type, like a brand-coloured button — and declaring it once is what keeps
-            // the bar and the next-prayer hero from drifting apart. The item colours are set through
-            // NavigationBarItem's own `colors`, which is also what makes LocalContentColor the tint the
-            // glyphs read below, instead of each icon restating the same white.
-            val accents = LocalSalahAccents.current
+            // The bar now follows the reference: it sits on the page's own canvas rather than on the
+            // brand green, and the selected item is marked with the scheme's mint indicator behind a
+            // green glyph and label. The colours are the theme's own roles, so the bar re-themes with
+            // the rest of the app instead of naming a fixed brand surface here. The item colours go
+            // through NavigationBarItem's own `colors`, which is what LocalContentColor's tint reads.
+            val scheme = MaterialTheme.colorScheme
             NavigationBar(
-                containerColor = accents.brandSurface,
-                contentColor = accents.onBrandSurface,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = scheme.onSurfaceVariant,
                 tonalElevation = 0.dp,
             ) {
                 // The items, their order and their labels come from the destination enum, so the bar
@@ -159,11 +157,11 @@ private fun AppShell() {
                         },
                         label = { Text(text = stringResource(dest.labelRes)) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = accents.onBrandSurface,
-                            selectedTextColor = accents.onBrandSurface,
-                            indicatorColor = accents.onBrandSurface.copy(alpha = 0.15f),
-                            unselectedIconColor = accents.onBrandSurface.copy(alpha = 0.8f),
-                            unselectedTextColor = accents.onBrandSurface.copy(alpha = 0.8f),
+                            selectedIconColor = scheme.primary,
+                            selectedTextColor = scheme.primary,
+                            indicatorColor = scheme.primaryContainer,
+                            unselectedIconColor = scheme.onSurfaceVariant,
+                            unselectedTextColor = scheme.onSurfaceVariant,
                         ),
                     )
                 }

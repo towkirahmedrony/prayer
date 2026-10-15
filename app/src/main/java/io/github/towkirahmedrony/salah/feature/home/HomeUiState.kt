@@ -68,6 +68,14 @@ sealed interface HomeUiState {
         val nextPrayer: NextPrayerSection,
         val prayerRows: List<PrayerRow>,
         val solarRows: List<SolarRow>,
+        /**
+         * The day's sunlight span — sunset minus sunrise — rendered as `11h 38m`, or `null` when the
+         * schedule carries both solar events and the span can be measured. Never invented: without
+         * sunrise and sunset there is no span to state.
+         */
+        val daylight: String?,
+        /** Where each prayer and the current moment sit on the day's prayer arc, for the hero chart. */
+        val heroArc: HeroArcSection,
         val prohibited: ProhibitedSection,
         val provenance: ProvenanceSection,
         /** Non-null when the configured provider failed; shown with a retry action. */
@@ -113,6 +121,43 @@ data class NextPrayerSection(
     val prayer: PrayerName?,
     val time: String?,
     val countdown: String?,
+    /** [countdown] rendered compactly for the hero card, e.g. `1h 17m`; `null` with [countdown]. */
+    val countdownCompact: String? = null,
+)
+
+/**
+ * The day's prayer arc, as geometry rather than instants.
+ *
+ * Each prayer and the current moment are carried as a fraction of the interval the arc spans (Fajr to
+ * Isha), resolved in [HomeUiStateFactory] from the same schedule the rest of the screen reads. Passing
+ * fractions rather than timestamps keeps the composable free of any formatting or time arithmetic: it
+ * places a mark where it is told, and cannot disagree with the timetable by recalculating a position.
+ *
+ * When no schedule exists, [markers] is empty and [progress] is `null`, which is the honest state for a
+ * chart that has nothing real to plot.
+ */
+data class HeroArcSection(
+    /** Where the displayed moment sits on the arc, `0f`..`1f`, or `null` when it cannot be placed. */
+    val progress: Float?,
+    val markers: List<HeroArcMarker>,
+) {
+    companion object {
+        /** The chart with nothing to plot: no schedule, so no marks and no progress. */
+        val Empty = HeroArcSection(progress = null, markers = emptyList())
+    }
+}
+
+/** One prayer's position on the hero arc, already resolved against the displayed moment. */
+data class HeroArcMarker(
+    val prayer: PrayerName,
+    /** Position along the arc, `0f` at Fajr through `1f` at Isha. */
+    val position: Float,
+    /** True when this prayer's time is at or before the displayed moment. */
+    val isPassed: Boolean,
+    /** True when this prayer's period is the one open now. */
+    val isCurrent: Boolean,
+    /** True when this prayer is the next to begin. */
+    val isNext: Boolean,
 )
 
 /**
@@ -147,6 +192,8 @@ data class CurrentPrayerSection(
     val endsWithSolarEvent: SolarEvent?,
     /** Countdown to the end of the open period, formatted. */
     val countdown: String?,
+    /** [countdown] rendered compactly for the hero card, e.g. `1h 17m`; `null` with [countdown]. */
+    val countdownCompact: String?,
     /** The next prayer to begin, used when no period is open and shown as secondary detail. */
     val next: NextPrayerSection,
     /** Non-null when no period can be resolved, so the card explains the gap. */
@@ -161,6 +208,13 @@ data class PrayerRow(
     val adjustmentMinutes: Int = 0,
     /** True when this is the next prayer to begin. */
     val isNext: Boolean,
+    /**
+     * True when this prayer's own time is at or before the displayed moment.
+     *
+     * Used by the today list to label a row "Passed"; derived here from the schedule and the clock so
+     * the composable never compares a time itself.
+     */
+    val isPassed: Boolean = false,
     /**
      * True when this prayer's period is the one that is open at the moment the screen is showing.
      *

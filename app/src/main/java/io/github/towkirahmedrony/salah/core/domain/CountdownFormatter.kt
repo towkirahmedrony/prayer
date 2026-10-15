@@ -28,4 +28,24 @@ object CountdownFormatter {
             String.format(Locale.ROOT, "%02d:%02d", minutes, seconds)
         }
     }
+
+    /**
+     * Formats [remaining] as a compact hour-and-minute reading such as `1h 17m`, or `17m` below an
+     * hour.
+     *
+     * The Home hero card and the today list read the remaining time as a coarse phrase rather than a
+     * ticking `H:MM:SS`, so they need a second rendering of the same [Duration] — not a second clock.
+     * Seconds are dropped rather than rounded up, so the reading never claims more time is left than
+     * there is. Like [format], digits use [Locale.ROOT] and negative values are clamped to `0m`.
+     */
+    fun formatCompact(remaining: Duration): String {
+        val totalMinutes = remaining.seconds.coerceAtLeast(0L) / 60
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        return if (hours > 0) {
+            String.format(Locale.ROOT, "%dh %dm", hours, minutes)
+        } else {
+            String.format(Locale.ROOT, "%dm", minutes)
+        }
+    }
 }

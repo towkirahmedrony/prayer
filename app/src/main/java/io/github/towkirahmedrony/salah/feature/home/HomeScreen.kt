@@ -73,6 +73,15 @@ private fun HomeFailure(
     }
 }
 
+/**
+ * The composed Home screen, laid out to the reference: the saved place and the reminder bell, the date
+ * line, the hero card with the day's arc and solar span, then the day's timetable as a list and the two
+ * lower cards Home still owns.
+ *
+ * Every value is bound to [HomeUiState.Ready]; the screen reads no repository, formats no date and
+ * counts nothing down itself. The prohibited-times card and the daily tools sit below the fold so the
+ * screen opens on the reference's composition while those features stay reachable on Home.
+ */
 @Composable
 private fun HomeContent(
     state: HomeUiState.Ready,
@@ -82,19 +91,19 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item(key = "top-bar") {
-            HomeTopBar(onOpenSettings = { onNavigate("settings") })
-        }
-
-        item(key = "location-header") {
-            LocationAndDateHeader(
+        item(key = "home-header") {
+            HomeHeader(
                 state = state,
                 onOpenLocation = { onNavigate("location") },
-                onOpenCalendar = { onNavigate("calendar") },
+                onOpenNotifications = { onNavigate("notifications") },
             )
+        }
+
+        item(key = "date-line") {
+            HomeDateLine(state = state)
         }
 
         if (state.failureDetail != null) {
@@ -103,17 +112,15 @@ private fun HomeContent(
             }
         }
 
-        item(key = "current-hero") {
-            CurrentPrayerHeroCard(state = state.currentPrayer)
+        item(key = "prayer-hero") {
+            CurrentPrayerHeroCard(state = state)
         }
 
-        item(key = "prayer-times") {
-            TodayPrayerTimesSection(
-                rows = state.prayerRows,
-                // `View all` opens the prayer timetable this strip is a summary of: the `prayer`
-                // destination renders the same live period and the day's full timetable for the
-                // saved location. It used to open Calendar, which shows months of dates and no
-                // prayer times at all.
+        item(key = "today-timetable") {
+            TodayPrayerList(
+                state = state,
+                // `Full timetable` opens the prayer timetable this list summarises: the `prayer`
+                // destination renders the same live period and the day's full timetable.
                 onViewAll = { onNavigate("prayer") },
             )
         }
@@ -122,21 +129,13 @@ private fun HomeContent(
             ForbiddenTimesCard(
                 state = state,
                 // The prohibited windows are anchored to the day's solar events, so `View details`
-                // opens the same prayer-day destination rather than Calendar. There is no
-                // dedicated prohibited-times screen: the card lists every configured interval for
-                // today, and inventing a screen for the rest would be a design decision, not a
-                // data binding.
+                // opens the same prayer-day destination rather than Calendar.
                 onViewDetails = { onNavigate("prayer") },
             )
-        }
-
-        item(key = "sun-times") {
-            SunTimesCard(rows = state.solarRows)
         }
 
         item(key = "daily-tools") {
             DailyToolsSection(onNavigate = onNavigate)
         }
-
     }
 }

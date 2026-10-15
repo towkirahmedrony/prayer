@@ -691,6 +691,20 @@ class LocalizationResourcesTest {
             "home_hero_ends",
             "home_hero_ends_next_day",
             "home_hero_next_at",
+            // The hero card's two headings, its caption, and the day's sunlight span.
+            "home_hero_label_next_prayer",
+            "home_hero_label_time_left",
+            "home_hero_ends_then",
+            "home_solar_daylight",
+            // The day's timetable list: its action and its per-row status labels.
+            "home_action_full_timetable",
+            "home_prayer_status_now",
+            "home_prayer_status_time_left",
+            "home_prayer_status_up_next",
+            "home_prayer_status_passed",
+            "home_prayer_status_tonight",
+            "home_time_to",
+            "home_date_separator",
             // The day's timetable strip and the two actions off the card.
             "home_today_prayer_times_title",
             "home_action_view_all",
@@ -754,6 +768,7 @@ class LocalizationResourcesTest {
             "home_hero_next_at",
             "home_prohibited_window",
             "prohibited_window_range",
+            "home_date_separator",
         )
     }
 }

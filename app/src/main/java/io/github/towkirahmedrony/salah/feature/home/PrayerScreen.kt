@@ -51,7 +51,7 @@ fun PrayerScreen(
                 color = MaterialTheme.colorScheme.error,
             )
             is HomeUiState.Ready -> {
-                CurrentPrayerHeroCard(state = state.currentPrayer)
+                CurrentPrayerHeroCard(state = state)
                 Spacer(modifier = Modifier.height(4.dp))
                 TimetableCard(state = state)
             }

@@ -21,6 +21,7 @@ import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
+import java.time.Duration
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -104,6 +105,7 @@ class HomeUiStateFactory(
             prayer = nextPrayer?.prayer,
             time = nextPrayer?.let { timeFormatter.format(it.time) },
             countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
+            countdownCompact = nextPrayer?.let { CountdownFormatter.formatCompact(it.remaining) },
         )
 
         // The open period is resolved exactly once. The hero card and the current-prayer marker on the
@@ -113,6 +115,17 @@ class HomeUiStateFactory(
         // independently re-selecting from the list.
         val currentStatus = currentPrayerResolver.resolve(schedule, now, nextDayFajr)
         val currentPrayerName = (currentStatus as? CurrentPrayerStatus.Active)?.period?.prayer
+
+        // The hero chart and the daylight span are the only geometry Home needs. Both are derived
+        // from the same schedule everything else on the screen reads, so the chart cannot plot a day
+        // the timetable disagrees with, and the span is measured, never assumed.
+        val heroArc = buildHeroArc(
+            schedule = schedule,
+            now = now,
+            currentPrayer = currentPrayerName,
+            nextPrayer = nextPrayer?.prayer,
+        )
+        val daylight = daylightSpan(schedule)
 
         return HomeUiState.Ready(
             gregorianDate = gregorian?.formattedDate,
@@ -158,6 +171,7 @@ class HomeUiStateFactory(
                     timeLabel = entry?.let { timeFormatter.format(it.time) },
                     adjustmentMinutes = entry?.adjustmentMinutes ?: 0,
                     isNext = nextPrayer?.prayer == prayer,
+                    isPassed = entry != null && !entry.time.isAfter(now),
                     isCurrent = currentPrayerName == prayer,
                     endTimeLabel = end?.let { timeFormatter.format(it.time) },
                     endsNextDay = end?.isNextDay == true,
@@ -169,6 +183,8 @@ class HomeUiStateFactory(
                     timeLabel = schedule?.timeOf(event)?.let(timeFormatter::format),
                 )
             },
+            daylight = daylight,
+            heroArc = heroArc,
             prohibited = prohibitedState.toSection(
                 schedule = schedule,
                 now = now,
@@ -211,6 +227,7 @@ class HomeUiStateFactory(
                 endsNextDay = (boundary as? PeriodBoundary.Prayer)?.isNextDay == true,
                 endsWithSolarEvent = (boundary as? PeriodBoundary.Solar)?.event,
                 countdown = CountdownFormatter.format(period.remaining),
+                countdownCompact = CountdownFormatter.formatCompact(period.remaining),
                 next = next,
                 unavailable = null,
             )
@@ -225,6 +242,7 @@ class HomeUiStateFactory(
             endsNextDay = false,
             endsWithSolarEvent = null,
             countdown = CountdownFormatter.format(status.remaining),
+            countdownCompact = CountdownFormatter.formatCompact(status.remaining),
             next = next,
             unavailable = null,
         )
@@ -238,9 +256,65 @@ class HomeUiStateFactory(
             endsNextDay = false,
             endsWithSolarEvent = null,
             countdown = null,
+            countdownCompact = null,
             next = next,
             unavailable = scheduleState.asTimetableNote() ?: status.reason,
         )
+    }
+
+    /**
+     * Places every prayer and the displayed moment on the day's arc.
+     *
+     * The interval the arc spans is Fajr to Isha — the two ends of the day the timetable brackets — so
+     * the first and last prayers sit on the arc's ends and the day's progress reads as a single
+     * fraction. A moment outside that interval clamps to the nearer end rather than leaving the arc,
+     * which is the honest reading for a pre-dawn or post-Isha view: the sun is at the day's boundary.
+     *
+     * Returns [HeroArcSection.Empty] instead of a partial chart when the schedule is missing or does
+     * not span a positive interval, so no mark is ever invented.
+     */
+    private fun buildHeroArc(
+        schedule: PrayerSchedule?,
+        now: ZonedDateTime,
+        currentPrayer: PrayerName?,
+        nextPrayer: PrayerName?,
+    ): HeroArcSection {
+        if (schedule == null || !schedule.isComplete) return HeroArcSection.Empty
+        val start = schedule.timeOf(PrayerName.FAJR) ?: return HeroArcSection.Empty
+        val end = schedule.timeOf(PrayerName.ISHA) ?: return HeroArcSection.Empty
+        val spanSeconds = Duration.between(start, end).seconds.toDouble()
+        if (spanSeconds <= 0.0) return HeroArcSection.Empty
+
+        fun fraction(time: ZonedDateTime): Float =
+            (Duration.between(start, time).seconds.toDouble() / spanSeconds)
+                .coerceIn(0.0, 1.0)
+                .toFloat()
+
+        val markers = PrayerName.entries.mapNotNull { prayer ->
+            val time = schedule.timeOf(prayer) ?: return@mapNotNull null
+            HeroArcMarker(
+                prayer = prayer,
+                position = fraction(time),
+                isPassed = !time.isAfter(now),
+                isCurrent = currentPrayer == prayer,
+                isNext = nextPrayer == prayer,
+            )
+        }
+        return HeroArcSection(progress = fraction(now), markers = markers)
+    }
+
+    /**
+     * The sunlight span of the day: sunset minus sunrise, in the compact `11h 38m` form.
+     *
+     * `null` until both solar events exist, because a span with one end missing is not a span, and
+     * Salah states no value it cannot measure.
+     */
+    private fun daylightSpan(schedule: PrayerSchedule?): String? {
+        val sunrise = schedule?.timeOf(SolarEvent.SUNRISE) ?: return null
+        val sunset = schedule?.timeOf(SolarEvent.SUNSET) ?: return null
+        val span = Duration.between(sunrise, sunset)
+        if (span.isNegative || span.isZero) return null
+        return CountdownFormatter.formatCompact(span)
     }
 
     /** The moment a prayer's period closes, and whether that moment is on the next local date. */

@@ -70,6 +70,18 @@
     <!-- Home: the hero card, which names the prayer period that is open now — or the one that is next. -->
     <string name="home_hero_status_current">বর্তমান ওয়াক্ত</string>
     <string name="home_hero_status_up_next">পরবর্তী ওয়াক্ত</string>
+    <string name="home_hero_label_next_prayer">পরবর্তী নামাজ</string>
+    <string name="home_hero_label_time_left">বাকি সময়</string>
+    <string name="home_hero_ends_then">%1$s এরপর শেষ হবে</string>
+    <string name="home_solar_daylight">দিনের আলো</string>
+    <string name="home_action_full_timetable">সম্পূর্ণ সময়সূচি</string>
+    <string name="home_prayer_status_now">এখন</string>
+    <string name="home_prayer_status_time_left">%1$s বাকি</string>
+    <string name="home_prayer_status_up_next">পরবর্তী</string>
+    <string name="home_prayer_status_passed">অতিবাহিত</string>
+    <string name="home_prayer_status_tonight">রাতে</string>
+    <string name="home_time_to">%1$s পর্যন্ত</string>
+    <string name="home_date_separator"> · </string>
     <string name="home_hero_subtitle_active">এখন নামাজের ওয়াক্ত চলছে</string>
     <string name="home_hero_subtitle_next">পরবর্তী নামাজ</string>
     <string name="home_hero_time_until">%1$s পর্যন্ত বাকি সময়</string>

@@ -108,6 +108,27 @@
     <string name="home_hero_ends_next_day">Ends %1$s (tomorrow)</string>
     <!-- The next prayer and its time, joined by a dash so the two read as one reading. -->
     <string name="home_hero_next_at">%1$s — %2$s</string>
+    <!--
+      Home: the hero card's two column headings, the caption under the countdown, and the day's
+      sunlight span. Written in capitals here rather than upper-cased at the call site, for the same
+      reason as home_hero_status_current: Bengali has no letter case.
+    -->
+    <string name="home_hero_label_next_prayer">NEXT PRAYER</string>
+    <string name="home_hero_label_time_left">TIME LEFT</string>
+    <string name="home_hero_ends_then">%1$s ends then</string>
+    <string name="home_solar_daylight">Daylight</string>
+
+    <!-- Home: the actions and status labels of the day's timetable list. -->
+    <string name="home_action_full_timetable">Full timetable</string>
+    <string name="home_prayer_status_now">NOW</string>
+    <string name="home_prayer_status_time_left">%1$s left</string>
+    <string name="home_prayer_status_up_next">Up next</string>
+    <string name="home_prayer_status_passed">Passed</string>
+    <string name="home_prayer_status_tonight">Tonight</string>
+    <!-- A closing time prefixed with "to", as the list renders "to 5:51 AM". -->
+    <string name="home_time_to">to %1$s</string>
+    <!-- The separator between the Gregorian, Hijri and Bangla dates on the header's date line. -->
+    <string name="home_date_separator"> · </string>
 
     <!-- Home: the day's timetable strip and the two actions that leave the card. -->
     <string name="home_today_prayer_times_title">Today\'s Prayer Times</string>

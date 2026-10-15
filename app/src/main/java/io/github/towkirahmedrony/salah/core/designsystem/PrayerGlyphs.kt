@@ -52,6 +52,24 @@ private fun starPath(cx: Float, cy: Float, outer: Float, inner: Float, points: I
         close()
     }
 
+/** Dhuhr: a simple sun — a disc with eight rays. */
+@Composable
+fun SunGlyph(tint: Color, modifier: Modifier = Modifier) = PrayerGlyph(modifier) {
+    drawCircle(tint, radius = 4.6f, center = Offset(12f, 12f), style = Stroke(width = 1.8f))
+    repeat(8) { i ->
+        val angle = (i * 45.0 * PI / 180.0).toFloat()
+        val inner = 7.4f
+        val outer = 10.2f
+        drawLine(
+            color = tint,
+            start = Offset(12f + inner * cos(angle), 12f + inner * sin(angle)),
+            end = Offset(12f + outer * cos(angle), 12f + outer * sin(angle)),
+            strokeWidth = 1.8f,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
 /** Asr: a clock face. */
 @Composable
 fun ClockGlyph(tint: Color, modifier: Modifier = Modifier) = PrayerGlyph(modifier) {
