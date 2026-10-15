@@ -39,6 +39,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsR
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
+import io.github.towkirahmedrony.salah.data.dataset.LocalDatasetStore
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
@@ -79,7 +80,16 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
+import java.io.File
 import java.time.Clock
+
+/**
+ * Where an applied (validated, non-bundled) dataset is kept, under `filesDir`.
+ *
+ * Namespaced by dataset so a second independently published dataset can be added later without moving
+ * the first one. The bundled assets are unaffected by anything here.
+ */
+private const val APPLIED_DATASET_DIRECTORY = "datasets/bd_locations"
 
 /**
  * Single dependency container for Salah.
@@ -117,10 +127,26 @@ val salahModules = module {
     single<DataStore<Preferences>> { androidContext().salahPreferencesDataStore }
     single<UserPreferencesRepository> { DataStoreUserPreferencesRepository(get()) }
     single<LocationRepository> { DataStoreLocationRepository(get()) }
-    // The Bangladesh geography bundled with the app: divisions, districts, upazilas and thanas with
-    // their published reference coordinates, plus the national boundary the country policy checks
-    // against. Read from assets and parsed once; see docs/LOCATION_SYSTEM.md section 5.
-    single<BangladeshAreaCatalog> { AssetBangladeshAreaCatalog(androidContext(), get()) }
+    // The Bangladesh geography the app runs on: divisions, districts, upazilas and thanas with their
+    // published reference coordinates, plus the national boundary the country policy checks against.
+    //
+    // Two sources, one port. The bundled assets are parsed by AssetBangladeshAreaCatalog exactly as
+    // they always were, and LocalDatasetStore puts a validated, applied dataset in front of them when
+    // one exists — falling back to the bundled assets when none does, or when the applied one can no
+    // longer be read. Callers still ask a BangladeshAreaCatalog for "the dataset" and get whichever is
+    // in force, so nothing above this line has to know the concept exists.
+    //
+    // The applied dataset lives under filesDir, not in DataStore: it is replaceable data whose
+    // consistency with the files on disk is the whole point, so it is kept beside them. See
+    // docs/ARCHITECTURE.md section 12 and docs/LOCATION_SYSTEM.md section 5.
+    single<BangladeshAreaCatalog> {
+        LocalDatasetStore(
+            root = File(androidContext().filesDir, APPLIED_DATASET_DIRECTORY),
+            bundled = AssetBangladeshAreaCatalog(androidContext(), get()),
+            logger = get(),
+            clock = get(),
+        )
+    }
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
     }

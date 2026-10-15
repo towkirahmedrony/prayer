@@ -183,4 +183,23 @@ object SalahDiagnosticEvents {
      * the only realistic failures are an unreadable dataset and a parser exception.
      */
     const val LOCATION_SEARCH_FAILED = "location_search_failed"
+
+    // Local dataset foundation -------------------------------------------------
+    // Dataset events record versions, counts and rejection codes. Never a coordinate and never a
+    // payload's contents: a version string identifies a publication, not a person.
+
+    /** A validated dataset payload became the active dataset. */
+    const val DATASET_ACTIVATED = "dataset_activated"
+
+    /** A candidate payload was refused, with the distinct problem codes that refused it. */
+    const val DATASET_ACTIVATION_REJECTED = "dataset_activation_rejected"
+
+    /**
+     * An applied payload named by the record could not be read, so a different one was used.
+     *
+     * Logged with the slot that failed and, when one was found, the slot it was recovered from — or
+     * nothing when the fallback had to go all the way to the bundled assets. This is the event that
+     * says "the app recovered", and it is a warning rather than an error because the app did recover.
+     */
+    const val DATASET_APPLIED_UNAVAILABLE = "dataset_applied_unavailable"
 }

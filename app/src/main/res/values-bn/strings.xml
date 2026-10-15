@@ -701,6 +701,8 @@
     <string name="location_setup_manual_confirm">অবস্থান নিশ্চিত করুন</string>
     <string name="location_setup_footer">আপনার নির্বাচিত এলাকা স্থানীয় নামাজের সময় হিসাব করতে ব্যবহৃত হবে। জিপিএস ঐচ্ছিক।</string>
     <string name="location_setup_made_for">বাংলাদেশের মুসলিমদের জন্য তৈরি</string>
+    <string name="location_setup_reason_area_missing">এই ডিভাইসে সংরক্ষিত এলাকাটি এই বিল্ড যে অবস্থান ডেটাসেট পড়তে পারে তার ভেতরে নেই, তাই সালাহ আবার তা চাইছে। আপনার অন্য কোনো সেটিং বদলায়নি।</string>
+    <string name="location_setup_reason_outside_country">এই ডিভাইসে সংরক্ষিত অবস্থানটি সালাহ যে এলাকা সমর্থন করে তার বাইরে, তাই আবার বেছে নিতে হবে। আপনার অন্য কোনো সেটিং বদলায়নি।</string>
 
     <!--
       Ramadan: the Ramadan screen and the Sehri/Iftar timetable it draws. The reminder controls it

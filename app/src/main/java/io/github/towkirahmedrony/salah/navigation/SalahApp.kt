@@ -86,6 +86,11 @@ fun SalahApp(
                     LocationSelectionScreen(
                         context = LocationSelectionContext.FIRST_LAUNCH,
                         modifier = Modifier.padding(innerPadding),
+                        // Why the gate is asking at all. Null is the ordinary case — a fresh install
+                        // has no location to account for — and DatasetUnavailable is not a reason to
+                        // pass, because that state is about the dataset being unreadable rather than
+                        // about anything the user chose.
+                        reason = (setupState as? LocationSetupState.Required)?.reason,
                     )
                 }
 

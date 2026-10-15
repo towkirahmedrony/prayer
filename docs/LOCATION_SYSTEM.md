@@ -391,6 +391,38 @@ by the same function. The possible results, in the order the policy can produce 
 There is no case in which a division alone reaches this function: `BangladeshAreaRef` always carries a
 district, because a selection that stops at a division cannot be saved.
 
+### 8.3 Stable identity: what an id promises
+
+An area's **identity** is its id, its level and its parent. Everything else about it — the English name,
+the Bangla name, the representative coordinate — is a *description* that may legitimately be corrected.
+`AreaIdentity` and `DatasetIdentity` keep the two apart so that the difference is decided by code rather
+than by care.
+
+The rules, and what each protects:
+
+| Rule | Why |
+|---|---|
+| An existing id keeps meaning the same place | A saved location stores ids; a meaning that drifts silently changes which place a user is praying for |
+| Ids are never regenerated from names or list positions | A rename or a reordered file must not mint a new identity or recycle an old one |
+| A corrected name, Bangla name or coordinate is **not** an identity change | Ordinary data corrections must not fail a build or disturb a saved location |
+| Removing an id, or changing its level or its parent, **is** a breaking change | Any of the three can leave a saved location unresolvable, or resolvable to a different place |
+| Adding an area is an extension, not a break | New coverage invalidates nothing |
+| A retired id is not reused for a different place | A reused id is detected through its level or parent, since the name alone would look plausible |
+| Renamed, retired, split or merged locations are handled explicitly | None of them is remapped silently |
+
+Level is part of identity, not a separate lookup: an id that still exists but has moved from district to
+upazila no longer describes the same place, and `DatasetIdentity.recognises` rejects a reference whose
+ids are not present **at the levels the reference expects**.
+
+Enforcement lives in two places:
+
+- **At runtime**, `DatasetValidator` rejects a candidate dataset that would break an identity the active
+  dataset already has, or that would leave the user's stored location unresolvable.
+- **In CI**, `BundledDatasetIdentityTest` compares the shipped dataset against
+  `app/src/test/resources/location/bd_identity.baseline.tsv` — `level`, `id`, `parent id`, and nothing
+  else. An intended change to the shipped data appears as a small, readable diff to that file and must be
+  acknowledged; an unintended one fails the build. Full detail is in `docs/ARCHITECTURE.md` §12.
+
 ## 9. Offline operation and persistence
 
 Nothing in the location system **needs** a network. The search reads the same bundled files the
@@ -406,7 +438,10 @@ dropdowns do, and the device-fix path asks the platform's own location provider.
 - **Geography:** `AssetBangladeshAreaCatalog` reads the assets once per process (≈ 142 KB total, a few
   milliseconds to parse) and caches the parsed dataset. The locality file is read *optionally*: missing
   it is logged as a warning and yields an empty layer, because the two files the app cannot work
-  without are the hierarchy and the boundary.
+  without are the hierarchy and the boundary. `LocalDatasetStore` implements the same port, putting a
+  validated *applied* dataset in front of those assets when one exists and falling back to them when it
+  does not — so the bundled files remain the floor and the first-launch dataset, and nothing above the
+  port changed. See `docs/ARCHITECTURE.md` §12.
 - **Failure is a value.** A missing or unreadable asset returns `null` and is logged; a dataset that
   parses into something unusable is returned as it is, and `LocationSetup` decides what to tell the
   user. Nothing throws into the UI, and nothing falls back to a hand-written list of "popular" places.

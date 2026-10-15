@@ -704,6 +704,8 @@
     <string name="location_setup_manual_confirm">Confirm Location</string>
     <string name="location_setup_footer">Your selected area will be used to calculate local prayer times. GPS is optional.</string>
     <string name="location_setup_made_for">Made for Muslims in Bangladesh</string>
+    <string name="location_setup_reason_area_missing">The area saved on this device is not in the location dataset this build can read, so Salah is asking for it again. Nothing else about your settings has changed.</string>
+    <string name="location_setup_reason_outside_country">The location saved on this device is outside the area Salah supports, so it has to be chosen again. Nothing else about your settings has changed.</string>
 
     <!--
       The map picker is gone; this label is kept only so a location stored by an earlier build, whose

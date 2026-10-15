@@ -589,3 +589,168 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
 - Prohibited prayer windows are **implemented and configured** with this application's documented
   policy. Confirming the boundaries is a data change: add a reviewed `ProhibitedRuleSet`. See
   `docs/FORBIDDEN_PRAYER_TIMES.md`.
+
+## 12. Local dataset foundation
+
+This section describes the local half of Salah's data story: which dataset the app is running on, how a
+validated one safely replaces it, and what is guaranteed when that goes wrong. **No remote tier exists**
+— there is no `INTERNET` permission, no HTTP client and no synchronisation. What exists is the mechanism
+a published dataset will eventually arrive through, built and tested locally first so that the arrival
+is a change of supplier rather than a change of architecture.
+
+### 12.1 The model
+
+```
+bundled assets  ──►  active dataset  ──►  UI
+   (always present)     (may be applied)
+```
+
+- **Bundled assets** (`app/src/main/assets/location/*.tsv`) are the floor. They ship inside the APK, are
+  never overwritten, and are the dataset on a fresh install and after any failure.
+- **An applied dataset** is one that passed validation and now lives in the application's own storage.
+- `BangladeshAreaCatalog` is the port; `LocalDatasetStore` implements it by putting an applied dataset in
+  front of `AssetBangladeshAreaCatalog` and falling back to it. **Callers are unchanged** — the setup
+  gate, the picker, the search, the area resolver and the locality resolver all ask for "the dataset" and
+  receive whichever is in force.
+
+### 12.2 Storage layout
+
+```
+<filesDir>/datasets/bd_locations/
+  active.tsv                     the metadata record: the active payload, and the one before it
+  payloads/
+    <sha256>/                    one directory per applied payload, named by its own checksum
+      dataset.version            the payload describes its own version
+      bd_areas.tsv
+      bd_boundary.tsv
+      bd_localities.tsv
+    .staging-<n>/                an in-flight write; never referenced by the record
+```
+
+The payload files are **the same three tab-separated texts, parsed by the same parser** as the bundled
+assets. There is one format and one parser, so a future published payload is not a new kind of data —
+it is the same data, movable. The bundled TSV files are not regenerated, reformatted or re-verified by
+anything in this design.
+
+The dataset lives under `filesDir` rather than in DataStore on purpose: what matters about it is that it
+is consistent *with the files beside it*, so it is kept beside them. DataStore remains the home of user
+preferences and the stored location, which is what it is good at.
+
+### 12.3 Safe activation, and the one operation it depends on
+
+A multi-step write cannot be made atomic; the design instead arranges the steps so that only **one** of
+them needs to be, and so that every interruption before it leaves the previous dataset intact:
+
+1. write the payload into a fresh `.staging-<n>` directory and flush it to storage;
+2. rename that directory to `payloads/<checksum>` — a single directory rename. Until step 3 the
+   directory is unreferenced, so publishing it early is harmless;
+3. rewrite `active.tsv` by writing a sibling temporary file and renaming it over the old one. **This
+   single rename is the commit point.**
+4. delete payload directories the new record does not name. Housekeeping only.
+
+The invariant that makes this safe: **the record is the only pointer, and it is only ever moved after
+the thing it points at is complete.** Step 1 is the only place a partial dataset can exist, and nothing
+references it. The previous applied payload is retained alongside the new one, so a payload that was
+valid on activation and is unreadable later is recovered from rather than lost.
+
+**Recovery states, all covered by tests** (`LocalDatasetStoreTest`):
+
+| State on disk | Result |
+|---|---|
+| No record | Bundled dataset |
+| Record names a payload directory that is absent | Bundled dataset |
+| Record's version disagrees with the payload's own version | Bundled dataset |
+| Payload bytes do not match the checksum that names the directory | Bundled dataset (and the fallback is logged) |
+| Payload parses but is structurally defective | Bundled dataset |
+| Active payload unreadable, previous payload readable | Previous applied payload |
+| Both unreadable | Bundled dataset |
+| Stray `.staging-<n>` directory present | Ignored, then discarded; active dataset unaffected |
+
+Reading never trusts the record: each named payload is re-read, its checksum recomputed from the bytes
+on disk and compared to the directory name. A record that disagrees with the bytes is a *detected*
+condition, not a corrupted dataset.
+
+### 12.4 What a checksum does and does not establish
+
+The checksum detects **accidental corruption** — a truncated write, a half-published payload, contents
+that are not what was published. It does **not** establish authenticity: whoever can change the payload
+can change the checksum beside it. There is no key-management design in this phase, so no signature is
+pretended. When published datasets arrive, integrity and authenticity are separate decisions.
+
+`fsync` is applied to payload and record writes before their rename. This defends without qualification
+against **process death**; against power loss it is best-effort, because a directory rename is durable
+only once the *directory* is synced and not every platform permits opening one. The commit point is the
+rename, not the flush. No test here claims to prove power-loss durability.
+
+### 12.5 Stable location identity
+
+An area's **identity** is its id, level and parent. Its **description** is its name, Bangla name and
+coordinates. `AreaIdentity` and `DatasetIdentity` keep those apart, and the rules are:
+
+- an existing id keeps meaning the same place: ids are never regenerated from names or list positions;
+- a corrected name, Bangla name or coordinate changes nothing about identity;
+- removing an id, changing its level or changing its parent **is** a breaking change, because it can
+  invalidate a location a user has already saved;
+- adding an area is an extension and invalidates nothing;
+- reusing a retired id for a different place is detected through level or parent, not through the name.
+
+Two things enforce it:
+
+1. **At runtime**, `DatasetValidator` compares a candidate's identity against the active dataset's and
+   rejects any breaking change. This is the seam a published dataset must pass.
+2. **In CI**, `BundledDatasetIdentityTest` compares the shipped dataset against the checked-in baseline
+   `app/src/test/resources/location/bd_identity.baseline.tsv`, which contains only `level`, `id` and
+   `parent id`. A legitimate data change is **reviewable** — it shows up as a small diff to a file whose
+   only content is identity — and cannot pass unnoticed. A corrected label or coordinate does not appear
+   in that file at all, so ordinary edits do not fail the build.
+
+### 12.6 The location-compatibility guarantee
+
+`LocationSetup.evaluate` reports `Required(AREA_NOT_IN_DATASET)` when the stored location's area is not in
+the dataset, and the shell answers that by replacing the navigation graph with the setup screen. That is
+correct for a location that genuinely cannot be resolved, and unacceptable for one that could have been
+if the update had been refused first. So:
+
+- a candidate that does not contain the area of the **saved location** is rejected before anything is
+  written (`DatasetProblem.StoredLocationWouldBreak`);
+- a rejected candidate changes nothing, so the saved location never becomes unresolvable because of one;
+- `LocalDatasetStore` takes the stored location only as an **input** to validation and has no way to
+  write one, so no failed update can clear it;
+- when a location truly cannot be resolved against any available dataset, the setup screen is still shown
+  — and now explains why, rather than presenting a bare first-launch prompt.
+
+### 12.7 Backup and restore ownership
+
+| Data | Backed up | Why |
+|---|---|---|
+| Preferences and the saved location (`files/datastore/`) | **Yes** | Small, user-owned, not reconstructible |
+| Applied dataset payloads (`files/datasets/`) | **No** | Replaceable, potentially large, and a stale copy restored over a newer one is worse than nothing |
+| Bundled assets | n/a | Inside the APK |
+
+Because only `<include>` entries appear in the rule files, everything not listed is excluded, so the
+dataset cache needs no explicit `<exclude>`. `BackupRulesConfigurationTest` asserts these properties as
+configuration, including that the manifest still points at the rule files.
+
+**Manual verification still required.** A JVM test cannot prove that the platform captures and restores
+the files. To verify on a device or emulator:
+
+1. set a theme, a language and a manual area selection;
+2. record them, then run `adb shell bmgr backupnow <applicationId>` (or use Settings → System → Backup);
+3. clear the app's data, then restore (`adb shell bmgr restore <token> <applicationId>`), or perform a
+   device-to-device transfer with a cable;
+4. confirm the theme, the language **and the saved location** survive, and that the app opens on Home
+   rather than on location setup.
+
+Step 4 is the assertion that matters: losing the saved location is exactly the failure the previous
+`sharedpref`-only configuration produced, and it presents as a completed setup being asked for again.
+
+### 12.8 Future extension points
+
+- **A published dataset**: supply a `DatasetPayload` and call `LocalDatasetStore.activate`. Everything
+  else — validation, atomicity, recovery, identity protection — is already in place and tested.
+- **A manifest**: version comparison is `DatasetVersion.isSameAs`, deliberately equality-only. Ordering,
+  if ever wanted, belongs in a separate publication field rather than smuggled into the version string.
+- **A second dataset**: the root is namespaced per dataset (`datasets/bd_locations`), so published
+  timetables or Ramadan calendars can be added without moving this one.
+- **Not planned in this phase**: Supabase, HTTP, background sync, remote theming, remote Ramadan data,
+  Room or KSP. Nothing here depends on any of them.

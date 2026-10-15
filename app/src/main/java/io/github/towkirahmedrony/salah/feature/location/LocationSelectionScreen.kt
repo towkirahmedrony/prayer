@@ -52,6 +52,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeleto
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupReason
 import io.github.towkirahmedrony.salah.core.domain.location.AreaResolution
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
@@ -139,6 +140,15 @@ fun LocationSelectionScreen(
     context: LocationSelectionContext,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /**
+     * Why the first-launch gate is asking, when it knows.
+     *
+     * Only the gate passes this, and only for the two reasons that mean the user *had* a location:
+     * a submitted area the dataset does not contain, or one outside the supported country. It is
+     * explanatory and nothing more — the screen behaves identically without it, and `null` (a fresh
+     * install, or a location that cannot be read at all) simply adds no note. See [selectionNotice].
+     */
+    reason: LocationSetupReason? = null,
     viewModel: LocationViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -199,7 +209,32 @@ fun LocationSelectionScreen(
         onSelectSearchResult = viewModel::selectSearchResult,
         nameLanguage = nameLanguage,
         onBack = onBack,
+        reason = reason,
     )
+}
+
+/**
+ * What to tell a user who already had a location but is being asked for one again, or `null` when
+ * there is nothing worth saying.
+ *
+ * Deliberately silent for [LocationSetupReason.NO_LOCATION] — a fresh install is not a failure, and the
+ * first-launch header already accounts for it — and for a `null` reason, which is what every context
+ * other than the gate passes.
+ *
+ * The two reasons that do warrant words are the ones where the user had something and it stopped being
+ * usable. In both cases the useful information is that **only** the location needs attention: the rest
+ * of their settings are untouched, and saying so is the difference between a prompt that reads as
+ * routine and one that reads as data loss.
+ *
+ * Nothing here invents a resolution. If a stored location cannot be resolved against any available
+ * dataset, the honest answer is to ask for it again and say why — never to substitute an area the user
+ * did not choose.
+ */
+@Composable
+private fun selectionNotice(reason: LocationSetupReason?): String? = when (reason) {
+    LocationSetupReason.AREA_NOT_IN_DATASET -> stringResource(R.string.location_setup_reason_area_missing)
+    LocationSetupReason.OUTSIDE_SUPPORTED_COUNTRY -> stringResource(R.string.location_setup_reason_outside_country)
+    LocationSetupReason.NO_LOCATION, null -> null
 }
 
 /**
@@ -243,6 +278,7 @@ private fun LocationSelectionContent(
     onSelectSearchResult: (LocationSearchResult) -> Unit,
     nameLanguage: LocationNameLanguage,
     onBack: () -> Unit,
+    reason: LocationSetupReason? = null,
 ) {
     Column(
         modifier = modifier
@@ -265,6 +301,14 @@ private fun LocationSelectionContent(
                 backContentDescription = stringResource(R.string.action_back),
                 onBack = onBack,
             )
+        }
+
+        // Why they are here again, when they already had a location. Placed directly under the header
+        // so it is read before the options rather than discovered after them — the stored location is
+        // shown below, which says what was held; this says why it is not being used.
+        selectionNotice(reason)?.let { notice ->
+            Spacer(modifier = Modifier.height(14.dp))
+            SalahUnavailableNote(text = notice)
         }
 
         // What the dataset is, stated once for both contexts: the version when there is one worth

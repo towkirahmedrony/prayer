@@ -1,5 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto Backup rules for Salah (API 30 and below; see data_extraction_rules.xml for 31+).
+
+  What is backed up, and why it is exactly this:
+
+    file/datastore        Salah's preferences and the saved location. These are stored with
+                          androidx.datastore.preferences, which writes a single file to
+                          `<filesDir>/datastore/<name>.preferences_pb`. The `file` domain is
+                          therefore the domain that actually contains them — the previous
+                          configuration named only `sharedpref`, which Salah does not use, so the
+                          intent ("the theme and the manual location are small and safe to back up")
+                          was not being carried out and a device transfer silently lost both.
+
+    sharedpref            Kept because it costs nothing and is the right domain if any dependency
+                          ever stores a preference the platform way.
+
+  What is deliberately NOT backed up:
+
+    file/datasets         An applied dataset payload (see LocalDatasetStore). It is replaceable
+                          data that can be produced again from a publication, it can be large, and
+                          restoring a stale copy over a newer one would be worse than restoring
+                          nothing. The bundled assets inside the APK always reconstruct a usable
+                          dataset, so excluding it loses no capability.
+
+  Because only <include> entries are listed, everything else is excluded — the dataset payloads
+  above do not need an explicit <exclude>. If an <exclude> is ever added here, one is needed for
+  `file/datasets` too, because an <exclude> would otherwise widen what is captured.
+-->
 <full-backup-content>
-    <!-- Preferences (theme, manual location) are small and safe to back up. -->
+    <include domain="file" path="datastore/" />
     <include domain="sharedpref" path="." />
 </full-backup-content>
