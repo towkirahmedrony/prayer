@@ -29,4 +29,33 @@ class CountdownFormatterTest {
     fun `formats zero as zero`() {
         assertEquals("00:00", CountdownFormatter.format(Duration.ZERO))
     }
+
+    @Test
+    fun `formats the compact reading as hours and minutes above an hour`() {
+        assertEquals(
+            "1h 17m",
+            CountdownFormatter.formatCompact(Duration.ofHours(1).plusMinutes(17).plusSeconds(42)),
+        )
+        assertEquals(
+            "11h 38m",
+            CountdownFormatter.formatCompact(Duration.ofHours(11).plusMinutes(38)),
+        )
+    }
+
+    @Test
+    fun `formats the compact reading as minutes below an hour`() {
+        assertEquals("17m", CountdownFormatter.formatCompact(Duration.ofMinutes(17).plusSeconds(59)))
+        assertEquals("0m", CountdownFormatter.formatCompact(Duration.ZERO))
+    }
+
+    @Test
+    fun `the compact reading drops seconds rather than rounding time up`() {
+        // Two seconds past the minute still reads as that minute, never as the next one.
+        assertEquals("5m", CountdownFormatter.formatCompact(Duration.ofMinutes(5).plusSeconds(2)))
+    }
+
+    @Test
+    fun `the compact reading clamps negative durations to zero`() {
+        assertEquals("0m", CountdownFormatter.formatCompact(Duration.ofMinutes(-5)))
+    }
 }

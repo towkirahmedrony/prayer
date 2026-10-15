@@ -763,4 +763,66 @@ class HomeUiStateFactoryTest {
         assertTrue("no prayer is current between periods", state.prayerRows.none { it.isCurrent })
         assertTrue(state.prayerRows.first { it.prayer == PrayerName.DHUHR }.isNext)
     }
+
+    // --- The hero's geometry and the list's passed markers ---------------------------------------
+
+    @Test
+    fun `the daylight span is measured from sunrise to sunset`() {
+        // Sunrise 05:54 to sunset 17:36 is 11h 42m on this fixture.
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+        )
+
+        assertEquals("11h 42m", state.daylight)
+    }
+
+    @Test
+    fun `the hero arc spans Fajr to Isha and places the moment between them`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+        )
+
+        val markers = state.heroArc.markers
+        assertEquals(PrayerName.entries.toList(), markers.map { it.prayer })
+        assertEquals(0.0, markers.first { it.prayer == PrayerName.FAJR }.position.toDouble(), 0.0001)
+        assertEquals(1.0, markers.first { it.prayer == PrayerName.ISHA }.position.toDouble(), 0.0001)
+        // Every position is inside the arc, and the 15:00 moment sits strictly between its ends.
+        assertTrue(markers.all { it.position in 0f..1f })
+        val progress = state.heroArc.progress
+        assertNotNull(progress)
+        assertTrue("expected a moment inside the arc, got $progress", progress!! > 0f && progress < 1f)
+    }
+
+    @Test
+    fun `the list marks a prayer passed once its own time has reached`() {
+        // 15:00: Fajr and Dhuhr have arrived; Asr and everything after it have not.
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+        )
+
+        assertEquals(
+            listOf(PrayerName.FAJR, PrayerName.DHUHR),
+            state.prayerRows.filter { it.isPassed }.map { it.prayer },
+        )
+        assertTrue(state.heroArc.markers.first { it.prayer == PrayerName.FAJR }.isPassed)
+        assertFalse(state.heroArc.markers.first { it.prayer == PrayerName.ISHA }.isPassed)
+    }
+
+    @Test
+    fun `without a schedule the arc and the daylight span are empty rather than invented`() {
+        val state = ready(
+            location = null,
+            scheduleState = PrayerScheduleState.Unavailable(
+                reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+                origin = origin,
+            ),
+        )
+
+        assertNull(state.daylight)
+        assertTrue(state.heroArc.markers.isEmpty())
+        assertNull(state.heroArc.progress)
+    }
 }
