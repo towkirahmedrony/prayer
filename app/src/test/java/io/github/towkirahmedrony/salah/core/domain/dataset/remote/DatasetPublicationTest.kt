@@ -50,8 +50,13 @@ class DatasetPublicationTest {
         return if (asArray) "[$body]" else body
     }
 
-    private fun parsed(body: String): DatasetPublication =
-        (DatasetPublicationParser.parseRestResponse(body) as ManifestParseResult.Parsed).publication
+    private fun parsed(body: String): DatasetPublication {
+        val result = DatasetPublicationParser.parseRestResponse(body)
+        if (result !is ManifestParseResult.Parsed) {
+            throw AssertionError("expected a parsed manifest, got $result for body: $body")
+        }
+        return result.publication
+    }
 
     // Reading ------------------------------------------------------------------------------------
 
@@ -76,6 +81,17 @@ class DatasetPublicationTest {
     @Test
     fun `an empty result means the slot has no current publication`() {
         assertEquals(ManifestParseResult.NoPublication, DatasetPublicationParser.parseRestResponse("[]"))
+    }
+
+    @Test
+    fun `a literal manifest with optional fields is read`() {
+        // Isolates the reader from the builder: if this passes and the next one fails, the builder is
+        // wrong; if both fail, the reader is.
+        val literal = """[{"dataset_id":"bd_locations","publication_id":"pub-2","version":"v2","payload_schema_version":1,"status":"published","checksum":"${checksum}","payload_path":"bd_locations/pub-2/payload.zip","payload_size_bytes":1234,"area_count":579,"locality_count":1216,"boundary_ring_count":13,"notes":"hello"}]"""
+
+        val result = DatasetPublicationParser.parseRestResponse(literal)
+
+        assertTrue("literal manifest failed: $result", result is ManifestParseResult.Parsed)
     }
 
     @Test
