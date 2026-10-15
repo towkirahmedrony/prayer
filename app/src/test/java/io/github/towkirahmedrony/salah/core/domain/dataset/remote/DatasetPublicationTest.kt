@@ -12,12 +12,18 @@ import org.junit.Test
  * answer different questions ("is this a manifest?" versus "may this manifest replace the app's data?")
  * and a failure that conflated them would report a draft publication as *unreadable* rather than as
  * *unpublished* — hiding the one diagnosis an operator needs.
+ *
+ * Every JSON string here is written with ordinary escaped quotes. An earlier version used triple-quoted
+ * literals, and a quote at a literal's edge is subtle enough that one numeric field silently emitted
+ * `1234"`; the builder below is the version that cannot do that.
  */
 class DatasetPublicationTest {
 
     private val checksum = "a".repeat(64)
 
-    private fun manifestJson(
+    private fun jsonObject(fields: List<String>): String = "{${fields.joinToString(",")}}"
+
+    private fun manifestBody(
         datasetId: String = "bd_locations",
         publicationId: String = "pub-2",
         version: String = "v2",
@@ -30,24 +36,29 @@ class DatasetPublicationTest {
         localityCount: Int? = null,
         boundaryRingCount: Int? = null,
         notes: String? = null,
-        asArray: Boolean = true,
     ): String {
-        val fields = buildList {
-            add(""""dataset_id":"$datasetId"""")
-            add(""""publication_id":"$publicationId"""")
-            add(""""version":"$version"""")
-            add(""""payload_schema_version":$schema""")
-            add(""""status":"$status"""")
-            if (checksum != null) add(""""checksum":"$checksum"""")
-            if (payloadPath != null) add(""""payload_path":"$payloadPath"""")
-            if (payloadSizeBytes != null) add(""""payload_size_bytes":$payloadSizeBytes"""")
-            if (areaCount != null) add(""""area_count":$areaCount"""")
-            if (localityCount != null) add(""""locality_count":$localityCount"""")
-            if (boundaryRingCount != null) add(""""boundary_ring_count":$boundaryRingCount"""")
-            if (notes != null) add(""""notes":"$notes"""")
-        }.joinToString(",")
-        val body = "{$fields}"
-        return if (asArray) "[$body]" else body
+        val fields = mutableListOf<String>()
+        fun quoted(name: String, value: String) {
+            fields += "\"$name\":\"$value\""
+        }
+
+        fun number(name: String, value: Any) {
+            fields += "\"$name\":$value"
+        }
+
+        quoted("dataset_id", datasetId)
+        quoted("publication_id", publicationId)
+        quoted("version", version)
+        number("payload_schema_version", schema)
+        quoted("status", status)
+        if (checksum != null) quoted("checksum", checksum)
+        if (payloadPath != null) quoted("payload_path", payloadPath)
+        if (payloadSizeBytes != null) number("payload_size_bytes", payloadSizeBytes)
+        if (areaCount != null) number("area_count", areaCount)
+        if (localityCount != null) number("locality_count", localityCount)
+        if (boundaryRingCount != null) number("boundary_ring_count", boundaryRingCount)
+        if (notes != null) quoted("notes", notes)
+        return jsonObject(fields)
     }
 
     private fun parsed(body: String): DatasetPublication {
@@ -62,7 +73,7 @@ class DatasetPublicationTest {
 
     @Test
     fun `a full manifest is read from the PostgREST array form`() {
-        val publication = parsed(manifestJson())
+        val publication = parsed("[${manifestBody()}]")
 
         assertEquals("bd_locations", publication.datasetId)
         assertEquals("pub-2", publication.publicationId)
@@ -75,7 +86,7 @@ class DatasetPublicationTest {
 
     @Test
     fun `a bare object is read as well as the array form`() {
-        assertEquals("pub-2", parsed(manifestJson(asArray = false)).publicationId)
+        assertEquals("pub-2", parsed(manifestBody()).publicationId)
     }
 
     @Test
@@ -84,25 +95,14 @@ class DatasetPublicationTest {
     }
 
     @Test
-    fun `a literal manifest with optional fields is read`() {
-        // Isolates the reader from the builder: if this passes and the next one fails, the builder is
-        // wrong; if both fail, the reader is.
-        val literal = """[{"dataset_id":"bd_locations","publication_id":"pub-2","version":"v2","payload_schema_version":1,"status":"published","checksum":"${checksum}","payload_path":"bd_locations/pub-2/payload.zip","payload_size_bytes":1234,"area_count":579,"locality_count":1216,"boundary_ring_count":13,"notes":"hello"}]"""
-
-        val result = DatasetPublicationParser.parseRestResponse(literal)
-
-        assertTrue("literal manifest failed: $result", result is ManifestParseResult.Parsed)
-    }
-
-    @Test
     fun `optional fields are read when present`() {
-        val body = manifestJson(
+        val body = "[${manifestBody(
             payloadSizeBytes = 1234,
             areaCount = 579,
             localityCount = 1216,
             boundaryRingCount = 13,
             notes = "hello",
-        )
+        )}]"
 
         val publication = parsed(body)
 
@@ -115,20 +115,21 @@ class DatasetPublicationTest {
 
     @Test
     fun `a manifest missing a required field is malformed and names the field`() {
-        val required = listOf(
-            manifestJson().replace(""""dataset_id":"bd_locations",""", ""),
-            manifestJson().replace(""""publication_id":"pub-2",""", ""),
-            manifestJson().replace(""""version":"v2",""", ""),
-            manifestJson().replace(""""payload_schema_version":1,""", ""),
-            manifestJson().replace(""""status":"published",""", ""),
-            manifestJson(checksum = null),
-            manifestJson(payloadPath = null),
+        val bodies = listOf(
+            "[" + manifestBody().replace("\"dataset_id\":\"bd_locations\",", "") + "]",
+            "[" + manifestBody().replace("\"publication_id\":\"pub-2\",", "") + "]",
+            "[" + manifestBody().replace("\"version\":\"v2\",", "") + "]",
+            "[" + manifestBody().replace("\"payload_schema_version\":1,", "") + "]",
+            "[" + manifestBody().replace("\"status\":\"published\",", "") + "]",
+            "[${manifestBody(checksum = null)}]",
+            "[${manifestBody(payloadPath = null)}]",
         )
 
-        for (body in required) {
+        for (body in bodies) {
             val result = DatasetPublicationParser.parseRestResponse(body)
             assertTrue("expected malformed for $body", result is ManifestParseResult.Malformed)
             assertTrue(
+                "expected a missing-field message for $body",
                 (result as ManifestParseResult.Malformed).detail.contains("required field"),
             )
         }
@@ -136,30 +137,26 @@ class DatasetPublicationTest {
 
     @Test
     fun `an unknown status is malformed`() {
-        val result = DatasetPublicationParser.parseRestResponse(manifestJson(status = "banana"))
+        val result = DatasetPublicationParser.parseRestResponse("[${manifestBody(status = "banana")}]")
 
         assertTrue(result is ManifestParseResult.Malformed)
     }
 
     @Test
     fun `invalid JSON is malformed`() {
-        val result = DatasetPublicationParser.parseRestResponse("not json")
-
-        assertTrue(result is ManifestParseResult.Malformed)
+        assertTrue(DatasetPublicationParser.parseRestResponse("not json") is ManifestParseResult.Malformed)
     }
 
     @Test
     fun `a JSON scalar is malformed`() {
-        assertTrue(
-            DatasetPublicationParser.parseRestResponse("42") is ManifestParseResult.Malformed,
-        )
+        assertTrue(DatasetPublicationParser.parseRestResponse("42") is ManifestParseResult.Malformed)
     }
 
     // Validating ---------------------------------------------------------------------------------
 
     @Test
     fun `a well-formed published manifest is accepted`() {
-        val problems = DatasetPublicationValidator.validate(parsed(manifestJson()), "bd_locations")
+        val problems = DatasetPublicationValidator.validate(parsed("[${manifestBody()}]"), "bd_locations")
 
         assertTrue(problems.toString(), problems.isEmpty())
     }
@@ -167,7 +164,7 @@ class DatasetPublicationTest {
     @Test
     fun `an unsupported payload schema version is refused`() {
         val problems = DatasetPublicationValidator.validate(
-            parsed(manifestJson(schema = 2)),
+            parsed("[${manifestBody(schema = 2)}]"),
             "bd_locations",
         )
 
@@ -178,7 +175,7 @@ class DatasetPublicationTest {
     fun `an unpublished publication is refused`() {
         for (status in listOf("draft", "archived")) {
             val problems = DatasetPublicationValidator.validate(
-                parsed(manifestJson(status = status)),
+                parsed("[${manifestBody(status = status)}]"),
                 "bd_locations",
             )
 
@@ -189,7 +186,7 @@ class DatasetPublicationTest {
     @Test
     fun `a checksum that is not a sha-256 digest is refused`() {
         val problems = DatasetPublicationValidator.validate(
-            parsed(manifestJson(checksum = "nope")),
+            parsed("[${manifestBody(checksum = "nope")}]"),
             "bd_locations",
         )
 
@@ -199,7 +196,7 @@ class DatasetPublicationTest {
     @Test
     fun `a manifest for another dataset slot is refused`() {
         val problems = DatasetPublicationValidator.validate(
-            parsed(manifestJson(datasetId = "other_slot")),
+            parsed("[${manifestBody(datasetId = "other_slot")}]"),
             "bd_locations",
         )
 
@@ -209,7 +206,7 @@ class DatasetPublicationTest {
     @Test
     fun `multiple problems are all reported and ordered`() {
         val problems = DatasetPublicationValidator.validate(
-            parsed(manifestJson(schema = 9, status = "draft", checksum = "x")),
+            parsed("[${manifestBody(schema = 9, status = "draft", checksum = "x")}]"),
             "bd_locations",
         )
 
