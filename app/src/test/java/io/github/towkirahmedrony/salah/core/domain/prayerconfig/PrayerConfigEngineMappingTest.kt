@@ -89,17 +89,23 @@ class PrayerConfigEngineMappingTest {
         val bundled = schedule(
             resolver.resolve(null, PrayerSettings.DEFAULT, PrayerConfigOverrides.NONE, null).profile,
         )
-        val worldLeague = schedule(
+        // The published method has to be one whose *Fajr* angle differs from the bundled default's.
+        // The default is KARACHI at 18/18, and MUSLIM_WORLD_LEAGUE is 18/17: it shares Fajr's 18°
+        // with the default, so choosing it would leave Fajr provably unchanged and this test would
+        // be asserting something the engine cannot do. NORTH_AMERICA is 15/15, so both twilight
+        // bounds move — the same pairing the engine's own test pins in
+        // AdhanPrayerTimesProviderTest. See the angle table in docs/PRAYER_CALCULATION.md.
+        val northAmerica = schedule(
             resolver.resolve(
-                sampleSnapshot(method = PrayerCalculationMethod.MUSLIM_WORLD_LEAGUE),
+                sampleSnapshot(method = PrayerCalculationMethod.NORTH_AMERICA),
                 PrayerSettings.DEFAULT,
                 PrayerConfigOverrides.NONE,
                 null,
             ).profile,
         )
 
-        assertNotEquals(bundled.at(PrayerName.FAJR), worldLeague.at(PrayerName.FAJR))
-        assertNotEquals(bundled.at(PrayerName.ISHA), worldLeague.at(PrayerName.ISHA))
+        assertNotEquals(bundled.at(PrayerName.FAJR), northAmerica.at(PrayerName.FAJR))
+        assertNotEquals(bundled.at(PrayerName.ISHA), northAmerica.at(PrayerName.ISHA))
     }
 
     @Test
