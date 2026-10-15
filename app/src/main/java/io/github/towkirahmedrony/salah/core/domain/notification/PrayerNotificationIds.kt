@@ -28,18 +28,24 @@ import java.time.LocalDate
  * delivered intent alone.
  *
  * **Why the request code is collision-free.** The code is
- * `floorMod(epochDay, 1_000_000) * 16 + target.ordinal * 2 + kind.ordinal`. Within any window of
- * `1_000_000` days (about 2 700 years) every `(target, kind)` pair gets a distinct 4-bit block,
- * and the planner only ever plans a window of a few days. `ReminderTarget` now has 8 constants
- * (the five prayers, sunrise, Sehri and Iftar) and `PrayerReminderKind` has 2, which is exactly the
- * block size of 16 — every combination still gets its own code, and the scheme is unchanged, so
- * alarms scheduled by an earlier build keep their identity. The whole value stays far below
- * `Int.MAX_VALUE`.
+ * `floorMod(epochDay, 1_000_000) * BLOCK_SIZE + target.ordinal * 2 + kind.ordinal`. Within any window
+ * of `1_000_000` days (about 2 700 years) every `(target, kind)` pair gets a distinct 5-bit block, and
+ * the planner only ever plans a window of a few days. `ReminderTarget` has 9 constants (the five
+ * prayers, sunrise, and the three Ramadan targets Sehri, Iftar and Imsak) and `PrayerReminderKind` has
+ * 2, so `9 * 2 = 18` codes are needed per day and [BLOCK_SIZE] is 32 — every combination gets its own
+ * code. The whole value stays far below `Int.MAX_VALUE`.
+ *
+ * **On growing the target set.** Earlier builds used a block size of 16, which fit exactly the eight
+ * targets then present. Adding the ninth (Imsak) required widening the block to 32, which changes the
+ * generated codes; an alarm scheduled by a pre-widening build therefore does not share a code with the
+ * widened scheme. Salah reschedules every reminder it manages on app start and on the next
+ * reconciliation, so this is a one-time re-identification, not a lasting duplicate: the coordinator's
+ * derived cancellation still covers the whole `(target, kind)` cross-product it knows about.
  */
 object PrayerNotificationIds {
 
     /** Number of `(target, kind)` combinations reserved per day. Must stay a power of two. */
-    private const val BLOCK_SIZE = 16
+    private const val BLOCK_SIZE = 32
 
     /** Days after which a request code would repeat — about 2 700 years. */
     private const val EPOCH_MODULUS = 1_000_000

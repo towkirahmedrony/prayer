@@ -51,20 +51,32 @@ enum class ReminderTarget(
      * switch Iftar reminders on or off independently of the Maghrib reminder.
      */
     IFTAR(null),
+
+    /**
+     * The optional **precautionary Imsak** time, during Ramadan.
+     *
+     * Imsak is a separate, earlier stopping time that some communities observe as a precaution. It is
+     * **not** the end of Sehri — that is the calculated Fajr, which is [SEHRI]'s reference. Its time is
+     * derived from the user's configured Imsak interval relative to the calculated Fajr, so it exists
+     * only when an interval is configured; see
+     * [io.github.towkirahmedrony.salah.core.model.CalendarSettings.imsakMinutesBeforeFajr]. Like the
+     * other Ramadan targets it has no [prayer] of its own.
+     */
+    IMSAK(null),
     ;
 
     /** True when this target is one of the five obligatory prayers. */
     val isObligatoryPrayer: Boolean get() = prayer != null
 
-    /** True for the two Ramadan reminders, which are only ever scheduled inside Ramadan. */
-    val isRamadanReminder: Boolean get() = this == SEHRI || this == IFTAR
+    /** True for the Ramadan reminders, which are only ever scheduled inside Ramadan. */
+    val isRamadanReminder: Boolean get() = this == SEHRI || this == IFTAR || this == IMSAK
 
     companion object {
 
         /** The five obligatory prayers, in declaration order. */
         val obligatoryPrayers: List<ReminderTarget> = entries.filter { it.isObligatoryPrayer }
 
-        /** The Ramadan reminders, in declaration order. */
+        /** The Ramadan reminders (Sehri, Iftar and the optional Imsak), in declaration order. */
         val ramadanReminders: List<ReminderTarget> = entries.filter { it.isRamadanReminder }
 
         /** The single solar target. */

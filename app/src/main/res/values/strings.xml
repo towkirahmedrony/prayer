@@ -251,6 +251,7 @@
     <string name="calendar_occasion_note">Observance dates follow the Hijri calendar, so local moon sighting may move them by a day.</string>
     <string name="calendar_sehri_end">Sehri ends</string>
     <string name="calendar_iftar">Iftar</string>
+    <string name="calendar_imsak">Imsak</string>
 
     <!-- Calendar: settings -->
     <string name="calendar_settings_title">Calendar settings</string>
@@ -303,6 +304,17 @@
     <string name="ramadan_stage_maghfirah">Maghfirah</string>
     <string name="ramadan_stage_najat">Najat</string>
     <string name="ramadan_stage_range">Days %1$d–%2$d</string>
+    <!-- The optional precautionary Imsak time: a separate, earlier stop, never the end of Sehri. -->
+    <string name="ramadan_imsak_row">Imsak %1$s</string>
+    <string name="ramadan_imsak_card_title">Precautionary Imsak</string>
+    <string name="ramadan_imsak_card_body">An optional, earlier stopping time before the calculated Fajr, observed by some as a precaution. It is not the end of Sehri — Sehri ends at Fajr.</string>
+    <string name="ramadan_imsak_off">No precautionary Imsak time is configured, so none is shown or scheduled.</string>
+    <string name="ramadan_imsak_minutes_before_fajr">%1$d minutes before Fajr</string>
+    <string name="ramadan_imsak_reminder">Remind me at Imsak</string>
+    <!-- The next fasting event. Shown only inside Ramadan and only when a timetable exists. -->
+    <string name="ramadan_countdown_title">Next fasting event</string>
+    <string name="ramadan_countdown_sehri">Sehri ends in %1$s</string>
+    <string name="ramadan_countdown_iftar">Iftar in %1$s</string>
 
     <!-- Shared states -->
     <string name="state_loading">Loading…</string>
@@ -478,6 +490,8 @@
     <string name="notifications_ramadan_sehri_body">Before the calculated Fajr, which is the end of Sehri.</string>
     <string name="notifications_ramadan_iftar">Iftar reminder</string>
     <string name="notifications_ramadan_iftar_body">At the calculated Maghrib, which is Iftar.</string>
+    <string name="notifications_ramadan_imsak">Imsak reminder</string>
+    <string name="notifications_ramadan_imsak_body">At the precautionary Imsak time, when you have configured an interval.</string>
     <string name="notifications_ramadan_iftar_lead">Also remind me before Iftar</string>
     <string name="notifications_ramadan_iftar_lead_at_time">At Iftar only</string>
     <string name="notifications_ramadan_source_note">Both derive from the calculated Fajr and Maghrib times, so they follow your calculation method and manual adjustments automatically. Salah applies no extra buffer to either, and does not claim to reproduce any authority\'s timetable.</string>
@@ -495,6 +509,8 @@
     <string name="notification_body_iftar_time">Iftar is at %1$s, the Maghrib time calculated for your location.</string>
     <string name="notification_title_iftar_advance">Iftar in %1$s</string>
     <string name="notification_body_iftar_advance">Iftar is at %1$s, the calculated Maghrib time.</string>
+    <string name="notification_title_imsak_time">Precautionary Imsak</string>
+    <string name="notification_body_imsak_time">The precautionary Imsak time is %1$s. This is not the end of Sehri — Sehri ends at the calculated Fajr.</string>
 
     <!--
       Qibla compass. The screen states each fact once: the heading line carries the position and the

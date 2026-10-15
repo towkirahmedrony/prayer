@@ -75,6 +75,18 @@ sealed interface RamadanUiState {
         val sehriLeadMinutes: Int,
         val iftarReminderEnabled: Boolean,
         val iftarLeadMinutes: Int,
+        /** The precautionary Imsak reminder switch. Only meaningful when [imsakConfigured] is true. */
+        val imsakReminderEnabled: Boolean,
+
+        /**
+         * Minutes before Fajr the precautionary Imsak time is shown, or `null` when no Imsak rule is
+         * configured — in which case the screen shows no Imsak time at all, because Salah has none of
+         * its own to fall back on.
+         */
+        val imsakMinutesBeforeFajr: Int?,
+
+        /** True when an Imsak rule is configured, so the table and the reminder control make sense. */
+        val imsakConfigured: Boolean,
 
         val hijriAdjustmentDays: Int,
         val message: RamadanMessage?,
@@ -146,6 +158,22 @@ data class RamadanDayRow(
     /** Iftar: the calculated Maghrib. */
     val iftarLabel: String?,
     val maghribLabel: String?,
+    /**
+     * The Bangladesh (Bangla) civil date of the day, for example `১ চৈত্র ১৪৩০`, or `null` when the date
+     * falls outside the range the 2019 rules are verified for.
+     *
+     * A row's civil date is a fact about the day, shown beside its Gregorian and Hijri dates. A `null`
+     * is reported instead of an approximated date, exactly as the Calendar screen reports it.
+     */
+    val banglaLabel: String?,
+    /**
+     * The **precautionary Imsak** time of the day, or `null` when no Imsak rule is configured or the day
+     * has no Fajr.
+     *
+     * Imsak is kept in its own field, beside — never in place of — [sehriEndLabel], because it is a
+     * separate precautionary stop and not the end of Sehri. The screen labels it as such.
+     */
+    val imsakLabel: String?,
     val isToday: Boolean,
     val hasSchedule: Boolean,
     /** Why there is no schedule for this day, when there is none. */

@@ -162,13 +162,14 @@ class PrayerNotificationDeliverer(
         ReminderTarget.SUNRISE -> sunriseReminderEnabled
         ReminderTarget.SEHRI -> sehriReminderEnabled
         ReminderTarget.IFTAR -> iftarReminderEnabled
+        ReminderTarget.IMSAK -> imsakReminderEnabled
     }
 
     /** Sound and vibration for [target]; Ramadan reminders inherit their prayer's preference. */
     private fun PrayerNotificationSettings.announcementPreferenceFor(
         target: ReminderTarget,
     ): PrayerNotificationPreference = when (target) {
-        ReminderTarget.FAJR, ReminderTarget.SEHRI -> preferenceFor(PrayerName.FAJR)
+        ReminderTarget.FAJR, ReminderTarget.SEHRI, ReminderTarget.IMSAK -> preferenceFor(PrayerName.FAJR)
         ReminderTarget.MAGHRIB, ReminderTarget.IFTAR -> preferenceFor(PrayerName.MAGHRIB)
         ReminderTarget.DHUHR -> preferenceFor(PrayerName.DHUHR)
         ReminderTarget.ASR -> preferenceFor(PrayerName.ASR)

@@ -50,8 +50,8 @@ without an account.
 | **Gregorian calendar** — device date, navigable month grid, today distinguished from the selection, selected-day details, locale week order | **Implemented, offline** |
 | **Bangladesh Bangla calendar** — conversion under the 2019 rules, with the verified range stated and refused outside it | **Implemented, offline** |
 | **Hijri calendar** — Umm al-Qura conversion from the platform's own `java.time` table, a user day offset, and observances derived from the lunar date | **Implemented, offline, always labelled as an estimate** |
-| **Ramadan calendar** — estimated window, daily table with Ramadan day number, Gregorian, Bangla and Hijri dates, Sehri end, Fajr, Iftar and Maghrib, and the provenance of the times | **Implemented, offline** |
-| **Sehri and Iftar reminders** — scheduled from the same calculated Fajr and Maghrib through the existing notification subsystem, only on the days the calendar places inside Ramadan | **Implemented, offline** |
+| **Ramadan calendar** — estimated window, daily table with Ramadan day number, Gregorian, Bangla and Hijri dates, Sehri end, Fajr, optional precautionary Imsak, Iftar and Maghrib, a next-fasting-event countdown, and the provenance of the times | **Implemented, offline** |
+| **Sehri, Iftar and optional Imsak reminders** — scheduled from the same calculated Fajr and Maghrib (and, for Imsak, a separately configured interval before Fajr) through the existing notification subsystem, only on the days the calendar places inside Ramadan | **Implemented, offline** |
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla and Ramadan reached from Tools and from Home, and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
@@ -82,6 +82,10 @@ Salah only shows values it actually has:
   the calculated Maghrib, read from the same schedule the Home screen and the reminders use. Salah
   adds no buffer to either and does not claim to reproduce any authority's timetable. See
   [`docs/CALENDAR_SYSTEM.md`](docs/CALENDAR_SYSTEM.md).
+- **Imsak is a separate precaution, never the end of Sehri.** Salah has no Imsak rule of its own: the
+  user configures an interval (minutes before the calculated Fajr) or there is no Imsak time at all.
+  When configured, it is shown and scheduled separately from the Sehri deadline and never presented as
+  it.
 - **Prayer times** are calculated on the device by a local astronomical engine from the configured
   coordinates, the date and the selected method. They appear only when a **complete** schedule
   exists for **today at the configured location**; otherwise the screen explains why (no location,

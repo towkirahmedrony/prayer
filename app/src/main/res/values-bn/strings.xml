@@ -158,6 +158,7 @@
     <string name="ramadan_schedule_title">দৈনিক সেহরি ও ইফতার</string>
     <string name="calendar_sehri_end">সেহরির শেষ সময়</string>
     <string name="calendar_iftar">ইফতারের সময়</string>
+    <string name="calendar_imsak">ইমসাক</string>
     <string name="notifications_ramadan_sehri">সেহরির রিমাইন্ডার</string>
     <string name="notifications_ramadan_iftar">ইফতারের রিমাইন্ডার</string>
     <string name="notifications_ramadan_iftar_lead_at_time">শুধু ইফতারের সময়</string>
@@ -558,6 +559,8 @@
     <string name="notifications_ramadan_body">সেহরি ও ইফতারের রিমাইন্ডার, বাকি সবকিছুর মতো একই হিসাব করা সময় থেকে এবং শুধু রমজানেই নির্ধারিত।</string>
     <string name="notifications_ramadan_sehri_body">হিসাব করা ফজরের আগে, যা সেহরির শেষ সময়।</string>
     <string name="notifications_ramadan_iftar_body">হিসাব করা মাগরিবে, যা ইফতার।</string>
+    <string name="notifications_ramadan_imsak">ইমসাক রিমাইন্ডার</string>
+    <string name="notifications_ramadan_imsak_body">আপনি অন্তর্বর্তীকাল নির্ধারণ করলে, সতর্কতামূলক ইমসাক সময়ে।</string>
     <string name="notifications_ramadan_iftar_lead">ইফতারের আগেও মনে করিয়ে দিন</string>
     <string name="notifications_ramadan_source_note">দুটোই হিসাব করা ফজর ও মাগরিবের সময় থেকে আসে, তাই এগুলো স্বয়ংক্রিয়ভাবে আপনার হিসাবের পদ্ধতি ও নিজে দেওয়া সংশোধন অনুসরণ করে। সালাহ কোনোটিতেই বাড়তি সময় যোগ করে না, এবং কোনো কর্তৃপক্ষের সময়সূচি নকল করার দাবি করে না।</string>
 
@@ -588,6 +591,8 @@
     <string name="notification_body_iftar_time">ইফতার %1$s-এ, যা আপনার অবস্থানের জন্য হিসাব করা মাগরিবের সময়।</string>
     <string name="notification_title_iftar_advance">%1$s পরে ইফতার</string>
     <string name="notification_body_iftar_advance">ইফতার %1$s-এ, হিসাব করা মাগরিবের সময়।</string>
+    <string name="notification_title_imsak_time">সতর্কতামূলক ইমসাক</string>
+    <string name="notification_body_imsak_time">সতর্কতামূলক ইমসাকের সময় %1$s। এটি সেহরির শেষ নয় — সেহরি শেষ হয় হিসাব করা ফজরে।</string>
 
     <!--
       Qibla: the whole screen, including its headings, readings, error explanations, sensor and
@@ -734,6 +739,17 @@
     <string name="ramadan_stage_maghfirah">মাগফিরাত</string>
     <string name="ramadan_stage_najat">নাজাত</string>
     <string name="ramadan_stage_range">দিন %1$d–%2$d</string>
+    <!-- ঐচ্ছিক সতর্কতামূলক ইমসাক সময়: আলাদা, আরও আগের বিরতি, কখনও সেহরির শেষ নয়। -->
+    <string name="ramadan_imsak_row">ইমসাক %1$s</string>
+    <string name="ramadan_imsak_card_title">সতর্কতামূলক ইমসাক</string>
+    <string name="ramadan_imsak_card_body">হিসাব করা ফজরের আগে ঐচ্ছিক, আরও আগের বিরতির সময়, যা কেউ কেউ সতর্কতা হিসেবে পালন করেন। এটি সেহরির শেষ নয় — সেহরি শেষ হয় ফজরে।</string>
+    <string name="ramadan_imsak_off">কোনো সতর্কতামূলক ইমসাক সময় নির্ধারণ করা নেই, তাই কোনোটি দেখানো বা নির্ধারিত হচ্ছে না।</string>
+    <string name="ramadan_imsak_minutes_before_fajr">ফজরের %1$d মিনিট আগে</string>
+    <string name="ramadan_imsak_reminder">ইমসাকে আমাকে মনে করিয়ে দিন</string>
+    <!-- পরবর্তী রোজার ইভেন্ট। কেবল রমজানে এবং সময়সূচি থাকলে দেখানো হয়। -->
+    <string name="ramadan_countdown_title">পরবর্তী রোজার ইভেন্ট</string>
+    <string name="ramadan_countdown_sehri">সেহরি শেষ হবে %1$s পরে</string>
+    <string name="ramadan_countdown_iftar">%1$s পরে ইফতার</string>
 
     <!-- The prayer screen (`feature_prayer_*`) and the planned-destination screen (`wip_*`). -->
     <string name="feature_prayer_title">নামাজ</string>

@@ -9,6 +9,7 @@ import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarMonthResolver
+import io.github.towkirahmedrony.salah.core.domain.calendar.FastingCountdownResolver
 import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
@@ -313,6 +314,9 @@ val salahModules = module {
     single { BanglaCalendar() }
     single { HijriCalendar() }
     single { RamadanCalendar(hijriCalendar = get()) }
+    // Resolves the next fasting event from the calculated schedules; pure, stateless and cheap, so the
+    // Ramadan screen can refresh it on a one-second tick without touching the prayer engine.
+    single { FastingCountdownResolver() }
     single { GregorianCalendarGrid() }
     single { CalendarFormatting() }
     // The two converters decide which Gregorian days the selected calendar system's month covers.
@@ -503,6 +507,8 @@ val salahModules = module {
             notificationPreferences = get(),
             coordinator = get(),
             uiStateFactory = get(),
+            countdownResolver = get(),
+            clock = get(),
         )
     }
     viewModel {

@@ -77,19 +77,23 @@ class PrayerNotificationPlanner {
      * @param ramadanDates the dates the calendar places inside Ramadan, taken in the same zone the
      *   schedule's date is. Empty means "no Ramadan reminders", which is what a date outside Ramadan
      *   produces — never an invented Ramadan reminder.
+     * @param imsakOffsetMinutes the user's configured precautionary Imsak interval in minutes before
+     *   Fajr, or `null` when none is configured. A `null` interval produces no Imsak reminder: Salah
+     *   never assumes a fixed one.
      */
     fun plan(
         settings: PrayerNotificationSettings,
         schedules: List<PrayerSchedule>,
         now: ZonedDateTime,
         ramadanDates: Set<LocalDate> = emptySet(),
+        imsakOffsetMinutes: Int? = null,
     ): List<PlannedPrayerNotification> {
         if (!settings.masterEnabled) return emptyList()
 
         val planned = schedules
             .asSequence()
             .filter { it.isComplete }
-            .flatMap { schedule -> planForSchedule(settings, schedule, now, ramadanDates) }
+            .flatMap { schedule -> planForSchedule(settings, schedule, now, ramadanDates, imsakOffsetMinutes) }
             .distinctBy { it.slot }
             .sortedWith(compareBy({ it.triggerAt.toInstant() }, { it.slot.identity }))
             .toList()
@@ -118,6 +122,7 @@ class PrayerNotificationPlanner {
         schedule: PrayerSchedule,
         now: ZonedDateTime,
         ramadanDates: Set<LocalDate>,
+        imsakOffsetMinutes: Int?,
     ): List<PlannedPrayerNotification> {
         val nowAtLocation = now.withZoneSameInstant(schedule.zoneId)
         val build = mutableListOf<PlannedPrayerNotification>()
@@ -144,7 +149,7 @@ class PrayerNotificationPlanner {
         // so its reminder is an advance one — an at-time Sehri reminder would collide with Fajr's.
         // Iftar is Maghrib, so it gets both an at-time reminder and, when configured, a lead-in.
         if (schedule.date in ramadanDates) {
-            build += ramadanReminders(schedule, settings, nowAtLocation)
+            build += ramadanReminders(schedule, settings, nowAtLocation, imsakOffsetMinutes)
         }
 
         // Sunrise is a solar event: it is only ever offered through its own switch, it is never
@@ -178,8 +183,27 @@ class PrayerNotificationPlanner {
         schedule: PrayerSchedule,
         settings: PrayerNotificationSettings,
         nowAtLocation: ZonedDateTime,
+        imsakOffsetMinutes: Int?,
     ): List<PlannedPrayerNotification> {
         val build = mutableListOf<PlannedPrayerNotification>()
+
+        // The precautionary Imsak reminder is only planned when the user has both enabled it and
+        // configured an interval. Without an interval there is no Imsak time and Salah does not invent
+        // one; the reminder fires *at* Imsak itself, which is already an earlier, precautionary stop.
+        if (settings.imsakReminderEnabled && imsakOffsetMinutes != null && imsakOffsetMinutes > 0) {
+            val fajrPreference = settings.preferenceFor(PrayerName.FAJR)
+            schedule.timeOf(PrayerName.FAJR)?.let { fajr ->
+                val imsakAt = fajr.minusMinutes(imsakOffsetMinutes.toLong())
+                build += atTime(
+                    schedule = schedule,
+                    target = ReminderTarget.IMSAK,
+                    eventAt = imsakAt,
+                    sound = fajrPreference.sound,
+                    vibration = fajrPreference.vibration,
+                    nowAtLocation = nowAtLocation,
+                )
+            }
+        }
 
         if (settings.sehriReminderEnabled) {
             val fajrPreference = settings.preferenceFor(PrayerName.FAJR)

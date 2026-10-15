@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +41,9 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusP
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.domain.CountdownFormatter
+import io.github.towkirahmedrony.salah.core.domain.calendar.FastingCountdown
+import io.github.towkirahmedrony.salah.core.domain.calendar.FastingEventKind
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanStage
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
@@ -90,6 +95,7 @@ fun RamadanScreen(
     viewModel: RamadanViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val countdown by viewModel.countdown.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -111,11 +117,13 @@ fun RamadanScreen(
 
             is RamadanUiState.Ready -> {
                 RamadanHeader(state = state, onOpenCalendar = onOpenCalendar)
+                FastingCountdownCard(countdown = countdown)
                 RemindersCard(
                     state = state,
                     onOpenNotifications = onOpenNotifications,
                     viewModel = viewModel,
                 )
+                ImsakCard(state = state, viewModel = viewModel)
                 ScheduleCard(state = state)
             }
         }
@@ -600,6 +608,17 @@ private fun DayRow(row: RamadanDayRow) {
                     color = mutedColor,
                 )
             }
+            // The Bangladesh (Bangla) civil date of the day, in its own script and numerals. Absent
+            // outside the range the 2019 rules are verified for, where the row states only the dates it
+            // really has rather than an approximated one.
+            row.banglaLabel?.let { bangla ->
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = bangla,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = mutedColor,
+                )
+            }
             if (!row.hasSchedule) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -611,14 +630,30 @@ private fun DayRow(row: RamadanDayRow) {
             }
         }
 
-        Text(
-            text = row.sehriEndLabel ?: stringResource(R.string.home_time_unavailable),
-            style = MaterialTheme.typography.bodyMedium,
-            color = contentColor,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
+        Column(
             modifier = Modifier.weight(TIME_COLUMN_WEIGHT),
-        )
+            horizontalAlignment = Alignment.End,
+        ) {
+            Text(
+                text = row.sehriEndLabel ?: stringResource(R.string.home_time_unavailable),
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.End,
+            )
+            // The precautionary Imsak time, when one is configured, is shown *under* the Sehri deadline
+            // and labelled with its own word — never in place of it — because it is a separate, earlier
+            // stop and not the end of Sehri.
+            row.imsakLabel?.let { imsak ->
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.ramadan_imsak_row, imsak),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = mutedColor,
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
         Text(
             text = row.iftarLabel ?: stringResource(R.string.home_time_unavailable),
             style = MaterialTheme.typography.bodyMedium,
@@ -627,6 +662,135 @@ private fun DayRow(row: RamadanDayRow) {
             textAlign = TextAlign.End,
             modifier = Modifier.weight(TIME_COLUMN_WEIGHT),
         )
+    }
+}
+
+/**
+ * The next fasting event and how long remains.
+ *
+ * Rendered from the countdown-only flow, so the one-second tick that refreshes it recomposes this card
+ * and nothing else. When there is no fasting event Salah can state — outside Ramadan, on a day with no
+ * timetable, or after Iftar on the last day — the card is absent entirely, rather than showing a
+ * placeholder that could read as a countdown to a fast that is not there.
+ */
+@Composable
+private fun FastingCountdownCard(countdown: FastingCountdown?) {
+    if (countdown == null) return
+
+    SalahSectionCard {
+        Text(
+            text = stringResource(R.string.ramadan_countdown_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = stringResource(
+                when (countdown.kind) {
+                    FastingEventKind.SEHRI_END -> R.string.ramadan_countdown_sehri
+                    FastingEventKind.IFTAR -> R.string.ramadan_countdown_iftar
+                },
+                CountdownFormatter.format(countdown.remaining),
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/**
+ * The optional **precautionary Imsak** time and its reminder.
+ *
+ * Imsak is deliberately kept visually separate from Sehri: this card explains that it is an earlier
+ * precautionary stop, not the end of the fast, and it never turns on with a rule of Salah's own — the
+ * switch configures a documented interval (minutes before the calculated Fajr) or clears it, and while
+ * it is off the card says so instead of showing a time.
+ */
+@Composable
+private fun ImsakCard(state: RamadanUiState.Ready, viewModel: RamadanViewModel) {
+    SalahSectionCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.ramadan_imsak_card_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            SalahSwitch(
+                checked = state.imsakConfigured,
+                onCheckedChange = viewModel::setImsakEnabled,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = stringResource(R.string.ramadan_imsak_card_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        val minutes = state.imsakMinutesBeforeFajr
+        if (minutes == null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.ramadan_imsak_off),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SalahSectionCard
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.ramadan_imsak_minutes_before_fajr, minutes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = { viewModel.shiftImsakMinutes(false) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                ) {
+                    Text(text = "−", style = MaterialTheme.typography.titleMedium)
+                }
+                TextButton(
+                    onClick = { viewModel.shiftImsakMinutes(true) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                ) {
+                    Text(text = "+", style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.ramadan_imsak_reminder),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            SalahSwitch(
+                checked = state.imsakReminderEnabled && state.masterEnabled,
+                onCheckedChange = viewModel::setImsakReminderEnabled,
+                enabled = state.masterEnabled,
+            )
+        }
     }
 }
 

@@ -182,6 +182,7 @@ fun PrayerNotificationSettingsScreen(
             onSehriLeadShift = viewModel::shiftSehriLead,
             onIftarEnabledChange = viewModel::setIftarReminderEnabled,
             onIftarLeadShift = viewModel::shiftIftarLead,
+            onImsakEnabledChange = viewModel::setImsakReminderEnabled,
         )
 
         AzanCard(uiState = uiState)
@@ -563,6 +564,7 @@ private fun RamadanReminderCard(
     onSehriLeadShift: (Boolean) -> Unit,
     onIftarEnabledChange: (Boolean) -> Unit,
     onIftarLeadShift: (Boolean) -> Unit,
+    onImsakEnabledChange: (Boolean) -> Unit,
 ) {
     SalahSectionCard {
         Text(
@@ -616,6 +618,31 @@ private fun RamadanReminderCard(
             },
             onLeadShift = onIftarLeadShift,
         )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // The precautionary Imsak reminder. It has no lead stepper of its own: its time is the Imsak
+        // interval relative to Fajr, configured on the Ramadan screen, and the reminder simply fires at
+        // Imsak. Without a configured interval the planner schedules nothing, so the body says so.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.notifications_ramadan_imsak),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.notifications_ramadan_imsak_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            SalahSwitch(checked = settings.imsakReminderEnabled, onCheckedChange = onImsakEnabledChange)
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(

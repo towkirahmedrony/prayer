@@ -150,6 +150,9 @@ class PrayerNotificationCoordinator(
                 schedules = available,
                 now = ZonedDateTime.ofInstant(clock.instant(), zone),
                 ramadanDates = ramadanDates,
+                // The precautionary Imsak interval, read from the same calendar settings the Ramadan
+                // screen uses. `null` (no configured rule) plans no Imsak reminder.
+                imsakOffsetMinutes = calendarSettings.imsakMinutesBeforeFajr,
             )
 
             // A date may be reconciled only when we know what belongs there:

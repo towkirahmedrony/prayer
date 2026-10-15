@@ -176,6 +176,16 @@ class PrayerNotificationSettingsViewModel(
         current.withIftarReminder(enabled)
     }
 
+    /**
+     * Turns the precautionary Imsak reminder on or off.
+     *
+     * The planner only schedules an Imsak reminder when an Imsak interval is also configured — so this
+     * switch alone schedules nothing until the user sets the interval on the Ramadan screen.
+     */
+    fun setImsakReminderEnabled(enabled: Boolean) = updateSettings(message = null) { current ->
+        current.withImsakReminder(enabled)
+    }
+
     /** Moves the Iftar lead-in to the next offered value; `0` means "at Iftar only". */
     fun shiftIftarLead(forward: Boolean) = updateSettings(message = null) { current ->
         current.withIftarReminder(

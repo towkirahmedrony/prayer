@@ -2,6 +2,8 @@ package io.github.towkirahmedrony.salah.feature.ramadan
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.core.domain.calendar.FastingCountdown
+import io.github.towkirahmedrony.salah.core.domain.calendar.FastingCountdownResolver
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileOutcome
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
@@ -21,13 +23,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
 
@@ -57,6 +63,8 @@ class RamadanViewModel(
     private val notificationPreferences: PrayerNotificationPreferencesRepository,
     private val coordinator: PrayerNotificationCoordinator,
     private val uiStateFactory: RamadanUiStateFactory,
+    private val countdownResolver: FastingCountdownResolver = FastingCountdownResolver(),
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
 
     private val message = MutableStateFlow<RamadanMessage?>(null)
@@ -111,6 +119,46 @@ class RamadanViewModel(
         initialValue = RamadanUiState.Loading,
     )
 
+    /**
+     * The next fasting event and the time remaining, refreshed on a one-second tick.
+     *
+     * Kept as its own flow rather than folded into [uiState] on purpose: the countdown changes every
+     * second and the table does not, so separating them means the one-second tick recomposes only the
+     * countdown composable instead of the whole Ramadan list. The tick recomputes a pure subtraction
+     * over already-calculated schedules — no prayer recalculation, no network, no calendar conversion —
+     * and only runs while the screen is actually subscribed.
+     *
+     * It is `null` whenever there is no fasting event Salah can state: outside Ramadan, on a day with no
+     * timetable, or after Iftar on the last day. The screen shows nothing rather than a misleading
+     * countdown in those cases.
+     */
+    val countdown: StateFlow<FastingCountdown?> = combine(
+        calendarRepository.observeTodayDate(),
+        window,
+        schedules,
+        countdownTicks(),
+    ) { today, currentWindow, states, instant ->
+        countdownResolver.resolve(
+            today = today,
+            now = instant,
+            window = currentWindow,
+            todaySchedule = states.availableScheduleOn(today),
+            tomorrowSchedule = states.availableScheduleOn(today.plusDays(1)),
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),
+        initialValue = null,
+    )
+
+    /** Emits the current instant, then once a second while the countdown is observed. */
+    private fun countdownTicks(): Flow<Instant> = flow {
+        while (true) {
+            emit(clock.instant())
+            delay(COUNTDOWN_TICK_MILLIS)
+        }
+    }
+
     // --- Reminders ---------------------------------------------------------------
 
     /** Turns the Sehri reminder on or off, then reconciles. */
@@ -133,6 +181,55 @@ class RamadanViewModel(
     /** Turns the Iftar reminder on or off, then reconciles. */
     fun setIftarReminderEnabled(enabled: Boolean) = updateReminders { current ->
         current.withIftarReminder(enabled)
+    }
+
+    /**
+     * Turns the **precautionary Imsak** reminder on or off, then reconciles.
+     *
+     * A reminder is only ever planned when an Imsak interval is also configured, so switching this on
+     * with no interval schedules nothing — the card only offers it once an interval exists.
+     */
+    fun setImsakReminderEnabled(enabled: Boolean) = updateReminders { current ->
+        current.withImsakReminder(enabled)
+    }
+
+    /**
+     * Turns the precautionary Imsak time on or off.
+     *
+     * Turning it on configures the documented default interval (it never leaves Imsak on with no rule);
+     * turning it off clears the rule entirely, so no Imsak time is shown and none is scheduled. The
+     * change is followed by a reconciliation because the Imsak reminder's time moves with the interval.
+     */
+    fun setImsakEnabled(enabled: Boolean) {
+        message.value = null
+        viewModelScope.launch {
+            userPreferencesRepository.updateCalendarSettings { current ->
+                if (enabled) {
+                    current.copy(
+                        imsakMinutesBeforeFajr = current.imsakMinutesBeforeFajr
+                            ?: CalendarSettings.DEFAULT_IMSAK_MINUTES,
+                    )
+                } else {
+                    current.withoutImsak()
+                }
+            }
+            applyReconcile()
+        }
+    }
+
+    /** Moves the configured Imsak interval to the next offered value. A no-op when none is configured. */
+    fun shiftImsakMinutes(forward: Boolean) {
+        message.value = null
+        viewModelScope.launch {
+            userPreferencesRepository.updateCalendarSettings { current ->
+                val currentMinutes = current.imsakMinutesBeforeFajr ?: return@updateCalendarSettings current
+                val choices = CalendarSettings.IMSAK_MINUTE_CHOICES
+                val index = choices.indexOf(currentMinutes).let { if (it >= 0) it else 0 }
+                val next = choices[(index + if (forward) 1 else -1).coerceIn(0, choices.lastIndex)]
+                current.copy(imsakMinutesBeforeFajr = next)
+            }
+            applyReconcile()
+        }
     }
 
     /** Moves the Iftar lead-in to the next offered value, then reconciles. */
@@ -158,20 +255,25 @@ class RamadanViewModel(
             // Persist first, then reconcile: a reminder scheduled from stale settings for even a moment
             // is exactly the ghost the reconciliation exists to remove.
             notificationPreferences.update(transform)
-            when (val outcome = coordinator.reconcile(ReconcileReason.SETTINGS_CHANGED)) {
-                is ReconcileOutcome.Applied -> {
-                    message.value = if (outcome.datesWithSchedule.isEmpty()) {
-                        RamadanMessage.NoSchedule
-                    } else {
-                        RamadanMessage.ScheduleUpdated
-                    }
-                }
+            applyReconcile()
+        }
+    }
 
-                is ReconcileOutcome.Disabled,
-                is ReconcileOutcome.NoLocation,
-                is ReconcileOutcome.Failed,
-                -> message.value = RamadanMessage.NoSchedule
+    /** Reconciles once and turns the outcome into the card's transient message. */
+    private suspend fun applyReconcile() {
+        when (val outcome = coordinator.reconcile(ReconcileReason.SETTINGS_CHANGED)) {
+            is ReconcileOutcome.Applied -> {
+                message.value = if (outcome.datesWithSchedule.isEmpty()) {
+                    RamadanMessage.NoSchedule
+                } else {
+                    RamadanMessage.ScheduleUpdated
+                }
             }
+
+            is ReconcileOutcome.Disabled,
+            is ReconcileOutcome.NoLocation,
+            is ReconcileOutcome.Failed,
+            -> message.value = RamadanMessage.NoSchedule
         }
     }
 
@@ -217,6 +319,10 @@ class RamadanViewModel(
         }
     }.distinctUntilChanged().flatMapLatest { request -> prayerScheduleRepository.ensureSchedule(request) }
 
+    /** The schedule for [date] when one is available, or `null`. */
+    private fun Map<LocalDate, PrayerScheduleState>.availableScheduleOn(date: LocalDate) =
+        (this[date] as? PrayerScheduleState.Available)?.schedule
+
     private data class SettingsSnapshot(
         val calendar: CalendarSettings,
         val prayer: PrayerSettings,
@@ -231,5 +337,8 @@ class RamadanViewModel(
 
     private companion object {
         const val SUBSCRIBE_TIMEOUT_MILLIS = 5_000L
+
+        /** How often the fasting countdown refreshes. One second, so an `MM:SS` reading stays honest. */
+        const val COUNTDOWN_TICK_MILLIS = 1_000L
     }
 }

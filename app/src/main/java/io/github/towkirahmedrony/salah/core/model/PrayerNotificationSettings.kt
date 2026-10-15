@@ -115,6 +115,18 @@ data class PrayerNotificationSettings(
      * the at-time reminder is still scheduled.
      */
     val iftarLeadMinutes: Int = DEFAULT_IFTAR_LEAD_MINUTES,
+
+    /**
+     * Ramadan: remind at the **optional precautionary Imsak** time.
+     *
+     * Imsak is a separate, earlier stopping time that some communities observe as a precaution; it is
+     * **not** the end of Sehri. A reminder is only ever planned when the user has also configured an
+     * Imsak interval
+     * ([io.github.towkirahmedrony.salah.core.model.CalendarSettings.imsakMinutesBeforeFajr]) — without
+     * one there is no Imsak time to remind of, and Salah does not invent a fixed interval. Off by
+     * default, like the other Ramadan reminders, and only ever scheduled inside Ramadan.
+     */
+    val imsakReminderEnabled: Boolean = false,
 ) {
 
     /** The stored preference for [prayer], or the documented default when none was stored. */
@@ -145,7 +157,7 @@ data class PrayerNotificationSettings(
     val hasAnyEnabledTarget: Boolean
         get() = hasAnyEnabledPrayer ||
             (masterEnabled && sunriseReminderEnabled) ||
-            (masterEnabled && (sehriReminderEnabled || iftarReminderEnabled))
+            (masterEnabled && (sehriReminderEnabled || iftarReminderEnabled || imsakReminderEnabled))
 
     /** A copy with the Sehri reminder configured, clamping the lead time. */
     fun withSehriReminder(enabled: Boolean, leadMinutes: Int = sehriLeadMinutes): PrayerNotificationSettings =
@@ -160,6 +172,10 @@ data class PrayerNotificationSettings(
             iftarReminderEnabled = enabled,
             iftarLeadMinutes = clampIftarLead(leadMinutes),
         )
+
+    /** A copy with the precautionary Imsak reminder configured. */
+    fun withImsakReminder(enabled: Boolean): PrayerNotificationSettings =
+        copy(imsakReminderEnabled = enabled)
 
     companion object {
         /** Largest advance reminder Salah accepts, in minutes. */

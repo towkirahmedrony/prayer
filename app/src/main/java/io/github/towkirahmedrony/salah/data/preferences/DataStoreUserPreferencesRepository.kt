@@ -152,6 +152,15 @@ class DataStoreUserPreferencesRepository(
             preferences[Keys.HIJRI_ADJUSTMENT_DAYS] = CalendarSettings.clampHijriAdjustment(
                 updated.hijriAdjustmentDays,
             )
+            // The precautionary Imsak interval: a configured interval is clamped to an offered value
+            // and stored, and a cleared one removes the key so "no Imsak rule" is representable and
+            // distinguishable from "a rule of zero minutes".
+            val imsak = updated.imsakMinutesBeforeFajr
+            if (imsak == null) {
+                preferences.remove(Keys.IMSAK_MINUTES_BEFORE_FAJR)
+            } else {
+                preferences[Keys.IMSAK_MINUTES_BEFORE_FAJR] = CalendarSettings.clampImsak(imsak)
+            }
         }
     }
 
@@ -172,6 +181,9 @@ class DataStoreUserPreferencesRepository(
         dateLanguage = DateLanguagePreference.entries
             .firstOrNull { it.name == this[Keys.DATE_LANGUAGE] }
             ?: CalendarSettings.DEFAULT.dateLanguage,
+        // Absent means "no Imsak rule configured"; a present value is normalised to an offered choice.
+        imsakMinutesBeforeFajr = this[Keys.IMSAK_MINUTES_BEFORE_FAJR]
+            ?.let(CalendarSettings::clampImsak),
     )
 
     private fun Preferences.toPrayerSettings(): PrayerSettings = PrayerSettings(
@@ -209,6 +221,7 @@ class DataStoreUserPreferencesRepository(
         val PREFERRED_CALENDAR = stringPreferencesKey("calendar_preferred_system")
         val HIJRI_ADJUSTMENT_DAYS = intPreferencesKey("calendar_hijri_adjustment_days")
         val DATE_LANGUAGE = stringPreferencesKey("calendar_date_language")
+        val IMSAK_MINUTES_BEFORE_FAJR = intPreferencesKey("calendar_imsak_minutes_before_fajr")
 
         fun adjustment(prayer: PrayerName) = intPreferencesKey("prayer_adjustment_${prayer.name}")
     }

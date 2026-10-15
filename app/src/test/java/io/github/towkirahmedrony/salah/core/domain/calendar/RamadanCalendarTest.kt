@@ -83,6 +83,39 @@ class RamadanCalendarTest {
     }
 
     @Test
+    fun `a configured Imsak interval is exactly that many minutes before the calculated Fajr`() {
+        val schedule = testSchedule(LocalDate.parse("2024-03-11"), zone = zone, fajr = LocalTime.of(4, 47))
+
+        // The documented rule: Imsak is the calculated Fajr minus the user's interval.
+        assertEquals(
+            ZonedDateTime.of(LocalDate.parse("2024-03-11"), LocalTime.of(4, 37), zone),
+            RamadanCalendar.imsakOf(schedule, minutesBeforeFajr = 10),
+        )
+        assertEquals(
+            ZonedDateTime.of(LocalDate.parse("2024-03-11"), LocalTime.of(4, 17), zone),
+            RamadanCalendar.imsakOf(schedule, minutesBeforeFajr = 30),
+        )
+    }
+
+    @Test
+    fun `Imsak is a separate value from the Sehri deadline`() {
+        val schedule = testSchedule(LocalDate.parse("2024-03-11"), zone = zone, fajr = LocalTime.of(4, 47))
+
+        // Sehri ends at Fajr; Imsak is an earlier, distinct time and never replaces the deadline.
+        assertEquals(LocalTime.of(4, 47), RamadanCalendar.sehriEndOf(schedule)!!.toLocalTime())
+        assertEquals(LocalTime.of(4, 32), RamadanCalendar.imsakOf(schedule, minutesBeforeFajr = 15)!!.toLocalTime())
+        assertFalse(RamadanCalendar.imsakOf(schedule, 15)!!.toLocalTime() == RamadanCalendar.sehriEndOf(schedule)!!.toLocalTime())
+    }
+
+    @Test
+    fun `a day with no Fajr has no Imsak time either`() {
+        val noFajr = testSchedule(LocalDate.parse("2024-06-21"), zone = zone)
+            .let { schedule -> schedule.copy(prayers = schedule.prayers.filterNot { it.prayer == PrayerName.FAJR }) }
+
+        assertNull(RamadanCalendar.imsakOf(noFajr, minutesBeforeFajr = 10))
+    }
+
+    @Test
     fun `the window for a date is the one containing it, or the next one`() {
         assertEquals(1445, calendar.windowFor(LocalDate.parse("2024-03-20"))!!.hijriYear)
         assertEquals(1446, calendar.windowFor(LocalDate.parse("2024-05-01"))!!.hijriYear)

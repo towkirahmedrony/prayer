@@ -62,5 +62,21 @@ class RamadanCalendar(
 
         /** Iftar for [schedule]: the calculated Maghrib time. `null` when Maghrib is missing. */
         fun iftarOf(schedule: PrayerSchedule): ZonedDateTime? = schedule.timeOf(PrayerName.MAGHRIB)
+
+        /**
+         * The **precautionary** Imsak time for [schedule]: [minutesBeforeFajr] minutes before the
+         * calculated Fajr, or `null` when [schedule] has no Fajr.
+         *
+         * Imsak is deliberately a *separate* value from Sehri. Sehri ends at the calculated Fajr
+         * ([sehriEndOf]); Imsak is an earlier, optional precautionary stopping time some communities
+         * observe. Salah never treats it as the end of Sehri.
+         *
+         * The interval is a required, explicit parameter — there is no default. Salah has no Imsak rule
+         * of its own, so [io.github.towkirahmedrony.salah.core.model.CalendarSettings.imsakMinutesBeforeFajr]
+         * is `null` until the user configures one, and this function is only called when it is not.
+         * A fixed interval is never assumed.
+         */
+        fun imsakOf(schedule: PrayerSchedule, minutesBeforeFajr: Int): ZonedDateTime? =
+            schedule.timeOf(PrayerName.FAJR)?.minusMinutes(minutesBeforeFajr.toLong())
     }
 }

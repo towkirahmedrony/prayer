@@ -61,6 +61,9 @@ class DataStorePrayerNotificationPreferencesRepository(
             preferences[Keys.IFTAR_LEAD_MINUTES] = PrayerNotificationSettings.clampIftarLead(
                 updated.iftarLeadMinutes,
             )
+            // The precautionary Imsak reminder. Stored like the other Ramadan switches: it is one flag,
+            // and its time comes from the separately stored Imsak interval rather than from a lead here.
+            preferences[Keys.IMSAK_ENABLED] = updated.imsakReminderEnabled
 
             PrayerName.entries.forEach { prayer ->
                 val preference = updated.preferenceFor(prayer).withBoundedAdvanceMinutes()
@@ -99,6 +102,8 @@ class DataStorePrayerNotificationPreferencesRepository(
             iftarLeadMinutes = PrayerNotificationSettings.clampIftarLead(
                 this[Keys.IFTAR_LEAD_MINUTES] ?: PrayerNotificationSettings.DEFAULT.iftarLeadMinutes,
             ),
+            imsakReminderEnabled = this[Keys.IMSAK_ENABLED]
+                ?: PrayerNotificationSettings.DEFAULT.imsakReminderEnabled,
             prayers = PrayerName.entries
                 .mapNotNull { prayer ->
                     val preference = PrayerNotificationPreference(
@@ -125,6 +130,7 @@ class DataStorePrayerNotificationPreferencesRepository(
         val SEHRI_LEAD_MINUTES = intPreferencesKey("notification_sehri_reminder_lead_minutes")
         val IFTAR_ENABLED = booleanPreferencesKey("notification_iftar_reminder_enabled")
         val IFTAR_LEAD_MINUTES = intPreferencesKey("notification_iftar_reminder_lead_minutes")
+        val IMSAK_ENABLED = booleanPreferencesKey("notification_imsak_reminder_enabled")
 
         fun prayerEnabled(prayer: PrayerName) = booleanPreferencesKey("notification_${prayer.name}_enabled")
         fun prayerSound(prayer: PrayerName) = stringPreferencesKey("notification_${prayer.name}_sound")

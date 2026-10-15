@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.ramadan
 
+import io.github.towkirahmedrony.salah.core.domain.calendar.BanglaCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
@@ -51,6 +52,7 @@ import java.util.Locale
 class RamadanUiStateFactory(
     private val formatting: CalendarFormatting = CalendarFormatting(),
     private val hijriCalendar: HijriCalendar = HijriCalendar(),
+    private val banglaCalendar: BanglaCalendar = BanglaCalendar(),
 ) {
 
     fun create(
@@ -91,6 +93,9 @@ class RamadanUiStateFactory(
             sehriLeadMinutes = inputs.notificationSettings.sehriLeadMinutes,
             iftarReminderEnabled = inputs.notificationSettings.iftarReminderEnabled,
             iftarLeadMinutes = inputs.notificationSettings.iftarLeadMinutes,
+            imsakReminderEnabled = inputs.notificationSettings.imsakReminderEnabled,
+            imsakMinutesBeforeFajr = inputs.calendarSettings.imsakMinutesBeforeFajr,
+            imsakConfigured = inputs.calendarSettings.imsakMinutesBeforeFajr != null,
             hijriAdjustmentDays = inputs.calendarSettings.hijriAdjustmentDays,
             message = null,
         )
@@ -131,6 +136,14 @@ class RamadanUiStateFactory(
         // Sehri is Fajr and Iftar is Maghrib, taken from the schedule rather than recalculated.
         val sehriEnd = schedule?.let(RamadanCalendar::sehriEndOf)
         val iftar = schedule?.let(RamadanCalendar::iftarOf)
+        // The precautionary Imsak time exists only when the user has configured an interval. Without
+        // one there is no Imsak value — Salah never falls back to a fixed interval of its own.
+        val imsakMinutes = inputs.calendarSettings.imsakMinutesBeforeFajr
+        val imsak = if (imsakMinutes == null) {
+            null
+        } else {
+            schedule?.let { RamadanCalendar.imsakOf(it, imsakMinutes) }
+        }
 
         return RamadanDayRow(
             date = date,
@@ -141,6 +154,8 @@ class RamadanUiStateFactory(
             fajrLabel = schedule?.timeOf(PrayerName.FAJR)?.let(timeFormatter::format),
             iftarLabel = iftar?.let(timeFormatter::format),
             maghribLabel = schedule?.timeOf(PrayerName.MAGHRIB)?.let(timeFormatter::format),
+            banglaLabel = banglaCalendar.convert(date)?.let { bangla -> formatting.bangla(bangla, locale) },
+            imsakLabel = imsak?.let(timeFormatter::format),
             isToday = date == inputs.today,
             hasSchedule = schedule != null,
             unavailable = state?.unavailabilityReason(),

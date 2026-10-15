@@ -44,11 +44,13 @@ class RamadanReminderPlanTest {
         settings: PrayerNotificationSettings,
         ramadanDates: Set<LocalDate> = setOf(date),
         scheduleDates: List<LocalDate> = listOf(date),
+        imsakOffsetMinutes: Int? = null,
     ) = planner.plan(
         settings = settings,
         schedules = scheduleDates.map { scheduleFor(it) },
         now = now,
         ramadanDates = ramadanDates,
+        imsakOffsetMinutes = imsakOffsetMinutes,
     )
 
     private fun scheduleFor(target: LocalDate) =
@@ -60,6 +62,7 @@ class RamadanReminderPlanTest {
         sehriLead: Int = 10,
         iftar: Boolean = true,
         iftarLead: Int = 0,
+        imsak: Boolean = false,
     ): PrayerNotificationSettings = PrayerNotificationSettings.DEFAULT
         .let { base ->
             PrayerName.entries.fold(base) { settings, prayer ->
@@ -71,6 +74,7 @@ class RamadanReminderPlanTest {
         }
         .withSehriReminder(enabled = sehri, leadMinutes = sehriLead)
         .withIftarReminder(enabled = iftar, leadMinutes = iftarLead)
+        .withImsakReminder(enabled = imsak)
 
     private fun List<PlannedPrayerNotification>.ramadan() =
         filter { it.slot.target.isRamadanReminder }
@@ -190,10 +194,10 @@ class RamadanReminderPlanTest {
         val prayerSlots = allSlots.filterNot { it.target.isRamadanReminder }
         val ramadanSlots = allSlots.filter { it.target.isRamadanReminder }
 
-        // Six non-Ramadan targets (five prayers and sunrise) and two Ramadan ones, each with an
-        // at-time and an advance slot.
+        // Six non-Ramadan targets (five prayers and sunrise) and three Ramadan ones (Sehri, Iftar and
+        // the precautionary Imsak), each with an at-time and an advance slot.
         assertEquals(12, prayerSlots.size)
-        assertEquals(4, ramadanSlots.size)
+        assertEquals(6, ramadanSlots.size)
         val codes = allSlots.map { PrayerNotificationIds.requestCode(it) }
         assertEquals(codes.size, codes.toSet().size)
         // And the same slot always maps back from its alarm URI, which is how a fired alarm is
@@ -277,10 +281,56 @@ class RamadanReminderPlanTest {
     }
 
     @Test
-    fun `the two Ramadan targets are the two the reminder system knows about`() {
-        assertEquals(listOf(ReminderTarget.SEHRI, ReminderTarget.IFTAR), ReminderTarget.ramadanReminders)
+    fun `the Ramadan targets are the three the reminder system knows about`() {
+        assertEquals(
+            listOf(ReminderTarget.SEHRI, ReminderTarget.IFTAR, ReminderTarget.IMSAK),
+            ReminderTarget.ramadanReminders,
+        )
         assertTrue(ReminderTarget.ramadanReminders.all { it.prayer == null })
         assertFalse(ReminderTarget.SEHRI.isObligatoryPrayer)
         assertFalse(ReminderTarget.IFTAR.isObligatoryPrayer)
+        assertFalse(ReminderTarget.IMSAK.isObligatoryPrayer)
+    }
+
+    @Test
+    fun `the precautionary Imsak reminder is planned only when an interval is configured`() {
+        // Enabled but no interval: nothing is planned, because Salah has no Imsak rule of its own.
+        assertTrue(
+            plan(ramadanOnly(imsak = true)).none { it.slot.target == ReminderTarget.IMSAK },
+        )
+
+        // Interval configured and the reminder enabled: an at-time reminder at Fajr minus the interval.
+        val imsak = plan(ramadanOnly(imsak = true), imsakOffsetMinutes = 15)
+            .single { it.slot.target == ReminderTarget.IMSAK }
+        assertEquals(PrayerReminderKind.AT_TIME, imsak.slot.kind)
+        assertTrue(imsak.isAtEventTime)
+        // Fajr for this schedule is 04:47, so a 15-minute interval puts Imsak at 04:32.
+        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 47), zone), imsak.eventAt)
+        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 32), zone), imsak.triggerAt)
+    }
+
+    @Test
+    fun `Imsak is a separate time from the Sehri deadline`() {
+        val planned = plan(
+            ramadanOnly(sehri = true, sehriLead = 10, imsak = true),
+            imsakOffsetMinutes = 20,
+        )
+        val sehri = planned.single { it.slot.target == ReminderTarget.SEHRI }
+        val imsak = planned.single { it.slot.target == ReminderTarget.IMSAK }
+
+        // Sehri ends at the calculated Fajr (04:47); Imsak is a different, earlier, separately
+        // identified event (04:27) and never replaces the Sehri deadline.
+        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 47), zone), sehri.eventAt)
+        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 27), zone), imsak.eventAt)
+        assertFalse(sehri.slot == imsak.slot)
+    }
+
+    @Test
+    fun `switching the Imsak reminder off removes its slot`() {
+        val on = plan(ramadanOnly(imsak = true), imsakOffsetMinutes = 10)
+        val off = plan(ramadanOnly(imsak = false), imsakOffsetMinutes = 10)
+
+        assertTrue(on.any { it.slot.target == ReminderTarget.IMSAK })
+        assertTrue(off.none { it.slot.target == ReminderTarget.IMSAK })
     }
 }

@@ -137,6 +137,18 @@ For each obligatory prayer that is enabled:
 The sunrise reminder, when its own switch is on, produces a single `AT_TIME` reminder at sunrise. It
 is never given an advance reminder and is never treated as one of the five prayers.
 
+On a date the calendar places **inside Ramadan**, three further reminders can be planned, and only
+there:
+
+- **Sehri** — an `ADVANCE` reminder before the calculated Fajr (never an at-time one, which would
+  collide with the Fajr prayer reminder).
+- **Iftar** — an `AT_TIME` reminder at the calculated Maghrib, plus an optional advance lead-in.
+- **Precautionary Imsak** — an `AT_TIME` reminder at Imsak, which is the calculated Fajr **minus the
+  user's configured interval**. It exists only when the user has both enabled the reminder and
+  configured an interval; with no interval there is no Imsak time and **no reminder** — Salah does
+  not invent a fixed one. Imsak is not the end of Sehri and is a separate target, never a second
+  Sehri reminder.
+
 A reminder exists **only** where a complete schedule supplies the time. A missing, incomplete or
 failed schedule produces no reminders — never a guessed one — and the coordinator reports which
 dates had no timetable.
@@ -147,10 +159,14 @@ Four independent mechanisms, because an alarm that fires twice is worse than an 
 fire at all:
 
 1. **Deterministic identity.** Each slot's `PendingIntent` request code is
-   `floorMod(epochDay, 1_000_000) * 16 + target.ordinal * 2 + kind.ordinal`. Within any window of
-   about 2 700 years every `(target, kind)` pair occupies a distinct block, and the planner only
-   ever plans two days. `PrayerNotificationIdsTest` asserts uniqueness across 400 consecutive days
-   × 6 targets × 2 kinds.
+   `floorMod(epochDay, 1_000_000) * BLOCK_SIZE + target.ordinal * 2 + kind.ordinal`, with
+   `BLOCK_SIZE = 32`. Within any window of about 2 700 years every `(target, kind)` pair occupies a
+   distinct block, and the planner only ever plans two days. `PrayerNotificationIdsTest` asserts
+   uniqueness across 400 consecutive days × 9 targets × 2 kinds. The block was widened from 16 to 32
+   when the ninth target (the precautionary Imsak) was added; because the block size is part of the
+   code, an alarm scheduled by an earlier build does not share a code with the widened scheme, so
+   Salah **re-identifies** every reminder it manages on the next reconciliation rather than reusing
+   the old codes.
 2. **A stable data URI, moving times in extras.** `PendingIntent` equality ignores extras and
    compares action, data, type, class and categories. Giving every slot a unique data URI makes its
    alarms genuinely distinct; keeping the *times* out of that URI is what makes rescheduling a moved

@@ -289,9 +289,15 @@ The screen is a heading, one card of reminders and one card of timetable, and no
 - **A row is labelled by its own Gregorian date** (`19 Feb`), not by a repeated "Ramadan day 3". The
   Ramadan day number is still on the row — it is the day of the Hijri date printed beneath the Gregorian
   one — and the stage heading states the days that stage covers. One fact, one place.
-- **No Bangla calendar date on this screen.** The Bangla date belongs to the Calendar screen; a Ramadan
-  list states the Gregorian date and the Hijri date, which is what a reader counting the fast needs. The
-  conversion (`BanglaCalendar`) and every other screen that shows it are untouched.
+- **Each row carries all three dates.** The Gregorian date is the row's label, the Hijri date sits
+  beneath it, and the Bangladesh (Bangla) civil date sits beneath that, converted by the same
+  `BanglaCalendar` the Calendar screen uses. A day outside the range the 2019 rules are verified for shows
+  no Bangla date rather than an approximated one (`RamadanUiStateFactoryTest`).
+- **A live fasting countdown sits above the table.** It counts to the calculated **Fajr** before Sehri ends
+  and to the calculated **Maghrib** afterwards, moves to the next day's Fajr after Iftar, and is absent
+  outside Ramadan or after Iftar on the last day. It is resolved by a pure `FastingCountdownResolver` from
+  the same schedules the table shows and refreshed on a one-second tick kept in its own flow, so the tick
+  recomposes only the countdown card and never re-runs the prayer engine (`FastingCountdownTest`).
 - **The heading states the window once**: its range and day count, today's Ramadan day when today is
   inside the window (or the phase sentence when it is not), and the estimate sentence. Nothing on it
   repeats a date or a day number the table below already carries.
@@ -320,6 +326,23 @@ The rule is one sentence, and it is implemented in exactly one place
   shows no Sehri or Iftar time and says why, rather than showing a plausible-looking figure.
 - **The screens say what to do about it**: follow the relevant local authority or a timetable you trust
   for observance.
+
+### 7.1 Sehri versus Imsak
+
+Imsak is **not** the end of Sehri, and Salah keeps the two apart everywhere:
+
+- **Sehri ends at the calculated Fajr** — that is the deadline, and it is what the countdown, the Sehri
+  reminder and the table's Sehri column all use.
+- **Imsak is an optional, earlier *precautionary* time.** Salah has **no Imsak rule of its own.** The user
+  configures an interval (one of `CalendarSettings.IMSAK_MINUTE_CHOICES`, minutes before the calculated
+  Fajr), and Imsak is then the calculated Fajr **minus** that interval (`RamadanCalendar.imsakOf`). Until an
+  interval is configured, `CalendarSettings.imsakMinutesBeforeFajr` is `null` and Salah shows and schedules
+  **no Imsak time at all** — it never assumes a fixed interval.
+- **It is always labelled separately and kept in its own field.** In the table it appears *under* the Sehri
+  deadline on the same row, with the word *Imsak*, and it is a distinct value the reminder system treats as
+  its own target. It is never presented as the actual Sehri deadline.
+- **It is not a countdown target.** The fasting countdown counts to the Fajr deadline and to Iftar; a
+  precaution is not a deadline and is not counted down to as though it ended the fast.
 
 ---
 
@@ -351,10 +374,13 @@ Persisted (in the existing shared DataStore, keys prefixed `calendar_`):
 | Default calendar view | `calendar_preferred_system` | `GREGORIAN` |
 | Hijri day offset | `calendar_hijri_adjustment_days` | `0` |
 | Date language (script and numerals) | `calendar_date_language` | `SYSTEM` |
+| Precautionary Imsak interval (minutes before Fajr) | `calendar_imsak_minutes_before_fajr` | none — no Imsak time is shown or scheduled |
 
 Ramadan reminder preferences live with the other notification preferences, so there is one store that owns
 whether a reminder exists (`notification_sehri_reminder_enabled`, `notification_sehri_reminder_lead_minutes`,
-`notification_iftar_reminder_enabled`, `notification_iftar_reminder_lead_minutes`).
+`notification_iftar_reminder_enabled`, `notification_iftar_reminder_lead_minutes`,
+`notification_imsak_reminder_enabled`). The Imsak **interval** lives in the calendar settings above, because
+it is a fasting-time rule rather than a notification switch; the Imsak reminder simply fires at that time.
 
 - **No new database.** "Room for structured cached data only where appropriate" resolves to *nowhere* here:
   the month is a pure function of a date and a few settings, so persisting it would only create a copy that

@@ -16,6 +16,7 @@ import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import io.github.towkirahmedrony.salah.testing.testSchedule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -390,5 +391,44 @@ class RamadanUiStateFactoryTest {
 
         assertEquals("04:47", state.rows.single().sehriEndLabel)
         assertEquals("18:00", state.rows.single().iftarLabel)
+    }
+
+    @Test
+    fun `a configured Imsak rule is shown separately from the Sehri deadline`() {
+        val state = ready(
+            factory.create(
+                inputs(
+                    mapOf(available("2024-03-11", fajr = LocalTime.of(4, 47))),
+                    calendar = CalendarSettings(imsakMinutesBeforeFajr = 10),
+                ),
+                english,
+            ),
+        )
+
+        val row = state.rows.first()
+        // Sehri stays the calculated Fajr; Imsak is its own, earlier, separately labelled time.
+        assertEquals("04:47", row.sehriEndLabel)
+        assertEquals("04:37", row.imsakLabel)
+        assertTrue(state.imsakConfigured)
+        assertEquals(10, state.imsakMinutesBeforeFajr)
+    }
+
+    @Test
+    fun `no Imsak rule means no Imsak time is invented`() {
+        val state = ready(factory.create(inputs(mapOf(available("2024-03-11"))), english))
+
+        assertNull(state.rows.first().imsakLabel)
+        assertFalse(state.imsakConfigured)
+        assertNull(state.imsakMinutesBeforeFajr)
+    }
+
+    @Test
+    fun `each row carries the Bangla civil date of its own day`() {
+        val state = ready(factory.create(inputs(mapOf(available("2024-03-11"))), english))
+
+        val bangla = state.rows.first().banglaLabel
+        assertNotNull(bangla)
+        // 11 March 2024 falls in Bangla year 1430 (which began on 14 April 2023).
+        assertTrue("unexpected Bangla date: $bangla", bangla!!.contains("1430"))
     }
 }

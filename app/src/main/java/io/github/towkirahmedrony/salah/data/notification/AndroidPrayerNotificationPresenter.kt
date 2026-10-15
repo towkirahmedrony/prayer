@@ -104,6 +104,9 @@ class AndroidPrayerNotificationPresenter(
                 )
             }
 
+            // Imsak is a precautionary stop, never the end of Sehri, so its title says so.
+            ReminderTarget.IMSAK -> return context.getString(R.string.notification_title_imsak_time)
+
             else -> Unit
         }
 
@@ -148,6 +151,8 @@ class AndroidPrayerNotificationPresenter(
                 time,
             )
 
+            ReminderTarget.IMSAK -> return context.getString(R.string.notification_body_imsak_time, time)
+
             else -> Unit
         }
 
@@ -168,6 +173,7 @@ class AndroidPrayerNotificationPresenter(
             prayer != null -> context.getString(prayerNameRes(prayer))
             delivery.slot.target == ReminderTarget.SEHRI -> context.getString(R.string.calendar_sehri_end)
             delivery.slot.target == ReminderTarget.IFTAR -> context.getString(R.string.calendar_iftar)
+            delivery.slot.target == ReminderTarget.IMSAK -> context.getString(R.string.calendar_imsak)
             else -> context.getString(R.string.notification_title_sunrise)
         }
     }

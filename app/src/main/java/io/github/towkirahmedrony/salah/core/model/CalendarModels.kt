@@ -167,22 +167,60 @@ data class CalendarSettings(
 
     /** Which language and numeral system calendar dates are rendered in. */
     val dateLanguage: DateLanguagePreference = DateLanguagePreference.SYSTEM,
+
+    /**
+     * Minutes before the calculated Fajr at which an **optional precautionary Imsak** time is shown,
+     * or `null` when no Imsak rule is configured.
+     *
+     * `null` is the default and is meaningful: Salah has no Imsak rule of its own, so when the user
+     * has not configured one it shows and schedules no Imsak time at all. It never assumes a fixed
+     * interval. The offset is clamped to `[IMSAK_MINUTE_CHOICES]` on read and on write.
+     *
+     * Imsak is **not** the end of Sehri. Sehri ends at the calculated Fajr; Imsak is a separate, earlier
+     * stopping time that some communities observe as a precaution. The two are always labelled
+     * separately and the interval is never presented as the actual Sehri deadline.
+     */
+    val imsakMinutesBeforeFajr: Int? = null,
 ) {
 
     /** A copy with the Hijri offset moved by [days], clamped to the supported range. */
     fun shiftHijriAdjustment(days: Int): CalendarSettings =
         copy(hijriAdjustmentDays = clampHijriAdjustment(hijriAdjustmentDays + days))
 
+    /** A copy with the precautionary Imsak interval set, clamped to an offered value. */
+    fun withImsakMinutesBeforeFajr(minutes: Int): CalendarSettings =
+        copy(imsakMinutesBeforeFajr = clampImsak(minutes))
+
+    /** A copy with the precautionary Imsak interval cleared, so no Imsak time is shown or scheduled. */
+    fun withoutImsak(): CalendarSettings = copy(imsakMinutesBeforeFajr = null)
+
     companion object {
         /** Largest Hijri day offset Salah accepts, in either direction. */
         const val MAX_HIJRI_ADJUSTMENT_DAYS: Int = 2
 
-        /** The preferences a fresh install starts from: estimated dates, no offset. */
+        /**
+         * The Imsak intervals Salah offers, in minutes before the calculated Fajr.
+         *
+         * The rule is explicit and documented: when a user selects an interval *N*, Imsak is shown and
+         * scheduled *N* minutes before the calculated Fajr. Salah offers no Imsak rule of its own — the
+         * user must choose one, and [imsakMinutesBeforeFajr] stays `null` until they do.
+         */
+        val IMSAK_MINUTE_CHOICES: List<Int> = listOf(5, 10, 15, 20, 25, 30)
+
+        /** The interval a user starts from when they first enable the precautionary Imsak time. */
+        const val DEFAULT_IMSAK_MINUTES: Int = 10
+
+        /** The preferences a fresh install starts from: estimated dates, no offset, no Imsak rule. */
         val DEFAULT: CalendarSettings = CalendarSettings()
 
         /** Fixes an out-of-range stored offset so the UI can always represent it. */
         fun clampHijriAdjustment(days: Int): Int =
             days.coerceIn(-MAX_HIJRI_ADJUSTMENT_DAYS, MAX_HIJRI_ADJUSTMENT_DAYS)
+
+        /** Normalises a stored or requested Imsak interval to one of the offered choices. */
+        fun clampImsak(minutes: Int): Int =
+            IMSAK_MINUTE_CHOICES.minByOrNull { candidate -> kotlin.math.abs(candidate - minutes) }
+                ?: DEFAULT_IMSAK_MINUTES
     }
 }
 
