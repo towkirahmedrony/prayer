@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -28,7 +25,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,9 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
@@ -61,8 +57,6 @@ import io.github.towkirahmedrony.salah.core.domain.location.LocationFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
-import io.github.towkirahmedrony.salah.core.domain.location.nameIn
-import io.github.towkirahmedrony.salah.core.model.BangladeshArea
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionAction
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionPolicy
@@ -72,22 +66,78 @@ import io.github.towkirahmedrony.salah.feature.common.sourceLabelRes
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * The location management screen, reached from Settings.
+ * Where the canonical location selection screen is being opened from.
  *
- * The framing the first-launch [LocationSetupScreen] does not have: it starts from the stored location,
- * shows it with its provenance, and offers the same two ways to replace it plus removal. Both screens
- * read one state and call one view model, so the first launch and every later change apply exactly the
- * same validation — there is no second code path that could accept a location the first one would
- * refuse.
+ * The distinction is about **context**, not about behaviour: every rule behind this screen — which
+ * dataset is listed, how a fix is validated against the country boundary, what a selection stores,
+ * which reminders are reconciled — is identical in both values. What differs is what the user arrived
+ * from, and therefore what a device fix does the moment it arrives.
+ */
+enum class LocationSelectionContext {
+
+    /**
+     * First launch: Salah has no usable location, and this screen *is* the app.
+     *
+     * The shell shows it instead of the navigation graph, so there is nothing behind it and nothing to
+     * dismiss it to. A fix that passes the country policy is stored as soon as it arrives: on a fresh
+     * install there is no location for it to replace, and a confirmation step would stand between the
+     * user and the app for a decision that is as reversible in Settings as any other location change.
+     * The manual card is shown outright, under its divider, with no way to close it.
+     */
+    FIRST_LAUNCH,
+
+    /**
+     * A later change: a location already exists, and the screen is a destination reached from Settings
+     * or from any other feature that offers one.
+     *
+     * The stored location stays exactly as it is until a new one is confirmed, and a device fix is held
+     * for confirmation rather than stored on sight — there the user is replacing something they chose,
+     * and the nearest-match area name is worth a look first. The manual card is revealed by the
+     * screen's own action and can be dismissed.
+     */
+    CHANGE,
+    ;
+
+    /** True for [FIRST_LAUNCH], the one context whose fix is stored on arrival. */
+    val isFirstLaunch: Boolean get() = this == FIRST_LAUNCH
+}
+
+/**
+ * The app's one location selection screen.
  *
- * It is also the "Location" category of Settings, and it is the only screen that writes a location. The
- * manual-coordinate form used to sit on the Settings page and write through its own view model; it is a
- * disclosure here instead, so all three ways in share one repository, one validation and one reminder
- * reconciliation, and so a saved position is shown as the current location on the same screen.
+ * **Why one screen.** Salah asks for a location in two situations — the first launch, when no usable
+ * location exists at all, and a later change, from Settings or from any other feature that offers it.
+ * The two differ in framing, never in rules: the same bundled dataset, the same country policy, the
+ * same validation, the same write path and the same reminder reconciliation. This composable is that
+ * one implementation, and [LocationSelectionContext] carries the only genuine difference between the
+ * entry points.
+ *
+ * **What it offers.** Every way of giving Salah a location the app has: a device fix from the
+ * platform's provider, with the permission decision taken by the shared `LocationPermissionPolicy`,
+ * and a manual choice of a Bangladeshi administrative area through the one `ManualAreaSection` picker
+ * — the division → district → upazila/thana levels plus a search over the same bundled dataset, in the
+ * interface's language and matching both the English and the Bangla names. On a change it also shows
+ * the location being replaced, and offers typed coordinates and removal. There is no map picker: it was
+ * removed, and nothing here reintroduces it.
+ *
+ * **How it is reached.** The first-launch gate in
+ * [io.github.towkirahmedrony.salah.navigation.SalahApp] renders it with
+ * [LocationSelectionContext.FIRST_LAUNCH] *instead of* the navigation graph; the
+ * `SalahDestination.LOCATION` route renders the same composable with
+ * [LocationSelectionContext.CHANGE], and that is the destination Settings → Location and every other
+ * entry point navigate to. There is no second location-selection destination, no per-feature copy of
+ * this screen, and no wrapper screen whose only difference is a title.
+ *
+ * **State and lifecycle.** One [LocationViewModel] per open screen, supplied by Koin and scoped to it,
+ * and no selection state outside it: the stored location lives in the repository, so both contexts read
+ * one truth and a change is visible everywhere the moment it is saved. Saving is the only thing that
+ * writes — a back press, a dismissed picker or a discarded fix leaves the stored location exactly as it
+ * was.
  */
 @Composable
-fun LocationScreen(
-    onBack: () -> Unit,
+fun LocationSelectionScreen(
+    context: LocationSelectionContext,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: LocationViewModel = koinViewModel(),
 ) {
@@ -100,7 +150,8 @@ fun LocationScreen(
 
     // The language the dataset's place names render in and the search matches against — taken from the
     // same resources every label here resolves through (`currentNameLanguage`), and handed to the view
-    // model because the dataset's names are data rather than strings.
+    // model because the dataset's names are data rather than strings. A change — including one made
+    // while this screen is open — re-runs any query already typed.
     val nameLanguage = currentNameLanguage()
     LaunchedEffect(nameLanguage) { viewModel.setLanguage(nameLanguage) }
 
@@ -112,13 +163,19 @@ fun LocationScreen(
 
     // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
     // platform facts it needs, so a permanently denied permission opens app settings instead of
-    // re-launching a dialog the system would silently ignore.
+    // re-launching a dialog the system would silently ignore. Nothing requests anything until the user
+    // taps the screen's own button.
+    //
+    // `saveOnArrival` is the one behavioural difference between the two contexts: a fix is stored where
+    // it lands on a first launch, and held for confirmation on a later change.
     val onUseDeviceLocation = rememberDeviceLocationAction(
         viewModel = viewModel,
         permissionState = state.permissionState,
+        saveOnArrival = context.isFirstLaunch,
     )
 
-    LocationContent(
+    LocationSelectionContent(
+        context = context,
         state = state,
         modifier = modifier,
         onUseDeviceLocation = onUseDeviceLocation,
@@ -146,22 +203,25 @@ fun LocationScreen(
 }
 
 /**
- * The management screen's body.
+ * The screen's body, as a function of the location state and the entry context alone.
  *
- * Order matters and is deliberate: the dataset's status, then the stored location, then the two ways
- * to replace it, then a pending fix or the open picker, then the actions and any message. Nothing is
- * shown before the dataset has been read, because a picker with no divisions in it is worse than a
- * spinner.
+ * Order is deliberate, and the same in both contexts: what the dataset is, the location being replaced
+ * (when there is one), a fix awaiting confirmation, the device option, the message about the last
+ * action with its settings affordance, then the manual picker — and, on a change, the remaining actions
+ * on the location that already exists. Nothing is offered before the dataset has been read, because a
+ * picker with no divisions in it is worse than a skeleton.
  *
- * The first-launch screen is a separate composable with its own framing; both render the same state
- * and call the same view model, so there is still exactly one set of rules behind the two.
+ * The header and the footer are the only parts that are not the same call in both: a first launch is
+ * the app's own front page, while a change is a subpage of Settings that names the location it is
+ * about to replace. Everything else below is shared, so the two can never accept different locations.
  *
- * The manual-coordinate form is last of the three ways in, and only rendered once the user has opened
- * it: it is the escape hatch for a position the bundled area dataset cannot express, not a second
- * primary path, and the two primary ones stay where they were.
+ * The manual-coordinate form is the last of the three ways in on a change, and only rendered once the
+ * user has opened it: it is the escape hatch for a position the bundled area dataset cannot express,
+ * not a second primary path, and the two primary ones stay where they were.
  */
 @Composable
-private fun LocationContent(
+private fun LocationSelectionContent(
+    context: LocationSelectionContext,
     state: LocationUiState,
     modifier: Modifier = Modifier,
     onUseDeviceLocation: () -> Unit,
@@ -188,56 +248,28 @@ private fun LocationContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            // A first launch is a full page — room above and below, everything centred — while a change
+            // is a subpage, tighter at the top, with its rows left-aligned like every other Settings page.
+            .padding(
+                horizontal = 20.dp,
+                vertical = if (context.isFirstLaunch) 24.dp else 8.dp,
+            ),
+        horizontalAlignment = if (context.isFirstLaunch) Alignment.CenterHorizontally else Alignment.Start,
+        verticalArrangement = if (context.isFirstLaunch) Arrangement.Top else Arrangement.spacedBy(16.dp),
     ) {
-        SalahSubpageHeader(
-            title = stringResource(R.string.location_title),
-            backContentDescription = stringResource(R.string.action_back),
-            onBack = onBack,
-        )
-
-        // Dataset status -----------------------------------------------------
-        if (state.isLoading) {
-            // A stand-in for the dataset version line that replaces it, rather than a progress bar.
-            // The read is a local file parse that finishes in milliseconds, and both ways of choosing
-            // a location below stay disabled until it finishes, so there is nothing here a user could
-            // act on early and nothing to wait behind a moving bar.
-            SalahSkeletonBlock(
-                height = 14.dp,
-                modifier = Modifier.fillMaxWidth(0.55f),
-            )
-        } else if (!state.isDatasetUsable) {
-            SalahSectionCard {
-                Text(
-                    text = stringResource(R.string.location_dataset_unavailable_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.location_dataset_unavailable_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.datasetDetail?.let { detail ->
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.location_dataset_incomplete, detail),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+        if (context.isFirstLaunch) {
+            FirstLaunchHeader()
         } else {
-            state.datasetVersion?.let { version ->
-                Text(
-                    text = stringResource(R.string.location_dataset_label, version),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            SalahSubpageHeader(
+                title = stringResource(R.string.location_title),
+                backContentDescription = stringResource(R.string.action_back),
+                onBack = onBack,
+            )
         }
+
+        // What the dataset is, stated once for both contexts: the version when there is one worth
+        // showing, and a broken dataset's own explanation when the areas cannot be listed at all.
+        DatasetStatusSection(state = state, showVersion = !context.isFirstLaunch)
 
         // Stored location ----------------------------------------------------
         state.stored?.let { stored -> StoredLocationCard(stored = stored) }
@@ -255,9 +287,16 @@ private fun LocationContent(
             )
         }
 
-        // The two primary ways to give Salah a location ----------------------
+        // The device option, and — on a change — the way into the manual picker beside it. A first
+        // launch draws its own card explaining what a fix is used for; a change draws the two buttons
+        // that sit above the location they would replace.
         if (state.pendingFix == null) {
-            if (state.isAcquiring) {
+            if (context.isFirstLaunch) {
+                UseCurrentLocationCard(
+                    state = state,
+                    onUseDeviceLocation = onUseDeviceLocation,
+                )
+            } else if (state.isAcquiring) {
                 SalahSectionCard {
                     Text(
                         text = stringResource(R.string.location_gps_acquiring),
@@ -285,29 +324,67 @@ private fun LocationContent(
             }
         }
 
-        Text(
-            text = stringResource(R.string.location_offline_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // A change states that both options work offline; a first launch says the same thing in its own
+        // footer, so the note is not repeated there.
+        if (!context.isFirstLaunch) {
+            Text(
+                text = stringResource(R.string.location_offline_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
-        // Manual picker ------------------------------------------------------
-        if (state.isPickerOpen) {
-            AreaPickerSection(
+        // The result of the last action, read where the action was, plus the one place the settings
+        // affordance is decided: a message the user can act on, or a denied permission with nothing
+        // stored yet. Both are the same rule for both contexts.
+        state.message?.let { message ->
+            LocationMessageRow(message = message, onDismiss = onDismissMessage)
+        }
+        if (state.shouldOfferLocationSettings) {
+            TextButton(onClick = onOpenLocationSettings) {
+                Text(text = stringResource(R.string.location_action_open_location_settings))
+            }
+        }
+
+        // The manual picker ------------------------------------------------------
+        // One picker for both contexts (`ManualAreaSection`): a first launch shows it outright, under
+        // its divider, with nothing to dismiss; a change reveals it from the action above and can
+        // cancel it. The wording and the confirm label are the only parameters — the levels, the search
+        // and the write are the same code, so a selection cannot be accepted here and refused there.
+        if (context.isFirstLaunch || state.isPickerOpen) {
+            if (context.isFirstLaunch) {
+                Spacer(modifier = Modifier.height(18.dp))
+                OrSelectManuallyDivider()
+                Spacer(modifier = Modifier.height(18.dp))
+            }
+            ManualAreaSection(
                 state = state,
                 onSelectDivision = onSelectDivision,
                 onSelectDistrict = onSelectDistrict,
                 onSelectUpazila = onSelectUpazila,
                 onSaveSelection = onSaveSelection,
-                onCloseAreaPicker = onCloseAreaPicker,
                 onSearchQueryChanged = onSearchQueryChanged,
                 onSelectSearchResult = onSelectSearchResult,
                 nameLanguage = nameLanguage,
+                titleRes = if (context.isFirstLaunch) {
+                    R.string.location_setup_manual_title
+                } else {
+                    R.string.location_picker_title
+                },
+                bodyRes = if (context.isFirstLaunch) R.string.location_setup_manual_body else null,
+                confirmRes = if (context.isFirstLaunch) {
+                    R.string.location_setup_manual_confirm
+                } else {
+                    R.string.location_action_save
+                },
+                onClose = if (context.isFirstLaunch) null else onCloseAreaPicker,
             )
         }
 
         // Actions on an existing location ------------------------------------
-        if (state.stored != null && !state.isPickerOpen && state.pendingFix == null) {
+        // Only ever offered on a change: a first launch has no location to refresh or remove, and its
+        // own framing ends after the picker.
+        if (!context.isFirstLaunch && state.stored != null && !state.isPickerOpen && state.pendingFix == null) {
             state.stored?.let { stored ->
                 if (stored.freshness.shouldOfferRefresh || stored.origin == LocationOrigin.AREA_SELECTION) {
                     OutlinedButton(
@@ -330,7 +407,7 @@ private fun LocationContent(
         // The third way to give Salah a location, behind a disclosure: the least used of the three, and
         // the only one that stores a position the country policy does not cover. Kept off the screen
         // until asked for, so the two ways most people are here for are not competing with a form.
-        if (!state.isPickerOpen && state.pendingFix == null && !state.isManualFormOpen) {
+        if (!context.isFirstLaunch && !state.isPickerOpen && state.pendingFix == null && !state.isManualFormOpen) {
             OutlinedButton(
                 onClick = onToggleManualCoordinates,
                 modifier = Modifier.fillMaxWidth(),
@@ -339,7 +416,7 @@ private fun LocationContent(
             }
         }
 
-        if (state.isManualFormOpen) {
+        if (!context.isFirstLaunch && state.isManualFormOpen) {
             ManualCoordinatesSection(
                 state = state,
                 onFormChange = onManualFormChange,
@@ -348,17 +425,25 @@ private fun LocationContent(
             )
         }
 
-        // Offered when automatic location is unavailable *and* nothing is stored yet: it is the one
-        // failure the user can fix without leaving the screen's subject. Once a location exists there
-        // is nothing to unblock, so the button would only be noise.
-        if (state.permissionState == LocationPermissionState.DENIED && state.stored == null) {
-            TextButton(onClick = onOpenLocationSettings) {
-                Text(text = stringResource(R.string.location_action_open_location_settings))
-            }
-        }
-
-        state.message?.let { message ->
-            LocationMessageRow(message = message, onDismiss = onDismissMessage)
+        // A first launch closes on its own footer, as designed: what the chosen area is used for, and
+        // who the app is for. A change has no footer — its last card is the location itself.
+        if (context.isFirstLaunch) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                text = stringResource(R.string.location_setup_footer),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.location_setup_made_for) + " " + FLAG_BANGLADESH,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -375,6 +460,115 @@ private fun LocationContent(
  * validation happen once, on save, in the repository. The error state is shown in place rather than only
  * as a message, because the invalid field is right here.
  */
+/**
+ * The first launch's opening: the app's mark, what Salah needs a location for, and the country drawn
+ * from the boundary the app already ships.
+ *
+ * It lives here rather than among the shared components because the *arrangement* is this screen's
+ * framing on a first launch; the pieces it draws — [Branding], [BangladeshMapArt] — are shared.
+ */
+@Composable
+private fun FirstLaunchHeader(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Branding()
+        Spacer(modifier = Modifier.height(22.dp))
+
+        Text(
+            text = stringResource(R.string.location_setup_title),
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.location_setup_subheading),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        BangladeshMapArt(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(196.dp),
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+}
+
+/**
+ * What the bundled dataset is, as one section for both contexts.
+ *
+ * Three states, each saying exactly what is true: a read still in flight (a stand-in line rather than a
+ * progress bar — the parse finishes in milliseconds, and every option below stays disabled until it
+ * does), a dataset that could not be read (with the file counts that were found), or a usable one. The
+ * version line is shown only on a change: on the first launch it would be a technical detail on the
+ * app's opening page, and it is not what a new user needs to read.
+ */
+@Composable
+private fun DatasetStatusSection(
+    state: LocationUiState,
+    showVersion: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        state.isLoading -> SalahSkeletonBlock(
+            height = 14.dp,
+            modifier = modifier.fillMaxWidth(0.55f),
+        )
+
+        !state.isDatasetUsable -> SalahSectionCard(modifier = modifier) {
+            Text(
+                text = stringResource(R.string.location_dataset_unavailable_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.location_dataset_unavailable_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.datasetDetail?.let { detail ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.location_dataset_incomplete, detail),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        showVersion -> state.datasetVersion?.let { version ->
+            Text(
+                text = stringResource(R.string.location_dataset_label, version),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+/**
+ * True when the platform's own location settings are the user's next step.
+ *
+ * Two situations, one answer: the last action failed for a reason a settings screen can fix (a denied
+ * permission, or location services switched off), or the permission is denied and nothing is stored
+ * yet — on a first launch, that is the state before anything has been tried. Deliberately not shown
+ * once a location exists and nothing is wrong: there it would be a button with no purpose.
+ */
+private val LocationUiState.shouldOfferLocationSettings: Boolean
+    get() = (permissionState == LocationPermissionState.DENIED && stored == null) ||
+        message?.isAnswerableWithSettings == true
+
+/** The flag that closes the first-launch screen, next to "Made for Muslims in Bangladesh". */
+private const val FLAG_BANGLADESH: String = "\uD83C\uDDED\uD83C\uDDE7"
+
 @Composable
 private fun ManualCoordinatesSection(
     state: LocationUiState,
@@ -680,176 +874,6 @@ private fun PendingFixCard(
 }
 
 @Composable
-private fun AreaPickerSection(
-    state: LocationUiState,
-    onSelectDivision: (String) -> Unit,
-    onSelectDistrict: (String) -> Unit,
-    onSelectUpazila: (String) -> Unit,
-    onSaveSelection: () -> Unit,
-    onCloseAreaPicker: () -> Unit,
-    onSearchQueryChanged: (String) -> Unit,
-    onSelectSearchResult: (LocationSearchResult) -> Unit,
-    nameLanguage: LocationNameLanguage,
-) {
-    SalahSectionCard {
-        Text(
-            text = stringResource(R.string.location_picker_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-        state.datasetVersion?.let { version ->
-            Text(
-                text = stringResource(R.string.location_dataset_label, version),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        // Search above the three levels, for the same reason it is above the setup screen's dropdowns:
-        // it finds a name without opening three lists, and choosing a result fills the levels below so
-        // there is still exactly one selection on screen. It needs a dataset to search, so it appears
-        // only once one has been read.
-        if (state.isDatasetUsable) {
-            Spacer(modifier = Modifier.height(12.dp))
-            LocationSearchField(
-                state = state,
-                onQueryChange = onSearchQueryChanged,
-                onSelectResult = onSelectSearchResult,
-            )
-        }
-
-        AreaLevelList(
-            title = stringResource(R.string.location_picker_step_division),
-            emptyMessage = null,
-            options = state.divisionOptions,
-            selectedId = state.selection.divisionId,
-            onSelect = onSelectDivision,
-            nameLanguage = nameLanguage,
-        )
-
-        AreaLevelList(
-            title = stringResource(R.string.location_picker_step_district),
-            emptyMessage = stringResource(R.string.location_picker_needs_division),
-            options = state.districtOptions,
-            selectedId = state.selection.districtId,
-            onSelect = onSelectDistrict,
-            nameLanguage = nameLanguage,
-        )
-
-        AreaLevelList(
-            title = stringResource(R.string.location_picker_step_upazila),
-            emptyMessage = stringResource(R.string.location_picker_needs_district),
-            options = state.upazilaOptions,
-            selectedId = state.selection.upazilaId,
-            onSelect = onSelectUpazila,
-            nameLanguage = nameLanguage,
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-        state.selectionSummary?.let { summary ->
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        val referenceText = state.selectionCoordinateText?.let { coordinates ->
-            stringResource(R.string.location_picker_reference, coordinates)
-        } ?: stringResource(R.string.location_picker_incomplete)
-        Text(
-            text = referenceText,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(
-            onClick = onSaveSelection,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = state.canSaveSelection,
-        ) {
-            Text(text = stringResource(R.string.location_action_save))
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        OutlinedButton(onClick = onCloseAreaPicker, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(R.string.location_action_cancel))
-        }
-    }
-}
-
-/**
- * One step of the hierarchy: every option for the current parent, as a selectable row.
- *
- * A list rather than a dropdown, because a district has at most a few dozen upazilas and every one of
- * them being visible is what makes "the area is not there" a verifiable observation rather than a
- * suspicion about a search box — the search above narrows the field, but this level still shows the
- * full set for the chosen parent. Rows are radio buttons so the current choice is unmistakable, and
- * each name is shown in the interface language, falling back to the English name where the dataset
- * has no Bangla one.
- */
-@Composable
-private fun AreaLevelList(
-    title: String,
-    emptyMessage: String?,
-    options: List<BangladeshArea>,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
-    nameLanguage: LocationNameLanguage,
-) {
-    Spacer(modifier = Modifier.height(12.dp))
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
-    if (options.isEmpty()) {
-        if (emptyMessage != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = emptyMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        return
-    }
-
-    // One selectable group per level, so TalkBack announces each row as a radio option with its own
-    // selected state and the number of options in the group. The row owns the selection and the
-    // RadioButton is non-interactive: a separately focusable button inside a clickable row makes the
-    // same option appear twice and hides which one is chosen.
-    Column(modifier = Modifier.selectableGroup()) {
-        options.forEach { area ->
-            val selected = area.id == selectedId
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = selected,
-                        role = Role.RadioButton,
-                        onClick = { onSelect(area.id) },
-                    )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = selected, onClick = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    // The active language's name: Bangla where the dataset has one, English otherwise.
-                    text = area.nameIn(nameLanguage),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun LocationDetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -909,17 +933,20 @@ private fun freshnessRes(freshness: LocationFreshness): Int = when (freshness) {
 }
 
 /**
- * Builds the "use the device's location" click handler shared by both location screens.
+ * Builds the "use the device's location" click handler the screen's device option calls.
  *
- * Both screens offered this identically before and must keep offering it identically, so the
- * permission handling is written once: the launcher, the decision from [LocationPermissionPolicy], and
- * the two settings paths. Manual area selection is unaffected by any of it and stays usable with the
- * permission denied.
+ * The permission handling is written once, here: the request launcher, the decision from
+ * [LocationPermissionPolicy] — so a permanently denied permission opens the app's settings page instead
+ * of re-launching a dialog the system would silently ignore — and both settings paths. Nothing runs on
+ * composition; the returned lambda is only ever invoked by the user's own tap, which is why merely
+ * opening the selection screen never prompts for anything. Manual area selection is unaffected by all
+ * of it and stays usable with the permission denied.
  *
- * @param saveOnArrival passed straight through to [LocationViewModel.useCurrentLocation]: true on the
- *   first-launch screen, where a verified fix is the answer and the app opens on it, and false on the
- *   location screen, which holds a fix for confirmation. Only the moment of the write differs; asking
- *   for the permission, and what happens when it is refused, are the same on both.
+ * @param saveOnArrival passed straight through to [LocationViewModel.useCurrentLocation]: true in
+ *   [LocationSelectionContext.FIRST_LAUNCH], where a verified fix is the answer and the app opens on it,
+ *   and false in [LocationSelectionContext.CHANGE], which holds a fix for confirmation. Only the moment
+ *   of the write differs; asking for the permission, and what happens when it is refused, are the same
+ *   in both.
  */
 @Composable
 internal fun rememberDeviceLocationAction(

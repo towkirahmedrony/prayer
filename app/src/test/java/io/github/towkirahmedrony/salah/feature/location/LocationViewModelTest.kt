@@ -56,14 +56,16 @@ import java.time.ZoneId
 import kotlin.time.Duration
 
 /**
- * The behaviour both location screens depend on, asserted once.
+ * The behaviour the one location selection screen depends on, asserted once.
  *
- * [LocationSetupScreen] and [LocationScreen] are two framings of this one view model, so the rules
- * that decide what a tap does are tested here rather than through either Compose tree:
+ * `LocationSelectionScreen` renders one state and calls one view model in both of its entry contexts —
+ * a first launch, which stores a fix on arrival, and a later change, which holds it for confirmation —
+ * so the rules that decide what a tap does are tested here rather than through either framing's Compose
+ * tree. (`LocationSelectionWiringTest` pins the wiring; this pins the behaviour behind it.)
  *
- *  - a device fix is checked against the Bangladesh-only policy on **both** paths, and what differs is
- *    only when it is written: the location screen holds it for confirmation, the first-launch screen
- *    stores it on arrival — so granting the permission is enough to reach the app;
+ *  - a device fix is checked against the Bangladesh-only policy in **both** contexts, and what differs
+ *    is only when it is written: a change holds it for confirmation while a first launch stores it on
+ *    arrival — so granting the permission is enough to reach the app;
  *  - a declined permission, a timeout and a position outside Bangladesh each produce their own
  *    message and leave the manual option usable — none of them stores anything;
  *  - a second tap while a fix is in flight starts one request, not two;
@@ -812,6 +814,37 @@ class LocationViewModelTest {
         val stored = locations.location.first()
         assertEquals("Home", stored?.label)
         assertEquals(23.8103, stored?.latitude ?: 0.0, 1e-9)
+    }
+
+    @Test
+    fun `the two entry points read one location, not one each`() = runTest(mainDispatcher) {
+        // What the app's two ways into the selection screen are: two view models, because each open
+        // screen has its own, and one repository behind both. The first-launch screen saves a location
+        // here; the screen a later change would open — already observing, and never refreshed by hand —
+        // must read exactly that record, which is what makes this one flow rather than two copies that
+        // happen to agree.
+        val firstLaunch = viewModel()
+        val laterChange = viewModel()
+        val laterStates = observe(laterChange)
+        laterChange.start()
+        runCurrent()
+
+        val firstStates = observe(firstLaunch)
+        firstLaunch.start()
+        runCurrent()
+
+        firstLaunch.selectDivision(KHULNA)
+        firstLaunch.selectDistrict(KUSHTIA)
+        firstLaunch.selectUpazila(KUMARKHALI)
+        firstLaunch.saveSelectedArea()
+        runCurrent()
+
+        assertEquals(LocationMessage.Saved, firstStates.settled().message)
+        val seen = requireNotNull(laterStates.settled().stored) {
+            "the screen a later change opens must see the location the first launch saved"
+        }
+        assertEquals(LocationOrigin.AREA_SELECTION, seen.origin)
+        assertEquals("BD1001001", seen.area?.upazilaId)
     }
 
     // --- Harness ---------------------------------------------------------------

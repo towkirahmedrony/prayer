@@ -94,10 +94,11 @@ directly. On the dark canvas that produced the reported symptoms:
 The light theme is unchanged by these edits wherever the old literal happened to equal the scheme role
 (the chip fill, the chip border, the card fill, the icon green, the link green are byte-identical).
 
-## 6. Branding and gold on the location setup screen
+## 6. Branding and gold on the location selection screen
 
-`LocationSetupScreen` drew the wordmark, the tagline and the map's ornaments in the fixed mid gold. On the
-cream canvas that is ~**2.4:1** — under the floor even for the 28sp wordmark. They now use
+The location selection screen's first-launch framing drew the wordmark, the tagline and the map's
+ornaments in the fixed mid gold. On the cream canvas that is ~**2.4:1** — under the floor even for the
+28sp wordmark. They now use
 `accents.goldText`, which is the readable gold of the active theme.
 
 ## 7. Every screen and component category, audited
@@ -110,7 +111,7 @@ cream canvas that is ~**2.4:1** — under the floor even for the 28sp wordmark. 
 | Calendar | `CalendarScreen`, `CalendarSettingsScreen` | Scheme roles + the new `tertiary`; chips inherit the fixed `outline` |
 | Ramadan | `RamadanScreen` | Scheme roles + `LocalSalahAccents` |
 | Qibla | `QiblaScreen`, `QiblaCompassDial` | Dial reads `surface`, `secondary`, `primary`, `onSurfaceVariant`; the Kaaba marker is punched out of the band in the face colour, which is what keeps it visible on the dark dial |
-| Location | `LocationScreen`, `LocationSetupScreen` | `OutlinedTextField` (§4), `DropdownMenu` (§3), `RadioButton` rows, map art gold (§6) |
+| Location | `LocationSelectionScreen`, `LocationSelectionComponents` | `OutlinedTextField` (§4), `DropdownMenu` (§3), country-art gold (§6) |
 | Settings | `SettingsScreen` + subpages, `SettingsComponents` | Scheme roles; the Appearance radio group is the same pattern as every other option group |
 | Notifications | `PrayerNotificationSettingsScreen`, `SalahSwitch` | Scheme roles; the switch palette is declared in `salahSwitchPalette`, which fixes its own contrast defect (see that function's documentation) |
 | Tools, empty/error/loading, planned-feature | `ToolsScreen`, `HomeSkeleton`, `FailureBanner`, `SalahUnavailableNote`, `PlannedFeatureScreen` | Scheme roles (`errorContainer`/`onErrorContainer`, `surfaceVariant`, `secondaryContainer`) |

@@ -45,27 +45,28 @@ itself (`LocationSetup.evaluate`), so a usable location and a completed setup ca
 - `DatasetUnavailable(detail)` — the bundled dataset could not be read and no location is stored, so
   neither way of choosing a location can be completed.
 
-The setup screen (`LocationSetupScreen`) offers exactly the two ways forward. A device that already had
-a location from an earlier build is not sent through setup again; a user who declined GPS and chose an
-area manually is complete, because **no permission state is part of the evaluation**; and a location
-cleared in Android settings or by the user returns the app to setup, because the repository then emits
-`null`.
+The canonical selection screen — `LocationSelectionScreen` — offers exactly the two ways forward, in
+both of its entry contexts. A device that already had a location from an earlier build is not sent
+through setup again; a user who declined GPS and chose an area manually is complete, because **no
+permission state is part of the evaluation**; and a location cleared in Android settings or by the user
+returns the app to setup, because the repository then emits `null`.
 
 `AREA_NOT_IN_DATASET` is reported rather than ignored: displaying an area name the current dataset can
-no longer verify, and offering it as if it were still selectable, would be a quiet lie. The location
-screen (`LocationScreen`) manages an existing location with the same rules.
+no longer verify, and offering it as if it were still selectable, would be a quiet lie. The same screen,
+opened as a change, manages an existing location with the same rules.
 
 **Where the screen is shown.** The shell (`SalahApp`) renders one of exactly three things, and the
-stored location decides which: the navigation graph when a location is usable, `LocationSetupScreen`
-when `requiresSetup`, and Home's own skeleton while the answer is still `Checking`. While setup is
+stored location decides which: the navigation graph when a location is usable, the same selection screen
+with `LocationSelectionContext.FIRST_LAUNCH` when `requiresSetup`, and Home's own skeleton while the
+answer is still `Checking`. While setup is
 required there is no navigation graph and no bottom bar — nowhere to go that would not have to invent
 a time — and no code marks setup as finished, because **saving a location is what closes the gate**.
 `AppViewModel.locationSetup` is the only thing the shell consults, and it is derived (above), so the
 answer survives process death and is re-derived identically on the next launch.
 
-**What the screen is.** One scrolling column: the app's mark and name, the heading, what a location
-is for, an illustration of Bangladesh, then the device option and the manual option separated by
-`OR SELECT MANUALLY`, and a closing line. Like the rest of the app it is drawn from the theme's
+**What the screen is.** In its first-launch context it is one scrolling column: the app's mark and
+name, the heading, what a location is for, an illustration of Bangladesh, then the device option and
+the manual option separated by `OR SELECT MANUALLY`, and a closing line. Like the rest of the app it is drawn from the theme's
 colours and type scale, so it follows light and dark mode. The illustration is generated from the
 **same** `bd_boundary.tsv` the country policy validates against — projected, simplified to a couple of
 hundred points and drawn as a path — so the shape shown is the country the app already knows rather
@@ -73,21 +74,45 @@ than a second drawing of it.
 
 ## 3. GPS and manual selection
 
+### 3.1 One selection screen, two entry contexts
+
+There is **one** location selection screen — `LocationSelectionScreen` in `feature/location` — and every
+genuine entry point renders it, with a `LocationSelectionContext` carrying the only difference between
+them.
+
+| Entry point | How it reaches the screen | Context |
+|---|---|---|
+| First launch, with nothing usable stored | The shell's location gate renders it *instead of* the navigation graph | `FIRST_LAUNCH` |
+| Settings → Location, and any other feature that offers a change | The `SalahDestination.LOCATION` route | `CHANGE` |
+
+`FIRST_LAUNCH` stores a device fix as soon as it passes the country policy, and shows the manual card
+outright, under its divider. `CHANGE` holds a fix for confirmation, shows the location being replaced,
+and reveals the same manual card from its own action, dismissible. Nothing else differs: the dataset,
+the country policy, the search, the hierarchy guards, the write path and the reminder reconciliation are
+one implementation, and `LocationViewModel` is the single state holder both contexts read. There is no
+per-entry copy of the screen, no second selection destination, and no wrapper whose only change is a
+title — `LocationSelectionWiringTest` fails the build if one appears.
+
+The screen is `LocationSelectionScreen` plus its components in `LocationSelectionComponents` (the device
+card, the manual card and its level fields, the first-launch framing) and `LocationSearchField`. The
+view model, the state and the repository behind them are the ones described in §5 and §9; no screen owns
+location state of its own.
+
 **Device fix.** `LocationProvider` is a one-shot port. The Android implementation
 (`AndroidLocationProvider`) uses `LocationManagerCompat.getCurrentLocation` — the framework provider,
 not Google Play Services — with a bounded wait, and registers no listener after returning. A fix is
 always checked against the country policy and attributed to an area where possible, and **when it is
-written depends on which screen asked for it**:
+written depends on the entry context**:
 
-- **First launch** stores it as soon as it passes the policy. Granting the permission and getting a
+- **`FIRST_LAUNCH`** stores it as soon as it passes the policy. Granting the permission and getting a
   fix is the whole interaction, and the app opens on it: a fresh install has no location to compare
   against, and a confirmation step there stands between the user and the app for a decision that is as
   reversible in Settings as any other. The screen shows the progress indicator until the write has
   landed, so a second tap cannot start a second request.
-- **The location screen**, reached later from Settings, holds it as a *pending* fix. That screen is
-  reviewing a location the user already has, and the area name is a nearest-match estimate worth a
-  look before it replaces something they chose. Nothing replaces the stored location until the user
-  taps **Use this location**.
+- **`CHANGE`**, reached later from Settings, holds it as a *pending* fix. That context is reviewing a
+  location the user already has, and the area name is a nearest-match estimate worth a look before it
+  replaces something they chose. Nothing replaces the stored location until the user taps **Use this
+  location**.
 
 Either way a position outside Bangladesh is refused and nothing is written: saving without asking is
 not saving without checking. `useCurrentLocation(saveOnArrival = …)` is the whole of the difference,
@@ -99,17 +124,18 @@ the levels below it, and an id that does not belong under the chosen parent is i
 stored, so a half-valid hierarchy cannot exist. A complete selection saves the **upazila's published
 centre** and the division/district/upazila names.
 
-The two screens present the same three levels differently — the setup screen as three dropdowns
-(division, district, upazila/thana), the management screen as an expandable list per level — because
-they answer different questions: "pick an area" against "check and change the area you have". Both
-read `LocationUiState` and call the same `selectDivision` / `selectDistrict` / `selectUpazila` /
-`saveSelectedArea` actions, so the rules above are enforced once, in the view model and in
-`AreaSelection` — never in the layout. A level is offered only once its parent is chosen, and one
-whose parent has not been chosen is disabled rather than shown empty. Both screens show each name in
-the language the interface is rendering in: the dataset's Bangla name where one exists, its English
-name otherwise.
+The hierarchy is presented once, by `ManualAreaSection`: three dropdowns (division, district,
+upazila/thana) with the search above them, and a summary of what the confirmation will store — the
+chosen hierarchy and the fact that the area's published reference coordinates are what is saved. Both
+contexts render that one composable — the first launch under its divider with the first-launch wording,
+a change from its own action with a cancel button — and read `LocationUiState` and call the same
+`selectDivision` / `selectDistrict` / `selectUpazila` / `saveSelectedArea` actions, so the rules above
+are enforced once, in the view model and in `AreaSelection` — never in the layout. A level is offered
+only once its parent is chosen, and one whose parent has not been chosen is disabled rather than shown
+empty. Each name is shown in the language the interface is rendering in: the dataset's Bangla name
+where one exists, its English name otherwise.
 
-**Search.** Both screens also offer a search field above the three levels (`LocationSearchField`),
+**Search.** The picker offers a search field above the three levels (`LocationSearchField`),
 backed by `LocationSearch` — an in-memory scan of the same bundled dataset (divisions, districts,
 upazilas/thanas and the named localities), with no network call and no index to build. Input is
 debounced (200 ms) and a superseded query is cancelled, so only the current query's results are ever
@@ -452,9 +478,9 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   dataset read, and the answer moves in **both** directions as the stored location is saved and
   cleared (the property that rules out a `setup_complete` flag).
 - `LocationViewModelTest` — what a tap does, on virtual time with the real view model, resolvers and
-  coordinator: a fix asked for by the location screen is held rather than saved on sight and only
-  stored on confirmation, a fix asked for on first launch is stored on arrival, a fix outside
-  Bangladesh is refused and stores nothing on **either** path, a declined permission and a timeout
+  coordinator: a fix asked for in the change context is held rather than saved on sight and only stored
+  on confirmation, a fix asked for on a first launch is stored on arrival, a fix outside
+  Bangladesh is refused and stores nothing in **either** context, a declined permission and a timeout
   each leave their message and the manual option, a second tap during a fix starts one request, the
   cascade drops a child its new parent cannot keep, a confirmed selection stores the chosen
   area's published centre with `AREA_SELECTION` provenance while a partial one is refused, a precise
@@ -466,7 +492,13 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   query and re-renders its results, a result from another division replaces every level below it, a
   district result clears the upazila chosen under the previous district, a query typed before the
   dataset read finishes waits for it instead of failing, an unreadable dataset reports the failure, and
-  closing the picker after a search leaves the stored location untouched.
+  closing the picker after a search leaves the stored location untouched. It also checks the shared
+  source of truth: a location saved by one screen is what a second, already-observing view model reads
+  without being refreshed by hand.
+- `LocationSelectionWiringTest` — the wiring a behaviour test cannot see: exactly one selection screen is
+  declared, no per-entry copy of it exists, the first-launch gate and exactly one navigation destination
+  render it (with the first-launch and change contexts respectively, and the destination popping back),
+  and the hierarchical picker has one implementation that both contexts render.
 - `DeviceFixAdoptionPolicyTest` — the Qibla write path, including that an accepted fix carries the
   locality its accuracy supports and that the same position at an approximate accuracy is adopted
   without one.

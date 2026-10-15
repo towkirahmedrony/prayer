@@ -1,23 +1,16 @@
 package io.github.towkirahmedrony.salah.feature.location
 
-import android.content.Intent
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -28,13 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,9 +44,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronDownGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
@@ -64,202 +51,30 @@ import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
-import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.domain.location.LocationNameLanguage
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSearchResult
 import io.github.towkirahmedrony.salah.core.domain.location.nameIn
 import io.github.towkirahmedrony.salah.core.model.BangladeshArea
-import org.koin.androidx.compose.koinViewModel
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * The first-launch location screen, as designed: the app's mark, what Salah needs a location for,
- * and the two ways to give it one.
+ * The pieces the canonical location selection screen is built from.
  *
- * **Where it sits.** The shell ([io.github.towkirahmedrony.salah.navigation.SalahApp]) shows this
- * screen *instead of* the navigation graph whenever
- * [io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState.requiresSetup] — no
- * bottom bar, and therefore no way to reach a screen that would have to invent a time. Completing
- * either option here saves a location, which is the only thing the gate looks at; the screen
- * disappears and the graph appears on the same recomposition, so nothing navigates anywhere.
+ * They live in one file because they are one flow's vocabulary: the device-location card, the manual
+ * area card and its level fields, the first-launch presentation (the app's mark, the divider and the
+ * country illustration), and the one place the "open location settings" affordance is decided. The
+ * screen that arranges them is `LocationSelectionScreen`; nothing here reads or writes a location
+ * itself — every value comes from the state the screen passes down and every action goes back up as
+ * a callback, so the two entry contexts (first launch and a later change) render the same behaviour.
  *
- * **One view model, two frames.** Everything below is read from and written to the existing
- * [LocationViewModel] — the same state and the same policy the location management screen uses.
- * Nothing about validating a position, resolving an area or reconciling the reminders lives here.
- *
- * **Both options always work.** Neither the manual card nor its button depends on location
- * permission, so a user who declines GPS is not trapped: the card below the divider is the whole
- * screen's second answer, not a fallback.
- *
- * **A device fix is not confirmed here.** Granting the permission and a fix that passes the
- * Bangladesh-only policy is the whole interaction: the location is stored where it lands and this
- * screen is replaced by the app on the next recomposition. Nothing is skipped in the process — the
- * position is still validated against the boundary, and a position outside Bangladesh is still
- * refused with its own message — but there is no "is this the right area?" card standing between the
- * user and the app on a fresh install, for a decision that is as reversible in Settings as any other
- * location change. `LocationScreen`, reached later from Settings, keeps that confirmation: there the
- * user is replacing a location they already have, and the nearest-match area name is worth a look
- * before it replaces something they chose.
+ * **One view model, one policy.** Everything these components show is [LocationViewModel]'s state and
+ * the shared `LocationPermissionPolicy`'s decision. Nothing about validating a position, resolving an
+ * area, searching the dataset or reconciling reminders lives here.
  */
-@Composable
-fun LocationSetupScreen(
-    modifier: Modifier = Modifier,
-    viewModel: LocationViewModel = koinViewModel(),
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LifecycleEventEffect(Lifecycle.Event.ON_START) {
-        viewModel.start()
-    }
-
-    // The language the dataset's place names render in and the search matches against, taken from the
-    // same resources every label on this screen resolves through (see `currentNameLanguage`). The view
-    // model needs it explicitly because the dataset's names are data, not strings: a change — including
-    // a change made while this screen is open — re-runs any query already typed.
-    val nameLanguage = currentNameLanguage()
-    LaunchedEffect(nameLanguage) { viewModel.setLanguage(nameLanguage) }
-
-    val settingsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) {
-        viewModel.refreshPermissionState()
-    }
-
-    // The permission decision lives in one place (LocationPermissionPolicy); this supplies the two
-    // platform facts it needs. It is only ever invoked by the screen's own button, so displaying
-    // this screen never prompts for anything.
-    //
-    // `saveOnArrival` is what makes this screen different from the location screen: granting the
-    // permission and a verified fix is the whole interaction, and the app opens on the next
-    // recomposition. There is no confirmation card here — see the class documentation.
-    val onUseDeviceLocation = rememberDeviceLocationAction(
-        viewModel = viewModel,
-        permissionState = state.permissionState,
-        saveOnArrival = true,
-    )
-
-    SetupContent(
-        state = state,
-        modifier = modifier,
-        onUseDeviceLocation = onUseDeviceLocation,
-        onOpenLocationSettings = {
-            settingsLauncher.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-        },
-        onSelectDivision = viewModel::selectDivision,
-        onSelectDistrict = viewModel::selectDistrict,
-        onSelectUpazila = viewModel::selectUpazila,
-        onSaveSelection = viewModel::saveSelectedArea,
-        onDismissMessage = viewModel::dismissMessage,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onSelectSearchResult = viewModel::selectSearchResult,
-        nameLanguage = nameLanguage,
-    )
-}
-
-/**
- * The screen body, as a function of the location state alone.
- *
- * Kept separate from [LocationSetupScreen] so the layout can be read against the design in one
- * pass: everything here is arrangement and wording, and every value in it comes from [state].
- */
-@Composable
-private fun SetupContent(
-    state: LocationUiState,
-    modifier: Modifier = Modifier,
-    onUseDeviceLocation: () -> Unit,
-    onOpenLocationSettings: () -> Unit,
-    onSelectDivision: (String) -> Unit,
-    onSelectDistrict: (String) -> Unit,
-    onSelectUpazila: (String) -> Unit,
-    onSaveSelection: () -> Unit,
-    onDismissMessage: () -> Unit,
-    onSearchQueryChanged: (String) -> Unit,
-    onSelectSearchResult: (LocationSearchResult) -> Unit,
-    nameLanguage: LocationNameLanguage,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Branding()
-        Spacer(modifier = Modifier.height(22.dp))
-
-        Text(
-            text = stringResource(R.string.location_setup_title),
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.location_setup_subheading),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-
-        BangladeshMapArt(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(196.dp),
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-
-        UseCurrentLocationCard(
-            state = state,
-            onUseDeviceLocation = onUseDeviceLocation,
-        )
-
-        state.message?.let { message ->
-            Spacer(modifier = Modifier.height(14.dp))
-            LocationMessageRow(message = message, onDismiss = onDismissMessage)
-            // The two failures the user can fix from here, in the place the failure was reported.
-            if (message.isAnswerableWithSettings) {
-                TextButton(onClick = onOpenLocationSettings) {
-                    Text(text = stringResource(R.string.location_action_open_location_settings))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-        OrSelectManuallyDivider()
-        Spacer(modifier = Modifier.height(18.dp))
-
-        ChooseLocationManuallyCard(
-            state = state,
-            onSelectDivision = onSelectDivision,
-            onSelectDistrict = onSelectDistrict,
-            onSelectUpazila = onSelectUpazila,
-            onSaveSelection = onSaveSelection,
-            onSearchQueryChanged = onSearchQueryChanged,
-            onSelectSearchResult = onSelectSearchResult,
-            nameLanguage = nameLanguage,
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-        Text(
-            text = stringResource(R.string.location_setup_footer),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.location_setup_made_for) + " " + FLAG_BANGLADESH,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
 
 /**
  * The app's mark and name, centred, as on the design.
@@ -270,7 +85,7 @@ private fun SetupContent(
  * active. In light mode that is a deeper gold; on the dark canvas, the muted one.
  */
 @Composable
-private fun Branding(modifier: Modifier = Modifier) {
+internal fun Branding(modifier: Modifier = Modifier) {
     val accents = LocalSalahAccents.current
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -296,7 +111,7 @@ private fun Branding(modifier: Modifier = Modifier) {
 
 /** The two options offered, separated by a rule with its own label, as on the design. */
 @Composable
-private fun OrSelectManuallyDivider(modifier: Modifier = Modifier) {
+internal fun OrSelectManuallyDivider(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -320,7 +135,7 @@ private fun OrSelectManuallyDivider(modifier: Modifier = Modifier) {
 
 /** The device-fix option: what it does, the button that starts it, and what it is used for. */
 @Composable
-private fun UseCurrentLocationCard(
+internal fun UseCurrentLocationCard(
     state: LocationUiState,
     onUseDeviceLocation: () -> Unit,
     modifier: Modifier = Modifier,
@@ -375,14 +190,27 @@ private fun UseCurrentLocationCard(
 }
 
 /**
- * The manual option: the division → district → upazila/thana selection, and its confirmation.
+ * The manual option: the division → district → upazila/thana selection, what it will store, and its
+ * confirmation — the app's one hierarchical picker.
  *
- * Every option is read from the bundled dataset through the view model — nothing is listed here —
- * and each level is offered only once its parent is chosen, because that is exactly the rule the
- * dataset's own hierarchy enforces.
+ * Every option is read from the bundled dataset through the view model — nothing is listed here — and
+ * each level is offered only once its parent is chosen, because that is exactly the rule the dataset's
+ * own hierarchy enforces. Search sits above the three levels as the fast path to a name the user
+ * already knows, and a chosen result fills the levels below it, so there is always exactly one
+ * selection on screen.
+ *
+ * **One picker, two entry contexts.** This is the same composable the first-launch screen shows under
+ * its divider and the location screen reveals from its "select manually" action. Only the wording and
+ * whether the card can be dismissed are parameters; the levels, the search, the summary and the write
+ * are the same code, so a selection cannot be accepted here and refused there.
+ *
+ * @param titleRes the heading for this context.
+ * @param bodyRes the explanatory line under it, or `null` for a context that has none.
+ * @param confirmRes the confirm button's label.
+ * @param onClose the action that dismisses the card, or `null` when there is nothing to dismiss.
  */
 @Composable
-private fun ChooseLocationManuallyCard(
+internal fun ManualAreaSection(
     state: LocationUiState,
     onSelectDivision: (String) -> Unit,
     onSelectDistrict: (String) -> Unit,
@@ -391,6 +219,10 @@ private fun ChooseLocationManuallyCard(
     onSearchQueryChanged: (String) -> Unit,
     onSelectSearchResult: (LocationSearchResult) -> Unit,
     nameLanguage: LocationNameLanguage,
+    titleRes: Int,
+    bodyRes: Int?,
+    confirmRes: Int,
+    onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SalahSectionCard(modifier = modifier) {
@@ -401,30 +233,24 @@ private fun ChooseLocationManuallyCard(
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = stringResource(R.string.location_setup_manual_title),
+                text = stringResource(titleRes),
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
                 color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.location_setup_manual_body),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        if (!state.isDatasetUsable && !state.isLoading) {
-            // The dataset is the only thing that can list an area, so this is what there is to say
-            // when it is missing. The device option above still works: it needs coordinates, not the
-            // area list.
-            Spacer(modifier = Modifier.height(12.dp))
-            SalahUnavailableNote(text = stringResource(R.string.location_dataset_unavailable_body))
+        bodyRes?.let { body ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
         if (state.isLoading) {
             // The read is a local file parse that finishes in milliseconds, and both levels below
-            // wait on it, so a placeholder of the first field's shape is enough.
+            // wait on it, so a placeholder of the first fields' shape is enough.
             SalahSkeletonBlock(height = 56.dp, modifier = Modifier.fillMaxWidth())
             SalahSkeletonBlock(height = 56.dp, modifier = Modifier.fillMaxWidth())
         } else {
@@ -471,11 +297,22 @@ private fun ChooseLocationManuallyCard(
             )
         }
 
-        // The chosen area stores its published reference coordinate, not the user's own position.
-        // Said here, before the confirmation, rather than after it.
+        // What the confirmation stores, stated before it is pressed: the hierarchy as chosen, and the
+        // fact that the area's own published reference coordinate is what will be saved — not the
+        // user's position, which no area selection can know.
         Spacer(modifier = Modifier.height(10.dp))
+        state.selectionSummary?.let { summary ->
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         Text(
-            text = stringResource(R.string.location_setup_area_note),
+            text = state.selectionCoordinateText?.let { coordinates ->
+                stringResource(R.string.location_picker_reference, coordinates)
+            } ?: stringResource(R.string.location_picker_incomplete),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -492,7 +329,13 @@ private fun ChooseLocationManuallyCard(
                 disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
             ),
         ) {
-            Text(text = stringResource(R.string.location_setup_manual_confirm))
+            Text(text = stringResource(confirmRes))
+        }
+        onClose?.let { close ->
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedButton(onClick = close, modifier = Modifier.fillMaxWidth()) {
+                Text(text = stringResource(R.string.location_action_cancel))
+            }
         }
     }
 }
@@ -506,7 +349,7 @@ private fun ChooseLocationManuallyCard(
  * just its text, the touch target.
  */
 @Composable
-private fun AreaDropdownField(
+internal fun AreaDropdownField(
     label: String,
     selected: BangladeshArea?,
     options: List<BangladeshArea>,
@@ -589,12 +432,15 @@ private fun AreaDropdownField(
     }
 }
 
-/** True when the message names a failure the user can act on from this screen's own settings link. */
-private val LocationMessage.isAnswerableWithSettings: Boolean
+/**
+ * True when the message names a failure the user can act on from the screen's own settings link.
+ *
+ * Used by the canonical screen to decide the settings affordance, together with the other condition it
+ * states itself: a denied permission with no stored location is the same situation, arrived at before
+ * the user has tried anything.
+ */
+internal val LocationMessage.isAnswerableWithSettings: Boolean
     get() = this == LocationMessage.PermissionDenied || this == LocationMessage.ServicesDisabled
-
-/** The flag that closes the screen, next to "Made for Muslims in Bangladesh". */
-private const val FLAG_BANGLADESH: String = "\uD83C\uDDED\uD83C\uDDE7"
 
 // The illustration ------------------------------------------------------------
 //
@@ -682,7 +528,7 @@ private const val MAP_TILT_DEGREES: Float = -18f
  * waves a device fix would travel along — and positioning them against the map is the whole job.
  */
 @Composable
-private fun BangladeshMapArt(modifier: Modifier = Modifier) {
+internal fun BangladeshMapArt(modifier: Modifier = Modifier) {
     val outline = MaterialTheme.colorScheme.primary
     val markFill = MaterialTheme.colorScheme.surface
     // The ornaments are gold on the canvas, so they take the theme's gold rather than the fixed mid

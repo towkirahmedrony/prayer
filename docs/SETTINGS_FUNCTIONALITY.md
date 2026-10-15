@@ -134,7 +134,7 @@ times; `resetHijriAdjustment` writes `0` and reconciles.
 same `LocationRepository` the prayer engine uses — so the location is genuinely shared — but it did not
 perform the reconciliation the location screen performs, even though `SETTINGS_STRUCTURE.md` §3 records
 exactly that omission as the reason the manual-coordinate path was repaired when it moved to
-`LocationScreen`. Alarms therefore kept pointing at the previous place after a location change made
+`LocationSelectionScreen`. Alarms therefore kept pointing at the previous place after a location change made
 from the Qibla screen.
 
 **Repair.** `QiblaViewModel` now takes the coordinator and calls it after every successful write

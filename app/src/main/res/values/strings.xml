@@ -663,9 +663,6 @@
     <string name="location_dataset_incomplete">The bundled dataset is incomplete: %1$s</string>
 
     <string name="location_picker_title">Select location manually</string>
-    <string name="location_picker_step_division">Division</string>
-    <string name="location_picker_step_district">District</string>
-    <string name="location_picker_step_upazila">Upazila / Thana</string>
     <string name="location_picker_needs_division">Choose a division first; its districts are listed next.</string>
     <string name="location_picker_needs_district">Choose a district first; its upazilas and thanas are listed next.</string>
     <string name="location_picker_reference">This will save the reference coordinates %1$s of the chosen area.</string>
@@ -707,7 +704,6 @@
     <string name="location_setup_manual_confirm">Confirm Location</string>
     <string name="location_setup_footer">Your selected area will be used to calculate local prayer times. GPS is optional.</string>
     <string name="location_setup_made_for">Made for Muslims in Bangladesh</string>
-    <string name="location_setup_area_note">A chosen area saves that area\'s published reference coordinates, not your exact position.</string>
 
     <!--
       The map picker is gone; this label is kept only so a location stored by an earlier build, whose

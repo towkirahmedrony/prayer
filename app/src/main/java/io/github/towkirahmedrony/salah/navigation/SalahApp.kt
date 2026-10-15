@@ -30,22 +30,29 @@ import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.app.ProvideAppLanguageStrings
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
-import io.github.towkirahmedrony.salah.feature.location.LocationSetupScreen
+import io.github.towkirahmedrony.salah.feature.location.LocationSelectionContext
+import io.github.towkirahmedrony.salah.feature.location.LocationSelectionScreen
 import org.koin.androidx.compose.koinViewModel
 
 /**
  * Application shell.
  *
  * **The location gate.** Everything Salah shows is derived from a place, so the shell decides in one
- * spot whether a usable location exists: while none does, the location setup screen *is* the app —
- * no navigation graph, no bottom bar, and therefore no way to reach a screen that would have to
- * invent a time. Once a location exists the graph is shown, and if the location is later cleared the
- * gate closes again on that same recomposition.
+ * spot whether a usable location exists: while none does, the app's one location selection screen —
+ * `LocationSelectionScreen` with [LocationSelectionContext.FIRST_LAUNCH] — *is* the app: no navigation
+ * graph, no bottom bar, and therefore no way to reach a screen that would have to invent a time. Once a
+ * location exists the graph is shown, and if the location is later cleared the gate closes again on
+ * that same recomposition.
  *
  * The gate is a decision about the *stored location*, not a flag: [AppViewModel.locationSetup]
  * derives it from the location and the bundled dataset, so "setup is complete" and "a usable
  * location exists" can never disagree. Nothing here marks setup as finished — saving a location is
  * what does that, and it is also what makes this screen disappear.
+ *
+ * **One selection screen, two entry contexts.** The gate renders the same composable the
+ * `SalahDestination.LOCATION` route does; only the context differs, and it is the context that decides
+ * whether a device fix is stored on arrival or held for confirmation. There is no second onboarding
+ * location screen to keep in step.
  *
  * **The appearance preference.** The theme comes from the stored [AppViewModel.themeMode] rather than
  * from a parameter with a default, so the Appearance screen's choice is what actually re-themes the
@@ -76,7 +83,10 @@ fun SalahApp(
                 setupState.requiresSetup -> Scaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                 ) { innerPadding ->
-                    LocationSetupScreen(modifier = Modifier.padding(innerPadding))
+                    LocationSelectionScreen(
+                        context = LocationSelectionContext.FIRST_LAUNCH,
+                        modifier = Modifier.padding(innerPadding),
+                    )
                 }
 
                 // Still deciding. A skeleton of the screen that normally follows, rather than a spinner:

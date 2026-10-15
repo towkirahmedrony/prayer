@@ -9,7 +9,8 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarScreen
 import io.github.towkirahmedrony.salah.feature.calendar.CalendarSettingsScreen
 import io.github.towkirahmedrony.salah.feature.home.HomeScreen
 import io.github.towkirahmedrony.salah.feature.home.PrayerScreen
-import io.github.towkirahmedrony.salah.feature.location.LocationScreen
+import io.github.towkirahmedrony.salah.feature.location.LocationSelectionContext
+import io.github.towkirahmedrony.salah.feature.location.LocationSelectionScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
@@ -116,8 +117,14 @@ fun SalahNavHost(
             SettingsAboutScreen(onBack = { navController.popBackStack() })
         }
 
+        // The app's one location selection destination. Settings' Location category navigates here, and
+        // so does every other feature that offers a change; the first-launch gate in `SalahApp` renders
+        // the same composable with the other context, so there is no second destination to keep in step.
         composable(SalahDestination.LOCATION.route) {
-            LocationScreen(onBack = { navController.popBackStack() })
+            LocationSelectionScreen(
+                context = LocationSelectionContext.CHANGE,
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(SalahDestination.NOTIFICATIONS.route) {

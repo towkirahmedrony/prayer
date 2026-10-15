@@ -64,7 +64,7 @@ MainActivity.setContent { SalahApp() }
   SalahApp                       → reads AppLanguage, wraps everything below it
     ProvideAppLanguageStrings    → provides LocalResources for the selected language
       SalahTheme
-        AppShell / LocationSetupScreen
+        AppShell / LocationSelectionScreen
           SalahNavHost           → Home, Calendar, Tools, Settings, …
 ```
 

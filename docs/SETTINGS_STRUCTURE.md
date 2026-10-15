@@ -19,7 +19,7 @@ subject.
 | Appearance | `SettingsAppearanceScreen` | `settings_appearance` | `UserPreferencesRepository.setThemeMode` |
 | Prayer times | `SettingsPrayerTimesScreen` | `settings_prayer_times` | `UserPreferencesRepository.updatePrayerSettings` |
 | Notifications & Adhan | `PrayerNotificationSettingsScreen` | `notifications` | `PrayerNotificationPreferencesRepository` + `PrayerNotificationCoordinator` |
-| Location | `LocationScreen` | `location` | `LocationRepository` + `PrayerNotificationCoordinator` |
+| Location | `LocationSelectionScreen` (`CHANGE`) | `location` | `LocationRepository` + `PrayerNotificationCoordinator` |
 | Calendar | `CalendarSettingsScreen` | `calendar_settings` | `UserPreferencesRepository.updateCalendarSettings` |
 | About Salah | `SettingsAboutScreen` | `settings_about` | nothing (static) |
 
@@ -46,8 +46,8 @@ repository that handles it; only the surface it is rendered on changed.
 - **Prayer notifications, location and the calendar preferences** already had screens of their own and
   keep them; they simply became the rows that open them. Their entry cards on the old Settings page are
   gone, so there is exactly one control per destination rather than a card plus a screen.
-- **Manual coordinates** moved from the Settings page into `LocationScreen`, behind a disclosure. See
-  section 3.
+- **Manual coordinates** moved from the Settings page into the location selection screen, behind a
+  disclosure. See section 3.
 - **Everything else** — the About text, the version line, the prayer-engine status, the location
   overview and the notification controls — is the same content on a different screen.
 

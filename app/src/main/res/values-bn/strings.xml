@@ -223,9 +223,6 @@
     <string name="location_action_confirm_location">এই অবস্থান ব্যবহার করুন</string>
     <string name="location_action_refresh_gps">জিপিএস থেকে নবায়ন করুন</string>
     <string name="location_picker_title">নিজে এলাকা নির্বাচন করুন</string>
-    <string name="location_picker_step_division">বিভাগ</string>
-    <string name="location_picker_step_district">জেলা</string>
-    <string name="location_picker_step_upazila">উপজেলা / থানা</string>
     <string name="location_gps_title">অবস্থান পাওয়া গেছে</string>
     <string name="location_gps_acquiring">আপনার অবস্থান নেওয়া হচ্ছে…</string>
     <string name="location_section_current_title">বর্তমান অবস্থান</string>
@@ -704,7 +701,6 @@
     <string name="location_setup_manual_confirm">অবস্থান নিশ্চিত করুন</string>
     <string name="location_setup_footer">আপনার নির্বাচিত এলাকা স্থানীয় নামাজের সময় হিসাব করতে ব্যবহৃত হবে। জিপিএস ঐচ্ছিক।</string>
     <string name="location_setup_made_for">বাংলাদেশের মুসলিমদের জন্য তৈরি</string>
-    <string name="location_setup_area_note">নির্বাচিত এলাকা ওই এলাকার প্রকাশিত রেফারেন্স স্থানাঙ্ক সংরক্ষণ করে, আপনার সঠিক অবস্থান নয়।</string>
 
     <!--
       Ramadan: the Ramadan screen and the Sehri/Iftar timetable it draws. The reminder controls it
