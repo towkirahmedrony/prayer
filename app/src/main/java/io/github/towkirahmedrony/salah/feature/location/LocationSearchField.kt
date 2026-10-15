@@ -181,6 +181,13 @@ private fun SearchResultList(
         results.forEachIndexed { index, result ->
             val levelLabel = stringResource(result.level.labelRes())
             val context = result.contextNames.joinToString(separator = " → ")
+            // Both parts are string resources and the separators are punctuation, so no copy is written
+            // in code: the level's own name and its ancestors are joined the same way as any other
+            // composed line in the app (see `QiblaScreen`), and the value is the level alone when the
+            // place has no ancestors to show.
+            val subtitle = listOf(levelLabel, context)
+                .filter { part -> part.isNotEmpty() }
+                .joinToString(separator = " · ")
             // The row owns its semantics, so TalkBack reads the name, the level and the ancestors as
             // one choice — "Gazipur Sadar, Upazila / Thana, Dhaka → Gazipur" — and announces it as a
             // button rather than as three separate pieces of text.
@@ -198,7 +205,7 @@ private fun SearchResultList(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = if (context.isEmpty()) levelLabel else "$levelLabel · $context",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
