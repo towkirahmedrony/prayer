@@ -304,8 +304,9 @@ class RamadanReminderPlanTest {
             .single { it.slot.target == ReminderTarget.IMSAK }
         assertEquals(PrayerReminderKind.AT_TIME, imsak.slot.kind)
         assertTrue(imsak.isAtEventTime)
-        // Fajr for this schedule is 04:47, so a 15-minute interval puts Imsak at 04:32.
-        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 47), zone), imsak.eventAt)
+        // Fajr for this schedule is 04:47, so a 15-minute interval puts Imsak at 04:32 — and the
+        // reminder fires *at Imsak*, so both its event and its trigger are that time, not Fajr.
+        assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 32), zone), imsak.eventAt)
         assertEquals(ZonedDateTime.of(date, LocalTime.of(4, 32), zone), imsak.triggerAt)
     }
 
