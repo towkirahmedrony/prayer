@@ -7,6 +7,7 @@ import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
@@ -394,5 +395,12 @@ class CalendarViewModelTest {
         override val prayerSettings: Flow<PrayerSettings> = MutableStateFlow(PrayerSettings.DEFAULT)
 
         override suspend fun updatePrayerSettings(transform: (PrayerSettings) -> PrayerSettings) = Unit
+
+        override val prayerConfigOverrides: Flow<PrayerConfigOverrides> =
+            MutableStateFlow(PrayerConfigOverrides.NONE)
+
+        override suspend fun updatePrayerConfigOverrides(
+            transform: (PrayerConfigOverrides) -> PrayerConfigOverrides,
+        ) = Unit
     }
 }

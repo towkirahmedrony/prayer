@@ -381,6 +381,14 @@
     <string name="settings_adjustment_increase">One minute later</string>
     <string name="settings_adjustment_minutes">%1$s min</string>
     <string name="settings_calculation_saved">Saved. Prayer times have been recalculated.</string>
+    <string name="settings_config_source_title">Configuration source</string>
+    <string name="settings_config_source_body">Salah uses published calculation settings when they apply to your area, unless you have changed a setting yourself. A published update never overwrites a choice you made.</string>
+    <string name="settings_config_source_bundled">Bundled default, calculated on this device</string>
+    <string name="settings_config_source_global">Published Bangladesh default</string>
+    <string name="settings_config_source_area">Published configuration for your area</string>
+    <string name="settings_config_source_user">Your own settings</string>
+    <string name="settings_config_reset">Reset to applicable defaults</string>
+    <string name="settings_config_reset_body">Removes your own calculation choices so the applicable published or bundled defaults apply again. Your location, reminders and other settings are kept.</string>
     <string name="settings_about_title">About Salah</string>
     <string name="settings_about_body">Salah is an offline-first Islamic companion. Gregorian dates come from the device clock, prayer times are calculated locally by an astronomical engine, and prayer reminders are scheduled and delivered without a network connection. The Bangladesh Bangla calendar is converted with the 2019 Bangla Academy rules and the Hijri calendar is an Umm al-Qura estimate, labelled as an estimate wherever it appears. Prohibited-time rules are not configured and Azan audio is not bundled \u2014 each of those is stated in the app where it applies.</string>
     <string name="settings_version">Version %1$s (build %2$d)</string>

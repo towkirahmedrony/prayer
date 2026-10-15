@@ -14,6 +14,7 @@ import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
@@ -72,6 +73,17 @@ class DataStoreUserPreferencesRepository(
         // Read-modify-write inside one transaction: concurrent updates cannot lose each other,
         // and no cached copy of the settings can be written back over a newer one.
         dataStore.edit { preferences ->
+            // Freeze the inferred overrides on the first write, before the settings change.
+            //
+            // A store written before this feature existed has no override key, so the owned fields are
+            // inferred from the settings. If they were only inferred on read, a remote value written into
+            // an unowned field could later be mis-read as a user's own choice (it would differ from the
+            // default). Materialising the inference here, from the state before this write, keeps the
+            // boundary between "the user chose this" and "a remote default supplied it" fixed.
+            if (!preferences.contains(Keys.PRAYER_CONFIG_OVERRIDES)) {
+                preferences[Keys.PRAYER_CONFIG_OVERRIDES] =
+                    PrayerConfigOverrides.deriving(preferences.toPrayerSettings()).encode()
+            }
             val updated = transform(preferences.toPrayerSettings())
             preferences[Keys.CALCULATION_METHOD] = updated.method.name
             preferences[Keys.ASR_METHOD] = updated.asrMethod.name
@@ -87,6 +99,42 @@ class DataStoreUserPreferencesRepository(
             }
         }
     }
+
+    // --- Prayer-configuration overrides -----------------------------------------
+
+    /**
+     * Which calculation fields the user owns.
+     *
+     * The key is read only when it is present; when it is absent — a store written before remote
+     * configuration existed — the owned fields are inferred from the stored settings. That inference
+     * preserves any value the user had changed while still allowing a remote default to supply a field that
+     * is still at the bundled default. See [PrayerConfigOverrides.deriving].
+     */
+    override val prayerConfigOverrides: Flow<PrayerConfigOverrides> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences -> preferences.toPrayerConfigOverrides() }
+
+    override suspend fun updatePrayerConfigOverrides(
+        transform: (PrayerConfigOverrides) -> PrayerConfigOverrides,
+    ) {
+        dataStore.edit { preferences ->
+            val updated = transform(preferences.toPrayerConfigOverrides())
+            preferences[Keys.PRAYER_CONFIG_OVERRIDES] = updated.encode()
+        }
+    }
+
+    /**
+     * Reads the owned calculation fields, inferring them for a store that predates the key.
+     *
+     * `contains` distinguishes "absent" (infer) from "present but empty" (the user has reset everything),
+     * which is the difference between adopting a remote default and honouring an explicit reset.
+     */
+    private fun Preferences.toPrayerConfigOverrides(): PrayerConfigOverrides =
+        if (contains(Keys.PRAYER_CONFIG_OVERRIDES)) {
+            PrayerConfigOverrides.decode(this[Keys.PRAYER_CONFIG_OVERRIDES])
+        } else {
+            PrayerConfigOverrides.deriving(toPrayerSettings())
+        }
 
     // --- Calendar ---------------------------------------------------------------
 
@@ -157,6 +205,7 @@ class DataStoreUserPreferencesRepository(
         val ASR_METHOD = stringPreferencesKey("prayer_asr_method")
         val HIGH_LATITUDE_RULE = stringPreferencesKey("prayer_high_latitude_rule")
         val TIME_FORMAT = stringPreferencesKey("time_format")
+        val PRAYER_CONFIG_OVERRIDES = stringPreferencesKey("prayer_config_overrides")
         val PREFERRED_CALENDAR = stringPreferencesKey("calendar_preferred_system")
         val HIJRI_ADJUSTMENT_DAYS = intPreferencesKey("calendar_hijri_adjustment_days")
         val DATE_LANGUAGE = stringPreferencesKey("calendar_date_language")

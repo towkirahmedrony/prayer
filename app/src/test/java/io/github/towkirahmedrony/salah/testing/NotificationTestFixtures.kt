@@ -27,6 +27,7 @@ import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationProfile
+import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
@@ -316,12 +317,14 @@ class FakeUserPreferencesRepository(
     initialTheme: ThemeMode = ThemeMode.SYSTEM,
     initialCalendarSettings: CalendarSettings = CalendarSettings.DEFAULT,
     initialAppLanguage: AppLanguage = AppLanguage.DEFAULT,
+    initialOverrides: PrayerConfigOverrides = PrayerConfigOverrides.NONE,
 ) : UserPreferencesRepository {
 
     private val settingsState = MutableStateFlow(initialSettings)
     private val themeState = MutableStateFlow(initialTheme)
     private val calendarState = MutableStateFlow(initialCalendarSettings)
     private val languageState = MutableStateFlow(initialAppLanguage)
+    private val overridesState = MutableStateFlow(initialOverrides)
 
     /**
      * When set, the next [setAppLanguage] throws this instead of storing anything, which models a
@@ -340,6 +343,14 @@ class FakeUserPreferencesRepository(
 
     override suspend fun updatePrayerSettings(transform: (PrayerSettings) -> PrayerSettings) {
         settingsState.value = transform(settingsState.value)
+    }
+
+    override val prayerConfigOverrides: Flow<PrayerConfigOverrides> = overridesState
+
+    override suspend fun updatePrayerConfigOverrides(
+        transform: (PrayerConfigOverrides) -> PrayerConfigOverrides,
+    ) {
+        overridesState.value = transform(overridesState.value)
     }
 
     override val calendarSettings: Flow<CalendarSettings> = calendarState

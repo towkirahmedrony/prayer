@@ -7,6 +7,9 @@ import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPo
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSyncTrigger
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
@@ -99,6 +102,25 @@ class SalahApplication : Application() {
             StartupTrace.mark("background_dataset_start")
             dataset.await()
             StartupTrace.mark("background_dataset_done")
+
+            // Remote prayer configuration: fetch, validate and adopt a published revision, then reapply
+            // the effective settings. It runs before the reconciliation so the reminders are planned from
+            // the effective profile. It can never block or break anything: a missing configuration, no
+            // network or an invalid response all leave the existing settings in force.
+            val prayerConfigSynchronizer = runCatching { koin.get<PrayerConfigSynchronizer>() }.getOrNull()
+            if (prayerConfigSynchronizer != null) {
+                StartupTrace.mark("prayer_config_sync_start")
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        prayerConfigSynchronizer.synchronize(PrayerConfigSyncTrigger.APP_START)
+                    }
+                }
+                StartupTrace.mark("prayer_config_sync_done")
+            }
+            runCatching { koin.get<PrayerConfigApplier>() }.getOrNull()?.let { applier ->
+                withContext(Dispatchers.IO) { runCatching { applier.apply() } }
+                StartupTrace.mark("prayer_config_applied")
+            }
 
             val coordinator = runCatching { koin.get<PrayerNotificationCoordinator>() }.getOrNull()
             if (coordinator != null) {

@@ -111,7 +111,7 @@ class SupabaseRemoteDatasetSource(
  * than using `URLEncoder`, which encodes a space as `+` (correct for a form body, wrong in a path
  * segment) and leaves `*` unescaped.
  */
-private fun percentEncode(value: String): String {
+internal fun percentEncode(value: String): String {
     val builder = StringBuilder(value.length)
     for (byte in value.toByteArray(Charsets.UTF_8)) {
         val code = byte.toInt() and 0xFF

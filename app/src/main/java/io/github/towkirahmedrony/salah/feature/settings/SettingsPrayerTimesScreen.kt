@@ -45,6 +45,7 @@ fun SettingsPrayerTimesScreen(
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val origin by viewModel.prayerConfigOrigin.collectAsStateWithLifecycle()
     val settings = uiState.prayerSettings
 
     SettingsSubpage(
@@ -57,6 +58,37 @@ fun SettingsPrayerTimesScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        SalahSectionCard {
+            Text(
+                text = stringResource(R.string.settings_config_source_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_config_source_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = stringResource(origin.labelRes()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(onClick = viewModel::resetToDefaults) {
+                Text(text = stringResource(R.string.settings_config_reset))
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.settings_config_reset_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         SalahSectionCard {
             Text(

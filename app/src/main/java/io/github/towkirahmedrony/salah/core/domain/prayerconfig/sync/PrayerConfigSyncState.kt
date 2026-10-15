@@ -1,0 +1,126 @@
+package io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync
+
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfig
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigProblem
+
+/**
+ * What set a synchronisation attempt in motion.
+ *
+ * Recorded and logged; it changes behaviour only in that a user-initiated check is never suppressed by the
+ * throttle. A check is otherwise the same sequence whoever asked for it, keeping the number of code paths
+ * that can touch the active configuration equal to one.
+ */
+enum class PrayerConfigSyncTrigger {
+    APP_START,
+    FOREGROUND,
+    MANUAL,
+}
+
+/** Why a check did not produce a new active configuration. Mirrors the dataset vocabulary. */
+enum class PrayerConfigFailureReason(val code: String, val transient: Boolean) {
+
+    MANIFEST_UNAVAILABLE("manifest_unavailable", transient = true),
+    MANIFEST_MALFORMED("manifest_malformed", transient = false),
+    UNSUPPORTED_SCHEMA("unsupported_schema_version", transient = false),
+    PUBLICATION_NOT_PUBLISHED("publication_not_published", transient = false),
+    CONFIGURATION_ID_MISMATCH("configuration_id_mismatch", transient = false),
+    INVALID_CHECKSUM("invalid_checksum", transient = false),
+    REVISION_REUSED("revision_reused_with_different_content", transient = false),
+    STALE_REVISION("stale_revision", transient = false),
+    CONTENT_UNAVAILABLE("content_unavailable", transient = true),
+    CONTENT_MALFORMED("content_malformed", transient = false),
+    CHECKSUM_MISMATCH("checksum_mismatch", transient = false),
+    INVALID_CONFIGURATION("invalid_configuration", transient = false),
+    ACTIVATION_FAILED("activation_failed", transient = false),
+    STORAGE_FAILED("storage_failed", transient = true),
+}
+
+/** A *terminal* failure cannot be fixed by repeating the same fetch, so it is not retried until the revision changes. */
+fun PrayerConfigFailureReason.isTerminal(): Boolean = !transient
+
+/**
+ * The outcome of one synchronisation attempt.
+ *
+ * "No update available" ([UpToDate]) and "the sync failed" ([Failed]) are different outcomes, as are
+ * "the publication was unacceptable" ([Rejected]) and "the environment failed" ([Failed]). Keeping them
+ * apart is what lets Diagnostics and the tests tell a normal no-op from a problem worth investigating.
+ */
+sealed interface PrayerConfigSyncOutcome {
+
+    /** No remote configuration is configured. The app runs on its bundled defaults exactly as before. */
+    data object NotConfigured : PrayerConfigSyncOutcome
+
+    /** A check ran too recently, so nothing was fetched. */
+    data object Throttled : PrayerConfigSyncOutcome
+
+    /** Nothing needed to change: the accepted revision already matches, or the publication was already declined. */
+    data class UpToDate(val active: ActivePrayerConfig?) : PrayerConfigSyncOutcome
+
+    /**
+     * A validated publication is now the active configuration.
+     *
+     * [droppedAssignments] is non-empty when the publication contained area overrides that named an
+     * unknown area; those assignments were dropped and the rest was applied.
+     */
+    data class Activated(
+        val active: ActivePrayerConfig,
+        val droppedAssignments: List<PrayerConfigProblem> = emptyList(),
+    ) : PrayerConfigSyncOutcome
+
+    /** The candidate failed validation or the revision rules. The active configuration is unchanged. */
+    data class Rejected(val problems: List<PrayerConfigProblem>) : PrayerConfigSyncOutcome
+
+    /** The attempt failed for an environmental or integrity reason. The active configuration is unchanged. */
+    data class Failed(
+        val reason: PrayerConfigFailureReason,
+        val detail: String? = null,
+    ) : PrayerConfigSyncOutcome
+
+    val isSuccess: Boolean get() = this is UpToDate || this is Activated
+    val isFailure: Boolean get() = this is Failed || this is Rejected
+}
+
+/**
+ * The small amount of state a synchronisation keeps between runs: when the last check ran, which revision
+ * it evaluated, and the failure code if it failed. Machine state only — not user data, and not backed up.
+ */
+data class PrayerConfigSyncState(
+    val lastAttemptAtEpochMillis: Long? = null,
+    val lastAttemptedRevisionId: String? = null,
+    val lastFailureCode: String? = null,
+)
+
+/** Where the synchroniser keeps [PrayerConfigSyncState]. A port so the synchroniser is testable in memory. */
+interface PrayerConfigSyncStateStore {
+
+    /** The stored state, or a default when nothing has been stored yet. Never throws. */
+    suspend fun read(): PrayerConfigSyncState
+
+    /** Replaces the stored state. */
+    suspend fun write(state: PrayerConfigSyncState)
+}
+
+/**
+ * How often a check may run, mirroring the dataset throttle policy and its constants.
+ *
+ * A successful check suppresses the next one for [successIntervalMillis]; a failed check for the shorter
+ * [failureIntervalMillis], because a failure may simply have been offline. A user-initiated check
+ * (`forced`) is never suppressed.
+ */
+class PrayerConfigThrottlePolicy(
+    val successIntervalMillis: Long = DEFAULT_SUCCESS_INTERVAL_MILLIS,
+    val failureIntervalMillis: Long = DEFAULT_FAILURE_INTERVAL_MILLIS,
+) {
+
+    fun shouldCheck(state: PrayerConfigSyncState, nowEpochMillis: Long, forced: Boolean): Boolean {
+        if (forced) return true
+        val lastAttempt = state.lastAttemptAtEpochMillis ?: return true
+        val interval = if (state.lastFailureCode != null) failureIntervalMillis else successIntervalMillis
+        return nowEpochMillis - lastAttempt >= interval
+    }
+
+    companion object {
+        const val DEFAULT_SUCCESS_INTERVAL_MILLIS: Long = 12L * 60 * 60 * 1000
+        const val DEFAULT_FAILURE_INTERVAL_MILLIS: Long = 15L * 60 * 1000
+    }
+}

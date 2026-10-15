@@ -2,6 +2,8 @@ package io.github.towkirahmedrony.salah.feature.common
 
 import androidx.annotation.StringRes
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigOrigin
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigOriginKind
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
@@ -217,6 +219,20 @@ fun AppLanguage.labelRes(): Int = when (this) {
     AppLanguage.SYSTEM -> R.string.settings_language_system
     AppLanguage.ENGLISH -> R.string.settings_language_english
     AppLanguage.BANGLA -> R.string.settings_language_bangla
+}
+
+/**
+ * Where the effective prayer-calculation configuration comes from.
+ *
+ * Deliberately four plain statements and no revision id, checksum or payload: the user is told which layer
+ * is in force, not what a database row contains.
+ */
+@StringRes
+fun PrayerConfigOrigin.labelRes(): Int = when (kind) {
+    PrayerConfigOriginKind.BUNDLED_DEFAULT -> R.string.settings_config_source_bundled
+    PrayerConfigOriginKind.PUBLISHED_GLOBAL -> R.string.settings_config_source_global
+    PrayerConfigOriginKind.PUBLISHED_AREA -> R.string.settings_config_source_area
+    PrayerConfigOriginKind.USER_OVERRIDE -> R.string.settings_config_source_user
 }
 
 @StringRes

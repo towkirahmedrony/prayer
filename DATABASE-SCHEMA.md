@@ -10,6 +10,13 @@ mirror of `supabase/migrations/20260515000000_dataset_publications.sql` and of t
 > no live database change has been made and no remote publication has been served. See
 > `docs/SUPABASE_SETUP.md` for the exact steps to apply it. Nothing in this document claims a deployed
 > database.
+>
+> **Phase 3 adds a second published slot.** The remote prayer-time calculation configuration has its own
+> migration, `supabase/migrations/20260601000000_prayer_config_publications.sql`, its own tables and view,
+> and its own contract in `core/domain/prayerconfig/`. It follows the same publication pattern documented
+> here — immutable revisions, a single current-publication pointer, a definer view as the only client
+> surface, and read-only RLS for app clients — but the two slots are deliberately independent, so a change
+> to one cannot disturb the other. See `docs/PRAYER_CONFIGURATION.md`.
 
 ## 1. What the schema is for
 

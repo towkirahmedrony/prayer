@@ -36,6 +36,13 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetRemoteC
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncStateStore
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigResolver
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.remote.PrayerConfigRemoteConfig
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.remote.RemotePrayerConfigSource
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSyncStateStore
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
@@ -67,6 +74,9 @@ import io.github.towkirahmedrony.salah.data.preferences.DataStoreUserPreferences
 import io.github.towkirahmedrony.salah.data.preferences.salahPreferencesDataStore
 import io.github.towkirahmedrony.salah.data.prayer.AdhanPrayerTimesProvider
 import io.github.towkirahmedrony.salah.data.prayer.ProviderBackedPrayerScheduleRepository
+import io.github.towkirahmedrony.salah.data.prayerconfig.FilePrayerConfigStore
+import io.github.towkirahmedrony.salah.data.prayerconfig.remote.SupabaseRemotePrayerConfigSource
+import io.github.towkirahmedrony.salah.data.prayerconfig.sync.FilePrayerConfigSyncStateStore
 import io.github.towkirahmedrony.salah.data.prohibited.RuleBookProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.data.qibla.AndroidCompassSensorSource
 import io.github.towkirahmedrony.salah.data.qibla.AndroidGeomagneticDeclinationProvider
@@ -107,6 +117,17 @@ private const val APPLIED_DATASET_DIRECTORY = "datasets/bd_locations"
  * See [io.github.towkirahmedrony.salah.data.dataset.sync.FileDatasetSyncStateStore].
  */
 private const val DATASET_SYNC_STATE_FILE = "datasets/bd_locations.sync"
+
+/**
+ * Where the accepted prayer configuration is kept, under `filesDir` and outside the backup set.
+ *
+ * Namespaced by slot so a second independently published configuration can be added later without moving
+ * the first one. See [io.github.towkirahmedrony.salah.data.prayerconfig.FilePrayerConfigStore].
+ */
+private const val APPLIED_PRAYER_CONFIG_DIRECTORY = "prayer_config"
+
+/** Where the prayer-configuration synchronisation state is kept, beside the stored configuration. */
+private const val PRAYER_CONFIG_SYNC_STATE_FILE = "prayer_config.sync"
 
 /**
  * Single dependency container for Salah.
@@ -200,6 +221,60 @@ val salahModules = module {
             stateStore = get(),
             logger = get(),
             clock = get(),
+        )
+    }
+
+    // Remote prayer-configuration publication --------------------------------
+    // The same non-secret Supabase project and publishable key as the dataset source, and the same
+    // HttpTransport: this phase adds a second published slot, not a second networking client. The default
+    // build compiles the URL and key empty, so PrayerConfigRemoteConfig.isConfigured is false and the
+    // synchroniser reports "not configured" without touching the network.
+    single {
+        PrayerConfigRemoteConfig(
+            baseUrl = BuildConfig.SALAH_SUPABASE_URL,
+            anonKey = BuildConfig.SALAH_SUPABASE_ANON_KEY,
+        )
+    }
+    single<RemotePrayerConfigSource> { SupabaseRemotePrayerConfigSource(transport = get(), config = get()) }
+    single<ActivePrayerConfigStore> {
+        FilePrayerConfigStore(
+            root = File(androidContext().filesDir, APPLIED_PRAYER_CONFIG_DIRECTORY),
+            logger = get(),
+        )
+    }
+    single<PrayerConfigSyncStateStore> {
+        FilePrayerConfigSyncStateStore(
+            file = File(androidContext().filesDir, PRAYER_CONFIG_SYNC_STATE_FILE),
+            logger = get(),
+        )
+    }
+    single { PrayerConfigResolver() }
+    // Resolves the effective profile once and writes the non-overridden fields back into the one settings
+    // store, so every existing reader of PrayerSettings needs no change. It writes exactly one preference
+    // group and never touches the time format, the theme, the calendar settings or the location.
+    single {
+        PrayerConfigApplier(
+            resolver = get(),
+            userPreferences = get(),
+            store = get<ActivePrayerConfigStore>(),
+            locations = get(),
+            logger = get(),
+        )
+    }
+    single {
+        PrayerConfigSynchronizer(
+            config = get(),
+            source = get(),
+            store = get<ActivePrayerConfigStore>(),
+            // The active location dataset, read to validate area references in a publication. It is an
+            // input to validation and is never written by this path.
+            areaDataset = { get<BangladeshAreaCatalog>().dataset() },
+            stateStore = get(),
+            logger = get(),
+            clock = get(),
+            // After a validated revision becomes active, the effective settings are reapplied so the
+            // recalculation and the reminder reconciliation that follow use the new profile.
+            onActivated = { get<PrayerConfigApplier>().apply() },
         )
     }
 
@@ -403,7 +478,7 @@ val salahModules = module {
     viewModel {
         // The coordinator is injected because a calculation change moves every scheduled time; the
         // reconciliation that follows the write is what keeps the reminders in step with it.
-        SettingsViewModel(userPreferencesRepository = get(), coordinator = get())
+        SettingsViewModel(userPreferencesRepository = get(), coordinator = get(), applier = get())
     }
     viewModel {
         CalendarViewModel(

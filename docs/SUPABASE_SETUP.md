@@ -121,3 +121,29 @@ These cannot be verified in CI without a real project, and are listed so the gap
 - an end-to-end "publish a new release, watch an app adopt it" run.
 
 Until those are done, treat the remote path as **implemented and unit-tested, not live-verified**.
+
+## 6. Prayer-configuration publication (Phase 3)
+
+The second published slot is the remote prayer-time calculation configuration. It reuses the same project,
+the same publishable key and the same HTTP transport as the dataset path; it adds a slot, not a second
+networking client. Its schema is a separate migration,
+`supabase/migrations/20260601000000_prayer_config_publications.sql`, and it leaves the dataset tables
+untouched. The full reference is `docs/PRAYER_CONFIGURATION.md`.
+
+Apply it the same way as §2 (Supabase CLI `supabase db push`, or paste into the SQL editor). It is written
+to be reviewable and re-runnable. Then publish a revision as described in `docs/PRAYER_CONFIGURATION.md`
+§10, and verify the read path with the publishable key:
+
+```bash
+curl -s "https://<ref>.supabase.co/rest/v1/prayer_config_current_publication?configuration_id=eq.bd_prayer&limit=1&select=configuration_id,revision_id,revision_number,schema_version,status,checksum" \
+  -H "apikey: <anon-key>" -H "Authorization: Bearer <anon-key>"
+```
+
+The same configuration values from §1 (`salah.supabase.url` and `salah.supabase.anonKey`) enable both
+slots. With them set, the app on start-up (and never blocking a screen) checks for a published revision,
+validates it, adopts it and reapplies the effective settings; with them unset, both slots report "not
+configured" and the app runs entirely offline.
+
+**What still needs a live test here too:** the prayer-config migration applied to a real project, the view's
+RLS behaviour, and an end-to-end "publish a revision, watch an app adopt it" run. Until then, treat this
+path as **implemented and unit-tested, not live-verified**.

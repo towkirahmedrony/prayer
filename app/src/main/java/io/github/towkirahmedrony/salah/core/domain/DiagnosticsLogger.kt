@@ -228,4 +228,39 @@ object SalahDiagnosticEvents {
 
     /** A check ran too recently and was suppressed by the throttle policy. */
     const val DATASET_SYNC_THROTTLED = "dataset_sync_throttled"
+
+    // Remote prayer-configuration synchronisation ------------------------------
+    // Separate from the dataset events on purpose, and with the same discipline: events record the trigger,
+    // the configuration slot, the revision id and failure codes. Never a credential, a raw payload or a
+    // coordinate.
+
+    /** A prayer-configuration synchronisation began, with the trigger that started it. */
+    const val PRAYER_CONFIG_SYNC_STARTED = "prayer_config_sync_started"
+
+    /** A check found nothing to change, so no payload was downloaded. */
+    const val PRAYER_CONFIG_SYNC_UP_TO_DATE = "prayer_config_sync_up_to_date"
+
+    /** A validated remote revision became the active prayer configuration. */
+    const val PRAYER_CONFIG_SYNC_ACTIVATED = "prayer_config_sync_activated"
+
+    /** A remote revision (or an activation candidate) was refused, with the problem codes. */
+    const val PRAYER_CONFIG_SYNC_REJECTED = "prayer_config_sync_rejected"
+
+    /** A synchronisation attempt failed, with its reason code. The active configuration is unchanged. */
+    const val PRAYER_CONFIG_SYNC_FAILED = "prayer_config_sync_failed"
+
+    /** No remote prayer configuration is configured, so nothing was attempted. */
+    const val PRAYER_CONFIG_SYNC_NOT_CONFIGURED = "prayer_config_sync_not_configured"
+
+    /** A check ran too recently and was suppressed by the throttle policy. */
+    const val PRAYER_CONFIG_SYNC_THROTTLED = "prayer_config_sync_throttled"
+
+    /** The stored prayer configuration could not be read, so the bundled defaults are used. */
+    const val PRAYER_CONFIG_STORED_UNAVAILABLE = "prayer_config_stored_unavailable"
+
+    /** The effective calculation settings were reapplied from the active configuration and user overrides. */
+    const val PRAYER_CONFIG_EFFECTIVE_APPLIED = "prayer_config_effective_applied"
+
+    /** The user reset a calculation override back to the applicable default. */
+    const val PRAYER_CONFIG_OVERRIDE_RESET = "prayer_config_override_reset"
 }

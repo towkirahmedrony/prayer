@@ -432,6 +432,14 @@
     <string name="settings_adjustment_increase">এক মিনিট পরে</string>
     <string name="settings_adjustment_minutes">%1$s মিনিট</string>
     <string name="settings_calculation_saved">সংরক্ষিত হয়েছে। নামাজের সময় পুনরায় হিসাব করা হয়েছে।</string>
+    <string name="settings_config_source_title">কনফিগারেশনের উৎস</string>
+    <string name="settings_config_source_body">আপনার এলাকার জন্য প্রযোজ্য প্রকাশিত হিসাব-সেটিংস থাকলে সালাহ সেগুলো ব্যবহার করে, যদি না আপনি নিজে কোনো সেটিং বদলে থাকেন। প্রকাশিত হালনাগাদ আপনার নির্বাচিত মান কখনো মুছে ফেলে না।</string>
+    <string name="settings_config_source_bundled">অ্যাপের অন্তর্নির্মিত ডিফল্ট, এই ডিভাইসে হিসাব করা</string>
+    <string name="settings_config_source_global">প্রকাশিত বাংলাদেশ ডিফল্ট</string>
+    <string name="settings_config_source_area">আপনার এলাকার জন্য প্রকাশিত কনফিগারেশন</string>
+    <string name="settings_config_source_user">আপনার নিজের সেটিংস</string>
+    <string name="settings_config_reset">প্রযোজ্য ডিফল্টে ফেরান</string>
+    <string name="settings_config_reset_body">আপনার নিজের হিসাব-নির্বাচন মুছে দেয়, যাতে প্রযোজ্য প্রকাশিত বা অন্তর্নির্মিত ডিফল্ট আবার কার্যকর হয়। আপনার অবস্থান, রিমাইন্ডার ও অন্যান্য সেটিংস অপরিবর্তিত থাকে।</string>
 
     <!-- Settings: manual coordinates (a section of the Location screen). -->
     <string name="settings_location_title">নিজে দেওয়া স্থানাঙ্ক</string>

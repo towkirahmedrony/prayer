@@ -4,11 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigOrigin
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -48,9 +52,38 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val coordinator: PrayerNotificationCoordinator,
+    /**
+     * The effective-configuration applier, or `null` for a caller that does not manage remote configuration.
+     *
+     * It is optional so the prayer-settings contract (settings are stored, the timetable is recalculated)
+     * stays testable without standing up the whole remote pipeline. When it is present, the screen can also
+     * report where the effective configuration came from and reset a user override back to its default; when
+     * it is absent those two affordances simply do not appear.
+     */
+    private val applier: PrayerConfigApplier? = null,
 ) : ViewModel() {
 
     private val message = MutableStateFlow<SettingsMessage?>(null)
+
+    init {
+        // Reads the stored remote configuration once, so the origin flow has the active revision. It writes
+        // no preference and blocks nothing.
+        applier?.let { effective -> viewModelScope.launch { effective.refresh() } }
+    }
+
+    /**
+     * Where the effective calculation configuration comes from, for the Prayer times screen.
+     *
+     * A bundled default when no remote configuration is stored and the user owns nothing; a published
+     * global or area configuration when one applies; and a user override once the user has changed any
+     * calculation field themselves.
+     */
+    val prayerConfigOrigin: StateFlow<PrayerConfigOrigin> =
+        (applier?.origin ?: flowOf(PrayerConfigOrigin.BUNDLED)).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(subscribeTimeoutMillis),
+            initialValue = PrayerConfigOrigin.BUNDLED,
+        )
 
     val uiState: StateFlow<SettingsUiState> = combine(
         userPreferencesRepository.themeMode,
@@ -112,13 +145,13 @@ class SettingsViewModel(
     // --- Prayer calculation -----------------------------------------------------
 
     fun setCalculationMethod(method: PrayerCalculationMethod) =
-        updateSettings { it.copy(method = method) }
+        updateSettings(PrayerConfigOverrides.Field.METHOD) { it.copy(method = method) }
 
     fun setAsrMethod(asrMethod: AsrCalculationMethod) =
-        updateSettings { it.copy(asrMethod = asrMethod) }
+        updateSettings(PrayerConfigOverrides.Field.ASR_METHOD) { it.copy(asrMethod = asrMethod) }
 
     fun setHighLatitudeRule(rule: HighLatitudeRule) =
-        updateSettings { it.copy(highLatitudeRule = rule) }
+        updateSettings(PrayerConfigOverrides.Field.HIGH_LATITUDE_RULE) { it.copy(highLatitudeRule = rule) }
 
     /**
      * How times are written everywhere in the app, including its reminders.
@@ -141,17 +174,50 @@ class SettingsViewModel(
 
     /** Sets [prayer]'s manual correction to [minutes]; the model clamps it to the valid range. */
     fun setAdjustment(prayer: PrayerName, minutes: Int) =
-        updateSettings { it.withAdjustment(prayer, minutes) }
+        updateSettings(PrayerConfigOverrides.Field.ADJUSTMENTS) { it.withAdjustment(prayer, minutes) }
 
     /** Shifts [prayer]'s correction by [deltaMinutes], relative to the stored value. */
     fun shiftAdjustment(prayer: PrayerName, deltaMinutes: Int) =
-        updateSettings { it.withAdjustment(prayer, it.adjustmentFor(prayer) + deltaMinutes) }
+        updateSettings(PrayerConfigOverrides.Field.ADJUSTMENTS) {
+            it.withAdjustment(prayer, it.adjustmentFor(prayer) + deltaMinutes)
+        }
 
-    fun clearAdjustments() = updateSettings { it.withoutAdjustments() }
+    /**
+     * Clears every manual correction.
+     *
+     * The adjustment field stays user-owned: asking for zero is an explicit choice, and a later remote
+     * revision must not quietly put the corrections back. Resetting the field back to its applicable
+     * default is the separate "reset to defaults" action.
+     */
+    fun clearAdjustments() =
+        updateSettings(PrayerConfigOverrides.Field.ADJUSTMENTS) { it.withoutAdjustments() }
 
-    private fun updateSettings(transform: (PrayerSettings) -> PrayerSettings) {
+    /**
+     * Releases every calculation field the user owns back to its applicable default and reapplies.
+     *
+     * Only meaningful when an applier is present; it is a no-op otherwise. The reminders are rebuilt, because
+     * the reset changes the calculated times.
+     */
+    fun resetToDefaults() {
         message.value = null
         viewModelScope.launch {
+            applier?.resetAll()
+            message.value = SettingsMessage.PrayerSettingsSaved
+            coordinator.reconcile(ReconcileReason.SETTINGS_CHANGED)
+        }
+    }
+
+    private fun updateSettings(
+        field: PrayerConfigOverrides.Field?,
+        transform: (PrayerSettings) -> PrayerSettings,
+    ) {
+        message.value = null
+        viewModelScope.launch {
+            // Marking the field first records the user's ownership before the value is written, so a sync
+            // that runs in between cannot adopt a remote value over the choice being made now.
+            if (field != null) {
+                userPreferencesRepository.updatePrayerConfigOverrides { it.with(field) }
+            }
             userPreferencesRepository.updatePrayerSettings(transform)
             // Any of these changes alters the calculated times, so the user is told that the
             // timetable is being recalculated rather than left to wonder why it moved.

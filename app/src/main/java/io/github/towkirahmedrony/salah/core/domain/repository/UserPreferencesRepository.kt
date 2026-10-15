@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.core.domain.repository
 
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
+import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -68,4 +69,21 @@ interface UserPreferencesRepository {
      * change.
      */
     suspend fun updateCalendarSettings(transform: (CalendarSettings) -> CalendarSettings)
+
+    /**
+     * Which calculation fields the user has explicitly chosen, so a published remote configuration can
+     * supply defaults without ever overwriting a value the user set.
+     *
+     * Stored under its own key in the same DataStore as [prayerSettings], so a remote update can be applied
+     * to the settings without disturbing any other preference. The flow always emits a value: a store written
+     * before this feature existed yields the fields inferred from [prayerSettings] (see
+     * [PrayerConfigOverrides.deriving]), which errs on the side of preserving a change the user made.
+     */
+    val prayerConfigOverrides: Flow<PrayerConfigOverrides>
+
+    /**
+     * Atomically rewrites [prayerConfigOverrides] through [transform], with the same
+     * read-modify-write-in-one-transaction guarantee as [updatePrayerSettings].
+     */
+    suspend fun updatePrayerConfigOverrides(transform: (PrayerConfigOverrides) -> PrayerConfigOverrides)
 }
