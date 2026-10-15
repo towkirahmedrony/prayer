@@ -2,13 +2,23 @@ package io.github.towkirahmedrony.salah.feature.calendar
 
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGrid
+import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
+import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
+import io.github.towkirahmedrony.salah.core.model.BanglaDate
 import io.github.towkirahmedrony.salah.core.model.CalendarDay
 import io.github.towkirahmedrony.salah.core.model.CalendarMonth
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.HijriDate
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.PrayerName
+import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 
 /**
@@ -52,6 +62,17 @@ class CalendarUiStateFactory(
         settings: CalendarSettings,
         selected: LocalDate,
         systemLocale: Locale = Locale.getDefault(),
+        /**
+         * The prayer schedule for [selected] at the configured location, or its absence.
+         *
+         * Defaulted to [PrayerScheduleState.Loading] so a caller that has no prayer source — the
+         * factory's own unit tests — gets a screen with no times rather than a fabricated timetable.
+         */
+        prayerSchedule: PrayerScheduleState = PrayerScheduleState.Loading,
+        /** The prayer settings the times were calculated with, for the clock-format preference. */
+        prayerSettings: PrayerSettings = PrayerSettings.DEFAULT,
+        /** The saved location the prayer times belong to, or `null` when none is configured. */
+        location: LocationInfo? = null,
     ): CalendarUiState {
         val days = month.days
         if (days.isEmpty()) {
@@ -67,10 +88,14 @@ class CalendarUiStateFactory(
         val selectedDay = days.firstOrNull { it.date == selected } ?: days.first()
         val todayDay = days.firstOrNull { it.date == today } ?: selectedDay
 
+        val spans = month.hijriAndBanglaSpans(locale)
+
         return CalendarUiState.Ready(
             system = system,
             month = month.yearMonth,
             monthLabel = monthLabel(month, system, gridLocale, locale),
+            hijriSpanLabel = spans.first,
+            banglaSpanLabel = spans.second,
             weekdayLabels = weekdayLabels(month, gridLocale),
             weeks = month.weeks.map { week ->
                 week.map { cell -> cellOf(cell, selectedDay.date, month, system, gridLocale) }
@@ -80,6 +105,7 @@ class CalendarUiStateFactory(
             selectedIsToday = selectedDay.date == today,
             selectedOutOfRange = selectedDay.outOfRangeFor(system),
             ramadan = month.toRamadanSection(today, locale),
+            prayerTimes = prayerSection(prayerSchedule, prayerSettings, location, locale),
             hijriAdjustmentDays = settings.hijriAdjustmentDays,
             dateLanguage = settings.dateLanguage,
             monthStart = days.first().date,
@@ -158,6 +184,8 @@ class CalendarUiStateFactory(
 
     private fun CalendarDay.toSelectedDay(locale: Locale): SelectedDay = SelectedDay(
         date = date,
+        // Jumu'ah is the week's own name for a Friday, not a calendar observance Salah derives.
+        isJumuah = date.dayOfWeek == DayOfWeek.FRIDAY,
         weekday = formatting.weekday(date, locale),
         lines = listOf(
             CalendarDateLine(
@@ -226,6 +254,96 @@ class CalendarUiStateFactory(
             },
             isRamadanDay = cell.ramadanDayNumber != null,
             occasion = cell.occasions.firstOrNull(),
+            isHijriMonthStart = cell.hijri?.day == 1,
+        )
+    }
+
+    /**
+     * The Hijri and Bangla months the displayed month covers, as two ready-to-render labels.
+     *
+     * A Gregorian or Bangla month rarely lines up with the others, so each span is taken from the
+     * month's own first and last convertible days: when they fall in the same month the label names it
+     * once with its year, and when the month turns over inside the displayed span both months are named
+     * — with a year each only when the turn-over also crosses a year boundary.
+     *
+     * The Bangla half is always written in Bengali script and Bengali numerals, which is how the
+     * Bangladeshi civil calendar is named; the Hijri half follows the interface language, like every
+     * other Hijri label. `null` means the platform's tables do not cover the month, so nothing is shown
+     * rather than a guessed span.
+     */
+    private fun CalendarMonth.hijriAndBanglaSpans(locale: Locale): Pair<String?, String?> {
+        val monthDays = days
+        val hijriDays = monthDays.mapNotNull { it.hijri }
+        val banglaDays = monthDays.mapNotNull { it.bangla }
+        val hijriSpan = hijriDays.lastOrNull()?.let { last ->
+            hijriSpanLabel(hijriDays.first(), last, locale)
+        }
+        val banglaSpan = banglaDays.lastOrNull()?.let { last ->
+            banglaSpanLabel(banglaDays.first(), last)
+        }
+        return hijriSpan to banglaSpan
+    }
+
+    private fun hijriSpanLabel(first: HijriDate, last: HijriDate, locale: Locale): String =
+        spanLabel(
+            firstName = formatting.hijriMonthName(first.month, locale),
+            firstYear = first.year,
+            lastName = formatting.hijriMonthName(last.month, locale),
+            lastYear = last.year,
+            number = { year -> formatting.numerals(year, locale) },
+        )
+
+    private fun banglaSpanLabel(first: BanglaDate, last: BanglaDate): String {
+        val bengali = Locale(CalendarFormatting.BANGLA_LANGUAGE)
+        return spanLabel(
+            firstName = formatting.banglaMonthName(first.month, bengali),
+            firstYear = first.year,
+            lastName = formatting.banglaMonthName(last.month, bengali),
+            lastYear = last.year,
+            number = { year -> formatting.numerals(year, bengali) },
+        )
+    }
+
+    /** `Jumada al-Awwal – Jumada al-Thani 1448`, or the two ended forms when a year turns over too. */
+    private fun spanLabel(
+        firstName: String,
+        firstYear: Int,
+        lastName: String,
+        lastYear: Int,
+        number: (Int) -> String,
+    ): String = when {
+        firstName == lastName && firstYear == lastYear -> "$firstName ${number(firstYear)}"
+        firstYear == lastYear -> "$firstName \u2013 $lastName ${number(firstYear)}"
+        else -> "$firstName ${number(firstYear)} \u2013 $lastName ${number(lastYear)}"
+    }
+
+    /**
+     * The five prayers for the selected day, in the location's zone and the user's clock format.
+     *
+     * Derived from the same [PrayerScheduleState] the Home screen and the reminders use, so the calendar
+     * can never show a different time from the timetable it sits beside. A schedule that is absent or
+     * failed carries a reason into the section, so the card explains the gap instead of leaving five
+     * dashes.
+     */
+    private fun prayerSection(
+        scheduleState: PrayerScheduleState,
+        settings: PrayerSettings,
+        location: LocationInfo?,
+        locale: Locale,
+    ): PrayerTimesSection {
+        val schedule = (scheduleState as? PrayerScheduleState.Available)?.schedule
+        val zone = schedule?.zoneId ?: location?.zoneId ?: ZoneId.systemDefault()
+        val formatter = timeFormatterFor(zone = zone, locale = locale, preference = settings.timeFormat)
+        return PrayerTimesSection(
+            locationLabel = location?.let { stored -> LocationDisplayName.of(stored) },
+            rows = PrayerName.entries.map { prayer ->
+                PrayerTimeRow(prayer = prayer, timeLabel = schedule?.timeOf(prayer)?.let(formatter::format))
+            },
+            unavailable = when (scheduleState) {
+                is PrayerScheduleState.Unavailable -> scheduleState.reason
+                is PrayerScheduleState.Failed -> UnavailabilityReason.UNKNOWN
+                else -> null
+            },
         )
     }
 

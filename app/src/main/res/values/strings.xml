@@ -258,11 +258,20 @@
     <string name="calendar_cell_description">Date %1$s</string>
     <string name="calendar_legend_ramadan">Ramadan day</string>
     <string name="calendar_legend_occasion">Observance</string>
+    <string name="calendar_legend_hijri_start">Hijri month start, from the calculated table</string>
+
+    <!-- Calendar: the header's span line and the selected day's card -->
+    <string name="calendar_month_span_separator"> · </string>
+    <string name="calendar_selected_date_heading">%1$s · SELECTED DATE</string>
+    <string name="calendar_jumuah">Jumu\'ah</string>
+    <string name="calendar_prayer_times_title">PRAYER TIMES</string>
+    <string name="calendar_prayer_times_with_location">PRAYER TIMES · %1$s</string>
 
     <!-- Calendar: Ramadan summary -->
     <string name="calendar_ramadan_title">Ramadan</string>
     <string name="calendar_ramadan_day">Ramadan day %1$d</string>
     <string name="calendar_ramadan_range">Estimated Ramadan: %1$s</string>
+    <string name="calendar_ramadan_row_title">Ramadan %1$d · around %2$s</string>
     <string name="calendar_ramadan_unavailable">No reliable Ramadan range is available for this period on this device, so none is shown.</string>
     <string name="calendar_ramadan_in_ramadan">Today is inside the estimated Ramadan range.</string>
     <string name="calendar_ramadan_upcoming">The next Ramadan is expected within about two months, by this device\'s calculation.</string>

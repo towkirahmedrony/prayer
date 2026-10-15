@@ -357,8 +357,15 @@
     <string name="calendar_cell_description">তারিখ %1$s</string>
     <string name="calendar_legend_ramadan">রমজানের দিন</string>
     <string name="calendar_legend_occasion">পালনীয় দিন</string>
+    <string name="calendar_legend_hijri_start">হিজরি মাসের শুরু, হিসাব করা সারণি অনুযায়ী</string>
+    <string name="calendar_month_span_separator"> · </string>
+    <string name="calendar_selected_date_heading">নির্বাচিত দিন · %1$s</string>
+    <string name="calendar_jumuah">জুমুআ</string>
+    <string name="calendar_prayer_times_title">নামাজের সময়</string>
+    <string name="calendar_prayer_times_with_location">নামাজের সময় · %1$s</string>
 
     <string name="calendar_ramadan_range">আনুমানিক রমজান: %1$s</string>
+    <string name="calendar_ramadan_row_title">রমজান %1$d · আনুমানিক %2$s</string>
     <string name="calendar_ramadan_unavailable">এই সময়ের জন্য এই ডিভাইসে নির্ভরযোগ্য কোনো রমজান সময়কাল পাওয়া যায়নি, তাই একটি অনুমান করা সময়কাল দেখানোর বদলে কিছুই দেখানো হচ্ছে না।</string>
     <string name="calendar_ramadan_in_ramadan">আজ আনুমানিক রমজান সময়কালের ভিতরে পড়েছে।</string>
     <string name="calendar_ramadan_upcoming">এই ডিভাইসের হিসাব অনুযায়ী, পরবর্তী রমজান প্রায় দুই মাসের মধ্যে আশা করা হচ্ছে।</string>

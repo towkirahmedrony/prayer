@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.calendar
 
 import io.github.towkirahmedrony.salah.core.model.BanglaDate
+import io.github.towkirahmedrony.salah.core.model.BanglaMonth
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HijriDate
@@ -183,16 +184,21 @@ class CalendarFormatting {
         dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
 
     /** Localised Bangladesh Bangla date, for example `14 Boishakh 1431` or `১৪ বৈশাখ ১৪৩১`. */
-    fun bangla(date: BanglaDate, locale: Locale): String {
-        val month = if (isBangla(locale)) date.month.bengaliName else date.month.englishName
-        return "${numerals(date.day, locale)} $month ${numerals(date.year, locale)}"
-    }
+    fun bangla(date: BanglaDate, locale: Locale): String =
+        "${numerals(date.day, locale)} ${banglaMonthName(date.month, locale)} ${numerals(date.year, locale)}"
+
+    /**
+     * The name of a Bangla month in the script [locale] uses, for example `Ashwin` or `আশ্বিন`.
+     *
+     * Public so a caller that composes a *span* of months — the Calendar header's subtitle — names
+     * each month by the same rule as a single dated line, instead of reaching into the enum's fields.
+     */
+    fun banglaMonthName(month: BanglaMonth, locale: Locale): String =
+        if (isBangla(locale)) month.bengaliName else month.englishName
 
     /** Month and year of a Bangla month, for the calendar heading, for example `আশ্বিন ১৪৩১`. */
-    fun banglaMonth(date: BanglaDate, locale: Locale): String {
-        val month = if (isBangla(locale)) date.month.bengaliName else date.month.englishName
-        return "$month ${numerals(date.year, locale)}"
-    }
+    fun banglaMonth(date: BanglaDate, locale: Locale): String =
+        "${banglaMonthName(date.month, locale)} ${numerals(date.year, locale)}"
 
     /** Localised Hijri date, for example `1 Ramadan 1447`, `১ রমজান ১৪৪৭` or `١ رمضان ١٤٤٧`. */
     fun hijri(date: HijriDate, locale: Locale): String =
@@ -221,8 +227,14 @@ class CalendarFormatting {
         else -> text
     }
 
-    /** The month name in the script [locale] uses. */
-    private fun hijriMonthName(month: HijriMonth, locale: Locale): String = when (locale.language) {
+    /**
+     * The name of a Hijri month in the script [locale] uses, for example `Ramadan`, `রমজান` or
+     * `رمضان`.
+     *
+     * Public for the same reason as [banglaMonthName]: the Calendar header names the months a date
+     * span covers.
+     */
+    fun hijriMonthName(month: HijriMonth, locale: Locale): String = when (locale.language) {
         BANGLA_LANGUAGE -> month.bengaliName
         ARABIC_LANGUAGE -> month.arabicName
         else -> month.englishName

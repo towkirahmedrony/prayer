@@ -3,19 +3,30 @@ package io.github.towkirahmedrony.salah.feature.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleRequest
+import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.startup.PrayerSettingsState
+import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
+import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.LocationInfo
+import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
@@ -74,18 +85,82 @@ class CalendarViewModel(
      * its days with, so the anchor month and the "today" cell cannot disagree.
      */
     private val dayZone: LocationDayZone? = null,
+    /**
+     * The hot snapshot of the stored location and prayer settings.
+     *
+     * Injected (rather than read from the repositories) for the same reason Home reads it: the prayer
+     * times beside the selected date need the saved location and the clock-format preference, and the
+     * snapshot already publishes both as a `StateFlow`. `null` leaves the prayer section unavailable,
+     * which is what the factory's own tests want.
+     */
+    private val startup: StartupSnapshot? = null,
+    /**
+     * The same offline-first schedule repository the Home screen and the reminders read.
+     *
+     * `null` (the unit-test default) means no prayer source, so the selected-date card shows no
+     * timetable instead of inventing one.
+     */
+    private val prayerScheduleRepository: PrayerScheduleRepository? = null,
 ) : ViewModel() {
 
     /** A Gregorian day inside the displayed month; the month itself comes from the repository. */
     private val displayedAnchor = MutableStateFlow(today())
     private val selectedDate = MutableStateFlow(today())
 
+    /**
+     * The configured location, or `null` when none is stored or no snapshot was injected.
+     *
+     * Mapped through the same `Loaded` gate Home uses, so Home and the Calendar — and the repository
+     * below them — describe one stored location rather than one that is still being read.
+     */
+    private val locationFlow: Flow<LocationInfo?> = startup
+        ?.storedLocation
+        ?.transform { state -> if (state is StoredLocationState.Loaded) emit(state.location) }
+        ?: flowOf(null)
+
+    /** The prayer settings, or the defaults when no snapshot was injected. */
+    private val prayerSettingsFlow: Flow<PrayerSettings> = startup
+        ?.prayerSettings
+        ?.transform { state -> if (state is PrayerSettingsState.Loaded) emit(state.settings) }
+        ?: flowOf(PrayerSettings.DEFAULT)
+
+    /**
+     * The selected day's schedule at the saved location, with the settings it was asked with.
+     *
+     * Keyed on the selection, so picking another date asks the repository for that day and the times
+     * beside the date card update with it. The request is the repository's cache key, so moving the
+     * selection back and forth does not recompute a timetable that is already held.
+     */
+    private val prayerContext: Flow<PrayerContext> =
+        combine(locationFlow, prayerSettingsFlow, selectedDate) { location, settings, date ->
+            PrayerInput(location, settings, date)
+        }.flatMapLatest { input ->
+            val repository = prayerScheduleRepository
+            val location = input.location
+            if (repository == null || location == null) {
+                flowOf(PrayerContext(location, input.settings, PrayerScheduleState.Loading))
+            } else {
+                repository
+                    .ensureSchedule(
+                        PrayerScheduleRequest(
+                            date = input.date,
+                            location = location,
+                            profile = input.settings.toProfile(),
+                        ),
+                    )
+                    .map { state -> PrayerContext(location, input.settings, state) }
+            }
+        }
+
     val uiState: StateFlow<CalendarUiState> = combine(
         userPreferencesRepository.calendarSettings,
         userPreferencesRepository.appLanguage,
         displayedAnchor,
         selectedDate,
-    ) { settings, language, anchor, selected -> MonthRequest(settings, language, anchor, selected) }
+        prayerContext,
+    ) { settings, language, anchor, selected, prayers ->
+        MonthRequest(settings, language, anchor, selected, prayers)
+    }
         .flatMapLatest { request ->
             // Reading the month of the *selected* system: a Bangla or Hijri selection re-emits a grid
             // of that system's days, so the screen updates as soon as the chip is tapped. A change to
@@ -102,6 +177,9 @@ class CalendarViewModel(
                         // "follow the interface". SYSTEM keeps the device's own locale, which is both
                         // the default and the behaviour the app had before a selector existed.
                         systemLocale = request.language.locale() ?: Locale.getDefault(),
+                        prayerSchedule = request.prayers.scheduleState,
+                        prayerSettings = request.prayers.settings,
+                        location = request.prayers.location,
                     )
                 }
         }
@@ -160,13 +238,28 @@ class CalendarViewModel(
     private fun today(): LocalDate =
         clock.instant().atZone(dayZone?.current() ?: ZoneId.systemDefault()).toLocalDate()
 
-    /** The four inputs a month is built from; kept as a value so the combine has one type. */
+    /** The five inputs a month is built from; kept as a value so the combine has one type. */
     private data class MonthRequest(
         val settings: CalendarSettings,
         /** The interface language, used only as the date-rendering locale. */
         val language: AppLanguage,
         val anchor: LocalDate,
         val selected: LocalDate,
+        val prayers: PrayerContext,
+    )
+
+    /** The selected day and the settings a prayer schedule is asked with. */
+    private data class PrayerInput(
+        val location: LocationInfo?,
+        val settings: PrayerSettings,
+        val date: LocalDate,
+    )
+
+    /** The saved location, the prayer settings, and the schedule resolved for the selected day. */
+    private data class PrayerContext(
+        val location: LocationInfo?,
+        val settings: PrayerSettings,
+        val scheduleState: PrayerScheduleState,
     )
 
     private companion object {

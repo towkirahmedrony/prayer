@@ -493,6 +493,10 @@ val salahModules = module {
             // The same zone source the repository reads, so the month this screen opens on contains the
             // day the repository marks as today.
             dayZone = get(),
+            // The location and prayer settings, read hot, and the same offline-first schedule repository
+            // Home and the reminders use, so the times beside the selected date are the timetable's own.
+            startup = get(),
+            prayerScheduleRepository = get(),
         )
     }
     // The coordinator is injected for the Hijri offset, which moves the Ramadan window the Sehri and

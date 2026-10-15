@@ -4,6 +4,7 @@ import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
 import io.github.towkirahmedrony.salah.core.model.HijriDateSource
 import io.github.towkirahmedrony.salah.core.model.IslamicOccasion
+import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import java.time.LocalDate
@@ -43,6 +44,23 @@ sealed interface CalendarUiState {
         /** Localised month and year in the selected calendar, for example `October 2026`. */
         val monthLabel: String,
 
+        /**
+         * The Hijri span the displayed month covers, for example `Rabi' al-Thani – Jumada al-Awwal
+         * 1448`, or `null` when the platform's Hijri table does not cover the month.
+         *
+         * The header's subtitle names the months a reader would otherwise have to infer from the grid's
+         * day numbers. It is a *span* because a Gregorian or Bangla month rarely lines up with a Hijri
+         * one: it can begin in one Hijri month and end in the next.
+         */
+        val hijriSpanLabel: String?,
+
+        /**
+         * The Bangla span the displayed month covers, for example `আশ্বিন – কার্তিক ১৪৩৩`, or `null`
+         * when the date is outside the verified Bangladesh-calendar range. Always written in Bengali
+         * script and Bengali numerals, which is how the Bangla calendar is named.
+         */
+        val banglaSpanLabel: String?,
+
         /** Column headers, in the locale's week order. */
         val weekdayLabels: List<String>,
 
@@ -61,6 +79,9 @@ sealed interface CalendarUiState {
         val selectedOutOfRange: UnavailabilityReason?,
 
         val ramadan: RamadanSection,
+
+        /** The five prayers for the selected day at the saved location, or the reason they are absent. */
+        val prayerTimes: PrayerTimesSection,
 
         val hijriAdjustmentDays: Int,
 
@@ -101,6 +122,14 @@ data class CalendarCell(
     val stage: CalendarCellStage,
     val isRamadanDay: Boolean,
     val occasion: IslamicOccasion?,
+    /**
+     * True when this is the first Gregorian day of a Hijri month.
+     *
+     * Drawn as the grid's crescent mark: it is where the Hijri month turns over, which is the one
+     * boundary a reader can otherwise only see by switching to the Hijri view. It is a fact about the
+     * calculated table, never a claim that the month was sighted — the legend says so.
+     */
+    val isHijriMonthStart: Boolean = false,
 )
 
 /** One calendar representation of a single day. */
@@ -121,6 +150,34 @@ data class SelectedDay(
     val occasions: List<IslamicOccasion>,
     /** 1-based Ramadan day, or `null` when the date is not in Ramadan. */
     val ramadanDayNumber: Int?,
+    /**
+     * True when the day is a Friday.
+     *
+     * The screen labels a Friday as Jumu'ah; that is the week's own name for the day rather than a
+     * calendar observance, so it is derived from the weekday and claims nothing about a date.
+     */
+    val isJumuah: Boolean = false,
+)
+
+/**
+ * The five obligatory prayers for the selected day, at the saved location.
+ *
+ * Shown beside the selected date so a reader looking at a day also sees when its prayers fall — the
+ * same schedule the Home screen and the reminders are built from, formatted by the same rule. The rows
+ * carry no times when no schedule could be produced, and [unavailable] then explains the gap rather
+ * than leaving five dashes unexplained.
+ */
+data class PrayerTimesSection(
+    /** The location the times belong to, already composed for display, or `null` when unset. */
+    val locationLabel: String?,
+    val rows: List<PrayerTimeRow>,
+    val unavailable: UnavailabilityReason?,
+)
+
+/** One prayer and its time, or `null` when the schedule does not carry that prayer. */
+data class PrayerTimeRow(
+    val prayer: PrayerName,
+    val timeLabel: String?,
 )
 
 /**
