@@ -121,10 +121,12 @@ class LocalDatasetStore(
      *   is a user who opens the app to a setup screen they had already completed.
      * @param expectedChecksum the checksum published for this payload, when the caller has one.
      */
+    // The default values for `storedArea` and `expectedChecksum` are declared on
+    // [ActiveDatasetStore.activate] and inherited here: an override may not repeat them.
     override suspend fun activate(
         payload: DatasetPayload,
-        storedArea: BangladeshAreaRef? = null,
-        expectedChecksum: String? = null,
+        storedArea: BangladeshAreaRef?,
+        expectedChecksum: String?,
     ): DatasetActivationResult = mutex.withLock {
         val current = resolveLocked()
         val applied = current?.active?.takeIf { it.source == DatasetSource.APPLIED }
