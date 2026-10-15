@@ -33,10 +33,14 @@
                               user taps the relevant button — see docs/QIBLA_COMPASS.md
                               section 4.
 
+        INTERNET              Added in the remote-dataset phase: the app may check a published dataset
+                              manifest and download an updated location dataset. This is the only
+                              network use, it is entirely optional, and every feature works without
+                              it — with no configuration, no connection, or a failed check, Salah
+                              runs on its bundled data exactly as before. Nothing else in the app
+                              opens a connection; see docs/ARCHITECTURE.md section 13.
+
       Deliberately NOT requested:
-        * no INTERNET — every feature runs offline. The location picker works from the bundled
-          dataset, prayer times are calculated on-device, and nothing in the app opens a network
-          connection;
         * no ACCESS_BACKGROUND_LOCATION — the Qibla screen needs a position only while it is in
           front of the user, and a background grant would be a permission without a purpose;
         * no FOREGROUND_SERVICE permission — no long-running service exists (see section 5 of the
@@ -44,6 +48,7 @@
           implemented).
     -->
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />

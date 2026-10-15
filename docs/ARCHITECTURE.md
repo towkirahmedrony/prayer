@@ -577,8 +577,9 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
   cheap to add and is cheap to extend.
 - **A different declination model**: implement `GeomagneticDeclinationProvider`. The correction step
   and the north-reference types do not change.
-- **A Qibla map or a remote computation**: would need an `INTERNET` permission, which Salah
-  deliberately does not hold. The bearing is closed-form and offline by design.
+- **A Qibla map or a remote computation**: not implemented, and the bearing is closed-form and offline by
+  design. The `INTERNET` permission the app now holds (§13) is used *only* for the optional dataset
+  publication check; no Qibla feature opens a connection.
 - **Splitting modules**: move packages into `core:*`, `data:*`, `feature:*` Gradle modules; the
   rules in §4 are already the intended boundaries.
 
@@ -593,10 +594,11 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
 ## 12. Local dataset foundation
 
 This section describes the local half of Salah's data story: which dataset the app is running on, how a
-validated one safely replaces it, and what is guaranteed when that goes wrong. **No remote tier exists**
-— there is no `INTERNET` permission, no HTTP client and no synchronisation. What exists is the mechanism
-a published dataset will eventually arrive through, built and tested locally first so that the arrival
-is a change of supplier rather than a change of architecture.
+validated one safely replaces it, and what is guaranteed when that goes wrong. It was written before a
+remote tier existed, and it remains the description of the mechanism a published dataset arrives through:
+the remote path added in Phase 2 (§13) supplies a `DatasetPayload` and calls `LocalDatasetStore.activate`,
+so the arrival was a change of supplier rather than a change of architecture. Read this section for the
+local guarantees and §13 for the network path that feeds it.
 
 ### 12.1 The model
 
@@ -744,7 +746,7 @@ the files. To verify on a device or emulator:
 Step 4 is the assertion that matters: losing the saved location is exactly the failure the previous
 `sharedpref`-only configuration produced, and it presents as a completed setup being asked for again.
 
-### 12.8 Future extension points
+### 12.8 Extension points (as of the local foundation)
 
 - **A published dataset**: supply a `DatasetPayload` and call `LocalDatasetStore.activate`. Everything
   else — validation, atomicity, recovery, identity protection — is already in place and tested.
@@ -752,5 +754,124 @@ Step 4 is the assertion that matters: losing the saved location is exactly the f
   if ever wanted, belongs in a separate publication field rather than smuggled into the version string.
 - **A second dataset**: the root is namespaced per dataset (`datasets/bd_locations`), so published
   timetables or Ramadan calendars can be added without moving this one.
-- **Not planned in this phase**: Supabase, HTTP, background sync, remote theming, remote Ramadan data,
+- **A remote publication**: implemented in Phase 2 over this exact seam — the synchroniser supplies a
+  `DatasetPayload` and calls `LocalDatasetStore.activate`. See §13.
+- **Still not planned in this phase**: remote theming, remote Ramadan data, a published prayer timetable,
   Room or KSP. Nothing here depends on any of them.
+
+## 13. Remote dataset publication and synchronisation
+
+Phase 2 adds the first real remote-data path. It is deliberately the *smallest complete* one — the
+Bangladesh location dataset — because its purpose is to establish a working, secure, reusable end-to-end
+pattern, not to move every dataset online.
+
+```
+bundled verified fallback
+        ▼
+active local dataset  ──►  UI  (reads local data only)
+        ▲
+        │ validated activation (Phase 1, unchanged)
+        │
+  DatasetSynchronizer ──►  RemoteDatasetSource ──►  Supabase REST + Storage
+        │
+        └─ DatasetSyncStateStore (throttle + last attempt)
+```
+
+The dependency direction is `UI → repository/use cases → synchroniser → remote source + local store`.
+No composable ever calls Supabase; remote work is never on the path to drawing a screen.
+
+### 13.1 The publication contract
+
+A manifest is one small row describing one immutable release: `dataset_id` (the slot), `publication_id`
+(the opaque release id), `version`, `payload_schema_version`, `status`, `checksum`, `payload_path`, and
+optionally `payload_size_bytes`, `area_count`, `locality_count`, `boundary_ring_count`, `published_at`,
+`notes`. It is read from the `dataset_current_publication` view over PostgREST and parsed by
+`DatasetPublicationParser`. `docs/DATABASE-SCHEMA.md` is the schema reference.
+
+**Version semantics.** `version` is descriptive and is *never* used to decide which release is newer —
+comparison is `DatasetVersion.isSameAs`, equality only. *Which* publication differs is decided from
+`publication_id`/`checksum`, not from any ordering of strings.
+
+**Only published releases are served.** The app re-checks `status == published` even though the view
+already filters it, and the database refuses to point the current-publication pointer at a non-published
+row. Both ends enforce it.
+
+### 13.2 The payload and its checksum
+
+The payload is one immutable ZIP archive holding the same three tab-separated tables and the version
+file the bundled assets hold, decoded by `DatasetPayloadArchive` into the existing `DatasetPayload`. The
+checksum published in the manifest is the `DatasetChecksum` of those **logical parts**, not a hash of the
+archive, and the app recomputes it from the decoded payload — so compression framing is not trusted and
+the value is one the local activation path independently agrees with. See §12.4 for what a checksum
+does and does not establish.
+
+### 13.3 The synchronisation sequence
+
+1. fetch the manifest (cheap; no payload);
+2. validate it — well-formed, supported schema, published, checksum-shaped;
+3. compare with the active dataset (equal checksum → **download nothing**);
+4. fetch the payload under a size ceiling;
+5. decode the archive;
+6. verify the payload checksum against the published one;
+7. verify the asserted record counts;
+8. hand the payload to `LocalDatasetStore.activate` (Phase 1) with the user's saved area as an input.
+
+**Every failure leaves the active dataset exactly as it was.** The synchroniser has no branch that writes
+user data, clears the stored location, or removes a dataset; its only mutation is `activate`, which itself
+writes nothing unless the whole candidate passes validation. A failed synchronisation cannot make the app
+unavailable.
+
+**Failure handling.** No network, DNS/connection failure, timeout, HTTP error, missing or malformed
+manifest, unsupported schema, unpublished release, oversized payload, invalid checksum, truncated archive,
+invalid TSV, duplicate ids, a missing saved location, a local write failure and interrupted activation are
+all handled as *values*: `DatasetSyncOutcome` distinguishes "no update available" (`UpToDate`) from "the
+sync failed" (`Failed`) and from "the candidate was unacceptable" (`Rejected`). Retries are bounded by the
+throttle, never a loop.
+
+### 13.4 Triggers and throttling
+
+A check is attempted at application start-up and when the app comes to the foreground, both off the main
+thread and after Home's own work, so neither can delay the first frame or the location gate.
+`SyncThrottlePolicy` allows at most one background check per 12 hours after a success and one per 15
+minutes after a failure; a user-initiated (`forced`) check is never suppressed. This is deliberately *not*
+a poll: there is no timer, and nothing checks on a recomposition or a UI event.
+
+`FileDatasetSyncStateStore` keeps only `lastAttemptAtEpochMillis`, `lastAttemptedPublicationId` and
+`lastFailureCode`, under `files/datasets/` — machine state, outside the backup set (§12.7). It also lets a
+publication that was downloaded and then *terminally* declined (a malformed manifest, an unsupported
+schema, a checksum mismatch, a rejected candidate) avoid being re-downloaded on every launch, while a
+transient failure is retried promptly.
+
+### 13.5 Bundled fallback and first install
+
+The first-install offline path is mandatory and unchanged: the app opens and works with **no** Supabase
+URL, **no** key, no network, no published dataset and no successful synchronisation. The bundled assets
+remain the permanent recovery floor. A missing configuration does not crash the app and is reported as
+`dataset_sync_not_configured`, not as a successful sync.
+
+### 13.6 Security model
+
+App clients read only through the `dataset_current_publication` view (and the read policy on the private
+`datasets` Storage bucket); the base tables have RLS enabled with no client policy and their privileges are
+revoked, so a client cannot publish, edit or delete. Publishing is a `service_role` operation. The APK
+carries only the publishable/anon key, supplied as two non-secret Gradle properties; a privileged key must
+never appear in the app. See `docs/DATABASE-SCHEMA.md` and `docs/SUPABASE_SETUP.md`.
+
+### 13.7 Networking choice
+
+One minimal HTTP surface (`HttpTransport`), implemented with the JDK's `HttpURLConnection`, for exactly two
+GETs. No Retrofit, OkHttp, Ktor or Supabase SDK was introduced: two reads with explicit timeouts and a body
+ceiling do not justify a general client, and a Supabase Kafka/Kotlin SDK's real API and version were not
+assumed. The transport is faked in tests; the synchroniser above it is fully unit-tested without a socket.
+
+### 13.8 Reuse for future datasets
+
+The slot-based schema and the `datasetId`-keyed manifest mean a future published dataset type — prayer-time
+profiles, corrections and overrides, theme presets, Ramadan calendars, Hijri adjustments, feature
+configuration — reuses the same tables, the same synchroniser shape and the same activation seam, in a new
+slot, without an architectural change. This phase implements the location dataset only, and does not touch
+the prayer-time calculation engine.
+
+> **Status.** The remote path is implemented and unit-tested against fakes. No Supabase project is
+> configured for this repository, so the migration has not been applied and no remote publication or live
+> integration has been verified. See `docs/SUPABASE_SETUP.md` §5 for what still needs a live test.

@@ -4,6 +4,21 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+// Remote dataset publication configuration.
+//
+// These two values are NON-SECRET by design: the Supabase project URL and the publishable/anon client
+// key. Both are meant to be embedded in a client, and both are constrained by the row-level security the
+// schema defines. A privileged key (service_role, secret, or the database password) must NEVER be placed
+// here: it would bypass every policy and hand a client the ability to publish datasets.
+//
+// They are read from Gradle properties so the repository ships no credentials and the default build is the
+// supported offline configuration: with neither property set both values are empty, the app reports "no
+// remote dataset configured" and runs entirely on its bundled data. Supply them for a real build with
+// `-Psalah.supabase.url=... -Psalah.supabase.anonKey=...`, an uncommitted `local.properties`, or the CI
+// secret mechanism. See docs/SUPABASE_SETUP.md.
+val salahSupabaseUrl: String = (findProperty("salah.supabase.url") as String?)?.trim().orEmpty()
+val salahSupabaseAnonKey: String = (findProperty("salah.supabase.anonKey") as String?)?.trim().orEmpty()
+
 android {
     namespace = "io.github.towkirahmedrony.salah"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -17,6 +32,19 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+
+        // Compiled into BuildConfig. Empty when unconfigured, which the app treats as "no remote
+        // dataset" rather than as an error; see DatasetRemoteConfig.isConfigured.
+        buildConfigField(
+            "String",
+            "SALAH_SUPABASE_URL",
+            "\"${salahSupabaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        buildConfigField(
+            "String",
+            "SALAH_SUPABASE_ANON_KEY",
+            "\"${salahSupabaseAnonKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
     }
 
     buildTypes {

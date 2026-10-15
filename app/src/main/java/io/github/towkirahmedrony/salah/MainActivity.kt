@@ -6,12 +6,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncTrigger
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.navigation.SalahApp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.core.context.GlobalContext
 
 /** Single-activity host for the Compose UI. */
 class MainActivity : ComponentActivity() {
@@ -36,6 +40,16 @@ class MainActivity : ComponentActivity() {
         // "the UI was ready to draw its first frame", nothing stronger.
         Choreographer.getInstance().postFrameCallback {
             StartupTrace.mark("first_frame_callback")
+        }
+
+        // A foreground trigger for the remote dataset check. Entirely non-blocking and off the main
+        // thread: the synchroniser's own throttle suppresses it if a check ran recently, and everything
+        // it can do is optional — the app is fully usable while it runs and if it fails. It is started
+        // here rather than awaited anywhere because nothing on the screen depends on it.
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                GlobalContext.get().get<DatasetSynchronizer>().synchronize(DatasetSyncTrigger.FOREGROUND)
+            }
         }
 
         // Temporary: record when the location gate stops being undecided. It is written to Logcat

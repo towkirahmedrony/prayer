@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import io.github.towkirahmedrony.salah.BuildConfig
 import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
@@ -30,6 +31,11 @@ import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionCheck
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationProvider
 import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaCalculator
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedRuleBook
+import io.github.towkirahmedrony.salah.core.domain.dataset.ActiveDatasetStore
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetRemoteConfig
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncStateStore
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
@@ -40,6 +46,10 @@ import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRep
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import io.github.towkirahmedrony.salah.data.dataset.LocalDatasetStore
+import io.github.towkirahmedrony.salah.data.dataset.remote.HttpTransport
+import io.github.towkirahmedrony.salah.data.dataset.remote.SupabaseRemoteDatasetSource
+import io.github.towkirahmedrony.salah.data.dataset.remote.UrlConnectionHttpTransport
+import io.github.towkirahmedrony.salah.data.dataset.sync.FileDatasetSyncStateStore
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
@@ -77,6 +87,7 @@ import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -90,6 +101,12 @@ import java.time.Clock
  * the first one. The bundled assets are unaffected by anything here.
  */
 private const val APPLIED_DATASET_DIRECTORY = "datasets/bd_locations"
+
+/**
+ * Where the remote synchronisation state is kept, beside the applied dataset and outside the backup set.
+ * See [io.github.towkirahmedrony.salah.data.dataset.sync.FileDatasetSyncStateStore].
+ */
+private const val DATASET_SYNC_STATE_FILE = "datasets/bd_locations.sync"
 
 /**
  * Single dependency container for Salah.
@@ -139,7 +156,7 @@ val salahModules = module {
     // The applied dataset lives under filesDir, not in DataStore: it is replaceable data whose
     // consistency with the files on disk is the whole point, so it is kept beside them. See
     // docs/ARCHITECTURE.md section 12 and docs/LOCATION_SYSTEM.md section 5.
-    single<BangladeshAreaCatalog> {
+    single {
         LocalDatasetStore(
             root = File(androidContext().filesDir, APPLIED_DATASET_DIRECTORY),
             bundled = AssetBangladeshAreaCatalog(androidContext(), get()),
@@ -147,6 +164,45 @@ val salahModules = module {
             clock = get(),
         )
     }
+    single<BangladeshAreaCatalog> { get<LocalDatasetStore>() }
+    // The same instance, seen through the port the remote synchroniser applies payloads through. Binding
+    // it twice keeps exactly one store — and therefore one activation system — while letting the
+    // synchroniser depend on the domain port instead of the filesystem implementation.
+    single<ActiveDatasetStore> { get<LocalDatasetStore>() }
+
+    // Remote dataset publication ---------------------------------------------
+    // Supabase is the publication source for future remotely managed data; this phase wires only the
+    // location dataset. The endpoint and publishable key are compiled in (see app/build.gradle.kts) and
+    // are empty by default, which is the supported offline configuration: the synchroniser reports
+    // "not configured" and never reaches the network. No privileged key is ever placed here.
+    single {
+        DatasetRemoteConfig(
+            baseUrl = BuildConfig.SALAH_SUPABASE_URL,
+            anonKey = BuildConfig.SALAH_SUPABASE_ANON_KEY,
+        )
+    }
+    single<HttpTransport> { UrlConnectionHttpTransport() }
+    single<RemoteDatasetSource> { SupabaseRemoteDatasetSource(transport = get(), config = get()) }
+    single<DatasetSyncStateStore> {
+        FileDatasetSyncStateStore(
+            file = File(androidContext().filesDir, DATASET_SYNC_STATE_FILE),
+            logger = get(),
+        )
+    }
+    // The one place a remote publication can become the active dataset. It reads the user's saved area
+    // only as an input to activation and has no way to write user data, so a failed sync cannot clear it.
+    single {
+        DatasetSynchronizer(
+            config = get(),
+            source = get(),
+            store = get<ActiveDatasetStore>(),
+            storedArea = { get<LocationRepository>().location.first()?.area },
+            stateStore = get(),
+            logger = get(),
+            clock = get(),
+        )
+    }
+
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
     }

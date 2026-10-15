@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.data.dataset
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.dataset.ActiveDataset
+import io.github.towkirahmedrony.salah.core.domain.dataset.ActiveDatasetStore
 import io.github.towkirahmedrony.salah.core.domain.dataset.DatasetActivationResult
 import io.github.towkirahmedrony.salah.core.domain.dataset.DatasetPayload
 import io.github.towkirahmedrony.salah.core.domain.dataset.DatasetSource
@@ -90,7 +91,7 @@ class LocalDatasetStore(
     private val bundled: BangladeshAreaCatalog,
     private val logger: DiagnosticsLogger,
     private val clock: Clock,
-) : BangladeshAreaCatalog {
+) : BangladeshAreaCatalog, ActiveDatasetStore {
 
     private val mutex = Mutex()
 
@@ -105,7 +106,7 @@ class LocalDatasetStore(
      *
      * Resolved rather than remembered: this describes what is genuinely being read.
      */
-    suspend fun activeDataset(): ActiveDataset? = mutex.withLock { resolveLocked() }?.active
+    override suspend fun activeDataset(): ActiveDataset? = mutex.withLock { resolveLocked() }?.active
 
     /**
      * Offers [payload] as the dataset to activate.
@@ -120,7 +121,7 @@ class LocalDatasetStore(
      *   is a user who opens the app to a setup screen they had already completed.
      * @param expectedChecksum the checksum published for this payload, when the caller has one.
      */
-    suspend fun activate(
+    override suspend fun activate(
         payload: DatasetPayload,
         storedArea: BangladeshAreaRef? = null,
         expectedChecksum: String? = null,

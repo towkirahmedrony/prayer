@@ -202,4 +202,30 @@ object SalahDiagnosticEvents {
      * says "the app recovered", and it is a warning rather than an error because the app did recover.
      */
     const val DATASET_APPLIED_UNAVAILABLE = "dataset_applied_unavailable"
+
+    // Remote dataset synchronisation ------------------------------------------
+    // The remote path is invisible by construction — it runs off the main thread and changes no screen —
+    // so the log is the only evidence it ran. Events record the trigger, the dataset slot, the publication
+    // id and failure codes. Never a credential: the anon key is a header and is never passed here.
+
+    /** A synchronisation attempt began, with the trigger that started it. */
+    const val DATASET_SYNC_STARTED = "dataset_sync_started"
+
+    /** A check found nothing to change, so no payload was downloaded. */
+    const val DATASET_SYNC_UP_TO_DATE = "dataset_sync_up_to_date"
+
+    /** A validated remote publication became the active dataset. */
+    const val DATASET_SYNC_ACTIVATED = "dataset_sync_activated"
+
+    /** A remote publication (or an activation candidate) was refused, with the problem codes. */
+    const val DATASET_SYNC_REJECTED = "dataset_sync_rejected"
+
+    /** A synchronisation attempt failed, with its reason code. The active dataset is unchanged. */
+    const val DATASET_SYNC_FAILED = "dataset_sync_failed"
+
+    /** No remote dataset is configured, so nothing was attempted. The app runs on local data. */
+    const val DATASET_SYNC_NOT_CONFIGURED = "dataset_sync_not_configured"
+
+    /** A check ran too recently and was suppressed by the throttle policy. */
+    const val DATASET_SYNC_THROTTLED = "dataset_sync_throttled"
 }

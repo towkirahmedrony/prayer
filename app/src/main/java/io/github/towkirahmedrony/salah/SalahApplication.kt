@@ -1,6 +1,8 @@
 package io.github.towkirahmedrony.salah
 
 import android.app.Application
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncTrigger
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
@@ -109,6 +111,19 @@ class SalahApplication : Application() {
                     runCatching { coordinator.reconcile(ReconcileReason.APP_START) }
                 }
                 StartupTrace.mark("reconcile_done")
+            }
+
+            // Remote dataset publication check. Last and non-blocking on purpose: it must never delay
+            // the location gate, Home or its schedules, so it runs after everything else. A missing
+            // configuration, no connection or a failed check all simply leave the local dataset in
+            // force — the bundled assets are the permanent floor. See docs/ARCHITECTURE.md section 13.
+            val synchronizer = runCatching { koin.get<DatasetSynchronizer>() }.getOrNull()
+            if (synchronizer != null) {
+                StartupTrace.mark("dataset_sync_start")
+                withContext(Dispatchers.IO) {
+                    runCatching { synchronizer.synchronize(DatasetSyncTrigger.APP_START) }
+                }
+                StartupTrace.mark("dataset_sync_done")
             }
         }
     }
