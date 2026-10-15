@@ -31,10 +31,31 @@ the stored location and every calculation built on it keep working exactly as be
 
 ### 2.1 What was chosen
 
-**MapLibre Native for Android**, `org.maplibre.gl:android-sdk:13.5.3` (Maven Central), embedded in Compose
-with `AndroidView`. Map data and styles are OpenStreetMap-derived vector tiles served from a build-time
-style URL ([§5](#5-providers) and [§8](#8-configuration-and-keys)); reverse geocoding is an optional HTTPS
-lookup against a Nominatim-compatible endpoint.
+**MapLibre Native for Android**, `org.maplibre.gl:android-sdk-opengl:13.5.3` (Maven Central), embedded in
+Compose with `AndroidView`. Map data and styles are OpenStreetMap-derived vector tiles served from a
+build-time style URL ([§5](#5-providers) and [§8](#8-configuration-and-keys)); reverse geocoding is an
+optional HTTPS lookup against a Nominatim-compatible endpoint.
+
+**The OpenGL ES artifact, and why that is part of the choice rather than a detail of it.** MapLibre
+publishes several artifacts of the same SDK release that differ in rendering backend. Since MapLibre
+Android 13.0.0 the plain `org.maplibre.gl:android-sdk` artifact is **Vulkan-only** (its changelog records
+that as a breaking change and names `org.maplibre.gl:android-sdk-opengl` as the OpenGL ES package). That
+Vulkan backend crashes natively on Android 16: a SIGSEGV reading `Cause: null pointer dereference` inside
+`mln::android::MapRenderer::render()`, called from `org.maplibre.android.maps.renderer.MapRenderer.onDrawFrame`
+on the `MapLibreVulkanSurfaceView$VulkanThread` draw thread. That is the signature reported upstream as
+[`maplibre/maplibre-native#4274`](https://github.com/maplibre/maplibre-native/issues/4274) — the same
+function, the same thread, Android 16 only, and stable on Android 8–15 across four OEMs with four
+different GPUs. It was closed as not planned: there is no later release to move to that fixes it.
+
+This picker therefore links the **OpenGL ES** artifact at the same version. `MapLibreVulkanSurfaceView`
+is compiled only into the SDK's `vulkan` and `multiBackend` flavors, so switching the artifact takes the
+entire Vulkan draw path out of the APK — the crash is removed by construction rather than caught, and no
+`try`/`catch` is involved because a native SIGSEGV on the render thread cannot be caught from Kotlin.
+Nothing in this screen changed: `MapLibre.getInstance(Context)` selects its backend through
+`RenderingEngine.getDefaultRenderingEngine()`, which returns `OPENGL` unconditionally in the OpenGL ES
+flavor (the Vulkan hardware probe exists only in the `multiBackend` flavor), so the existing call already
+picks the backend this build contains. The version was left at `13.5.3` — `13.6.0` and `13.6.1` are
+published but contain no fix for this crash, and `13.7` is a pre-release; see `TECH_STACK.md` §3.12.
 
 The map is a *View*, not a Compose API. MapLibre's own documentation does not prescribe a Compose wrapper,
 and the separate "MapLibre Compose" project states that its API is not yet stable, so the stable View API
@@ -259,6 +280,11 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   refusals that matter (truncated, trailing content, raw control characters, bad literals).
 - `BangladeshMapViewportTest` — the camera rectangle contains the whole real country, clamping behaves, and
   the rectangle is genuinely wider than the country (so a rectangle corner is not classified `Inside`).
+- `MapRenderingBackendTest` — the dependency invariant behind [§2.1](#21-what-was-chosen): reads
+  `gradle/libs.versions.toml` and `app/build.gradle.kts` and asserts the map library alias resolves to
+  `org.maplibre.gl:android-sdk-opengl` at an exact version, that no entry declares the Vulkan-only
+  `android-sdk` artifact, and that the module depends on the catalog alias rather than a hard-coded
+  coordinate. It is a static check on the build configuration, not a run of the map.
 - `BundledDatasetIntegrityTest`, `BangladeshLocationPolicyTest`, `AreaResolverTest`, `DataStoreLocationRepositoryTest`
   — unchanged, and still the gate on the boundary polygon and the area resolution this feature reuses.
 
@@ -268,6 +294,14 @@ Run with `./gradlew testDebugUnitTest` (the same command CI runs).
   behaviour alongside the panel, the dark/light style switch and the permission flow need hardware; the
   decisions behind them are unit-tested, and the CI build compiles and lints the whole thing, but no
   emulator or screenshot comparison was run here.
+- **The Android 16 Vulkan crash is removed by construction, not by a device test.** The fix is the
+  artifact change in [§2.1](#21-what-was-chosen) — the Vulkan backend is no longer linked into the app —
+  not a runtime guard, because a SIGSEGV on the native render thread cannot be caught in Kotlin. What has
+  been established is that the crash signature matches upstream issue #4274 exactly and that the class
+  family it occurs in is absent from an OpenGL ES build; what has **not** been established from this
+  repository is a successful run on the affected hardware (Vivo Y18, arm64, Android 16), which nobody
+  here had. `MapRenderingBackendTest` pins the artifact so the Vulkan-only one cannot come back unnoticed,
+  and that is a static check, not a substitute for the device run.
 - **The default tile provider has no SLA** ([§5.1](#51-map-tiles-and-style--openfreemap-default)).
 - **The default geocoder is a public instance.** Its policy permits user-initiated app lookups within the
   aggregate rate limit, and the picker is built to respect that, but a large user base should self-host or

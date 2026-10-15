@@ -41,7 +41,10 @@ adhan = "0.0.5"
 # populated places) and keeps the recurring cost of a map at zero; see docs/MAP_PICKER.md for the
 # full comparison, the tile and geocoding providers, and their terms.
 #
-# 13.5.3 is the latest stable release; the 13.7 line is published as a pre-release and is not used.
+# 13.5.3 is deliberately unchanged by the Android 16 renderer fix recorded at `maplibre-android-sdk`
+# below. MapLibre publishes 13.6.x, but nothing in 13.6.0 or 13.6.1 fixes the Vulkan renderer crash, so
+# moving the version would be an arbitrary change that addresses nothing; 13.7 is published as a
+# pre-release and is not used.
 maplibre = "13.5.3"
 
 [libraries]
@@ -70,7 +73,17 @@ adhan-kotlin = { group = "com.batoulapps.adhan", name = "adhan2", version.ref = 
 
 # Map rendering for the location picker. Tiles are fetched from a style URL (a Gradle property, with a
 # key-free default); the coordinates and their validation stay offline.
-maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
+#
+# The **OpenGL ES** artifact, not `org.maplibre.gl:android-sdk`. Since MapLibre Android 13.0.0 the
+# plain `android-sdk` artifact is Vulkan-only, and that Vulkan renderer hits a native SIGSEGV in
+# `mln::android::MapRenderer::render()`, on the `MapLibreVulkanSurfaceView$VulkanThread` draw path, on
+# Android 16. It is reported upstream as maplibre/maplibre-native#4274 — same function, same thread,
+# Android 16 only, stable on Android 8–15 — and was closed unimplemented, so there is no version to
+# upgrade to that fixes it. The `-opengl` artifact is the stable, widest-compatibility build of the
+# same SDK release, and it removes the whole Vulkan path: `MapLibreVulkanSurfaceView` is compiled only
+# into the Vulkan and multiBackend flavors, so it is not in this APK at all. Switching the artifact
+# (rather than the version) is the fix; see docs/MAP_PICKER.md §2.1.
+maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk-opengl", version.ref = "maplibre" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }

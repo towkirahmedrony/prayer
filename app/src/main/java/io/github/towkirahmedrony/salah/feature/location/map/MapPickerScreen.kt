@@ -431,6 +431,13 @@ private fun MapViewport(
             // The SDK singleton must exist before a MapView is constructed; `runCatching` because a
             // second call after a process-level initialisation is not an error but is not free either, and
             // a failure here should degrade to the "map unavailable" overlay rather than crash the screen.
+            //
+            // No rendering-engine argument is passed, and that is deliberate rather than an omission.
+            // The dependency is the OpenGL ES artifact (`org.maplibre.gl:android-sdk-opengl`, see
+            // gradle/libs.versions.toml), whose `RenderingEngine.getDefaultRenderingEngine()` returns
+            // OPENGL unconditionally — there is no Vulkan auto-detection to override, and the Vulkan
+            // renderer is not in this APK. The Vulkan backend is what crashed in
+            // `mln::android::MapRenderer::render()` on Android 16; see docs/MAP_PICKER.md §2.1.
             runCatching { MapLibre.getInstance(ctx.applicationContext) }
             MapView(ctx).also { view ->
                 view.onCreate(null)

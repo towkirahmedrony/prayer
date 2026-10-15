@@ -37,7 +37,7 @@ Pinned Android and Kotlin libraries (not covered by the BOM):
 | `io.insert-koin:koin-android`, `koin-androidx-compose` | `4.2.2` |
 | `org.jetbrains.kotlinx:kotlinx-coroutines(-android/-test)` | `1.11.0` |
 | `junit:junit` | `4.13.2` |
-| `org.maplibre.gl:android-sdk` | `13.5.3` (see §3.12) |
+| `org.maplibre.gl:android-sdk-opengl` | `13.5.3` (see §3.12) |
 
 Verification performed when this configuration was written (all stable releases, no
 `1.+`-style dynamic versions, no alpha/beta/RC/EAP):
@@ -177,16 +177,47 @@ of 21 (class-file major version 65) and cannot be loaded by this project's JDK 1
 release published for a JVM target the project can run. Upgrading it requires moving the toolchain
 to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
 
-### 3.12 Map rendering: MapLibre Native, pinned to `13.5.3`
+### 3.12 Map rendering: MapLibre Native, pinned to `13.5.3`, OpenGL ES artifact
 
 The location picker renders a real map with **MapLibre Native for Android**
-(`org.maplibre.gl:android-sdk:13.5.3`, Maven Central). It is the latest stable release; the 13.7 line is
-published as a pre-release and is not used. Its own `minSdk` is 23, below this project's 26, and its
-compiled-against API level is well under this project's `compileSdk` of 37.
+(`org.maplibre.gl:android-sdk-opengl:13.5.3`, Maven Central). Its own `minSdk` is 23, below this
+project's 26, and its compiled-against API level is well under this project's `compileSdk` of 37.
+
+**Why the `-opengl` artifact rather than the plain one.** Since MapLibre Android 13.0.0 the plain
+`org.maplibre.gl:android-sdk` artifact is **Vulkan-only** — its changelog records that as a breaking
+change and offers `org.maplibre.gl:android-sdk-opengl` as the OpenGL ES package. That Vulkan renderer
+crashes natively on Android 16: a SIGSEGV with `Cause: null pointer dereference` inside
+`mln::android::MapRenderer::render()`, reached from `MapRenderer.onDrawFrame` on the
+`MapLibreVulkanSurfaceView$VulkanThread` draw thread — the exact signature reported upstream as
+`maplibre/maplibre-native#4274` (same function, same thread, Android 16 only, stable on Android 8–15
+across four OEMs and four different GPU vendors; closed unimplemented, so no later release fixes it).
+Choosing the OpenGL ES artifact rather than a different version removes the Vulkan backend from the
+APK entirely: `MapLibreVulkanSurfaceView` is compiled only into the `vulkan` and `multiBackend` Gradle
+flavors of the SDK, so it is not a class in this application at all. The version therefore stays at
+`13.5.3`; §3.12.1 records why no upgrade was the answer.
+
+The artifact also changes nothing in the code. `MapLibre.getInstance(Context)` resolves the backend
+through `RenderingEngine.getDefaultRenderingEngine()`, which in the OpenGL ES flavor returns `OPENGL`
+unconditionally — the Vulkan hardware auto-detection lives in the `multiBackend` flavor only — so the
+picker's existing initialisation call selects OpenGL ES with no argument to add and no flag to invent.
 
 The SDK is a View-based map and is embedded with `AndroidView`, with MapLibre's lifecycle forwarded from
 a `DisposableEffect` — the SDK documents no first-party Compose API, and the separate MapLibre Compose
 project states that its API is not yet stable, so the stable View API is what this project builds on.
+
+#### 3.12.1 Why not a version upgrade, and what is still unverified
+
+`13.5.3` is unchanged deliberately. Maven Central publishes `13.6.0` and `13.6.1`, but the upstream
+Android changelog for both contains no fix for this renderer crash, and the issue that documents the
+crash was closed as not planned; `13.7` is published as a pre-release. A version bump would therefore
+be an arbitrary change that addresses nothing, which is exactly what the task this section records
+asked to avoid. The artifact change is the fix.
+
+**What this does not establish.** No part of the fix was reproduced on a physical device from this
+repository: the crash is Android 16 + Vulkan specific, and the change was validated by the unit tests,
+Android lint and a debug APK build in GitHub Actions, not by running the picker on a Vivo Y18. The
+crash path is removed by construction (the Vulkan backend is not linked into the APK), but only a run
+on the affected hardware can confirm the picker itself. See `docs/MAP_PICKER.md` §12.
 
 **Why not the Google Maps SDK.** It needs an API key for rendering and its terms meter map loads, which
 is a recurring cost and a credential for a feature that must work for every user of a Bangladesh-only
