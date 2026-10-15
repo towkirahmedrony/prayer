@@ -50,11 +50,14 @@ Implemented:
   Fully offline.
 - Repository/provider boundaries for prayer schedules, prohibited periods, calendars, location,
   preferences and notification settings.
+- **Optional remote publication (Supabase):** a revisioned, checksummed location dataset (§13) and a
+  revisioned prayer configuration that supplies the calculation engine's *inputs* (§14). Both are off
+  by default, validated before use, cached locally, and never required to calculate or show a time.
 - Unit tests for domain, data and presentation-mapping logic.
 - GitHub Actions workflow that runs tests, lint and builds the debug APK.
 
 Deliberately **not** implemented (see §11): an authority-confirmed Hijri date or Sehri/Iftar
- timetable, prohibited-time rules, bundled Azan audio, network providers, Room, widgets,
+ timetable, prohibited-time rules, bundled Azan audio, third-party timetable providers, Room, widgets,
  foreground-service playback.
 
 Detailed calendar documentation, including the Bangladesh rules and their source, the supported
@@ -254,8 +257,10 @@ location + settings + 1s tick ──► request ────┘           │
   `SharingStarted.WhileSubscribed`, so nothing keeps ticking in the background once the user leaves
   Home. No WorkManager job is involved: a countdown is not a deferrable task.
 - **Failures are values.** Provider failures become `PrayerScheduleState.Failed` and arrive as
-  `failureDetail` with a retry action; expected problems never throw. A network failure cannot
-  erase settings or schedules because no network call exists in this phase.
+  `failureDetail` with a retry action; expected problems never throw. A network failure cannot erase
+  settings or schedules: the optional publication checks (§13, §14) only ever *refresh* the inputs a
+  schedule is calculated from, and any failure along that path leaves the bundled or last-known-good
+  configuration in force.
 - **Provenance travels with the data.** `DataSourceInfo(source, providerId, observedAt,
   isAvailableOffline)` is attached to every schedule state and rendered in the provenance card.
 
@@ -577,9 +582,13 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
   cheap to add and is cheap to extend.
 - **A different declination model**: implement `GeomagneticDeclinationProvider`. The correction step
   and the north-reference types do not change.
+- **Remote calculation settings**: implemented in Phase 3 (§14) through the same publication seam as
+  §13. A new supported value is added by extending the explicit mapping in `PrayerConfigurationParser`
+  *and* the engine mapping in `AdhanPrayerTimesProvider` together, so an unknown value is rejected
+  rather than silently dropped.
 - **A Qibla map or a remote computation**: not implemented, and the bearing is closed-form and offline by
-  design. The `INTERNET` permission the app now holds (§13) is used *only* for the optional dataset
-  publication check; no Qibla feature opens a connection.
+  design. The `INTERNET` permission the app now holds (§13) is used *only* for the optional dataset and
+  prayer-configuration publication checks; no Qibla feature opens a connection.
 - **Splitting modules**: move packages into `core:*`, `data:*`, `feature:*` Gradle modules; the
   rules in §4 are already the intended boundaries.
 
@@ -866,12 +875,114 @@ assumed. The transport is faked in tests; the synchroniser above it is fully uni
 
 ### 13.8 Reuse for future datasets
 
-The slot-based schema and the `datasetId`-keyed manifest mean a future published dataset type — prayer-time
-profiles, corrections and overrides, theme presets, Ramadan calendars, Hijri adjustments, feature
-configuration — reuses the same tables, the same synchroniser shape and the same activation seam, in a new
-slot, without an architectural change. This phase implements the location dataset only, and does not touch
-the prayer-time calculation engine.
+The slot-based schema and the `datasetId`-keyed manifest mean a future published dataset type reuses the
+same shape, synchroniser structure and activation seam, in a new slot, without an architectural change.
+Phase 3 has already taken that step for one such type — the prayer configuration (§14), which keeps its own
+tables and view while following the same rules — without touching the prayer-time calculation engine.
+Theme presets, published Ramadan calendars, Hijri adjustments and general feature configuration remain
+future and would follow the same pattern.
 
 > **Status.** The remote path is implemented and unit-tested against fakes. No Supabase project is
-> configured for this repository, so the migration has not been applied and no remote publication or live
+> configured for this repository, so neither migration has been applied and no remote publication or live
 > integration has been verified. See `docs/SUPABASE_SETUP.md` §5 for what still needs a live test.
+
+## 14. Remote prayer configuration and settings resolution
+
+Phase 3 adds the second published slot. It reuses the publication pattern of §13 — immutable revisions, a
+single current-publication pointer, one client-readable view, service-role-only publishing — for a
+different payload, and it does **not** touch the calculation engine.
+
+```
+bundled default (permanent floor)
+      ▲
+      │ resolution precedence (deepest first)
+      │   user override → upazila → district → division → global → bundled
+      ▼
+effective PrayerCalculationProfile ──► AdhanPrayerTimesProvider (unchanged)
+      ▲
+      │ validated, atomically activated snapshot
+      │
+PrayerConfigSynchronizer ──► RemotePrayerConfigSource ──► prayer_config_current_publication (Supabase)
+      │
+      └─ PrayerConfigSyncStateStore (throttle + last evaluated revision)
+```
+
+### 14.1 What it configures
+
+Exactly the inputs the engine already consumes, and nothing it cannot represent:
+
+| Setting | Supported values |
+|---|---|
+| Calculation method | the eleven methods `AdhanPrayerTimesProvider` maps |
+| Asr convention | `STANDARD`, `HANAFI` |
+| High-latitude rule | `AUTOMATIC`, `MIDDLE_OF_THE_NIGHT`, `SEVENTH_OF_THE_NIGHT`, `TWILIGHT_ANGLE` |
+| Prayer adjustments | ±60 minutes per obligatory prayer (sunrise, noon and sunset are solar events and carry none) |
+
+The value of every setting is a `PrayerCalculationProfile` — the same object the engine already takes — so
+a remote configuration can never express anything the engine cannot calculate. There is no separate
+on-disk format either: the stored snapshot is re-parsed by the same `PrayerConfigurationParser` that reads
+a downloaded one, and its writer emits a canonical byte-identical form. Every named value is mapped
+explicitly, and an unknown method, Asr convention, high-latitude rule, scope or prayer is reported as a
+problem rather than dropped — because dropping it would silently change the prayer times a publisher
+intended.
+
+### 14.2 The model and the revision rules
+
+A publication is one complete snapshot: `configuration_id`, an immutable `revision_id`, a monotonic
+`revision_number`, a `schema_version`, the global profile, and optional per-area profiles keyed by the
+**stable area id** of the verified dataset. `docs/PRAYER_CONFIGURATION.md` is the full reference and
+`docs/DATABASE-SCHEMA.md` the schema reference. The rules the two ends enforce:
+
+1. published revisions are immutable (a database trigger and an app check);
+2. changing a published configuration creates a new revision;
+3. an unsupported schema version is left alone, not guessed;
+4. invalid parameter values are rejected;
+5. a revision id reused with different content is rejected;
+6. a revision that is not newer than the accepted one is refused;
+7. draft/archived revisions never become active;
+8. any failed download or validation preserves the last known-good configuration.
+
+### 14.3 Resolution and precedence
+
+Resolution uses the stable area ids the verified location dataset publishes; editable names and coordinates
+are never keys, so manual selection works without the location permission and without GPS. The precedence,
+deepest first:
+
+```
+explicit user override → applicable upazila/thana → district → division → global default → bundled default
+```
+
+`PrayerConfigResolver` is the one place this is applied and the one place the user override is layered on;
+it is pure and synchronous, so every branch is directly testable. A field the user owns keeps the user's
+value; every other field comes from the resolved chain, which is what lets a user correct only Asr without
+losing a district's published Fajr and Isha settings. An area override that names an unknown area, or sits
+at the wrong level, is *dropped* and falls back safely — it can never change a known area's times.
+
+### 14.4 How it reaches the engine
+
+Rather than teach every consumer about remote configuration, `PrayerConfigApplier` resolves the effective
+profile once and writes the non-overridden fields back into the one `PrayerSettings` DataStore. Home, the
+notification coordinator and the startup warm-up therefore read exactly what they always did, and
+`AdhanPrayerTimesProvider` consumes the same `PrayerCalculationProfile`. Only the calculation fields are
+written; the time format, theme, calendar settings, stored location and reminders are never touched.
+
+### 14.5 Security
+
+`prayer_config_publications` and `prayer_config_current_publications` have RLS enabled with **no**
+`anon`/`authenticated` policy and their privileges revoked; clients read only the
+`prayer_config_current_publication` view, which re-filters on `status = 'published'`. Publishing is a
+`service_role` or migration operation. No service-role key, database password or privileged credential
+appears in the app; only the project URL and publishable key are compiled in, and both are empty by
+default. The dataset tables of §13 are untouched: the two slots are deliberately separate, so a change to
+one cannot disturb the other.
+
+### 14.6 Settings UI
+
+The existing Prayer times screen shows the effective configuration's **origin** (bundled default, published
+Bangladesh default, published area configuration, or the user's own override) and offers a **reset to
+applicable defaults** action that releases the user-owned fields. It exposes only the settings the engine
+can apply, labels them in Bangla and English through the existing resources, and never shows a raw payload
+or a database detail.
+
+> **Status.** Implemented and unit-tested against fakes, like §13. Not verified against a live Supabase
+> project — see `docs/SUPABASE_SETUP.md` and `docs/PRAYER_CONFIGURATION.md` §11.

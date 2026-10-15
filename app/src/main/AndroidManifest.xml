@@ -33,12 +33,15 @@
                               user taps the relevant button — see docs/QIBLA_COMPASS.md
                               section 4.
 
-        INTERNET              Added in the remote-dataset phase: the app may check a published dataset
-                              manifest and download an updated location dataset. This is the only
-                              network use, it is entirely optional, and every feature works without
-                              it — with no configuration, no connection, or a failed check, Salah
-                              runs on its bundled data exactly as before. Nothing else in the app
-                              opens a connection; see docs/ARCHITECTURE.md section 13.
+        INTERNET              Added in the remote-dataset phase and extended by the prayer-configuration
+                              phase: the app may check a published location-dataset manifest and
+                              download an updated location dataset, and may check for a published
+                              prayer configuration. Those are the only network uses, both are
+                              entirely optional, and every feature works without them — with no
+                              configuration, no connection, or a failed check, Salah runs on its
+                              bundled data and bundled calculation defaults exactly as before.
+                              Nothing else in the app opens a connection; see docs/ARCHITECTURE.md
+                              sections 13 and 14.
 
       Deliberately NOT requested:
         * no ACCESS_BACKGROUND_LOCATION — the Qibla screen needs a position only while it is in

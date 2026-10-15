@@ -5,11 +5,14 @@ tooling and Islamic utilities designed to keep working without an internet conne
 without an account.
 
 > **Current status:** the project foundation, the **local prayer-time calculation engine**,
-> **prayer notifications**, the **Qibla compass** and the **calendar system** (Gregorian, Bangladesh
-> Bangla, Hijri, and a Ramadan calendar with Sehri/Iftar times and reminders) are implemented and
-> covered by tests. Several long-term features described below are *planned*. This README states
-> exactly which is which, and the app itself labels unimplemented sections as “Not implemented yet”
-> instead of showing placeholder data.
+> **prayer notifications**, the **Qibla compass**, the **calendar system** (Gregorian, Bangladesh
+> Bangla, Hijri, and a Ramadan calendar with Sehri/Iftar times and reminders) and the **remote
+> publication path** — an optional, revisioned Supabase dataset and prayer-configuration sync — are
+> implemented and covered by tests. The remote path is deliberately optional: it is unit-tested
+> against fakes and is **not** yet verified against a live Supabase project, and every feature keeps
+> working offline without it. Several long-term features described below are *planned*. This README
+> states exactly which is which, and the app itself labels unimplemented sections as “Not implemented
+> yet” instead of showing placeholder data.
 
 ---
 
@@ -31,6 +34,8 @@ without an account.
 | Location from the device on request (approximate or precise) with timeouts, permission and service states | Implemented |
 | Manual coordinates that need no permission and no network, stored in the existing location repository | Implemented |
 | **Bundled Bangladesh administrative dataset** — 8 divisions, 64 districts and 507 upazilas/thanas with published reference coordinates, plus the simplified national boundary | **Implemented, offline** |
+| **Remote location-dataset publication** (Supabase) — an immutable, checksummed dataset revision is checked for, downloaded, validated and activated atomically, with the bundled data as the permanent fallback | **Implemented, unit-tested against fakes; not live-verified** |
+| **Remote prayer configuration** (Supabase) — published, immutable calculation-profile revisions that supply the engine's *inputs* (method, Asr convention, high-latitude rule, per-prayer corrections). Resolved for the user's Bangladesh division, district or upazila, with an explicit user choice always winning and the bundled default as the floor | **Implemented, unit-tested against fakes; not live-verified** |
 | **Named locality layer** — 1 216 urban neighbourhoods from OpenStreetMap, each joined to the district that contains it, so a device fix in a city reads *Mirpur, Dhaka* rather than a whole city corporation | **Implemented, offline** |
 | **One location display-name policy** — the locality, the upazila/thana or the district, de-duplicated, composed once and shown the same way on Home, Prayer, Qibla and Location | **Implemented** |
 | **Division → district → upazila picker** for choosing a location by area, with a search over the same bundled dataset above it — Bangla or English, matched and ranked in the interface language — and with no permission and no network | **Implemented** |
@@ -50,12 +55,13 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla and Ramadan reached from Tools and from Home, and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the bottom navigation and the Settings structure | Implemented (870 `@Test` methods in `app/src/test`) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the dataset publication path, the prayer-configuration path, the bottom navigation and the Settings structure | Implemented (1 107 `@Test` methods in `app/src/test`) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
 | A moon-sighting or authority-confirmed Hijri date, and an integrated authority Sehri/Iftar timetable | **Not implemented** — so no date or time is ever labelled as confirmed |
-| Quran, widgets, networking, Room | Not implemented |
+| Quran, widgets, Room | Not implemented |
+| Any network use beyond the two optional publication checks | **Not implemented** — no analytics, sync, account or content request exists |
 
 ## Why it looks the way it does
 
@@ -136,7 +142,7 @@ requires an actual comparison for the same location and date, which has not been
 | Sensors | `SensorManager` — rotation vector, geomagnetic rotation vector, or accelerometer + magnetometer; 10 Hz sampling; no foreground service |
 | Location | `LocationManagerCompat.getCurrentLocation` — one-shot and cancellable, no Play Services dependency |
 | Declination | `GeomagneticField` — the platform's World Magnetic Model, on device |
-| Permissions | `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION` — no `INTERNET`, no background location |
+| Permissions | `INTERNET` (only for the two optional publication checks), `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION` — no background location |
 | Tests | JUnit 4 + kotlinx-coroutines-test |
 
 Full version list, official references and compatibility decisions: [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
@@ -147,8 +153,10 @@ The calculation engine and its pinned version are explained in
 
 1. Local state is the primary source the UI observes — repositories expose `Flow`, the screen
    never waits on the network.
-2. Prayer times are computed on the device; nothing in this phase performs a network call. A
-   remote provider, if added later, would refresh a local cache, never replace it.
+2. Prayer times are computed on the device. An optional published prayer configuration and an
+   optional published location dataset are *inputs* that are validated and cached locally; neither is
+   ever on the path to calculating or showing a time, and a missing URL, key, connection or valid
+   response simply leaves the bundled configuration in force.
 3. Provider failures become visible states with a retry action; they never crash the app.
 4. A cached schedule is served only for the exact date, location and calculation profile it was
    produced with, so it can never appear current after the user changes location or settings.
@@ -157,7 +165,9 @@ The calculation engine and its pinned version are explained in
 6. Preferences, the manual location and the notification settings live on the device; no account
    is required.
 7. Notifications are scheduled, delivered and recovered after a reboot **without any network
-   access**. Salah declares no `INTERNET` permission at all, so there is nothing it could send.
+   access**. The app holds `INTERNET` for exactly one purpose — the optional, default-off dataset and
+   prayer-configuration checks — and opens no connection for anything else; the reminder subsystem
+   itself reads only calculated times and local preferences.
 8. The Qibla bearing is computed locally from a locally stored position, and magnetic declination
    is evaluated on device from the platform's own geomagnetic model. Automatic location uses the
    device's own provider, and manual coordinates work with neither network nor permission.
@@ -178,8 +188,10 @@ The calculation engine and its pinned version are explained in
 │       │   ├── domain/calendar/               Gregorian grid, Bangladesh Bangla, Hijri, Ramadan, formatting
 │       │   ├── domain/notification/           planner, coordinator, deliverer, Azan lifecycle
 │       │   ├── domain/qibla/                  bearing, heading maths, frames, state reducer
+│       │   ├── domain/dataset/                publication parser/validation, payload archive, synchroniser
+│       │   ├── domain/prayerconfig/           published calculation-profile model, validation, resolution, sync
 │       │   └── domain/location/               dataset parser, area resolution/selection, country policy, freshness
-│       ├── data/{preferences,location,calendar,prayer,prohibited}
+│       ├── data/{preferences,location,calendar,prayer,prohibited,dataset,prayerconfig}
 │       │   ├── location/                      DataStore location + bundled-asset area catalog
 │       │   ├── notification/                  AlarmManager, channels, receiver, presenter, Azan IO
 │       │   └── qibla/                         SensorManager, GeomagneticField, LocationManagerCompat
@@ -193,7 +205,10 @@ The calculation engine and its pinned version are explained in
 ├── docs/CALENDAR_SYSTEM.md                    Gregorian, Bangladesh Bangla, Hijri, Ramadan, Sehri/Iftar
 ├── docs/LOCATION_SYSTEM.md                    setup flow, GPS/manual selection, country policy, dataset, limits
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
+├── docs/PRAYER_CONFIGURATION.md               remote calculation settings: schema, revision rules, precedence, offline fallback
 ├── docs/PRAYER_NOTIFICATIONS.md               scheduler, permissions, channels, Azan, limitations
+├── docs/DATABASE-SCHEMA.md                    the Supabase tables, views and policies (dataset + prayer config)
+├── docs/SUPABASE_SETUP.md                     how to configure the project and publish a revision, and what still needs a live test
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
 ├── docs/QIBLA_COMPASS.md                      bearing formula, sensors, declination, limits
 ├── docs/QIBLA_COMPASS_TESTING.md              automated coverage + the manual device checklist
@@ -252,6 +267,14 @@ and no signing credentials.
   scales and a real device time-zone change are not.
 - Prohibited-time boundaries are this application's **configured policy**, disclosed as such on the
   screen that shows them; no source for the minute values has been verified in this repository.
+- **The remote publication path is not live-verified.** The Supabase migrations are authored and
+  reviewable in the repository, but no project is configured for it, so neither migration has been
+  applied and no publication has been served or downloaded. See `docs/SUPABASE_SETUP.md`.
+- **A published revision carries no authenticity claim.** Its checksum detects accidental corruption,
+  not a malicious publisher: there is no signature and no key management.
+- **Prayer-configuration resolution is by administrative area only.** It uses the stable area ids of
+  the verified dataset; a device with no saved area resolves to the global default, and coordinates
+  are never the key. International locations are out of scope for this phase.
 
 ## Roadmap
 
@@ -264,8 +287,9 @@ and no signing credentials.
    unattended long-form playback warrants a foreground service.
 4. **On-device verification** — work through the notification and Qibla checklists on real hardware
    and record the results, including device-specific Doze, battery and magnetometer behaviour.
-5. **Remote providers and caching** — optional AlAdhan integration with validation, caching and
-   provenance display.
+5. **Remote providers and caching** — the optional Supabase publication path (location dataset and
+   prayer configuration) ships in Phases 2–3; still open is a live-verified deployment, and, if ever
+   wanted, an AlAdhan timetable provider behind the existing provider seam.
 6. **Quran and content modules.**
 
 ## Contributing
