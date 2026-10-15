@@ -25,6 +25,11 @@ class DatasetPublicationTest {
         status: String = "published",
         checksum: String? = this.checksum,
         payloadPath: String? = "bd_locations/pub-2/payload.zip",
+        payloadSizeBytes: Long? = null,
+        areaCount: Int? = null,
+        localityCount: Int? = null,
+        boundaryRingCount: Int? = null,
+        notes: String? = null,
         asArray: Boolean = true,
     ): String {
         val fields = buildList {
@@ -35,6 +40,11 @@ class DatasetPublicationTest {
             add(""""status":"$status"""")
             if (checksum != null) add(""""checksum":"$checksum"""")
             if (payloadPath != null) add(""""payload_path":"$payloadPath"""")
+            if (payloadSizeBytes != null) add(""""payload_size_bytes":$payloadSizeBytes"""")
+            if (areaCount != null) add(""""area_count":$areaCount"""")
+            if (localityCount != null) add(""""locality_count":$localityCount"""")
+            if (boundaryRingCount != null) add(""""boundary_ring_count":$boundaryRingCount"""")
+            if (notes != null) add(""""notes":"$notes"""")
         }.joinToString(",")
         val body = "{$fields}"
         return if (asArray) "[$body]" else body
@@ -70,8 +80,13 @@ class DatasetPublicationTest {
 
     @Test
     fun `optional fields are read when present`() {
-        val body = manifestJson().dropLast(1) +
-            ""","payload_size_bytes":1234,"area_count":579,"locality_count":1216,"boundary_ring_count":13,"notes":"hello"}]"""
+        val body = manifestJson(
+            payloadSizeBytes = 1234,
+            areaCount = 579,
+            localityCount = 1216,
+            boundaryRingCount = 13,
+            notes = "hello",
+        )
 
         val publication = parsed(body)
 

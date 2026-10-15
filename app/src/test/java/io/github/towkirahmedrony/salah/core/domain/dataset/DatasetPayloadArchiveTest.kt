@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
+import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -114,17 +115,37 @@ class DatasetPayloadArchiveTest {
     }
 
     @Test
-    fun `a duplicated entry is refused`() {
+    fun `a hand-built stored archive decodes, so the duplicate test below is not vacuous`() {
         val result = DatasetPayloadArchive.read(
-            zip(
-                DatasetPayload.VERSION_PART to "v2",
-                DatasetPayload.AREAS_PART to areas,
-                DatasetPayload.BOUNDARY_PART to boundary,
-                DatasetPayload.AREAS_PART to areas,
+            rawStoredZip(
+                listOf(
+                    DatasetPayload.VERSION_PART to "v2",
+                    DatasetPayload.AREAS_PART to areas,
+                    DatasetPayload.BOUNDARY_PART to boundary,
+                ),
             ),
         )
 
-        assertTrue(result is DatasetPayloadArchive.Result.Malformed)
+        assertTrue(result.toString(), result is DatasetPayloadArchive.Result.Decoded)
+    }
+
+    @Test
+    fun `a duplicated entry is refused`() {
+        // Written by hand: java.util.zip.ZipOutputStream refuses to emit a duplicate name, and the
+        // decoder's guard exists for archives produced by other tools, so the case cannot be built with
+        // the standard writer.
+        val result = DatasetPayloadArchive.read(
+            rawStoredZip(
+                listOf(
+                    DatasetPayload.VERSION_PART to "v2",
+                    DatasetPayload.AREAS_PART to areas,
+                    DatasetPayload.BOUNDARY_PART to boundary,
+                    DatasetPayload.AREAS_PART to areas,
+                ),
+            ),
+        )
+
+        assertTrue(result.toString(), result is DatasetPayloadArchive.Result.Malformed)
     }
 
     @Test
@@ -160,5 +181,84 @@ class DatasetPayloadArchiveTest {
     @Test
     fun `an empty archive is refused`() {
         assertTrue(DatasetPayloadArchive.read(zip()) is DatasetPayloadArchive.Result.Malformed)
+    }
+
+    /**
+     * A stored (uncompressed) zip written by hand, so duplicate entry names can be produced.
+     *
+     * Deliberately minimal — local file headers, a central directory and an end-of-directory record —
+     * because that is all the decoder needs and all the test needs to control.
+     */
+    private fun rawStoredZip(entries: List<Pair<String, String>>): ByteArray {
+        val out = ByteArrayOutputStream()
+        val central = ByteArrayOutputStream()
+        var offset = 0
+        for ((name, content) in entries) {
+            val nameBytes = name.toByteArray(Charsets.UTF_8)
+            val data = content.toByteArray(Charsets.UTF_8)
+            val crc = CRC32().apply { update(data) }.value.toInt()
+
+            val local = ByteArrayOutputStream().apply {
+                writeIntLe(0x04034b50)
+                writeShortLe(20)
+                writeShortLe(0)
+                writeShortLe(0) // stored
+                writeShortLe(0)
+                writeShortLe(0)
+                writeIntLe(crc)
+                writeIntLe(data.size)
+                writeIntLe(data.size)
+                writeShortLe(nameBytes.size)
+                writeShortLe(0)
+                write(nameBytes)
+                write(data)
+            }.toByteArray()
+
+            out.write(local)
+            central.writeIntLe(0x02014b50)
+            central.writeShortLe(20)
+            central.writeShortLe(20)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeIntLe(crc)
+            central.writeIntLe(data.size)
+            central.writeIntLe(data.size)
+            central.writeShortLe(nameBytes.size)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeShortLe(0)
+            central.writeIntLe(0)
+            central.writeIntLe(offset)
+            central.write(nameBytes)
+
+            offset += local.size
+        }
+
+        val centralBytes = central.toByteArray()
+        out.write(centralBytes)
+        out.writeIntLe(0x06054b50)
+        out.writeShortLe(0)
+        out.writeShortLe(0)
+        out.writeShortLe(entries.size)
+        out.writeShortLe(entries.size)
+        out.writeIntLe(centralBytes.size)
+        out.writeIntLe(offset)
+        out.writeShortLe(0)
+        return out.toByteArray()
+    }
+
+    private fun ByteArrayOutputStream.writeShortLe(value: Int) {
+        write(value and 0xFF)
+        write((value ushr 8) and 0xFF)
+    }
+
+    private fun ByteArrayOutputStream.writeIntLe(value: Int) {
+        write(value and 0xFF)
+        write((value ushr 8) and 0xFF)
+        write((value ushr 16) and 0xFF)
+        write((value ushr 24) and 0xFF)
     }
 }
