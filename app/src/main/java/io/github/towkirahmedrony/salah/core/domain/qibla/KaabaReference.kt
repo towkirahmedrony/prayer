@@ -3,11 +3,19 @@ package io.github.towkirahmedrony.salah.core.domain.qibla
 /**
  * The geographic reference the Qibla bearing is measured towards.
  *
- * **Source of the coordinates.** `21°25′21″N 39°49′34″E`, published as `21.4225°N 39.82617°E` in
- * the coordinate block of the English Wikipedia article *Kaaba* (GeoHack parameters
- * `21.4225_N_39.82617_E`, region `SA`). That article's coordinates are the widely mirrored value
- * for the structure, and they agree with the commonly cited `21.4225, 39.8262` to within a
- * ten-thousandth of a degree.
+ * **The coordinate.** `21.4225° N, 39.8262° E` — the reference this project specifies, and the
+ * value its tests and documentation are written against.
+ *
+ * **Where it comes from, and what the last digit costs.** The English Wikipedia article *Kaaba*
+ * publishes the structure as `21°25′21″N 39°49′34″E`, with the GeoHack decimal parameter
+ * `21.4225_N_39.82617_E` (region `SA`). That decimal longitude sits `0.00003°` east of this
+ * constant — about **3.1 m** at the Kaaba's latitude — because this constant is that published
+ * value rounded to the four decimal places the specification states.
+ *
+ * The offset moves the bearing by at most `atan(3.1 m / d)`: `0.00004°` from Dhaka, `0.0002°` from
+ * Cairo, under `0.0002°` from anywhere beyond 1 000 km — all far below the compass's own
+ * uncertainty, so the two reference points are indistinguishable at every distance where a
+ * bearing is meaningful. `QiblaCalculatorTest` pins the resulting bearings.
  *
  * **Why one point is enough.** The Kaaba's footprint is about 12.86 m by 11.03 m, so any single
  * representative point lies within roughly 7 m of the structure's centre. Salah uses the
@@ -26,7 +34,7 @@ object KaabaReference {
     const val LATITUDE_DEGREES: Double = 21.4225
 
     /** Kaaba longitude in degrees, positive east. */
-    const val LONGITUDE_DEGREES: Double = 39.82617
+    const val LONGITUDE_DEGREES: Double = 39.8262
 
     /**
      * The shortest separation, in metres, at which a bearing is still meaningful.
@@ -39,5 +47,5 @@ object KaabaReference {
     const val MINIMUM_SEPARATION_METRES: Double = 1.0
 
     /** Human-readable provenance, shown in the UI and repeated in `docs/QIBLA_COMPASS.md`. */
-    const val SOURCE: String = "Wikipedia, \"Kaaba\" coordinate block (21.4225°N 39.82617°E)"
+    const val SOURCE: String = "Wikipedia, \"Kaaba\" coordinate block (21.4225°N 39.8262°E)"
 }

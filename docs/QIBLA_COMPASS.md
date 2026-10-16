@@ -75,9 +75,9 @@ and does not lose precision near ±90°. The result is normalized into `[0, 360)
 | Property | Value |
 |---|---|
 | Latitude | `21.4225° N` |
-| Longitude | `39.82617° E` |
-| Source | English Wikipedia, *Kaaba*, coordinate block: `21°25′21″N 39°49′34″E`, GeoHack `21.4225_N_39.82617_E`, region `SA` |
-| Agrees with | the commonly published `21.4225, 39.8262` to within `1e-4°` |
+| Longitude | `39.8262° E` |
+| Source | English Wikipedia, *Kaaba*, coordinate block: `21°25′21″N 39°49′34″E`; GeoHack parameter `21.4225_N_39.82617_E`, region `SA` |
+| Difference from the published decimal | the longitude is that published `39.82617` rounded to the four decimal places the specification states: `0.00003°`, about **3.1 m** at the Kaaba's latitude. A 3.1 m lateral shift of the reference point moves the bearing by at most `atan(3.1 m / d)` — `0.00004°` from Dhaka, `0.0002°` from Cairo, under `0.0002°` from any observer beyond 1 000 km — so the two reference points are indistinguishable at every distance where a bearing is meaningful |
 
 **Why one point is enough.** The Kaaba's footprint is about 12.86 m by 11.03 m, so any single
 representative point lies within roughly 7 m of the centre. A lateral displacement of `d` metres
@@ -131,7 +131,7 @@ genuinely different formulations are implemented inside the test file:
    the sign of the longitude difference.
 
 The production formula, both alternative formulations and a frozen city table agree to better than
-`1e-13` across a global grid. Human-checkable sanity cases are asserted exactly: due south of the
+`1e-12` across a global grid. Human-checkable sanity cases are asserted exactly: due south of the
 Kaaba on the same meridian reads `0°`, and at the Kaaba's own latitude due west of it reads
 slightly **north** of due east — because a great circle is not a parallel of latitude.
 
@@ -403,7 +403,18 @@ Two properties worth stating explicitly:
 ### 6.1 Alignment and the turn
 
 The turn is the **signed shortest** difference between the heading and the bearing, so approaching
-the Qibla from 359° reads as "turn right 2°" rather than as nearly a full rotation. Alignment is
+the Qibla from 359° reads as "turn right 2°" rather than as nearly a full rotation.
+
+There are two equivalent ways of stating this, and Salah uses each where it reads better. The
+*relative direction* — the angle the Qibla marker sits at on a dial that does not rotate — is
+`normalize(bearing − heading)` in `[0, 360)`. The *turn* is the same offset expressed as an
+instruction, in `(-180, 180]`. The dial is drawn with the whole rose rotated by `−heading` and the
+marker placed at `bearing`, so the marker's on-screen angle **is** `normalize(bearing − heading)`:
+the normalized angle is what is drawn, and the signed turn is what is written. The two cannot
+disagree because the marker is placed by one rotation and the turn is read from it, not computed
+separately.
+
+Alignment is
 claimed within `ALIGNMENT_TOLERANCE_DEGREES` (5°) of the bearing, and only when the orientation is
 usable and the heading is on the true-north reference. The dial turns under a fixed pointer — the
 whole rose is rotated in a single `rotate` block, so the ticks, cardinals and marker cannot disagree
@@ -575,7 +586,7 @@ screen's decisions are all unit-tested with fakes and only the thin adapters nee
 
 ## 11. Automated test coverage
 
-112 tests across 9 classes:
+141 tests across 11 classes:
 
 | Class | Tests | Covers |
 |---|---|---|
@@ -583,11 +594,13 @@ screen's decisions are all unit-tested with fakes and only the thin adapters nee
 | `HeadingMathTest` | 14 | Normalization and non-finite folding, signed shortest difference and its antisymmetry, the ±180 convention, declination applied once, the turn being declination-independent, dial rotation |
 | `HeadingSmootherTest` | 11 | Exact first sample, wrap behaviour, adoption threshold, partial adoption, steady-turn lag bounds, reset, jitter reduction |
 | `QiblaStateReducerTest` | 19 | Every phase, the precedence between them, every calibration advice, exhaustiveness over the accuracy values |
-| `DataStoreLocationRepositoryTest` | 11 | Manual and device round trips, metadata cleared on manual save, implausible accuracy discarded, recreation, clearing, pre-origin stores, foreign origins, partial writes |
+| `QiblaViewModelTest` | 22 | The wiring between all of the above: which stored location the bearing comes from and that it is recalculated when that location changes, the device-fix adoption path, declination applied once to the heading and never to the bearing, no heading claimed before the first sample, the compass collected once per start and released on stop, and a device with no compass still reporting the exact bearing |
+| `DataStoreLocationRepositoryTest` | 14 | Manual and device round trips, metadata cleared on manual save, implausible accuracy discarded, recreation, clearing, pre-origin stores, foreign origins, partial writes |
 | `LocationFreshnessTest` | 11 | Declared versus aged, both window boundaries, future timestamps, refresh eligibility |
 | `SensorFramesTest` | 8 | All four rotations, the quarter-turn cycle, no repeated axis, distinctness, coverage of the in-plane axes |
 | `CompassAccuracyGateTest` | 7 | Warm-up suppression, pass-through unaltered, reset, sample counting |
 | `LocationProviderSelectionTest` | 8 | Both orderings, full provider coverage, first-enabled selection, no-provider case, the orderings differing |
+| `LocationPermissionPolicyTest` | 4 | Whether a permission state means "ask", "ask again", or "send the user to app settings", and that coarse and precise are both treated as granted |
 
 Run by `.github/workflows/android-apk.yml` on every push to `main`, before lint and before the debug
 APK is assembled.

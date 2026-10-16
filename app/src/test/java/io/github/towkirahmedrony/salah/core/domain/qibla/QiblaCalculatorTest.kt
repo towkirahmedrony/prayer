@@ -105,28 +105,33 @@ class QiblaCalculatorTest {
     /**
      * Frozen baselines for named cities.
      *
-     * Each value was produced by all three formulations agreeing to better than `1e-13`, so the
+     * Each value was produced by all three formulations agreeing to better than `1e-12`, so the
      * table pins the arithmetic rather than a one-off result. It is a regression guard: if a change
      * alters any of these, two independent derivations in this file will disagree with the
      * production code at the same time, and the failure names the city.
+     *
+     * The decimals here are for the specified Kaaba longitude `39.8262`; they were recomputed —
+     * not copied from the production function — when that constant replaced the published
+     * `39.82617`. Every entry moved by less than `1.1e-4°`, which is the whole of the difference
+     * between the two reference points.
      */
     @Test
     fun `cross-checked reference bearings`() {
         val references = listOf(
             // city, latitude, longitude, bearing
-            City("Dhaka, Bangladesh", 23.8103, 90.4125, 277.567140),
-            City("London, United Kingdom", 51.5074, -0.1278, 118.987253),
-            City("New York, United States", 40.7128, -74.0060, 58.481721),
-            City("Jakarta, Indonesia", -6.2088, 106.8456, 295.151729),
-            City("Cairo, Egypt", 30.0444, 31.2357, 136.137383),
-            City("Tokyo, Japan", 35.6762, 139.6503, 292.998697),
-            City("Sydney, Australia", -33.8688, 151.2093, 277.499574),
-            City("Karachi, Pakistan", 24.8607, 67.0011, 267.741010),
-            City("Cape Town, South Africa", -33.9249, 18.4241, 23.352512),
-            City("Reykjavik, Iceland", 64.1466, -21.9426, 106.117668),
-            City("Sao Paulo, Brazil", -23.5505, -46.6333, 68.939360),
-            City("Anchorage, United States", 61.2181, -149.9003, 350.883085),
-            City("Suva, Fiji", -18.1416, 178.4419, 281.892720),
+            City("Dhaka, Bangladesh", 23.8103, 90.4125, 277.567131),
+            City("London, United Kingdom", 51.5074, -0.1278, 118.987219),
+            City("New York, United States", 40.7128, -74.0060, 58.481701),
+            City("Jakarta, Indonesia", -6.2088, 106.8456, 295.151736),
+            City("Cairo, Egypt", 30.0444, 31.2357, 136.137277),
+            City("Tokyo, Japan", 35.6762, 139.6503, 292.998680),
+            City("Sydney, Australia", -33.8688, 151.2093, 277.499589),
+            City("Karachi, Pakistan", 24.8607, 67.0011, 267.740996),
+            City("Cape Town, South Africa", -33.9249, 18.4241, 23.352542),
+            City("Reykjavik, Iceland", 64.1466, -21.9426, 106.117639),
+            City("Sao Paulo, Brazil", -23.5505, -46.6333, 68.939371),
+            City("Anchorage, United States", 61.2181, -149.9003, 350.883057),
+            City("Suva, Fiji", -18.1416, 178.4419, 281.892722),
         )
 
         references.forEach { city ->
@@ -182,7 +187,7 @@ class QiblaCalculatorTest {
     @Test
     fun `signed longitude delta takes the short way round`() {
         // 170E to 39.8E is 130 degrees the short way, not 230 the long way.
-        assertEquals(-130.17383, QiblaCalculator.signedLongitudeDeltaDegrees(170.0), 1e-5)
+        assertEquals(-130.1738, QiblaCalculator.signedLongitudeDeltaDegrees(170.0), 1e-5)
 
         // A point 10 degrees west of the Kaaba, expressed past the antimeridian.
         assertEquals(50.0, QiblaCalculator.signedLongitudeDeltaDegrees(-10.17383), 1e-4)
