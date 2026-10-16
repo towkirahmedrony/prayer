@@ -19,16 +19,20 @@ import org.junit.Test
 class TasbihSessionCodecTest {
 
     @Test
-    fun `a session survives a round trip`() {
+    fun `a completed session survives a round trip, count past the target included`() {
+        // Valid as written: the target was reached, so a completion time is the truth about this session
+        // rather than a value normalization would remove. An incomplete session carrying one — the first
+        // shape this test used — is repaired by normalized() and could not round-trip exactly.
         val session = tasbihSession(
             id = "session-1",
-            count = 34,
+            count = 100,
             target = 99,
             startedAtMillis = 1_700_000_000_000L,
             updatedAtMillis = 1_700_000_005_000L,
             completedAtMillis = 1_700_000_004_000L,
         )
 
+        assertEquals(session, session.normalized())
         assertEquals(session, TasbihSessionCodec.decode(TasbihSessionCodec.encode(session)))
     }
 
@@ -115,11 +119,20 @@ class TasbihSessionCodecTest {
 
     @Test
     fun `a history round trips in order and keeps every session distinct`() {
+        // Every entry is valid as written, so the round trip can be asserted exactly: a session that
+        // needed repairing on the way in would differ from its input for a reason this test is not about.
         val history = listOf(
-            tasbihSession(id = "session-3", count = 33, target = 33, startedAtMillis = 300L),
+            tasbihSession(
+                id = "session-3",
+                count = 33,
+                target = 33,
+                startedAtMillis = 300L,
+                completedAtMillis = 300L,
+            ),
             tasbihSession(id = "session-2", count = 12, target = 99, startedAtMillis = 200L),
             tasbihSession(id = "session-1", count = 4, target = 33, startedAtMillis = 100L),
         )
+        assertEquals(history, history.map { session -> session.normalized() })
 
         val decoded = TasbihSessionCodec.decodeHistory(TasbihSessionCodec.encodeHistory(history))
 
