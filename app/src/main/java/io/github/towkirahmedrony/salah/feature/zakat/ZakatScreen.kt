@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
@@ -45,36 +46,17 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusP
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import org.koin.androidx.compose.koinViewModel
 
+private const val COMPACT_PER_ROW = 4
+
 /**
- * The Zakat calculator.
+ * The Zakat calculator screen.
  *
- * ## What this screen is careful not to say
+ * Layout, top to bottom: the result, the gold/silver prices, assets, liabilities, method, limits.
  *
- * It reports arithmetic and names the position behind every figure. It never states that zakat is due, never
- * calls one recognised opinion correct, and never presents a result as a religious ruling. The wording of every
- * string was chosen for that: the amount is "zakat due" *as an arithmetic output of the rules shown on the same
- * screen*, the threshold is "at or above the nisab", and the methodology card names the school each choice comes
- * from. Salah is not religiously certified and the screen says so rather than implying otherwise through silence.
- *
- * ## Where the disagreements are surfaced
- *
- * The three choices that change the answer — the nisab weight pair, the jewellery ruling, and whether debts are
- * deducted — are on the screen as choices, with the positions named in their labels. When the all-one-metal rule
- * overrides the metal choice, the override is stated beside the choice rather than applied silently. A user can
- * therefore see which methodology produced their number, which is the difference between a calculator and a
- * black box. `docs/ZAKAT_METHODOLOGY.md` §3 and §4 are the sources for each.
- *
- * ## Result first
- *
- * The calculation sits above the form, because a user adjusting a figure wants to see the effect of the
- * adjustment without scrolling past the field they just typed into.
- *
- * ## Accessibility and layout
- *
- * Every interactive row is at least 48dp tall, the numeric fields carry their label and help text as real text
- * rather than as a placeholder that disappears on focus, a choice row is `selectable` with the radio-button role
- * so its state is announced, and the screen is a single scrolling column so nothing is unreachable at a large
- * font scale. Insets come from the shell's `Scaffold` — see `SalahApp` — and this screen adds none.
+ * The gold and silver **price boxes are hidden by default**: the published reference price is fetched
+ * automatically and shown as a one-line summary per metal. The boxes appear only when the user asks to adjust
+ * the prices, or when no usable published price exists (so the calculator can never be left without a way to
+ * get a price), or when the user has already typed their own price.
  */
 @Composable
 fun ZakatScreen(
@@ -89,7 +71,7 @@ fun ZakatScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         SalahSubpageHeader(
             title = stringResource(R.string.zakat_title),
@@ -109,7 +91,6 @@ fun ZakatScreen(
     }
 }
 
-/** The shape of the screen while the interface-language preference is still on its way. */
 @Composable
 private fun ZakatLoading(modifier: Modifier = Modifier) {
     SalahSectionCard(modifier = modifier) {
@@ -131,10 +112,10 @@ private fun ZakatContent(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         ResultCard(state = state)
-        ReferencePricesCard(state = state, viewModel = viewModel)
+        PricesCard(state = state, viewModel = viewModel)
         AssetsCard(state = state, viewModel = viewModel)
         LiabilitiesCard(state = state, viewModel = viewModel)
         MethodCard(state = state, viewModel = viewModel)
@@ -176,21 +157,18 @@ private fun ZakatContent(
     }
 }
 
-// --- Result -------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------
+// Result
+// ---------------------------------------------------------------------------------------------------------
 
 @Composable
 private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier) {
     val result = state.result
+    var showBreakdown by remember { mutableStateOf(false) }
 
     SalahSectionCard(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.zakat_section_result),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
+            SectionHeading(resId = R.string.zakat_section_result, modifier = Modifier.weight(1f))
             SalahStatusPill(
                 text = stringResource(result.statusRes),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -198,29 +176,78 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
             )
         }
 
+        Spacer(modifier = Modifier.height(14.dp))
+
+        if (result.due != null) {
+            Text(
+                text = stringResource(R.string.zakat_result_due),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = result.due,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = result.currency,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.zakat_result_net),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = result.netWealth ?: "\u2014",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (result.netWealth != null) {
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(
+                        text = result.currency,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 3.dp),
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.zakat_result_rate, result.rateLabel),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        result.metRes?.let { metRes ->
+            Spacer(modifier = Modifier.height(8.dp))
+            SalahStatusPill(
+                text = stringResource(metRes),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(10.dp))
 
-        // The answer, before the working. Nothing is shown as an amount when nothing could be worked out, so a
-        // user never reads a figure that was not computed.
-        TotalRow(
-            labelRes = R.string.zakat_result_net,
-            value = result.netWealth,
-            emphasised = true,
-            currency = result.currency,
-        )
+        if (result.due != null) {
+            TotalRow(labelRes = R.string.zakat_result_net, value = result.netWealth, currency = result.currency)
+        }
         TotalRow(labelRes = R.string.zakat_result_total_assets, value = result.totalAssets, currency = result.currency)
         TotalRow(labelRes = R.string.zakat_result_deductions, value = result.deductions, currency = result.currency)
-
-        Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TotalRow(
-            labelRes = R.string.zakat_result_nisab,
-            value = result.nisabAmount,
-            emphasised = true,
-            currency = result.currency,
-        )
+        TotalRow(labelRes = R.string.zakat_result_nisab, value = result.nisabAmount, currency = result.currency)
         if (result.nisabGramsLabel != null && result.nisabPriceLabel != null) {
             Text(
                 text = stringResource(
@@ -232,47 +259,6 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // Whether the threshold is met is stated in words *and* carried by the pill, so it does not depend on a
-        // colour the reader may not distinguish.
-        result.metRes?.let { metRes ->
-            Spacer(modifier = Modifier.height(6.dp))
-            SalahStatusPill(
-                text = stringResource(metRes),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (result.due != null) {
-            Text(
-                text = stringResource(R.string.zakat_result_due),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // The amount and the currency beside it: the number keeps the exact text the calculation
-            // produced, and the currency code is a separate piece of data rather than a symbol appended to a
-            // formatted figure.
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = result.due,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(
-                    text = result.currency,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Text(
-            text = stringResource(R.string.zakat_result_rate, result.rateLabel),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         if (result.incompleteLabels.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -312,14 +298,21 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
             )
         }
 
-        // The working. Every row says whether it was counted, and a row that was not still shows its amount, so a
-        // user can see what a ruling they chose removed from their total.
         if (result.rows.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(8.dp))
-            result.rows.forEach { row ->
-                BreakdownRow(row = row)
+            TextButton(
+                onClick = { showBreakdown = !showBreakdown },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (showBreakdown) R.string.zakat_breakdown_hide else R.string.zakat_breakdown_show,
+                    ),
+                )
+            }
+            if (showBreakdown) {
+                result.rows.forEach { row -> BreakdownRow(row = row) }
             }
         }
     }
@@ -330,13 +323,12 @@ private fun TotalRow(
     @androidx.annotation.StringRes labelRes: Int,
     value: String?,
     modifier: Modifier = Modifier,
-    emphasised: Boolean = false,
     currency: String? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -345,76 +337,125 @@ private fun TotalRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = value.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (value != null && currency != null) {
+            Spacer(modifier = Modifier.size(4.dp))
             Text(
-                text = value.orEmpty(),
-                style = if (emphasised) {
-                    MaterialTheme.typography.titleMedium
-                } else {
-                    MaterialTheme.typography.bodyMedium
-                },
-                color = MaterialTheme.colorScheme.onSurface,
+                text = currency,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // Shown only when there is an amount for it to belong to, so a currency code never floats beside
-            // an absent figure.
-            if (value != null && currency != null) {
-                Spacer(modifier = Modifier.size(4.dp))
-                Text(
-                    text = currency,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }
 
-// --- Reference prices ----------------------------------------------------------------------------
-
-/**
- * The published gold and silver reference rates, and where each of them came from.
- *
- * Every figure here is data from the published record: a price, a source name, or one of the record's own
- * timestamps, each named for what it actually is. Nothing is invented, and no timestamp is presented as proof
- * that a market price was live at that moment — a provider's own update and the moment the record was
- * retrieved are both statements about the plumbing, and they are labelled as such.
- *
- * The card is present whatever the availability, because "there is no published price" is information the
- * user needs before wondering why the price field is empty.
- */
 @Composable
-private fun ReferencePricesCard(
+private fun BreakdownRow(row: ZakatResultRowView, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(row.labelRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = row.amount.orEmpty(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        SalahStatusPill(
+            text = stringResource(row.treatmentRes),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Gold and silver prices
+// ---------------------------------------------------------------------------------------------------------
+
+@Composable
+private fun PricesCard(
     state: ZakatUiState.Ready,
     viewModel: ZakatViewModel,
     modifier: Modifier = Modifier,
 ) {
+    var adjusting by remember { mutableStateOf(false) }
+
+    val noUsableRate = state.referencePrices.any { price ->
+        price.status == ZakatReferencePriceStatus.UNAVAILABLE || price.status == ZakatReferencePriceStatus.FAILED
+    }
+    val typedOwnPrice = state.referencePrices.any { price -> price.manuallyEdited }
+    // The boxes are hidden unless the user asked for them, or there is no published price to fall back on, or
+    // the user has already typed a price of their own.
+    val showFields = adjusting || noUsableRate || typedOwnPrice
+    val priceFields = state.assetFields.filter { field -> field.field in ZakatViewModel.PRICE_FIELDS }
+
     SalahSectionCard(modifier = modifier) {
-        SectionHeading(resId = R.string.zakat_price_title)
-        Text(
-            text = stringResource(R.string.zakat_price_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        state.referencePrices.forEach { price ->
-            ReferencePriceRow(price = price, onRestore = viewModel::onRestoreReferencePrice)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionHeading(resId = R.string.zakat_price_title, modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = viewModel::refreshReferencePrices,
+                enabled = !state.refreshingReferencePrices,
+            ) {
+                Text(
+                    text = stringResource(
+                        if (state.refreshingReferencePrices) {
+                            R.string.zakat_prices_updating
+                        } else {
+                            R.string.zakat_prices_refresh
+                        },
+                    ),
+                )
+            }
         }
-        TextButton(
-            onClick = viewModel::refreshReferencePrices,
-            enabled = !state.refreshingReferencePrices,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 48.dp),
-        ) {
+
+        state.referencePrices.forEach { price ->
+            PriceSummaryRow(price = price, onRestore = viewModel::onRestoreReferencePrice)
+        }
+
+        if (noUsableRate) {
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = stringResource(
-                    if (state.refreshingReferencePrices) {
-                        R.string.zakat_price_refreshing
-                    } else {
-                        R.string.zakat_price_refresh
-                    },
-                ),
+                text = stringResource(R.string.zakat_prices_manual_needed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        if (!noUsableRate && !typedOwnPrice) {
+            TextButton(
+                onClick = { adjusting = !adjusting },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        if (adjusting) R.string.zakat_prices_hide else R.string.zakat_prices_adjust,
+                    ),
+                )
+            }
+        }
+
+        if (showFields) {
+            priceFields.forEach { field -> NumberField(state = field, viewModel = viewModel) }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = stringResource(R.string.zakat_price_source_note),
             style = MaterialTheme.typography.bodySmall,
@@ -423,14 +464,8 @@ private fun ReferencePricesCard(
     }
 }
 
-/**
- * One metal's reference price: what it is, what it came from, and whether the user's own figure is in force.
- *
- * The price is shown with its unit rather than bare, because a rate without a unit is not a rate; and the
- * source and the timestamps are shown only when the published record actually carries them.
- */
 @Composable
-private fun ReferencePriceRow(
+private fun PriceSummaryRow(
     price: ZakatReferencePriceState,
     onRestore: (ZakatFormField) -> Unit,
     modifier: Modifier = Modifier,
@@ -438,34 +473,19 @@ private fun ReferencePriceRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 10.dp),
+            .padding(top = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(price.metalRes),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            SalahStatusPill(
-                text = stringResource(price.statusRes),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val priceText = price.pricePerGram
-        if (priceText != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.zakat_price_per_gram),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
+            val priceText = price.pricePerGram
+            if (priceText != null) {
                 Text(
                     text = priceText,
                     style = MaterialTheme.typography.titleMedium,
@@ -477,8 +497,18 @@ private fun ReferencePriceRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            } else {
+                SalahStatusPill(
+                    text = stringResource(price.statusRes),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
+
+        // One provenance line rather than five: the first statement the record actually makes, worded as what it
+        // is (a reviewed date, the provider's own update, a fetch time, or a last-changed time) and never as
+        // proof the market price was live at that moment.
         price.sourceLabel?.let { source ->
             Text(
                 text = stringResource(R.string.zakat_price_source, source),
@@ -486,30 +516,16 @@ private fun ReferencePriceRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        price.effectiveLabel?.let { effective ->
-            Text(
-                text = stringResource(R.string.zakat_price_effective, effective),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val stamp: Pair<Int, String>? = when {
+            price.effectiveLabel != null -> R.string.zakat_price_effective to price.effectiveLabel
+            price.providerUpdatedLabel != null -> R.string.zakat_price_provider_update to price.providerUpdatedLabel
+            price.fetchedLabel != null -> R.string.zakat_price_fetched to price.fetchedLabel
+            price.updatedLabel != null -> R.string.zakat_price_last_updated to price.updatedLabel
+            else -> null
         }
-        price.providerUpdatedLabel?.let { updated ->
+        stamp?.let { (resId, value) ->
             Text(
-                text = stringResource(R.string.zakat_price_provider_update, updated),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        price.fetchedLabel?.let { fetched ->
-            Text(
-                text = stringResource(R.string.zakat_price_fetched, fetched),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        price.updatedLabel?.let { updated ->
-            Text(
-                text = stringResource(R.string.zakat_price_last_updated, updated),
+                text = stringResource(resId, value),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -533,44 +549,15 @@ private fun ReferencePriceRow(
                 onClick = { onRestore(price.priceField) },
                 modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.zakat_price_restore, stringResource(price.metalRes)),
-                )
+                Text(text = stringResource(R.string.zakat_price_restore, stringResource(price.metalRes)))
             }
         }
     }
 }
 
-@Composable
-private fun BreakdownRow(row: ZakatResultRowView, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(row.labelRes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = row.amount.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        SalahStatusPill(
-            text = stringResource(row.treatmentRes),
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-// --- Form sections ------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------------------------------------
 
 @Composable
 private fun AssetsCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, modifier: Modifier = Modifier) {
@@ -581,14 +568,19 @@ private fun AssetsCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, mod
             titleRes = R.string.zakat_field_currency,
             choices = state.currencyChoices,
             onSelect = viewModel::onCurrencyChange,
+            compact = true,
         )
         ChoiceGroup(
             titleRes = R.string.zakat_field_unit,
             choices = state.unitChoices,
             onSelect = viewModel::onUnitChange,
+            compact = true,
         )
 
-        state.assetFields.forEach { field -> NumberField(state = field, viewModel = viewModel) }
+        // The two price fields live in the prices card above and are hidden there until needed.
+        state.assetFields
+            .filter { field -> field.field !in ZakatViewModel.PRICE_FIELDS }
+            .forEach { field -> NumberField(state = field, viewModel = viewModel) }
 
         ChoiceGroup(
             titleRes = R.string.zakat_field_inventory_basis,
@@ -622,8 +614,8 @@ private fun MethodCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, mod
             helpRes = R.string.zakat_help_nisab_metal,
             choices = state.nisabMetalChoices,
             onSelect = viewModel::onNisabMetalChange,
+            compact = true,
         )
-        // The one place a user's own choice is not final, so the override is stated rather than applied quietly.
         if (state.nisabMetalOverridden && state.forcedNisabMetalRes != null) {
             Text(
                 text = stringResource(
@@ -647,23 +639,21 @@ private fun MethodCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, mod
             onSelect = viewModel::onDebtTreatmentChange,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.zakat_field_hawl),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
             value = state.hawlDateText,
             onValueChange = viewModel::onHawlDateChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             isError = state.hawlDateInvalid,
+            shape = RoundedCornerShape(14.dp),
+            label = { Text(text = stringResource(R.string.zakat_field_hawl)) },
         )
         Text(
             text = stringResource(R.string.zakat_help_hawl),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
@@ -699,8 +689,6 @@ private fun LimitsCard(modifier: Modifier = Modifier) {
     }
 }
 
-// --- Small pieces -------------------------------------------------------------------------------
-
 @Composable
 private fun SectionHeading(@androidx.annotation.StringRes resId: Int, modifier: Modifier = Modifier) {
     Text(
@@ -712,14 +700,6 @@ private fun SectionHeading(@androidx.annotation.StringRes resId: Int, modifier: 
     )
 }
 
-/**
- * One numeric row.
- *
- * The label and the help line are drawn as text beside the field rather than passed as a placeholder, so they do
- * not vanish the moment the user types and are readable by a screen reader before the field is focused. An
- * invalid entry is reported against the field, in the error colour, with its own message — never by silently
- * substituting a zero.
- */
 @Composable
 private fun NumberField(
     state: ZakatFieldState,
@@ -729,40 +709,43 @@ private fun NumberField(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(top = 10.dp),
     ) {
-        Text(
-            text = stringResource(state.labelRes),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        state.helpRes?.let { helpRes ->
-            Text(
-                text = stringResource(helpRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         OutlinedTextField(
             value = state.value,
             onValueChange = { value -> viewModel.onValueChange(state.field, value) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             isError = state.isInvalid,
+            shape = RoundedCornerShape(14.dp),
+            label = { Text(text = stringResource(state.labelRes)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
+        state.helpRes?.let { helpRes ->
+            Text(
+                text = stringResource(helpRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
         if (state.isInvalid) {
             Text(
                 text = stringResource(R.string.zakat_field_invalid),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
 }
 
-/** A titled group of mutually exclusive rows. */
+/**
+ * A titled group of mutually exclusive options.
+ *
+ * [compact] lays short options out as equal-width chips in rows of [COMPACT_PER_ROW] (currencies, units, the
+ * nisab metal); long sentence-style options stay as stacked rows so their wording is never truncated.
+ */
 @Composable
 private fun <T> ChoiceGroup(
     @androidx.annotation.StringRes titleRes: Int,
@@ -770,16 +753,17 @@ private fun <T> ChoiceGroup(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     @androidx.annotation.StringRes helpRes: Int? = null,
+    compact: Boolean = false,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+            .padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = stringResource(titleRes),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
         helpRes?.let { res ->
@@ -789,30 +773,81 @@ private fun <T> ChoiceGroup(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        choices.forEach { choice ->
-            ChoiceRow(
-                label = if (choice.labelIsValue) {
-                    choice.value.toString()
-                } else {
-                    stringResource(choice.labelRes)
-                },
-                selected = choice.selected,
-                onClick = { onSelect(choice.value) },
-            )
+        if (compact) {
+            choices.chunked(COMPACT_PER_ROW).forEach { rowChoices ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowChoices.forEach { choice ->
+                        ChoiceChip(
+                            label = if (choice.labelIsValue) {
+                                choice.value.toString()
+                            } else {
+                                stringResource(choice.labelRes)
+                            },
+                            selected = choice.selected,
+                            onClick = { onSelect(choice.value) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(COMPACT_PER_ROW - rowChoices.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        } else {
+            choices.forEach { choice ->
+                ChoiceRow(
+                    label = if (choice.labelIsValue) {
+                        choice.value.toString()
+                    } else {
+                        stringResource(choice.labelRes)
+                    },
+                    selected = choice.selected,
+                    onClick = { onSelect(choice.value) },
+                )
+            }
         }
     }
 }
 
-/**
- * One selectable option.
- *
- * A `selectable` row with the radio-button role rather than a chip, because these labels are sentences — the
- * counter's chips hold two digits and its target labels are numbers, while these name a position a user is
- * choosing between. The control follows the content rather than the other way round.
- *
- * The row is at least 48dp tall and its selected state is carried by the platform's semantics, so a screen reader
- * announces both the option and whether it is the one in force.
- */
+@Composable
+private fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+            )
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
 @Composable
 private fun ChoiceRow(
     label: String,
@@ -824,7 +859,7 @@ private fun ChoiceRow(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clip(MaterialTheme.shapes.small)
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (selected) {
                     MaterialTheme.colorScheme.primaryContainer
@@ -833,12 +868,13 @@ private fun ChoiceRow(
                 },
             )
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) {
                 MaterialTheme.colorScheme.onPrimaryContainer
             } else {
@@ -847,8 +883,6 @@ private fun ChoiceRow(
             modifier = Modifier.weight(1f),
         )
         if (selected) {
-            // Decoration, and deliberately silent: `selectable` already tells a screen reader that this row is the
-            // one in force, so announcing the dot as well would say it twice.
             Box(
                 modifier = Modifier
                     .padding(start = 8.dp)

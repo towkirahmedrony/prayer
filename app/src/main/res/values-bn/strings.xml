@@ -1051,4 +1051,11 @@
     <string name="home_qibla_bearing">সত্য উত্তর থেকে %1$s°</string>
     <string name="home_qibla_distance">কাবার দূরত্ব %1$s কিমি</string>
     <string name="home_qibla_open">কম্পাস খুলুন</string>
+    <string name="zakat_prices_refresh">নতুন করুন</string>
+    <string name="zakat_prices_updating">আনা হচ্ছে…</string>
+    <string name="zakat_prices_adjust">দাম পরিবর্তন করুন</string>
+    <string name="zakat_prices_hide">দামের ঘর লুকান</string>
+    <string name="zakat_prices_manual_needed">স্বয়ংক্রিয় দাম এখন পাওয়া যাচ্ছে না। প্রতি গ্রামের দাম নিজে লিখুন।</string>
+    <string name="zakat_breakdown_show">বিস্তারিত দেখুন</string>
+    <string name="zakat_breakdown_hide">বিস্তারিত লুকান</string>
 </resources>

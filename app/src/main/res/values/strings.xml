@@ -1048,4 +1048,11 @@
     <string name="home_qibla_bearing">%1$s° from true north</string>
     <string name="home_qibla_distance">%1$s km to the Kaaba</string>
     <string name="home_qibla_open">Open compass</string>
+    <string name="zakat_prices_refresh">Refresh</string>
+    <string name="zakat_prices_updating">Updating…</string>
+    <string name="zakat_prices_adjust">Adjust prices</string>
+    <string name="zakat_prices_hide">Hide price fields</string>
+    <string name="zakat_prices_manual_needed">An automatic price isn\'t available right now. Enter the price per gram yourself.</string>
+    <string name="zakat_breakdown_show">Show breakdown</string>
+    <string name="zakat_breakdown_hide">Hide breakdown</string>
 </resources>
