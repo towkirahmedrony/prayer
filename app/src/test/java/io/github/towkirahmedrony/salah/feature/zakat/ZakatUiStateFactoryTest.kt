@@ -1,7 +1,13 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPurity
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalType
+import io.github.towkirahmedrony.salah.core.domain.metalprice.PublishedMetalPrice
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
 import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
+import io.github.towkirahmedrony.salah.core.model.ZakatMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
@@ -12,6 +18,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.Locale
 
@@ -49,7 +56,46 @@ class ZakatUiStateFactoryTest {
         form: ZakatForm,
         locale: Locale = english,
         date: LocalDate = today,
-    ): ZakatUiState.Ready = factory.create(form = form, locale = locale, today = date)
+        referencePrices: ReferencePrices = ReferencePrices.notPublished(),
+        manualPriceFields: Set<ZakatFormField> = emptySet(),
+        refreshingReferencePrices: Boolean = false,
+    ): ZakatUiState.Ready = factory.create(
+        form = form,
+        locale = locale,
+        today = date,
+        referencePrices = referencePrices,
+        manualPriceFields = manualPriceFields,
+        refreshingReferencePrices = refreshingReferencePrices,
+    )
+
+    /**
+     * A synthetic published record.
+     *
+     * Every value here is a clearly labelled fixture, never a real Bangladesh market price: the point of these
+     * tests is which record is selected and how its fields are read, not what gold costs.
+     */
+    private fun publishedPrice(metal: MetalType, price: String): PublishedMetalPrice = PublishedMetalPrice(
+        metal = metal,
+        purity = MetalPurity.K22,
+        pricePerGram = BigDecimal(price),
+        currency = "BDT",
+        source = "Salah test fixture",
+        sourceUrl = "https://example.invalid/fixture",
+        effectiveAt = "2026-09-30T00:00:00Z",
+        providerLastUpdate = "2026-09-30T05:00:00Z",
+        fetchedAt = "2026-09-30T06:00:00Z",
+        updatedAt = "2026-09-30T06:05:00Z",
+    )
+
+    /** A published-price reading with a rate for whichever metals are named. */
+    private fun publishedPrices(gold: String? = null, silver: String? = null): ReferencePrices = ReferencePrices(
+        gold = gold
+            ?.let { price -> ReferencePriceResult.Available(publishedPrice(MetalType.GOLD, price)) }
+            ?: ReferencePriceResult.NotPublished,
+        silver = silver
+            ?.let { price -> ReferencePriceResult.Available(publishedPrice(MetalType.SILVER, price)) }
+            ?: ReferencePriceResult.NotPublished,
+    )
 
     private fun formWith(vararg entries: Pair<ZakatFormField, String>): ZakatForm =
         entries.fold(ZakatForm()) { form, (field, value) -> form.withValue(field, value) }
@@ -334,8 +380,10 @@ class ZakatUiStateFactoryTest {
         val ready = state(ZakatForm().copy(unit = ZakatMetalUnit.TOLA))
 
         assertEquals(ZakatMetalUnit.TOLA, ready.unitChoices.single { it.selected }.value)
-        // 7.5 tola is 87.4785 g, which at 12,000 is 1,049,742 — just under the 1,049,760 nisab, because the
-        // published constant and the tola arithmetic differ in the fifth place. docs/ZAKAT_METHODOLOGY.md §2.1.
+        // 7.5 tola is 87.4785 g, and the international threshold in a traditional unit is 7.5 × 11.6638, so the
+        // holding is exactly the nisab rather than the 0.0015 g short of the gram constant it would be if the
+        // converted weight were compared with 87.48. 1,049,742 × 0.025 = 26,243.55.
+        // docs/ZAKAT_METHODOLOGY.md §2.1 and §8.2.
         val tola = state(
             formWith(
                 ZakatFormField.GOLD_WEIGHT to "7.5",
@@ -343,7 +391,8 @@ class ZakatUiStateFactoryTest {
             ).copy(unit = ZakatMetalUnit.TOLA),
         )
         assertEquals("1049742.00", tola.result.totalAssets)
-        assertNull(tola.result.due)
+        assertEquals("1049742.00", tola.result.nisabAmount)
+        assertEquals("26243.55", tola.result.due)
     }
 
     @Test
@@ -396,5 +445,203 @@ class ZakatUiStateFactoryTest {
         assertTrue(state(formWith(ZakatFormField.CASH to "1")).canClear)
         // A half-typed field counts: the user would still lose it.
         assertTrue(state(ZakatForm().copy(hawlSeedDateText = "2026")).canClear)
+        // And a partially typed date is not an error — the field has something in it, on its way to a date.
+        assertFalse(state(ZakatForm().copy(hawlSeedDateText = "2026")).hawlDateInvalid)
+    }
+
+    // --- What a missing value is called, and what the result is called -------------------------
+
+    @Test
+    fun `a missing price is named as a price rather than as the metal's weight`() {
+        // The weight was typed and the price was not, so naming the weight sends the user to a field that is
+        // already correct. The assertions compare the labels the state itself carries, so no test here has to
+        // know a resource id.
+        val gold = state(formWith(ZakatFormField.GOLD_WEIGHT to "100"))
+        val goldWeightLabel = gold.assetFields.single { it.field == ZakatFormField.GOLD_WEIGHT }.labelRes
+        val goldPriceLabel = gold.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.labelRes
+        assertNotEquals(goldWeightLabel, goldPriceLabel)
+        assertEquals(listOf(goldPriceLabel), gold.result.incompleteLabels)
+
+        val silver = state(
+            formWith(ZakatFormField.GOLD_PRICE to "12000", ZakatFormField.SILVER_WEIGHT to "100"),
+        )
+        val silverWeightLabel = silver.assetFields.single { it.field == ZakatFormField.SILVER_WEIGHT }.labelRes
+        val silverPriceLabel = silver.assetFields.single { it.field == ZakatFormField.SILVER_PRICE }.labelRes
+        assertNotEquals(silverWeightLabel, silverPriceLabel)
+        assertEquals(listOf(silverPriceLabel), silver.result.incompleteLabels)
+
+        val foreign = state(
+            formWith(
+                ZakatFormField.CASH to "1000",
+                ZakatFormField.GOLD_PRICE to "12000",
+                ZakatFormField.FOREIGN_CURRENCY to "500",
+            ),
+        )
+        val foreignAmountLabel = foreign.assetFields.single { it.field == ZakatFormField.FOREIGN_CURRENCY }.labelRes
+        val foreignRateLabel = foreign.assetFields.single { it.field == ZakatFormField.FOREIGN_RATE }.labelRes
+        assertNotEquals(foreignAmountLabel, foreignRateLabel)
+        assertEquals(listOf(foreignRateLabel), foreign.result.incompleteLabels)
+    }
+
+    @Test
+    fun `a calculation, an estimate and a below-nisab result are told apart`() {
+        val calculated = state(goldAtTwelveThousand()).result
+        val estimate = state(formWith(ZakatFormField.GOLD_WEIGHT to "100")).result
+        val belowNisab = state(
+            formWith(ZakatFormField.CASH to "1000", ZakatFormField.GOLD_PRICE to "12000"),
+        ).result
+
+        assertEquals(3, listOf(calculated.statusRes, estimate.statusRes, belowNisab.statusRes).distinct().size)
+        // A below-nisab result is a completed calculation whose answer is "no payment is due", so it must not
+        // borrow the word used for a completed calculation that produced an amount.
+        assertNotNull(calculated.due)
+        assertNull(estimate.due)
+        assertNull(belowNisab.due)
+    }
+
+    @Test
+    fun `the currency the amounts are in reaches the result view`() {
+        assertEquals("BDT", state(ZakatForm()).result.currency)
+        assertEquals("USD", state(ZakatForm().copy(currency = "USD")).result.currency)
+    }
+
+    // --- The hawl date, while it is being typed ------------------------------------------------
+
+    @Test
+    fun `a partial ISO date is not reported as invalid while it is still being typed`() {
+        listOf("2026", "2026-1", "2026-01-", "2026-01-0").forEach { partial ->
+            val ready = state(ZakatForm().copy(hawlSeedDateText = partial))
+            assertFalse("$partial must not be reported as invalid", ready.hawlDateInvalid)
+            assertTrue("$partial must still count as entered", ready.canClear)
+        }
+    }
+
+    @Test
+    fun `a completed but impossible date, and an unrelated phrase, are reported as invalid`() {
+        listOf("2026-99-99", "2026-13-01", "next Ramadan").forEach { text ->
+            assertTrue(
+                "$text must be reported as invalid",
+                state(ZakatForm().copy(hawlSeedDateText = text)).hawlDateInvalid,
+            )
+        }
+    }
+
+    @Test
+    fun `Bengali digits in the seed date are read as the date they denote`() {
+        val ready = state(
+            formWith(ZakatFormField.CASH to "1200000").copy(hawlSeedDateText = "২০২৬-০১-০১"),
+        )
+
+        assertFalse(ready.hawlDateInvalid)
+        assertNotNull(ready.result.hawlEstimateDate)
+    }
+
+    // --- Reference prices at the state boundary ------------------------------------------------
+
+    @Test
+    fun `an available published rate fills a price field the user has not touched`() {
+        // 87.5 g × 19,550 = 1,710,625, above the 87.48 g gold nisab of 1,710,234.
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5"),
+            referencePrices = publishedPrices(gold = "19550.00"),
+        )
+
+        val priceField = ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }
+        // The field carries the record's own digits, unrounded, because that is the text the calculator parses.
+        assertEquals("19550.00", priceField.value)
+        assertFalse(priceField.isInvalid)
+        assertEquals("1710625.00", ready.result.totalAssets)
+
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertEquals(ZakatReferencePriceStatus.AVAILABLE, gold.status)
+        assertEquals("19550", gold.pricePerGram)
+        assertEquals("BDT", gold.currencyCode)
+        assertEquals("Salah test fixture", gold.sourceLabel)
+        assertNotNull(gold.effectiveLabel)
+        assertNotNull(gold.providerUpdatedLabel)
+        assertNotNull(gold.fetchedLabel)
+        assertNotNull(gold.updatedLabel)
+        assertNull(gold.messageRes)
+        assertFalse(gold.manuallyEdited)
+        assertFalse(gold.canRestoreReference)
+        // Gold first, then silver, whatever the availability.
+        assertEquals(listOf(ZakatMetal.GOLD, ZakatMetal.SILVER), ready.referencePrices.map { it.metal })
+    }
+
+    @Test
+    fun `a metal with no published rate leaves its price field empty and names the reason`() {
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5"),
+            referencePrices = publishedPrices(gold = "19550.00"),
+        )
+
+        assertEquals("", ready.assetFields.single { it.field == ZakatFormField.SILVER_PRICE }.value)
+        val silver = ready.referencePrices.single { it.metal == ZakatMetal.SILVER }
+        assertEquals(ZakatReferencePriceStatus.UNAVAILABLE, silver.status)
+        assertNull(silver.pricePerGram)
+        assertNull(silver.sourceLabel)
+        assertNotNull(silver.messageRes)
+    }
+
+    @Test
+    fun `no published rate at all leaves every price field empty and still accepts a typed one`() {
+        val ready = state(formWith(ZakatFormField.GOLD_WEIGHT to "87.5"))
+
+        assertEquals("", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        ready.referencePrices.forEach { price ->
+            assertEquals(ZakatReferencePriceStatus.UNAVAILABLE, price.status)
+            assertNull(price.pricePerGram)
+            assertNotNull(price.messageRes)
+        }
+        // The calculator is unaffected: the weight is still valued as needing a price, exactly as before.
+        assertEquals(
+            listOf(ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.labelRes),
+            ready.result.incompleteLabels,
+        )
+    }
+
+    @Test
+    fun `a price the user typed is kept, and the published rate is offered back instead`() {
+        val ready = state(
+            form = formWith(
+                ZakatFormField.GOLD_WEIGHT to "87.5",
+                ZakatFormField.GOLD_PRICE to "12000",
+            ),
+            referencePrices = publishedPrices(gold = "19550.00"),
+            manualPriceFields = setOf(ZakatFormField.GOLD_PRICE),
+        )
+
+        assertEquals("12000", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertTrue(gold.manuallyEdited)
+        assertTrue(gold.canRestoreReference)
+        assertEquals(ZakatFormField.GOLD_PRICE, gold.priceField)
+    }
+
+    @Test
+    fun `a price field the user has cleared goes back to the published reference rate`() {
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5", ZakatFormField.GOLD_PRICE to ""),
+            referencePrices = publishedPrices(gold = "19550.00"),
+        )
+
+        assertEquals("19550.00", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertFalse(ready.referencePrices.single { it.metal == ZakatMetal.GOLD }.manuallyEdited)
+    }
+
+    @Test
+    fun `a retrieval in flight is shown as loading rather than as absent`() {
+        val ready = state(form = ZakatForm(), referencePrices = ReferencePrices.loading())
+
+        assertFalse(ready.refreshingReferencePrices)
+        ready.referencePrices.forEach { price ->
+            assertEquals(ZakatReferencePriceStatus.LOADING, price.status)
+            assertNull(price.messageRes)
+        }
+    }
+
+    @Test
+    fun `the refresh flag reaches the state`() {
+        assertTrue(state(ZakatForm(), refreshingReferencePrices = true).refreshingReferencePrices)
     }
 }

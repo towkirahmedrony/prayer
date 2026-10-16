@@ -767,4 +767,224 @@ class ZakatCalculatorTest {
         assertNotEquals(BigDecimal("0.025"), BigDecimal(0.025))
         assertEquals(BigDecimal("25"), ZakatResult.RATE.movePointRight(3))
     }
+
+    // --- The international nisab stated in the traditional unit -------------------------------
+
+    @Test
+    fun `seven and a half tola of gold meets the international nisab in tola or vori`() {
+        // 7.5 × 11.6638 = 87.4785 g. The published gram constant is 87.48 g, which a strict tola conversion
+        // falls 0.0015 g short of — so the traditional-unit threshold is 7.5 tola times the configured
+        // factor, and a user holding exactly the traditional nisab meets it rather than falling below it.
+        // docs/ZAKAT_METHODOLOGY.md §2.1 and §8.2.
+        // 87.4785 g × 12,000 = 1,049,742, and 1,049,742 × 0.025 = 26,243.55.
+        val tola = ZakatCalculator.calculate(inputs(goldWeight = "7.5", metalUnit = ZakatMetalUnit.TOLA))
+        val vori = ZakatCalculator.calculate(inputs(goldWeight = "7.5", metalUnit = ZakatMetalUnit.VORI))
+
+        listOf(tola, vori).forEach { result ->
+            assertDecimal("87.4785", result.nisabGrams)
+            assertMoney("1049742", result.nisab)
+            assertMoney("1049742", result.netZakatableWealth)
+            assertEquals(ZakatStatus.CALCULATED, result.status)
+            assertTrue(result.nisabMet!!)
+            assertRoundedAmount("26243.55", result.zakatDue)
+        }
+        // The two labels are the same mass, so the label cannot move the threshold or the answer.
+        assertEquals(tola.nisab!!.amount, vori.nisab!!.amount)
+        assertEquals(vori.zakatDue!!.amount, tola.zakatDue!!.amount)
+    }
+
+    @Test
+    fun `just below seven and a half tola of gold owes nothing`() {
+        // 7.49 × 11.6638 = 87.361862 g, which at 12,000 is 1,048,342.344 — below the 1,049,742 threshold.
+        val result = ZakatCalculator.calculate(inputs(goldWeight = "7.49", metalUnit = ZakatMetalUnit.TOLA))
+
+        assertEquals(ZakatStatus.BELOW_NISAB, result.status)
+        assertMoney("1048342.344", result.netZakatableWealth)
+        assertNull(result.zakatDue)
+    }
+
+    @Test
+    fun `fifty two and a half tola of silver meets the international nisab in tola or vori`() {
+        // 52.5 × 11.6638 = 612.3495 g; × 150 = 91,852.425, and × 0.025 = 2,296.31 (half-up from 2,296.310625).
+        val tola = ZakatCalculator.calculate(
+            inputs(silverWeight = "52.5", metalUnit = ZakatMetalUnit.TOLA, nisabMetal = ZakatNisabMetal.SILVER),
+        )
+        val vori = ZakatCalculator.calculate(
+            inputs(silverWeight = "52.5", metalUnit = ZakatMetalUnit.VORI, nisabMetal = ZakatNisabMetal.SILVER),
+        )
+
+        listOf(tola, vori).forEach { result ->
+            assertDecimal("612.3495", result.nisabGrams)
+            assertMoney("91852.425", result.nisab)
+            assertMoney("91852.425", result.netZakatableWealth)
+            assertEquals(ZakatStatus.CALCULATED, result.status)
+            assertRoundedAmount("2296.31", result.zakatDue)
+        }
+    }
+
+    @Test
+    fun `just below fifty two and a half tola of silver owes nothing`() {
+        // 52.49 × 11.6638 = 612.232862 g; × 150 = 91,834.9293, below 91,852.425.
+        val result = ZakatCalculator.calculate(
+            inputs(silverWeight = "52.49", metalUnit = ZakatMetalUnit.TOLA, nisabMetal = ZakatNisabMetal.SILVER),
+        )
+
+        assertEquals(ZakatStatus.BELOW_NISAB, result.status)
+        assertNull(result.zakatDue)
+    }
+
+    @Test
+    fun `the gram unit still uses the published international nisab constants`() {
+        // The traditional-unit rule must not disturb the gram thresholds the sources publish.
+        val gold = ZakatCalculator.calculate(inputs(goldWeight = "87.48", metalUnit = ZakatMetalUnit.GRAM))
+        val silver = ZakatCalculator.calculate(
+            inputs(
+                silverWeight = "612.36",
+                metalUnit = ZakatMetalUnit.GRAM,
+                nisabMetal = ZakatNisabMetal.SILVER,
+            ),
+        )
+
+        assertDecimal("87.48", gold.nisabGrams)
+        assertDecimal("612.36", silver.nisabGrams)
+        assertEquals(ZakatStatus.CALCULATED, gold.status)
+        assertEquals(ZakatStatus.CALCULATED, silver.status)
+    }
+
+    @Test
+    fun `the Bangladesh nisab stays in grams whatever unit is selected`() {
+        // Dhaka Ahsania Mission publishes 85 g / 595 g and no traditional-unit equivalent, so the configured
+        // gram weights are used for every unit rather than being recomputed from the tola.
+        val gold = ZakatCalculator.calculate(
+            inputs(goldWeight = "8", metalUnit = ZakatMetalUnit.TOLA, nisabWeight = ZakatNisabWeight.BANGLADESH),
+        )
+        val silver = ZakatCalculator.calculate(
+            inputs(
+                silverWeight = "52.5",
+                metalUnit = ZakatMetalUnit.VORI,
+                nisabWeight = ZakatNisabWeight.BANGLADESH,
+                nisabMetal = ZakatNisabMetal.SILVER,
+            ),
+        )
+
+        assertDecimal("85", gold.nisabGrams)
+        assertMoney("1020000", gold.nisab)
+        assertDecimal("595", silver.nisabGrams)
+        assertMoney("89250", silver.nisab)
+    }
+
+    // --- The all-one-metal rule and wealth of another kind -------------------------------------
+
+    @Test
+    fun `holding cash alongside gold does not override the user's choice of the silver nisab`() {
+        // The rule is "assets entirely of one metal". Cash is not gold, so the wealth is not entirely gold and
+        // the user's own metal choice stands.
+        val result = ZakatCalculator.calculate(
+            inputs(cash = "5000", goldWeight = "1", nisabMetal = ZakatNisabMetal.SILVER),
+        )
+
+        assertEquals(ZakatNisabMetal.SILVER, result.nisabMetalUsed)
+        assertFalse(result.nisabMetalOverridden)
+        assertMoney("91854", result.nisab)
+    }
+
+    @Test
+    fun `other zakatable assets alongside silver do not force a metal-only nisab`() {
+        val withInventory = ZakatCalculator.calculate(
+            inputs(inventoryValue = "10", silverWeight = "1", nisabMetal = ZakatNisabMetal.GOLD),
+        )
+        assertEquals(ZakatNisabMetal.GOLD, withInventory.nisabMetalUsed)
+        assertFalse(withInventory.nisabMetalOverridden)
+
+        // An asset still waiting for a value is wealth of another kind as well, so it too keeps the choice.
+        val withIncomplete = ZakatCalculator.calculate(
+            inputs(
+                foreignCurrencyAmount = "500",
+                foreignCurrencyRate = null,
+                silverWeight = "1",
+                nisabMetal = ZakatNisabMetal.GOLD,
+            ),
+        )
+        assertEquals(ZakatNisabMetal.GOLD, withIncomplete.nisabMetalUsed)
+        assertFalse(withIncomplete.nisabMetalOverridden)
+    }
+
+    @Test
+    fun `a liability is not an asset that keeps the user's metal choice`() {
+        // A debt reduces the total; it is not a holding, and reading it as one would invert what it means.
+        val result = ZakatCalculator.calculate(
+            inputs(silverWeight = "1000", deductibleLiabilities = "500", nisabMetal = ZakatNisabMetal.GOLD),
+        )
+
+        assertEquals(ZakatNisabMetal.SILVER, result.nisabMetalUsed)
+        assertTrue(result.nisabMetalOverridden)
+    }
+
+    // --- Zero-value entries must not become incomplete ---------------------------------
+
+    @Test
+    fun `zero weight or zero foreign currency amount with no price or rate is treated as zero not incomplete`() {
+        // A gold weight of zero with no gold price: the user holds none of it, so no price is needed and the row
+        // is not left waiting for one. Cash beside it keeps the user's metal choice (see above).
+        val zeroGold = ZakatCalculator.calculate(
+            inputs(
+                cash = "200000",
+                goldWeight = "0",
+                goldPricePerGram = null,
+                nisabMetal = ZakatNisabMetal.SILVER,
+            ),
+        )
+        val gold = zeroGold.line(ZakatLineField.GOLD)
+        assertEquals(ZakatLineTreatment.INCLUDED, gold.treatment)
+        assertMoney("0", gold.amount)
+        assertTrue(zeroGold.incompleteFields.isEmpty())
+        assertEquals(ZakatStatus.CALCULATED, zeroGold.status)
+        assertRoundedAmount("5000.00", zeroGold.zakatDue)
+
+        // A silver weight of zero with no silver price.
+        val zeroSilver = ZakatCalculator.calculate(
+            inputs(cash = "1100000", silverWeight = "0", silverPricePerGram = null),
+        )
+        val silver = zeroSilver.line(ZakatLineField.SILVER)
+        assertEquals(ZakatLineTreatment.INCLUDED, silver.treatment)
+        assertMoney("0", silver.amount)
+        assertTrue(zeroSilver.incompleteFields.isEmpty())
+
+        // A foreign-currency amount of zero with no rate.
+        val zeroForeign = ZakatCalculator.calculate(
+            inputs(cash = "1100000", foreignCurrencyAmount = "0", foreignCurrencyRate = null),
+        )
+        val foreign = zeroForeign.line(ZakatLineField.FOREIGN_CURRENCY)
+        assertEquals(ZakatLineTreatment.INCLUDED, foreign.treatment)
+        assertMoney("0", foreign.amount)
+        assertTrue(zeroForeign.incompleteFields.isEmpty())
+    }
+
+    @Test
+    fun `a zero-weight holding of personal jewellery stays excluded rather than becoming an included zero`() {
+        val result = ZakatCalculator.calculate(
+            inputs(
+                goldWeight = "0",
+                goldPricePerGram = null,
+                preciousMetalsArePersonalJewellery = true,
+                jewelleryTreatment = ZakatJewelleryTreatment.PERSONAL_USE_EXEMPT,
+            ),
+        )
+
+        val gold = result.line(ZakatLineField.GOLD)
+        assertEquals(ZakatLineTreatment.EXCLUDED, gold.treatment)
+        assertMoney("0", gold.amount)
+    }
+
+    @Test
+    fun `a positive weight with no price is still incomplete`() {
+        // The zero rule must not swallow the case it exists beside: a weight Salah cannot value is still a
+        // question the user has not answered.
+        val result = ZakatCalculator.calculate(
+            inputs(cash = "1100000", goldWeight = "1", goldPricePerGram = null),
+        )
+
+        assertEquals(ZakatLineTreatment.INCOMPLETE, result.line(ZakatLineField.GOLD).treatment)
+        assertEquals(ZakatStatus.ESTIMATE, result.status)
+    }
 }

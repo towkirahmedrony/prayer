@@ -553,6 +553,39 @@
     <string name="zakat_clear_confirm">মুছুন</string>
     <string name="zakat_cancel">বাতিল</string>
 
+    <!-- দুই ধাতু, পদার্থ হিসেবে; নিসাবের লেবেল আলাদা -->
+    <string name="zakat_metal_gold">স্বর্ণ</string>
+    <string name="zakat_metal_silver">রূপা</string>
+    <string name="zakat_status_below_nisab">যাকাত প্রযোজ্য নয়</string>
+
+    <!-- রেফারেন্স দাম: অ্যাপ কেবল পড়ে, কিছু পাঠায় না -->
+    <string name="zakat_price_title">রেফারেন্স দাম</string>
+    <string name="zakat_price_subtitle">প্রকাশিত বাংলাদেশি বাজারের রেফারেন্স দর। চাইলে যেকোনোটি নিজের লেখা দামে বদলে নিতে পারেন।</string>
+    <string name="zakat_price_unit">%1$s প্রতি গ্রাম</string>
+    <string name="zakat_price_source">উৎস: %1$s</string>
+    <string name="zakat_price_effective">যাচাই %1$s</string>
+    <string name="zakat_price_provider_update">প্রদানকারীর হালনাগাদ %1$s</string>
+    <string name="zakat_price_fetched">সংগৃহীত %1$s</string>
+    <string name="zakat_price_last_updated">সর্বশেষ হালনাগাদ %1$s</string>
+    <string name="zakat_price_status_loading">লোড হচ্ছে</string>
+    <string name="zakat_price_status_available">প্রকাশিত দর</string>
+    <string name="zakat_price_status_unavailable">প্রকাশিত নয়</string>
+    <string name="zakat_price_status_conflict">পরস্পরবিরোধী রেকর্ড</string>
+    <string name="zakat_price_status_failed">পাওয়া যায়নি</string>
+    <string name="zakat_price_unavailable">প্রকাশিত কোনো রেফারেন্স দাম নেই। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_conflict">একাধিক প্রকাশিত দর পাওয়া গেছে, তাই কোনোটি নেওয়া হয়নি। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_invalid">প্রকাশিত দরটি ব্যবহার করা যায়নি। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_not_configured">কোনো দাম-সেবা কনফিগার করা নেই। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_table_unavailable">রেফারেন্স দাম এখনো প্রকাশিত হয়নি। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_access_denied">এই অ্যাপ থেকে প্রকাশিত দর পড়া যাচ্ছে না। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_retrieval_failed">রেফারেন্স দাম আনা যায়নি। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_refresh">রেফারেন্স দাম আবার আনুন</string>
+    <string name="zakat_price_refreshing">রেফারেন্স দাম আনা হচ্ছে…</string>
+    <string name="zakat_price_manual">এই দামটি আপনি নিজে লিখেছেন।</string>
+    <string name="zakat_price_restore">%1$s এর প্রকাশিত দাম ব্যবহার করুন</string>
+    <string name="zakat_price_per_gram">প্রতি গ্রাম দাম</string>
+    <string name="zakat_price_source_note">প্রকাশিত রেফারেন্স দর বাজারের একটি প্রচলিত মান, কোনো নির্দিষ্ট জিনিসের মূল্য নয়।</string>
+
     <string name="zakat_limits_title">যা এতে হিসাব হয় না</string>
     <string name="zakat_limits_body">কৃষিপণ্য, পশুসম্পদ, খনিজ, শেয়ার, সঞ্চয়পত্র ও ভবিষ্যৎ তহবিল, এবং বিক্রয়ের জন্য রাখা সম্পত্তি এতে নেই: প্রতিটির হার বা শর্ত আলাদা। মালিকি ও হাম্বলি মত এখানে দেওয়া হয়নি।</string>
     <string name="zakat_not_certified">সালাহ কোনো ধর্মীয় অনুমোদনপ্রাপ্ত অ্যাপ নয়। এটি শুধু হিসাব, ফতোয়া নয় — বিশ্বস্ত আলিমের সাথে যাচাই করে নিন।</string>

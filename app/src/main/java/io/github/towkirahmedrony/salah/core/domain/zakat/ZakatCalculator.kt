@@ -9,8 +9,10 @@ import io.github.towkirahmedrony.salah.core.model.ZakatLine
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
 import io.github.towkirahmedrony.salah.core.model.ZakatLineTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatMetal
+import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatMoney
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
+import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
 import io.github.towkirahmedrony.salah.core.model.ZakatQuantityUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatResult
 import io.github.towkirahmedrony.salah.core.model.ZakatStatus
@@ -54,6 +56,48 @@ import java.math.BigDecimal
  * user's own choice is not final, and it says so.
  */
 object ZakatCalculator {
+
+    /**
+     * The international gold nisab in the traditional unit: 7.5 tola (vori).
+     *
+     * The published 87.48 g figure is the traditional threshold stated in grams, and 7.5 × 11.6638 g =
+     * 87.4785 g — five ten-thousandths of a gram *below* the published constant. A user who enters "7.5"
+     * in tola therefore holds the traditional nisab exactly, and comparing their converted 87.4785 g
+     * against the 87.48 g constant would tell them they are below the threshold they actually meet. The
+     * unit's own exact multiple is used when the unit is a traditional one, so the boundary is the one the
+     * unit defines (see `docs/ZAKAT_METHODOLOGY.md` §2.1 and §8.2).
+     */
+    private val GOLD_NISAB_TOLA = BigDecimal("7.5")
+
+    /** The international silver nisab in the traditional unit: 52.5 tola (vori). See [GOLD_NISAB_TOLA]. */
+    private val SILVER_NISAB_TOLA = BigDecimal("52.5")
+
+    /**
+     * The nisab weight in grams that applies for [nisabWeight], [metal] and [unit].
+     *
+     * For a **gram** unit the published constants are used unchanged. For a **tola or vori** unit under the
+     * international weights, the threshold is the traditional figure — 7.5 tola of gold, 52.5 tola of
+     * silver — multiplied by the configured [ZakatMetalUnit.gramsPerUnit], so a user who enters the exact
+     * traditional nisab meets it rather than falling a fraction of a gram short. The Bangladesh weights are
+     * published only in grams and stay as configured whatever unit is selected.
+     *
+     * Exact decimal arithmetic throughout: no `Double`, no `Float`, and no duplicated special case — every
+     * caller reads the threshold through here.
+     */
+    private fun effectiveNisabGrams(
+        nisabWeight: ZakatNisabWeight,
+        metal: ZakatNisabMetal,
+        unit: ZakatMetalUnit,
+    ): BigDecimal = when {
+        nisabWeight == ZakatNisabWeight.INTERNATIONAL && unit != ZakatMetalUnit.GRAM ->
+            when (metal) {
+                ZakatNisabMetal.GOLD -> GOLD_NISAB_TOLA.multiply(unit.gramsPerUnit)
+                ZakatNisabMetal.SILVER -> SILVER_NISAB_TOLA.multiply(unit.gramsPerUnit)
+            }
+
+        metal == ZakatNisabMetal.GOLD -> nisabWeight.goldGrams
+        else -> nisabWeight.silverGrams
+    }
 
     /**
      * The result for [inputs].
@@ -135,12 +179,9 @@ object ZakatCalculator {
         // Floored: a liability larger than the assets means no zakat, never a negative one — §10 Case F.
         val netWealth = (totalAssets - totalDeducted).coerceAtLeastZero()
 
-        val forcedMetal = nisabMetalFor(inputs, gold, silver)
+        val forcedMetal = nisabMetalFor(inputs, lines, gold, silver)
         val nisabMetalOverridden = forcedMetal != inputs.nisabMetal
-        val nisabGrams = when (forcedMetal) {
-            ZakatNisabMetal.GOLD -> inputs.nisabWeight.goldGrams
-            ZakatNisabMetal.SILVER -> inputs.nisabWeight.silverGrams
-        }
+        val nisabGrams = effectiveNisabGrams(inputs.nisabWeight, forcedMetal, inputs.metalUnit)
         val nisabPrice = when (forcedMetal) {
             ZakatNisabMetal.GOLD -> inputs.goldPricePerGram
             ZakatNisabMetal.SILVER -> inputs.silverPricePerGram
@@ -241,7 +282,11 @@ object ZakatCalculator {
      *  * weight entered, no price ⇒ an **incomplete** row with no amount, because a weight Salah cannot value
      *    is not a weight worth nothing;
      *  * both entered ⇒ an included row, with the conversion and the price recorded in its computation so the
-     *    screen can show the working.
+     *    screen can show the working;
+     *  * **weight entered as zero ⇒ an included (or excluded) row worth exactly zero, with no price asked
+     *    for.** A user who types `0` has answered the question: they hold none of this metal. Making the row
+     *    incomplete because no price was also entered would report a question as unanswered when it was
+     *    answered, and would stop a calculation that needs no price at all to be complete.
      *
      * [exemptAsPersonalJewellery] is applied here rather than by zeroing the weight: an exempt row keeps its
      * value in the breakdown and is marked excluded, so the user can see how much the majority ruling would
@@ -258,6 +303,28 @@ object ZakatCalculator {
         // grams = weight × grams-per-unit. Exact: both operands are decimals, so no precision is lost even
         // when the unit is a tola with a repeating expansion.
         val grams = enteredWeight.multiply(gramsPerUnit)
+
+        // A zero weight is worth zero whatever the price is, so the price is not required and the row is not
+        // incomplete. The exemption still applies, so a zero-weight holding of personal jewellery stays
+        // excluded rather than being counted as a zero-valued included asset.
+        if (grams.signum() == 0) {
+            return ZakatLine(
+                field = field,
+                treatment = if (exemptAsPersonalJewellery) {
+                    ZakatLineTreatment.EXCLUDED
+                } else {
+                    ZakatLineTreatment.INCLUDED
+                },
+                amount = ZakatMoney.ZERO,
+                computation = ZakatComputation(
+                    quantity = grams,
+                    quantityUnit = ZakatQuantityUnit.GRAMS,
+                    unitPrice = pricePerGram,
+                    baseAmount = BigDecimal.ZERO,
+                    basis = ZakatValuationBasis.USER_ENTERED,
+                ),
+            )
+        }
 
         if (exemptAsPersonalJewellery) {
             val amount = pricePerGram?.let { price -> grams.multiply(price) }
@@ -303,9 +370,28 @@ object ZakatCalculator {
      * Salah fetches no rate. The rate is the user's own and is printed beside the row, so the conversion is
      * theirs to check — `docs/ZAKAT_METHODOLOGY.md` §4.1 and §7.3. An amount with no rate is incomplete, not
      * zero: converting it at a rate Salah invented would put an amount of its own choosing into the total.
+     * An amount **entered as zero** is the exception: zero of any currency converts to zero at any rate, so
+     * the row is included at zero and no rate is asked for. The user has answered the question, and asking
+     * for a rate before accepting a "none held" answer would be a request rather than a correction.
      */
     private fun foreignCurrencyLine(inputs: ZakatInputs): ZakatLine? {
         val amount = inputs.foreignCurrencyAmount ?: return null
+
+        if (amount.signum() == 0) {
+            return ZakatLine(
+                field = ZakatLineField.FOREIGN_CURRENCY,
+                treatment = ZakatLineTreatment.INCLUDED,
+                amount = ZakatMoney.ZERO,
+                computation = ZakatComputation(
+                    quantity = amount,
+                    quantityUnit = ZakatQuantityUnit.OTHER_CURRENCY,
+                    unitPrice = null,
+                    baseAmount = BigDecimal.ZERO,
+                    basis = ZakatValuationBasis.USER_ENTERED,
+                ),
+            )
+        }
+
         val rate = inputs.foreignCurrencyRate
             ?: return ZakatLine(
                 field = ZakatLineField.FOREIGN_CURRENCY,
@@ -337,12 +423,31 @@ object ZakatCalculator {
      * The rule is about the assets that are *actually zakatable*, so a metal excluded as personal jewellery
      * does not count as held for this purpose. If the user's zakatable metal is only gold, the gold nisab
      * applies; only silver, the silver nisab; both, or neither, and the user's own choice stands.
+     *
+     * The rule cannot be applied to a user who holds more than metal and metal alone: cash, a balance in
+     * another currency, stock, a receivable or a liability that still needs a value all mean the wealth is
+     * not *entirely* one metal, so [inputs]'s own [ZakatInputs.nisabMetal] is returned unchanged and the
+     * user's selection is never overridden merely because a small quantity of the other metal exists.
+     * Liabilities are never counted as "another asset" — a debt is what the total is reduced by, and reading
+     * one as the holding that forces a different threshold would invert what it means (§4.5).
      */
     private fun nisabMetalFor(
         inputs: ZakatInputs,
+        lines: List<ZakatLine>,
         gold: ZakatLine?,
         silver: ZakatLine?,
     ): ZakatNisabMetal {
+        // A row that is neither a liability nor one of the two metals, and which either contributes an
+        // amount or is waiting for a value, is wealth of another kind. Its presence means the assets are not
+        // one metal alone, so the all-one-metal rule does not apply and the user's choice stands.
+        val holdsAnotherZakatableAsset = lines.any { line ->
+            !line.field.isLiability &&
+                line.field != ZakatLineField.GOLD &&
+                line.field != ZakatLineField.SILVER &&
+                (line.isIncludedAndWorthSomething() || line.treatment == ZakatLineTreatment.INCOMPLETE)
+        }
+        if (holdsAnotherZakatableAsset) return inputs.nisabMetal
+
         val goldCounts = gold.isIncludedAndWorthSomething()
         val silverCounts = silver.isIncludedAndWorthSomething()
         return when {
@@ -379,7 +484,10 @@ object ZakatCalculator {
     ): List<ZakatLineField> {
         val fields = mutableListOf<ZakatLineField>()
 
-        if (inputs.foreignCurrencyAmount != null && inputs.foreignCurrencyRate == null) {
+        if (inputs.foreignCurrencyAmount != null &&
+            inputs.foreignCurrencyAmount.signum() > 0 &&
+            inputs.foreignCurrencyRate == null
+        ) {
             fields += ZakatLineField.FOREIGN_CURRENCY
         }
         if (gold?.treatment == ZakatLineTreatment.INCOMPLETE) fields += ZakatLineField.GOLD

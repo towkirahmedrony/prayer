@@ -40,6 +40,10 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetS
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncStateStore
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.SyncThrottlePolicy
+import io.github.towkirahmedrony.salah.core.domain.metalprice.LoadPublishedReferencePrices
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRemoteConfig
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
+import io.github.towkirahmedrony.salah.core.domain.metalprice.RemoteMetalPriceSource
 import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
@@ -65,6 +69,8 @@ import io.github.towkirahmedrony.salah.data.dataset.remote.SupabaseRemoteDataset
 import io.github.towkirahmedrony.salah.data.dataset.remote.UrlConnectionHttpTransport
 import io.github.towkirahmedrony.salah.data.dataset.sync.FileDatasetSyncStateStore
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
+import io.github.towkirahmedrony.salah.data.metalprice.SupabaseMetalPriceRepository
+import io.github.towkirahmedrony.salah.data.metalprice.SupabaseRemoteMetalPriceSource
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.data.notification.AndroidDiagnosticsLogger
@@ -333,14 +339,37 @@ val salahModules = module {
     // counter's history are written by the one rule the dates beside them were.
     single { TasbihUiStateFactory(formatting = get()) }
 
+    // Published reference prices ----------------------------------------------
+    // The same non-secret Supabase project and publishable key the app's other remote reads use, and the
+    // same HttpTransport: this adds one read of already-published records, not a second networking client
+    // and not a second credential. No privileged key is placed here, and the app never contacts the
+    // upstream market-price provider — an administrator workflow reads the provider, reviews it and
+    // publishes the records, which is outside this app.
+    //
+    // The default build compiles the URL and key empty, so MetalPriceRemoteConfig.isConfigured is false,
+    // the repository answers "not configured" without touching the network, and manual price entry is
+    // unaffected. See docs/ZAKAT_METHODOLOGY.md §8.5.
+    single {
+        MetalPriceRemoteConfig(
+            baseUrl = BuildConfig.SALAH_SUPABASE_URL,
+            anonKey = BuildConfig.SALAH_SUPABASE_ANON_KEY,
+        )
+    }
+    single<RemoteMetalPriceSource> { SupabaseRemoteMetalPriceSource(transport = get(), config = get()) }
+    single<MetalPriceRepository> { SupabaseMetalPriceRepository(source = get(), config = get()) }
+    single { LoadPublishedReferencePrices(repository = get()) }
+
     // Zakat -------------------------------------------------------------------
-    // The calculator has no repository and no stored state on purpose. The values a user enters are the
-    // most sensitive data the app ever handles, and the strongest privacy posture is not to keep them:
+    // The calculator itself has no repository and no stored state on purpose. The values a user enters are
+    // the most sensitive data the app ever handles, and the strongest privacy posture is not to keep them:
     // nothing is written, so nothing can leak, be backed up or be recovered from the device. The screen
     // says so, and the inputs live in the view model for as long as the screen is open. See
     // docs/ZAKAT_METHODOLOGY.md §8.4.
     //
-    // The engine itself is a pure object with no dependencies, so there is nothing to bind for it.
+    // The only thing Zakat retrieves is the *published* reference price for each metal — a read of records
+    // an administrator approved, with no user data in the request and no write path at all. The retrieval
+    // is a separate object the view model is given, so the calculation stays independent of it: the engine
+    // below is a pure object with no dependencies, and nothing to bind for it.
     single { ZakatUiStateFactory(formatting = get()) }
 
     // Start-up snapshot -------------------------------------------------------
@@ -632,6 +661,7 @@ val salahModules = module {
         ZakatViewModel(
             userPreferencesRepository = get(),
             uiStateFactory = get(),
+            loadReferencePrices = get(),
             clock = get(),
         )
     }

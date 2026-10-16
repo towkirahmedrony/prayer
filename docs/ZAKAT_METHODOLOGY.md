@@ -58,8 +58,20 @@ for the nisab weights.
 The 87.48 g figure follows from the tola definition to within 0.002 g. The 612.36 g figure does **not**:
 the arithmetic gives 612.3497 g, so the commonly published 612.36 g is 0.01 g higher than a strict
 to-la-conversion produces. Salah therefore carries the published figures as named constants
-(`ZakatNisab.GOLD_GRAMS = 87.48`, `SILVER_GRAMS = 612.36`) rather than recomputing them from the tola, so
+(`ZakatNisabWeight.INTERNATIONAL.goldGrams = 87.48`, `silverGrams = 612.36`) rather than recomputing them from the tola, so
 that its threshold is the one its sources state and not a value this project derived.
+
+**Which nisab applies depends on the unit the user selected, and this is deliberate.** When the unit is
+`GRAM`, the published constants above are the threshold: 87.48 g of gold or 612.36 g of silver. When the unit
+is `TOLA` or `VORI`, the threshold is the **traditional figure the sources state** — exactly **7.5 tola of
+gold** and **52.5 tola of silver** — multiplied by the configured `gramsPerUnit` (11.6638). The reason is the
+gap in the arithmetic above: 7.5 × 11.6638 = **87.4785 g**, which is 0.0015 g *below* the published 87.48 g
+constant, so a user who enters the traditional nisab in tola would be told they are below the threshold they
+actually hold. Comparing the converted weight against the published gram constant would make the traditional
+nisab unreachable in its own unit. The traditional-unit branch therefore uses the traditional threshold, and
+the two branches agree to within a fifth of a percent, which is the size of the discrepancy in the sources
+themselves. The `BANGLADESH` weights (85 g / 595 g) are published only in grams, so they stay as configured
+whichever unit is selected.
 
 ### 2.2 Units the calculator offers
 
@@ -187,7 +199,7 @@ therefore used, rather than a percentage this project chose on their behalf.
 
 **Silver: which silver.** Dhaka Ahsania Mission applies zakat to silver "in Pure form or Jewellery, Utensils,
 Decorative items and all household items including crockery, cutlery made of silver... at 2.5% of the
-prevailing market rates". Salah supports one silver weight, with the unit and purity the user enters.
+prevailing market rates". Salah supports one silver weight, with the unit and net weight the user enters.
 
 ### 4.3 Business inventory and trade goods — with a documented disagreement
 
@@ -358,15 +370,18 @@ described as the agreed one, and no option is described as invalid.
 
 ### 7.3 No price is fabricated, and no stale price is called live
 
-Salah fetches **no** precious-metal price. There is no remote price source, so there is no "live" label to
-misapply. Every price is entered by the user and is stored with the date it was entered for, and the
-breakdown prints the price and that date beside the threshold it produced. The screen states plainly that the
-nisab in currency depends on the price the user supplied and that Salah does not verify it.
+Every price the calculator uses is a **price field the user can see and edit**. A published reference rate
+(§8.5) may fill one of those fields when the user has not entered their own, and every price is printed in
+the breakdown beside the threshold it produced. Salah does not invent a rate, has no fallback constant, and
+never marks a rate live: the screen states plainly that the nisab in currency depends on the price in force
+and that the app does not verify it.
 
-This is a deliberate narrowing: the brief permits a verified remote source **if one is available and its use
-is appropriate**, and permits manual entry otherwise. No free, terms-compatible, authoritative metal-price
-API was verified in this phase, and adding a paid dependency is excluded by the brief. Manual entry is
-therefore the supported mechanism, permanently, until a source is verified.
+The reference rates come from records an administrator has already fetched, reviewed and **published**; the
+app reads only those, checks their publication status itself, and contacts no market-price provider directly.
+Where the available metadata cannot establish that a price was live — a provider's own update timestamp, or
+the moment a record was fetched — the label says what the timestamp actually is rather than presenting it as a
+verified market-effective time. When no usable published rate exists, manual entry is the supported
+mechanism, and it is never disabled.
 
 ### 7.4 Incomplete inputs are shown as incomplete
 
@@ -379,8 +394,10 @@ if complete.
 
 The result is labelled **calculated** when every category with data has the values it needs and the
 threshold is met; **estimate** when any row is incomplete or when a user-supplied price or rate is doing the
-work; and **nothing is due** when the threshold is not met. The three are visually distinct and worded
-differently.
+work; and **nothing is due** when the threshold is not met. The three are distinct statuses with their own
+words, and each is visually distinct: a completed calculation that produces an amount, an estimate waiting
+for a value, and a completed calculation whose answer is that no payment is due under the rules in force are
+three different statements, and the screen does not let two of them share a word.
 
 ---
 
@@ -401,8 +418,19 @@ verifying far more rules than this phase could.
 | `INTERNATIONAL` (default) | 87.48 g | 612.36 g | "87.48 g gold / 612.36 g silver — the weights published by Islamic Relief Worldwide, Muslim Aid, NZF and The Citizens Foundation" |
 | `BANGLADESH` | 85 g | 595 g | "85 g gold / 595 g silver — the weights published by Dhaka Ahsania Mission" |
 
+The weights above are the thresholds **when the weight unit is `GRAM`**. When the selected unit is `TOLA` or
+`VORI`, the `INTERNATIONAL` threshold is the traditional figure the sources state — exactly **7.5 tola of
+gold** or **52.5 tola of silver** — multiplied by the configured `gramsPerUnit` of 11.6638, giving 87.4785 g
+and 612.3495 g. The reason is given in §2.1: the strict tola conversion of the published gram constant falls
+just short of it, so a user entering the traditional nisab in its own unit would otherwise be told they hold
+less than the nisab. The `BANGLADESH` weights are published only in grams and are used unchanged for every
+unit.
+
 Metal choice: gold-based or silver-based, with the "all of one metal ⇒ that metal's nisab" rule from §3.3
-enforced rather than merely advised.
+enforced rather than merely advised. The rule applies only when the assets are **entirely** one metal: cash, a
+balance in another currency, stock, a receivable, or a row still waiting for a value all mean the wealth is not
+one metal alone, and the user's own choice then stands. A liability is never counted as such an asset — a debt
+is what the total is reduced by, not a holding.
 
 ### 8.3 Inventory valuation
 
@@ -427,14 +455,69 @@ The consequences, stated rather than hidden:
   deliberate.
 * **Nothing is logged.** No amount, holding or debt is written to log output anywhere in this feature. The only
   values that reach a log at all are the ones in failing test assertions.
-* **No network, no analytics, no account.** The calculator has no Internet permission use, no remote service, no
-  Supabase call and no telemetry. The `ZakatCalculator` is a pure function of its inputs and cannot reach a
-  network even in principle, because it has no dependency it could reach one through.
-* **The engine is offline by construction** — it is an `object` with no collaborators — so the calculation works
-  with no connection once the screen is open.
+* **No user data over the network, no analytics, no account.** The `ZakatCalculator` is a pure function of its
+  inputs and cannot reach a network even in principle, because it has no collaborator of any kind — a source
+  check in `ZakatNetworkIsolationTest` asserts that. The screen's one remote read is of *published reference
+  prices* (§8.5) and sends none of the user's fields; it has no parameter through which a weight, a balance, a
+  debt or a result could be passed. Nothing is uploaded, and there is no telemetry or account.
+* **The engine is offline by construction**, so the calculation works with no connection once the screen is
+  open, and a failed price read leaves the calculator exactly as usable as it was.
 
 If persistence is added later it must be local-only (the existing DataStore), must disclose what is stored, and
 must not be the vehicle for any synchronisation of financial data.
+
+### 8.5 Published reference prices (Android)
+
+Salah can fill the gold and silver price fields from **published reference-price records**, so a user who does
+not know today's rate does not have to look one up. What was implemented, and what it deliberately is not:
+
+**Where the prices come from.** Supabase is the source. The app performs one read-only query against the
+published-price table (`metal_prices`) with the app's existing **publishable (anon) key** — never a
+`service_role` or secret key, which would bypass the row-level security the design depends on. The records are
+fetched from the upstream provider, validated, reviewed and published by an **administrator workflow that is
+outside this app**; the app never calls that provider, and never writes a price.
+
+**Which record is used.** For each metal the app selects a record that is published (**`is_active`**, and
+`verification_status = verified` — both re-checked client-side so a misconfigured database cannot serve an
+unreviewed row), in the default purity **K22**, and in **BDT**. Exactly one such record is used. If the response
+contains two usable records for the same metal, purity and currency, the app reports a conflict and uses
+neither: choosing between two approvals would be inventing a policy. A row that exists but is inactive, pending
+or rejected is never presented as a current approved rate, and a price is never inferred from the newest
+timestamp.
+
+**The unit and the precision.** A reference price is **BDT per gram** as an exact decimal. The JSON number's
+own text is read into a `BigDecimal` — never through `Double` or `Float` — and a missing, malformed, zero or
+negative price is rejected rather than turned into zero. There is no hardcoded fallback rate anywhere in the
+feature.
+
+**How it reaches the calculator.** The retrieval lives behind its own data source, repository and one use case,
+and the calculator is untouched by it: it still receives a price through the same `ZakatInputs` it always did,
+and stays a pure function (`ZakatNetworkIsolationTest` asserts it mentions no networking type). The read happens
+once when the screen is created and then only when the user asks to refresh; nothing fetches on a keystroke or a
+recomposition.
+
+**Editing, and never overwriting an edit.** A user's own price is a local, in-memory session override. The app
+remembers only *which* price fields the user typed into — nothing about the value is written anywhere — and a
+published rate is offered only into a field the user has left alone. A refresh never replaces a typed price, and
+the screen offers to restore the published rate explicitly. A published rate never changes `nisabWeight`,
+`nisabMetal` or any other methodology choice.
+
+**When there is no usable price.** The screen says so, keeps manual entry working, never fills a field with
+zero, and leaves the calculator's own incomplete/estimate behaviour exactly as §7.4 describes. One metal's
+failure never stops the other metal's rate being used. Nothing crashes and nothing is blocked.
+
+**Labels.** The source name and any timestamps are shown as what they are: a reviewed/effective date only when
+the record carries `effective_at`; `provider_last_update` is labelled as the provider's own update and
+`fetched_at`/`updated_at` as when the record was retrieved or last changed. None of them is presented as proof
+that a market price was live at that moment, and the upstream provider is not described as an official BAJUS
+API or a guaranteed live rate. A published reference rate is a market convention, not the resale value of any
+particular item — the screen and the resource strings say so.
+
+**A note on this phase.** The Android side of this integration is implemented and unit-tested against synthetic
+fixtures. Whether a *live* published rate can actually be retrieved depends on the backend: the `metal_prices`
+table, the published records, and a read policy that permits this app's publishable key must exist in the
+deployment. If they do not, the app reports "no published reference price" (or the specific failure) and manual
+entry is used — which is the behaviour the tests pin. No end-to-end live retrieval is claimed here.
 
 ## 9. Limitations and unsupported cases
 
@@ -457,7 +540,11 @@ asserting more than its sources support.
 8. **The calculator cannot determine anyone's obligation.** It compares wealth to a threshold and reports the
    arithmetic. Whether zakat is due depends on facts it does not collect (ownership, the completion of the
    hawl, debts, dependants) and on the school the user follows.
-9. **Prices and rates are the user's.** Salah does not fetch, verify or date-stamp a market price (§7.3).
+9. **A price Salah offers is a reference, not a valuation.** Salah reads *published* gold and silver reference
+   rates (§8.5) and may fill an untouched price field with one, but it does not verify any rate, does not own
+   the intake process, and does not calculate what a particular item would fetch. Foreign-currency rates are
+   still entirely the user's (§4.1), and every price is editable. Where the deployment publishes no usable
+   record, manual entry is used.
 10. **The 2% / 25% jewellery stone-weight reductions are not implemented** (§4.2).
 11. **No zakat on gold or silver held as a business is separated from personal holdings.** Both are one
     weight field with one price, which is correct for the Hanafi calculation but cannot express a user who

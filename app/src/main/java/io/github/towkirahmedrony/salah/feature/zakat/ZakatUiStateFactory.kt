@@ -2,6 +2,9 @@ package io.github.towkirahmedrony.salah.feature.zakat
 
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
 import io.github.towkirahmedrony.salah.core.domain.zakat.ZakatCalculator
 import io.github.towkirahmedrony.salah.core.model.ZakatDebtTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatInputs
@@ -9,6 +12,7 @@ import io.github.towkirahmedrony.salah.core.model.ZakatInventoryBasis
 import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
 import io.github.towkirahmedrony.salah.core.model.ZakatLineTreatment
+import io.github.towkirahmedrony.salah.core.model.ZakatMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatMoney
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
@@ -58,9 +62,25 @@ class ZakatUiStateFactory(
      *
      * [today] is passed in rather than read here, so the valuation date is the caller's decision and a test can
      * pin it. Nothing in this class reads a clock.
+     *
+     * [referencePrices] and [manualPriceFields] are how a published gold or silver rate reaches the calculator
+     * without ever being persisted: a price field the user has not touched is filled from the published record
+     * for this reading only. [manualPriceFields] is the session's own record of which price fields the user
+     * typed into, so a published rate never overwrites a figure the user chose — see [ZakatForm].
      */
-    fun create(form: ZakatForm, locale: Locale, today: LocalDate): ZakatUiState.Ready {
-        val parsed = parse(form, today)
+    fun create(
+        form: ZakatForm,
+        locale: Locale,
+        today: LocalDate,
+        referencePrices: ReferencePrices = ReferencePrices.notPublished(),
+        manualPriceFields: Set<ZakatFormField> = emptySet(),
+        refreshingReferencePrices: Boolean = false,
+    ): ZakatUiState.Ready {
+        // The form as the engine and the screen see it: the user's own entries, with a published reference
+        // price standing in for a price field the user has not typed into. Both the calculation and every
+        // displayed value read the merged form, so the two can never disagree about which price is in force.
+        val effectiveForm = form.mergedWithReferencePrices(referencePrices, manualPriceFields)
+        val parsed = parse(effectiveForm, today)
         val result = ZakatCalculator.calculate(parsed.inputs)
 
         return ZakatUiState.Ready(
@@ -108,19 +128,26 @@ class ZakatUiStateFactory(
                 }
             },
             nisabMetalOverridden = result.nisabMetalOverridden,
+            // The **metal** held, not the nisab it selects: the sentence is "you hold only gold, so its nisab
+            // is applied", and naming "gold nisab" in that slot would read as "you hold only the gold nisab".
             forcedNisabMetalRes = if (result.nisabMetalOverridden) {
-                when (result.nisabMetalUsed) {
-                    ZakatNisabMetal.GOLD -> R.string.zakat_nisab_gold
-                    ZakatNisabMetal.SILVER -> R.string.zakat_nisab_silver
-                }
+                metalLabelFor(
+                    when (result.nisabMetalUsed) {
+                        ZakatNisabMetal.GOLD -> ZakatMetal.GOLD
+                        ZakatNisabMetal.SILVER -> ZakatMetal.SILVER
+                    },
+                )
             } else {
                 null
             },
-            assetFields = ASSET_FIELDS.map { field -> fieldState(field, form, parsed.invalid) },
-            liabilityFields = LIABILITY_FIELDS.map { field -> fieldState(field, form, parsed.invalid) },
+            assetFields = ASSET_FIELDS.map { field -> fieldState(field, effectiveForm, parsed.invalid) },
+            liabilityFields = LIABILITY_FIELDS.map { field -> fieldState(field, effectiveForm, parsed.invalid) },
+            // The field is a controlled input, so the text shown is exactly what the user typed.
             hawlDateText = form.hawlSeedDateText,
-            hawlDateInvalid = form.hawlSeedDateText.isNotBlank() && parsed.hawlDate == null,
+            hawlDateInvalid = isHawlDateInvalid(ZakatDigits.toWestern(form.hawlSeedDateText), parsed.hawlDate),
             result = resultView(result, locale),
+            referencePrices = referencePricesView(referencePrices, manualPriceFields, locale),
+            refreshingReferencePrices = refreshingReferencePrices,
             canClear = form.hasAnythingEntered(),
         )
     }
@@ -150,13 +177,17 @@ class ZakatUiStateFactory(
 
         // The seed date is an ISO date. It is parsed rather than validated per keystroke so that a user can
         // type "2026-1" on the way to "2026-10-01" without the field reporting an error at every character.
-        val hawlDate = form.hawlSeedDateText.trim().takeIf { text -> text.isNotEmpty() }?.let { text ->
-            try {
-                LocalDate.parse(text)
-            } catch (_: DateTimeParseException) {
-                null
+        // Bengali and Arabic-Indic digits are rewritten to Western ones first, so a user typing their own
+        // numerals is not told their date is unreadable because of the script their keyboard produces.
+        val hawlDate = ZakatDigits.toWestern(form.hawlSeedDateText).trim()
+            .takeIf { text -> text.isNotEmpty() }
+            ?.let { text ->
+                try {
+                    LocalDate.parse(text)
+                } catch (_: DateTimeParseException) {
+                    null
+                }
             }
-        }
 
         val inputs = ZakatInputs(
             currency = form.currency,
@@ -196,13 +227,13 @@ class ZakatUiStateFactory(
 
         return ZakatResultView(
             statusRes = when (result.status) {
-                // A wealth below the nisab is a *completed* calculation whose answer is "nothing is due", so it
-                // reports as a calculation and lets the below-the-nisab row say which way it went. There is no
-                // separate word for it because no separate answer is being given.
                 ZakatStatus.NOTHING_ENTERED -> R.string.zakat_status_nothing
                 ZakatStatus.CALCULATED -> R.string.zakat_status_calculated
                 ZakatStatus.ESTIMATE -> R.string.zakat_status_estimate
-                ZakatStatus.BELOW_NISAB -> R.string.zakat_status_calculated
+                // A wealth below the nisab is a *completed* calculation whose answer is that no payment is due
+                // under the rules in force. That answer is distinct from both "calculated an amount" and "an
+                // estimate waiting for a value", so it has its own word rather than borrowing either.
+                ZakatStatus.BELOW_NISAB -> R.string.zakat_status_below_nisab
             },
             rows = result.lines.map { line ->
                 ZakatResultRowView(
@@ -229,7 +260,10 @@ class ZakatUiStateFactory(
             },
             due = result.zakatDue?.let { amount -> money(amount, locale) },
             rateLabel = percent(result.zakatRate, locale),
-            incompleteLabels = result.incompleteFields.map { field -> lineLabelFor(field) },
+            // A missing price is named as a missing **price**, and a missing rate as a missing **rate**: the
+            // row's own weight label would say "gold weight" when the weight was typed and it is the price that
+            // is absent, which points the user at the wrong field.
+            incompleteLabels = result.incompleteFields.map { field -> incompleteLabelFor(field) },
             hawlEstimateDate = result.hawl?.let { hawl ->
                 formatting.gregorianDayMonthYear(hawl.estimatedAnniversary, locale)
             },
@@ -237,6 +271,7 @@ class ZakatUiStateFactory(
                 formatting.numerals(hawl.approximateYearDays, locale)
             },
             showsPriceNote = hasAnything && result.dependsOnUserSuppliedPrice,
+            currency = result.currency,
         )
     }
 
@@ -319,6 +354,181 @@ class ZakatUiStateFactory(
         ZakatLineField.LONG_TERM_LIABILITIES -> labelFor(ZakatFormField.LONG_TERM_LIABILITIES)
     }
 
+    /**
+     * The label of the **metal** a result row is about — gold or silver, as a substance.
+     *
+     * Distinct from [labelFor] applied to the metal's weight or price field: those name an *input*, and this
+     * names the metal itself. Reusing the nisab labels here is the mapping mistake these tests exist for —
+     * "you hold only gold nisab" is not a sentence about a holding.
+     */
+    private fun metalLabelFor(metal: ZakatMetal): Int = when (metal) {
+        ZakatMetal.GOLD -> R.string.zakat_metal_gold
+        ZakatMetal.SILVER -> R.string.zakat_metal_silver
+    }
+
+    /**
+     * The label for a field the calculation still needs, named for what is actually missing.
+     *
+     * A missing gold price is reported against the **price** field, not the weight: the weight was typed and
+     * the price was not, so naming the weight sends the user to a field that is already correct. The same
+     * applies to a missing silver price and to a missing foreign-currency rate.
+     */
+    private fun incompleteLabelFor(field: ZakatLineField): Int = when (field) {
+        ZakatLineField.FOREIGN_CURRENCY -> labelFor(ZakatFormField.FOREIGN_RATE)
+        ZakatLineField.GOLD -> labelFor(ZakatFormField.GOLD_PRICE)
+        ZakatLineField.SILVER -> labelFor(ZakatFormField.SILVER_PRICE)
+        else -> lineLabelFor(field)
+    }
+
+    /**
+     * True when the Hawl date text is neither empty, nor a date that can be read, nor a date still being typed.
+     *
+     * The third case is the one that matters: a user types `2026-10-01` one character at a time, and every
+     * prefix of it before the last digit is not a date. Reporting an error at each of those keystrokes would
+     * flash a validation message over a field the user is in the middle of filling in, and would make the field
+     * look wrong on the way to being right. A partial ISO date is therefore not an error while it is shorter
+     * than a completed date and still shaped like one.
+     *
+     * Anything else — a completed-looking date that does not parse, or free text such as `next Ramadan` — is an
+     * error, because it is neither complete nor on its way to being complete.
+     */
+    private fun isHawlDateInvalid(
+        rawText: String,
+        parsedDate: LocalDate?,
+    ): Boolean {
+        val trimmed = rawText.trim()
+
+        if (trimmed.isEmpty() || parsedDate != null) {
+            return false
+        }
+
+        val partialIsoPattern =
+            Regex("""^\d{1,4}(-\d{0,2}(-\d{0,2})?)?$""")
+
+        if (trimmed.length < 10 && partialIsoPattern.matches(trimmed)) {
+            return false
+        }
+
+        return true
+    }
+
+    /**
+     * The published reference prices as the screen shows them, gold first and silver second.
+     *
+     * Each metal is rendered from its own result, so one metal having no published rate or a conflicting one
+     * changes nothing about the other. Nothing here invents a source, a timestamp or a price: a label is only
+     * produced from a field the record actually carries.
+     */
+    private fun referencePricesView(
+        referencePrices: ReferencePrices,
+        manualPriceFields: Set<ZakatFormField>,
+        locale: Locale,
+    ): List<ZakatReferencePriceState> = listOf(
+        referencePriceState(
+            metal = ZakatMetal.GOLD,
+            priceField = ZakatFormField.GOLD_PRICE,
+            result = referencePrices.gold,
+            manualPriceFields = manualPriceFields,
+            locale = locale,
+        ),
+        referencePriceState(
+            metal = ZakatMetal.SILVER,
+            priceField = ZakatFormField.SILVER_PRICE,
+            result = referencePrices.silver,
+            manualPriceFields = manualPriceFields,
+            locale = locale,
+        ),
+    )
+
+    private fun referencePriceState(
+        metal: ZakatMetal,
+        priceField: ZakatFormField,
+        result: ReferencePriceResult,
+        manualPriceFields: Set<ZakatFormField>,
+        locale: Locale,
+    ): ZakatReferencePriceState {
+        val available = result as? ReferencePriceResult.Available
+        val manuallyEdited = priceField in manualPriceFields
+        return ZakatReferencePriceState(
+            metal = metal,
+            metalRes = metalLabelFor(metal),
+            priceField = priceField,
+            status = when (result) {
+                ReferencePriceResult.Loading -> ZakatReferencePriceStatus.LOADING
+                is ReferencePriceResult.Available -> ZakatReferencePriceStatus.AVAILABLE
+                ReferencePriceResult.NotPublished -> ZakatReferencePriceStatus.UNAVAILABLE
+                is ReferencePriceResult.Conflicting -> ZakatReferencePriceStatus.FAILED
+                is ReferencePriceResult.Failed -> ZakatReferencePriceStatus.FAILED
+            },
+            statusRes = when (result) {
+                ReferencePriceResult.Loading -> R.string.zakat_price_status_loading
+                is ReferencePriceResult.Available -> R.string.zakat_price_status_available
+                ReferencePriceResult.NotPublished -> R.string.zakat_price_status_unavailable
+                is ReferencePriceResult.Conflicting -> R.string.zakat_price_status_conflict
+                is ReferencePriceResult.Failed -> R.string.zakat_price_status_failed
+            },
+            // The unit is carried as a resource and a code rather than as a joined sentence: composing "BDT
+            // per gram" here would fix the English word order into a Bengali screen, and this class has no
+            // context with which to read a translated string. The screen joins the two.
+            unitLabelRes = R.string.zakat_price_unit,
+            currencyCode = available?.price?.currency ?: ZakatInputs.DEFAULT_CURRENCY,
+            pricePerGram = available?.price?.pricePerGram?.let { price -> plain(price, locale) },
+            sourceLabel = available?.price?.source,
+            effectiveLabel = available?.price?.effectiveAt?.let { raw -> timestampLabel(raw, locale) },
+            providerUpdatedLabel = available?.price?.providerLastUpdate?.let { raw -> timestampLabel(raw, locale) },
+            fetchedLabel = available?.price?.fetchedAt?.let { raw -> timestampLabel(raw, locale) },
+            updatedLabel = available?.price?.updatedAt?.let { raw -> timestampLabel(raw, locale) },
+            messageRes = messageFor(result),
+            manuallyEdited = manuallyEdited,
+            canRestoreReference = manuallyEdited && available != null,
+        )
+    }
+
+    /** The explanation for a state that is not a usable published rate, or `null` when there is one. */
+    private fun messageFor(result: ReferencePriceResult): Int? = when (result) {
+        ReferencePriceResult.Loading -> null
+        is ReferencePriceResult.Available -> null
+        ReferencePriceResult.NotPublished -> R.string.zakat_price_unavailable
+        is ReferencePriceResult.Conflicting -> R.string.zakat_price_conflict
+        is ReferencePriceResult.Failed -> when (result.failure) {
+            MetalPriceFailure.NOT_CONFIGURED -> R.string.zakat_price_not_configured
+            MetalPriceFailure.TABLE_UNAVAILABLE -> R.string.zakat_price_table_unavailable
+            MetalPriceFailure.ACCESS_DENIED -> R.string.zakat_price_access_denied
+            MetalPriceFailure.MALFORMED,
+            MetalPriceFailure.INVALID_DATA,
+            -> R.string.zakat_price_invalid
+
+            MetalPriceFailure.TIMEOUT,
+            MetalPriceFailure.CONNECTION,
+            MetalPriceFailure.NETWORK,
+            MetalPriceFailure.SERVER,
+            MetalPriceFailure.RESPONSE_TOO_LARGE,
+            -> R.string.zakat_price_retrieval_failed
+        }
+    }
+
+    /**
+     * [raw] as a readable date when it is an ISO timestamp, or the text itself when it is not.
+     *
+     * A published record's timestamps are ISO-8601 strings and may carry a time and an offset. Only the date
+     * part is shown, in the interface language's numerals, because the app has no way to establish which
+     * timezone a provider meant and a bare date is the honest reading of what the record states. A value that
+     * is not a date at all is shown as it arrived rather than reformatted into something it is not.
+     */
+    private fun timestampLabel(raw: String, locale: Locale): String {
+        val trimmed = raw.trim()
+        val date = try {
+            LocalDate.parse(trimmed.take(ISO_DATE_LENGTH))
+        } catch (_: DateTimeParseException) {
+            null
+        }
+        return if (date == null) {
+            formatting.localizeDigits(trimmed, locale)
+        } else {
+            formatting.gregorianDayMonthYear(date, locale)
+        }
+    }
+
     companion object {
         /** The asset rows, in the order the screen presents them. */
         val ASSET_FIELDS: List<ZakatFormField> = listOf(
@@ -345,5 +555,13 @@ class ZakatUiStateFactory(
 
         /** The sign that makes a rate a percentage. */
         const val PERCENT_SIGN: String = "%"
+
+        /**
+         * How many leading characters of a timestamp are its date.
+         *
+         * `YYYY-MM-DD` is ten characters, and the rest of an ISO-8601 timestamp is the time and its offset —
+         * which the app does not show, because it cannot establish the zone the publisher meant.
+         */
+        const val ISO_DATE_LENGTH: Int = 10
     }
 }

@@ -348,6 +348,43 @@
     <string name="zakat_clear_confirm">Clear</string>
     <string name="zakat_cancel">Cancel</string>
 
+    <!-- The two metals, as substances. Distinct from the nisab labels, which name a threshold. -->
+    <string name="zakat_metal_gold">gold</string>
+    <string name="zakat_metal_silver">silver</string>
+    <string name="zakat_status_below_nisab">Nothing due</string>
+
+    <!--
+      Reference prices. The app only ever reads these: an administrator workflow fetches, reviews and
+      publishes the records, and nothing here sends a user's own figures anywhere. The words state what each
+      timestamp actually is rather than presenting any of them as a live market price.
+    -->
+    <string name="zakat_price_title">Reference prices</string>
+    <string name="zakat_price_subtitle">Published Bangladesh market reference rates. Replace either with your own figure if you prefer.</string>
+    <string name="zakat_price_unit">%1$s per gram</string>
+    <string name="zakat_price_source">Source: %1$s</string>
+    <string name="zakat_price_effective">Reviewed %1$s</string>
+    <string name="zakat_price_provider_update">Provider update %1$s</string>
+    <string name="zakat_price_fetched">Retrieved %1$s</string>
+    <string name="zakat_price_last_updated">Last updated %1$s</string>
+    <string name="zakat_price_status_loading">Loading</string>
+    <string name="zakat_price_status_available">Published rate</string>
+    <string name="zakat_price_status_unavailable">Not published</string>
+    <string name="zakat_price_status_conflict">Conflicting records</string>
+    <string name="zakat_price_status_failed">Unavailable</string>
+    <string name="zakat_price_unavailable">No published reference price. Enter one yourself.</string>
+    <string name="zakat_price_conflict">More than one published rate was returned, so none was used. Enter a price yourself.</string>
+    <string name="zakat_price_invalid">A published rate could not be used. Enter a price yourself.</string>
+    <string name="zakat_price_not_configured">No price service is configured. Enter a price yourself.</string>
+    <string name="zakat_price_table_unavailable">Reference prices are not published yet. Enter a price yourself.</string>
+    <string name="zakat_price_access_denied">The published rates are not readable from this app. Enter a price yourself.</string>
+    <string name="zakat_price_retrieval_failed">The reference prices could not be retrieved. Enter a price yourself.</string>
+    <string name="zakat_price_refresh">Refresh reference prices</string>
+    <string name="zakat_price_refreshing">Refreshing reference prices…</string>
+    <string name="zakat_price_manual">You entered this price.</string>
+    <string name="zakat_price_restore">Use the published %1$s price</string>
+    <string name="zakat_price_per_gram">Price per gram</string>
+    <string name="zakat_price_source_note">A published reference rate is a market convention, not a valuation of any particular item.</string>
+
     <string name="zakat_limits_title">What this does not calculate</string>
     <string name="zakat_limits_body">Agricultural produce, livestock, minerals, shares, provident funds and property held for resale are not included: each has its own rate or its own trigger. The Maliki and Hanbali treatments are not offered.</string>
     <string name="zakat_not_certified">Salah is not religiously certified. This is arithmetic, not a ruling — check with a scholar you trust.</string>

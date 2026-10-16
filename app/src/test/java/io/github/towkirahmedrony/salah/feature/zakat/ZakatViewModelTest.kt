@@ -1,9 +1,18 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
+import io.github.towkirahmedrony.salah.core.domain.metalprice.LoadPublishedReferencePrices
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPurity
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalType
+import io.github.towkirahmedrony.salah.core.domain.metalprice.PublishedMetalPrice
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.ZakatDebtTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatInventoryBasis
 import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
+import io.github.towkirahmedrony.salah.core.model.ZakatMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
@@ -21,10 +30,12 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -69,9 +80,11 @@ class ZakatViewModelTest {
         preferences: FakeUserPreferencesRepository = FakeUserPreferencesRepository(
             initialAppLanguage = AppLanguage.ENGLISH,
         ),
+        priceRepository: MetalPriceRepository = FakeMetalPriceRepository(),
     ): ZakatViewModel = ZakatViewModel(
         userPreferencesRepository = preferences,
         uiStateFactory = ZakatUiStateFactory(),
+        loadReferencePrices = LoadPublishedReferencePrices(priceRepository),
         clock = clock,
     )
 
@@ -113,10 +126,18 @@ class ZakatViewModelTest {
     }
 
     @Test
-    fun `a leading decimal point is not accepted and a trailing one is`() {
-        // ".5" is not a shape this field produces, but "12." is a step towards "12.50" and must survive.
-        assertEquals("5", ZakatViewModel.filterDecimalInput(".5"))
+    fun `a leading decimal point is kept, with a zero in front of it`() {
+        // ".5" is half a unit. Dropping the point would turn it into five units — a wrong figure that nothing
+        // later in the flow could catch, because "5" is a perfectly valid amount, and the error would be the
+        // user's own figure changed silently under them.
+        assertEquals("0.5", ZakatViewModel.filterDecimalInput(".5"))
+        assertEquals("0.", ZakatViewModel.filterDecimalInput("."))
+        // A point with nothing after it is a step towards "0.50" and must survive too.
         assertEquals("12.", ZakatViewModel.filterDecimalInput("12."))
+        assertEquals("12.50", ZakatViewModel.filterDecimalInput("12.5.0"))
+        assertEquals("0.50", ZakatViewModel.filterDecimalInput(".5.0"))
+        // The same rule in the user's own numerals.
+        assertEquals("0.5", ZakatViewModel.filterDecimalInput("০.৫"))
     }
 
     // --- The form -------------------------------------------------------------------------------
@@ -296,4 +317,204 @@ class ZakatViewModelTest {
         assertEquals("12500.5", ZakatViewModel.filterDecimalInput("১২৫০০.৫"))
         assertEquals("12500", ZakatViewModel.filterDecimalInput("١٢٥٠٠"))
     }
+
+    // --- The Hawl date's digits -----------------------------------------------------------------
+
+    @Test
+    fun `normalizeDateDigits rewrites the digits it recognises and nothing else`() {
+        assertEquals("2026-01-01", ZakatViewModel.normalizeDateDigits("২০২৬-০১-০১"))
+        assertEquals("2026-01-01", ZakatViewModel.normalizeDateDigits("٢٠٢٦-٠١-٠١"))
+        // A date is structured text: separators survive, and text that carries no digits is left alone.
+        assertEquals("next Ramadan", ZakatViewModel.normalizeDateDigits("next Ramadan"))
+    }
+
+    @Test
+    fun `a Bengali seed date is normalised and parsed`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        observe(viewModel)
+
+        viewModel.onHawlDateChange("২০২৬-০১-০১")
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertEquals("2026-01-01", state.hawlDateText)
+        assertFalse(state.hawlDateInvalid)
+        assertNotNull(state.result.hawlEstimateDate)
+    }
+
+    @Test
+    fun `an Arabic-Indic seed date is normalised and parsed`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        observe(viewModel)
+
+        viewModel.onHawlDateChange("٢٠٢٦-٠١-٠١")
+        runCurrent()
+
+        assertEquals("2026-01-01", ready(viewModel).hawlDateText)
+    }
+
+    @Test
+    fun `a partially typed seed date is not reported as an error`() = runTest(mainDispatcher) {
+        val viewModel = viewModel()
+        observe(viewModel)
+
+        viewModel.onHawlDateChange("2026")
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertFalse(state.hawlDateInvalid)
+        assertTrue(state.canClear)
+    }
+
+    // --- Published reference prices --------------------------------------------------------------
+
+    @Test
+    fun `the published rates are read once when the screen is created`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = prices(gold = "19550")
+
+        viewModel(priceRepository = repository)
+        runCurrent()
+
+        // One read for the screen's lifetime so far: nothing reacts to a keystroke or a recomposition.
+        assertEquals(1, repository.calls)
+    }
+
+    @Test
+    fun `an available published rate fills a price field the user has left alone`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = prices(gold = "19550")
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_WEIGHT, "87.5")
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertEquals("19550", state.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        // 87.5 g × 19,550 = 1,710,625.
+        assertEquals("1710625.00", state.result.totalAssets)
+    }
+
+    @Test
+    fun `refreshing never overwrites a price the user edited`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = prices(gold = "19550")
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_PRICE, "20000")
+        runCurrent()
+        assertEquals("20000", ready(viewModel).assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+
+        // The service now has a newer rate, and the user asks for it.
+        repository.result = prices(gold = "21000")
+        viewModel.refreshReferencePrices()
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertEquals("20000", state.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals(2, repository.calls)
+        assertTrue(state.referencePrices.single { it.metal == ZakatMetal.GOLD }.manuallyEdited)
+    }
+
+    @Test
+    fun `restoring the published reference price puts it back`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = prices(gold = "19550")
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_PRICE, "20000")
+        runCurrent()
+        viewModel.onRestoreReferencePrice(ZakatFormField.GOLD_PRICE)
+        runCurrent()
+
+        assertEquals("19550", ready(viewModel).assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+    }
+
+    @Test
+    fun `a second read is not started while one is in flight`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        // The opening read has completed. Two refreshes asked for back to back produce exactly one more call.
+        viewModel.refreshReferencePrices()
+        viewModel.refreshReferencePrices()
+        runCurrent()
+
+        assertEquals(2, repository.calls)
+    }
+
+    @Test
+    fun `a failed retrieval leaves the calculator working from a typed price`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = ReferencePrices.failed(MetalPriceFailure.NETWORK)
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_WEIGHT, "87.5")
+        viewModel.onValueChange(ZakatFormField.GOLD_PRICE, "19550")
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertEquals("1710625.00", state.result.totalAssets)
+        assertEquals(
+            ZakatReferencePriceStatus.FAILED,
+            state.referencePrices.single { it.metal == ZakatMetal.GOLD }.status,
+        )
+    }
+
+    @Test
+    fun `clearing also drops the user's price edits, so the published rate applies again`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.result = prices(gold = "19550")
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_PRICE, "20000")
+        runCurrent()
+        viewModel.clearAll()
+        runCurrent()
+
+        assertEquals("19550", ready(viewModel).assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals(1, repository.calls)
+    }
 }
+
+/**
+ * A price repository that answers from memory and counts its calls.
+ *
+ * Offline and deterministic by construction: no test in this file reaches a network, and the rates it returns
+ * are labelled fixtures rather than presented as real Bangladesh market prices.
+ */
+private class FakeMetalPriceRepository : MetalPriceRepository {
+
+    var calls: Int = 0
+        private set
+
+    var result: ReferencePrices = ReferencePrices.notPublished()
+
+    override suspend fun publishedReferencePrices(): ReferencePrices {
+        calls += 1
+        return result
+    }
+}
+
+/** A reading with a published fixture rate for whichever metals are named. */
+private fun prices(gold: String? = null, silver: String? = null): ReferencePrices = ReferencePrices(
+    gold = gold?.let { price -> availablePrice(MetalType.GOLD, price) } ?: ReferencePriceResult.NotPublished,
+    silver = silver?.let { price -> availablePrice(MetalType.SILVER, price) } ?: ReferencePriceResult.NotPublished,
+)
+
+private fun availablePrice(metal: MetalType, price: String): ReferencePriceResult =
+    ReferencePriceResult.Available(
+        PublishedMetalPrice(
+            metal = metal,
+            purity = MetalPurity.K22,
+            pricePerGram = BigDecimal(price),
+            currency = "BDT",
+            source = "Salah test fixture",
+        ),
+    )

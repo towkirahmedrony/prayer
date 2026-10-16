@@ -2,6 +2,12 @@ package io.github.towkirahmedrony.salah.feature.zakat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.towkirahmedrony.salah.core.domain.metalprice.LoadPublishedReferencePrices
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
+import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
+import io.github.towkirahmedrony.salah.core.domain.metalprice.availablePriceText
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.ZakatDebtTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatInputs
@@ -10,12 +16,14 @@ import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
 import java.util.Locale
@@ -43,10 +51,27 @@ import java.util.Locale
  * [io.github.towkirahmedrony.salah.core.domain.zakat.ZakatCalculator]. The result is regenerated from the form
  * on every change rather than cached, so there is no second copy of the answer that could disagree with the
  * inputs.
+ *
+ * ## The one thing it fetches, and why that changes nothing above
+ *
+ * The published gold and silver reference prices are read once when the screen is created and then only when
+ * the user asks (see [refreshReferencePrices]). The calculator never waits for them: it is given whatever price
+ * the form holds, a published rate is only *offered* into a price field the user has left alone, and a failed
+ * read leaves manual entry exactly as it was. A published price is an input like any other, never a dependency
+ * of the arithmetic.
  */
 class ZakatViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val uiStateFactory: ZakatUiStateFactory,
+    /**
+     * Retrieves the published reference prices.
+     *
+     * Injected so the screen is testable against a fake that never reaches a network, and so a build with no
+     * price service configured delivers "nothing published" rather than an error. It takes no user data: see
+     * [LoadPublishedReferencePrices].
+     */
+    private val loadReferencePrices: LoadPublishedReferencePrices =
+        LoadPublishedReferencePrices(MetalPriceRepository.UNCONFIGURED),
     /**
      * The clock the default valuation date comes from — nothing else reads it. The screen dates its own
      * calculation with it, so "as at" means the day the user was looking at.
@@ -55,6 +80,25 @@ class ZakatViewModel(
 ) : ViewModel() {
 
     private val form = MutableStateFlow(ZakatForm())
+
+    /** The latest published-price read and how far it got. In flight at construction, because it is asked now. */
+    private val referencePrices = MutableStateFlow(ReferencePrices.loading())
+
+    /**
+     * Which price fields the user has typed into this session.
+     *
+     * In memory only, for the life of the screen, and deliberately so: this is the smallest state that
+     * distinguishes a published default from a figure the user chose, and remembering it beyond the session
+     * would mean writing something about their calculation down. Cleared by [clearAll].
+     */
+    private val manualPriceFields = MutableStateFlow(emptySet<ZakatFormField>())
+
+    /** True while a published-price read is in flight, so the refresh control can say so. */
+    private val refreshingReferencePrices = MutableStateFlow(false)
+
+    init {
+        refreshReferencePrices()
+    }
 
     /**
      * What the screen draws.
@@ -65,12 +109,18 @@ class ZakatViewModel(
     val uiState: StateFlow<ZakatUiState> = combine(
         form,
         userPreferencesRepository.appLanguage,
-    ) { current, language ->
+        referencePrices,
+        manualPriceFields,
+        refreshingReferencePrices,
+    ) { current, language, prices, manualPrices, refreshing ->
         uiStateFactory.create(
             form = current,
             // `null` is the "follow the device" choice, which an unset preference must still mean.
             locale = language.locale() ?: Locale.getDefault(),
             today = LocalDate.now(clock),
+            referencePrices = prices,
+            manualPriceFields = manualPrices,
+            refreshingReferencePrices = refreshing,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -78,14 +128,88 @@ class ZakatViewModel(
         initialValue = ZakatUiState.Loading,
     )
 
-    /** Records what the user typed into one field, after filtering what the field can hold. */
-    fun onValueChange(field: ZakatFormField, value: String) {
-        form.update { current -> current.withValue(field, filterDecimalInput(value)) }
+    /**
+     * Reads the published reference prices again.
+     *
+     * Called once when the screen is created, and afterwards only when the user asks. It is never driven by a
+     * keystroke or a recomposition, and a second read is not started while one is in flight, so a screen opening
+     * and a user tapping refresh cannot produce two concurrent reads of the same thing.
+     *
+     * A user's own edited price is **never** replaced: the factory fills only a price field the user has left
+     * alone. A failure leaves the screen exactly as usable as it was.
+     */
+    fun refreshReferencePrices() {
+        if (refreshingReferencePrices.value) return
+        refreshingReferencePrices.value = true
+        // Only a metal with no usable rate is marked in flight again, so a refresh does not blank out a rate the
+        // screen is already showing.
+        referencePrices.update { current ->
+            if (current.isLoading) {
+                current
+            } else {
+                ReferencePrices(
+                    gold = if (current.gold is ReferencePriceResult.Available) {
+                        current.gold
+                    } else {
+                        ReferencePriceResult.Loading
+                    },
+                    silver = if (current.silver is ReferencePriceResult.Available) {
+                        current.silver
+                    } else {
+                        ReferencePriceResult.Loading
+                    },
+                )
+            }
+        }
+        viewModelScope.launch {
+            val result = try {
+                loadReferencePrices()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // A retrieval the repository could not report as a value is still not allowed to take the screen
+                // down: it becomes "no published price" and manual entry carries on. Nothing about the user's
+                // entries appears in this outcome, or in any log of it.
+                ReferencePrices.failed(MetalPriceFailure.NETWORK)
+            }
+            referencePrices.value = result
+            refreshingReferencePrices.value = false
+        }
     }
 
-    /** Records the seed date text, unfiltered, because a date is parsed rather than filtered. */
+    /** Records what the user typed into one field, after filtering what the field can hold. */
+    fun onValueChange(field: ZakatFormField, value: String) {
+        val filtered = filterDecimalInput(value)
+        form.update { current -> current.withValue(field, filtered) }
+        if (field in PRICE_FIELDS) {
+            // The user has taken this price over for the session. Recorded in memory only, so a published rate
+            // can never overwrite it and so nothing about their calculation is written anywhere.
+            manualPriceFields.update { current -> current + field }
+        }
+    }
+
+    /**
+     * Records the seed date text.
+     *
+     * Bengali and Arabic-Indic digits are rewritten to Western ones as they are typed, so the field shows the
+     * date in the user's own numerals while the parser reads ISO digits. Nothing is dropped: a date is parsed
+     * rather than filtered, and the `-` separators have to survive.
+     */
     fun onHawlDateChange(value: String) {
-        form.update { current -> current.copy(hawlSeedDateText = value) }
+        form.update { current -> current.copy(hawlSeedDateText = normalizeDateDigits(value)) }
+    }
+
+    /**
+     * Drops the user's own price for [field], so the published reference price applies again.
+     *
+     * The only way a manually edited price is ever replaced is by asking for it. The field is emptied rather
+     * than overwritten with the published figure, and the factory then fills it from whatever rate is actually
+     * in force — so what the user sees is exactly the number that would be used, and not a copy of it.
+     */
+    fun onRestoreReferencePrice(field: ZakatFormField) {
+        if (field !in PRICE_FIELDS) return
+        form.update { current -> current.withValue(field, "") }
+        manualPriceFields.update { current -> current - field }
     }
 
     fun onCurrencyChange(currency: String) {
@@ -125,6 +249,10 @@ class ZakatViewModel(
      */
     fun clearAll() {
         form.value = ZakatForm()
+        // "Clear everything" is also the statement that no price in the form is the user's own any more, so a
+        // published reference price (if there is one) applies again. The published rate was never stored, so
+        // there is nothing to reload for it to be shown.
+        manualPriceFields.value = emptySet()
     }
 
     companion object {
@@ -132,6 +260,24 @@ class ZakatViewModel(
         const val SUBSCRIBE_TIMEOUT_MILLIS: Long = 5_000L
 
         private const val MAX_DECIMAL_PLACES = 12
+
+        /**
+         * The price fields a published reference price may fill when the user has left them alone.
+         *
+         * A set rather than two checks scattered through the class, so "which fields can a reference price
+         * stand in for" has one answer.
+         */
+        val PRICE_FIELDS: Set<ZakatFormField> =
+            setOf(ZakatFormField.GOLD_PRICE, ZakatFormField.SILVER_PRICE)
+
+        /**
+         * [value] with Bengali and Arabic-Indic digits rewritten as Western ones, everything else untouched.
+         *
+         * The Hawl field takes structured text rather than a number, so unlike [filterDecimalInput] this drops
+         * nothing: a borrowed implementation of the same mapping lives in [ZakatDigits], and the date parser
+         * behind this field reads the result as ISO digits.
+         */
+        fun normalizeDateDigits(value: String): String = ZakatDigits.toWestern(value)
 
         /**
          * Keeps what a numeric field can hold and drops the rest, writing every digit in Western form.
@@ -164,14 +310,19 @@ class ZakatViewModel(
             var decimals = 0
 
             value.forEach { character ->
-                val digit = westernDigit(character)
+                val digit = ZakatDigits.westernDigit(character)
                 when {
                     digit != null && (!seenPoint || decimals < MAX_DECIMAL_PLACES) -> {
                         builder.append(digit)
                         if (seenPoint) decimals += 1
                     }
 
-                    character == '.' && !seenPoint && builder.isNotEmpty() -> {
+                    // A leading point is kept, with a zero in front of it. ".5" is half a unit, and dropping
+                    // the point would silently turn it into five units — a mistake in the user's figure that
+                    // nothing later in the flow could detect, because "5" is a perfectly valid amount. A point
+                    // with nothing after it is likewise kept, because "0." is a step towards "0.50".
+                    character == '.' && !seenPoint -> {
+                        if (builder.isEmpty()) builder.append('0')
                         builder.append('.')
                         seenPoint = true
                     }
@@ -180,19 +331,6 @@ class ZakatViewModel(
                 }
             }
             return builder.toString()
-        }
-
-        /**
-         * [character] as a Western digit, or `null` when it is not a digit in any script this field accepts.
-         *
-         * Western, Bengali (U+09E6) and Arabic-Indic (U+0660) are the three scripts Salah's own language support
-         * can produce, which is why they are the three mapped.
-         */
-        private fun westernDigit(character: Char): Char? = when (character) {
-            in '0'..'9' -> character
-            in '\u09E6'..'\u09EF' -> '0' + (character - '\u09E6')
-            in '\u0660'..'\u0669' -> '0' + (character - '\u0660')
-            else -> null
         }
     }
 }
@@ -233,6 +371,37 @@ data class ZakatForm(
 
     fun withValue(field: ZakatFormField, value: String): ZakatForm =
         copy(values = values + (field to value))
+
+    /**
+     * This form with a published reference price standing in for a price field the user has left alone.
+     *
+     * A price field is filled only when **all three** hold: the user has not typed into it this session (it is
+     * absent from [manualPriceFields]), it currently holds nothing, and a usable published rate exists for that
+     * metal. Anything else leaves the user's own text exactly as it is — a manually edited price is never
+     * silently replaced by a published one.
+     *
+     * The result is a *view* of the form for one rendering, not a write: nothing is stored, and the published
+     * price disappears with the screen like every other value here. It lives here rather than in the state
+     * factory so that the calculation and the displayed field are both read from the same merged form, and can
+     * therefore never disagree about which price is in force.
+     */
+    fun mergedWithReferencePrices(
+        referencePrices: ReferencePrices,
+        manualPriceFields: Set<ZakatFormField>,
+    ): ZakatForm {
+        val merged = values.toMutableMap()
+
+        fun fill(field: ZakatFormField, result: ReferencePriceResult) {
+            if (field in manualPriceFields) return
+            if (!merged[field].isNullOrBlank()) return
+            val text = result.availablePriceText() ?: return
+            merged[field] = text
+        }
+
+        fill(ZakatFormField.GOLD_PRICE, referencePrices.gold)
+        fill(ZakatFormField.SILVER_PRICE, referencePrices.silver)
+        return if (merged == values) this else copy(values = merged)
+    }
 
     /**
      * True when the user has entered anything at all.

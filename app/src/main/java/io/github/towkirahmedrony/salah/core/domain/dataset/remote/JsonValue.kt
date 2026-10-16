@@ -1,5 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.dataset.remote
 
+import java.math.BigDecimal
+
 /**
  * A parsed JSON value, and the tiny reader that produces one.
  *
@@ -29,8 +31,17 @@ sealed interface JsonValue {
     /** A JSON string, with escapes already resolved. */
     data class StringValue(val value: String) : JsonValue
 
-    /** A JSON number. Held as a [Double]; the manifest's numbers are all integral in range. */
-    data class NumberValue(val value: Double) : JsonValue
+    /**
+     * A JSON number.
+     *
+     * [value] is the numeric value as a [Double], which is all the publication manifests need — their
+     * numbers are counts and byte sizes. [literal] is the exact text the number was written as, kept so a
+     * caller with a value that must not pass through binary floating point — a market price — can read it
+     * through [decimalOrNull] instead. It is `null` for a [NumberValue] constructed in code rather than
+     * read from a document.
+     */
+    data class NumberValue(val value: Double, val literal: String? = null) : JsonValue {}
+
 
     /** `true` or `false`. */
     data class BooleanValue(val value: Boolean) : JsonValue
@@ -52,6 +63,23 @@ sealed interface JsonValue {
 
     /** The boolean named [name], or `null` when it is absent or of another kind. */
     fun booleanOrNull(name: String): Boolean? = (child(name) as? BooleanValue)?.value
+
+    /**
+     * The exact decimal named [name], or `null` when it is absent or not a number.
+     *
+     * Read from the value's **literal text**, never from the [Double] beside it: a market price such as
+     * `19550.00` has no exact binary floating-point representation, so converting through `Double` would put
+     * an approximation of the price into the arithmetic. A JSON number read from a document always carries
+     * its literal; a [NumberValue] built in code does not, and is reported as absent rather than approximated.
+     *
+     * A JSON **string** is accepted too, because PostgREST returns a `numeric` column either way depending
+     * on how the query is shaped, and both spell the same exact decimal.
+     */
+    fun decimalOrNull(name: String): BigDecimal? = when (val value = child(name)) {
+        is StringValue -> value.value.trim().takeIf { it.isNotEmpty() }?.toBigDecimalOrNull()
+        is NumberValue -> value.literal?.toBigDecimalOrNull()
+        else -> null
+    }
 }
 
 /**
@@ -95,7 +123,7 @@ object JsonReader {
                 'f' -> if (consume("false")) JsonValue.BooleanValue(false) else null
                 'n' -> if (consume("null")) JsonValue.NullValue else null
                 else -> if (character == '-' || character.isDigit()) {
-                    readNumber()?.let { JsonValue.NumberValue(it) }
+                    readNumber()
                 } else {
                     null
                 }
@@ -188,12 +216,16 @@ object JsonReader {
             return null
         }
 
-        private fun readNumber(): Double? {
+        private fun readNumber(): JsonValue? {
             val start = index
             if (peek() == '-') index++
             while (index < text.length && text[index].isNumberCharacter()) index++
             if (index == start) return null
-            return text.substring(start, index).toDoubleOrNull()
+            val literal = text.substring(start, index)
+            val value = literal.toDoubleOrNull() ?: return null
+            // The literal is kept beside the value so a caller that must not round — a market price — can
+            // read the exact digits the service sent rather than their nearest binary approximation.
+            return JsonValue.NumberValue(value, literal)
         }
 
         private fun Char.isNumberCharacter(): Boolean =

@@ -4,7 +4,9 @@ import androidx.annotation.StringRes
 import io.github.towkirahmedrony.salah.core.model.ZakatDebtTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatInventoryBasis
 import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
+import io.github.towkirahmedrony.salah.core.model.ZakatInputs
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
+import io.github.towkirahmedrony.salah.core.model.ZakatMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
@@ -58,15 +60,95 @@ sealed interface ZakatUiState {
         val assetFields: List<ZakatFieldState>,
         /** The liability rows. */
         val liabilityFields: List<ZakatFieldState>,
-        /** The seed date as the user typed it, so the field is a controlled input. */
+        /**
+         * The seed date text, so the field is a controlled input.
+         *
+         * Exactly what the user typed except for its digits, which are rewritten to Western numerals as they
+         * are entered — a Bengali or Arabic keyboard produces digits `LocalDate` cannot read, and the field
+         * shows the date in a form that can be parsed while keeping every separator and letter the user typed.
+         */
         val hawlDateText: String,
         /** True when [hawlDateText] is neither empty nor a date that can be read. */
         val hawlDateInvalid: Boolean,
         val result: ZakatResultView,
+        /**
+         * The published gold and silver reference prices, and whether each could be used.
+         *
+         * Always two entries — gold first, then silver — so the screen renders a stable pair whatever the
+         * availability, rather than a list whose shape changes with the network.
+         */
+        val referencePrices: List<ZakatReferencePriceState>,
+        /** True while a reference-price retrieval is in flight, so the refresh control can say so. */
+        val refreshingReferencePrices: Boolean,
         /** True when something has been entered, so "clear" has something to clear. */
         val canClear: Boolean,
     ) : ZakatUiState
 }
+
+/**
+ * How far one metal's published reference price has got.
+ *
+ * Four states rather than two, because "we have not asked yet", "we asked and there is nothing", "we asked
+ * and could not get an answer" and "we have a rate" are four different things to tell a user, and collapsing
+ * any two of them would state something the app does not know.
+ */
+enum class ZakatReferencePriceStatus {
+    /** The retrieval is in flight. */
+    LOADING,
+
+    /** A published, verified rate is available. */
+    AVAILABLE,
+
+    /** The service answered, and has no rate this app may use. */
+    UNAVAILABLE,
+
+    /** The rate could not be retrieved or could not be used. */
+    FAILED,
+}
+
+/**
+ * One metal's published reference price, as the screen renders it.
+ *
+ * [pricePerGram] and the unit are carried separately for the same reason the result's amounts are: the number
+ * is formatted by one rule and the unit is a phrase by another. [unitLabelRes] holds the phrase and
+ * [currencyCode] the code the record itself states. [sourceLabel], [effectiveLabel], [providerUpdatedLabel],
+ * [fetchedLabel] and [updatedLabel] each say what their value actually is — a source name, a reviewed date, a
+ * provider's own update, or merely when the record was retrieved or last changed — and none of them is
+ * presented as proof that a market price was live at that moment.
+ *
+ * [manuallyEdited] is true when the user has typed their own value into the price field this session; the
+ * screen shows that the published rate is not the figure in force, and offers to restore it.
+ */
+data class ZakatReferencePriceState(
+    val metal: ZakatMetal,
+    @StringRes val metalRes: Int,
+    /** The price field this reference rate stands in for, so the screen can act on it. */
+    val priceField: ZakatFormField,
+    val status: ZakatReferencePriceStatus,
+    @StringRes val statusRes: Int,
+    /** The resource that words "_ per gram", so the unit of the figure is never left implicit. */
+    @StringRes val unitLabelRes: Int,
+    /** The currency code the price is stated in, taken from the record rather than assumed. */
+    val currencyCode: String,
+    /** The reference price per gram, formatted, or `null` when there is no usable published rate. */
+    val pricePerGram: String?,
+    /** The organisation the price came from, when the record names one. Never invented. */
+    val sourceLabel: String?,
+    /** The reviewed/effective date, when the record records one. */
+    val effectiveLabel: String?,
+    /** The provider's own last-update statement, when the record has one. */
+    val providerUpdatedLabel: String?,
+    /** When the record was fetched, when the record has one. */
+    val fetchedLabel: String?,
+    /** When the record was last updated, when the record has one. */
+    val updatedLabel: String?,
+    /** The explanation to show for a state that is not [ZakatReferencePriceStatus.AVAILABLE]. */
+    @StringRes val messageRes: Int?,
+    /** True when the user has typed their own price for this metal this session. */
+    val manuallyEdited: Boolean,
+    /** True when the offered control should be "use the published reference price". */
+    val canRestoreReference: Boolean,
+)
 
 /**
  * The rows a user can type into.
@@ -167,6 +249,14 @@ data class ZakatResultView(
      * Salah knew a price.
      */
     val showsPriceNote: Boolean,
+    /**
+     * The currency the amounts are in, as an ISO code.
+     *
+     * Carried so the screen can state **which** currency the figures beside it are in without appending it
+     * to the formatted amounts themselves: the amount text is the number, unchanged by the code, so an
+     * amount a test pins stays the amount it pins.
+     */
+    val currency: String = ZakatInputs.DEFAULT_CURRENCY,
 )
 
 /**

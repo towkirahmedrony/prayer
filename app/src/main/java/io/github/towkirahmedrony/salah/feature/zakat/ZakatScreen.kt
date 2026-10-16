@@ -134,6 +134,7 @@ private fun ZakatContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ResultCard(state = state)
+        ReferencePricesCard(state = state, viewModel = viewModel)
         AssetsCard(state = state, viewModel = viewModel)
         LiabilitiesCard(state = state, viewModel = viewModel)
         MethodCard(state = state, viewModel = viewModel)
@@ -205,15 +206,21 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
             labelRes = R.string.zakat_result_net,
             value = result.netWealth,
             emphasised = true,
+            currency = result.currency,
         )
-        TotalRow(labelRes = R.string.zakat_result_total_assets, value = result.totalAssets)
-        TotalRow(labelRes = R.string.zakat_result_deductions, value = result.deductions)
+        TotalRow(labelRes = R.string.zakat_result_total_assets, value = result.totalAssets, currency = result.currency)
+        TotalRow(labelRes = R.string.zakat_result_deductions, value = result.deductions, currency = result.currency)
 
         Spacer(modifier = Modifier.height(8.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(8.dp))
 
-        TotalRow(labelRes = R.string.zakat_result_nisab, value = result.nisabAmount, emphasised = true)
+        TotalRow(
+            labelRes = R.string.zakat_result_nisab,
+            value = result.nisabAmount,
+            emphasised = true,
+            currency = result.currency,
+        )
         if (result.nisabGramsLabel != null && result.nisabPriceLabel != null) {
             Text(
                 text = stringResource(
@@ -244,11 +251,22 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = result.due,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            // The amount and the currency beside it: the number keeps the exact text the calculation
+            // produced, and the currency code is a separate piece of data rather than a symbol appended to a
+            // formatted figure.
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = result.due,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(
+                    text = result.currency,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Text(
             text = stringResource(R.string.zakat_result_rate, result.rateLabel),
@@ -313,6 +331,7 @@ private fun TotalRow(
     value: String?,
     modifier: Modifier = Modifier,
     emphasised: Boolean = false,
+    currency: String? = null,
 ) {
     Row(
         modifier = modifier
@@ -326,15 +345,199 @@ private fun TotalRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = value.orEmpty(),
+                style = if (emphasised) {
+                    MaterialTheme.typography.titleMedium
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            // Shown only when there is an amount for it to belong to, so a currency code never floats beside
+            // an absent figure.
+            if (value != null && currency != null) {
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = currency,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// --- Reference prices ----------------------------------------------------------------------------
+
+/**
+ * The published gold and silver reference rates, and where each of them came from.
+ *
+ * Every figure here is data from the published record: a price, a source name, or one of the record's own
+ * timestamps, each named for what it actually is. Nothing is invented, and no timestamp is presented as proof
+ * that a market price was live at that moment — a provider's own update and the moment the record was
+ * retrieved are both statements about the plumbing, and they are labelled as such.
+ *
+ * The card is present whatever the availability, because "there is no published price" is information the
+ * user needs before wondering why the price field is empty.
+ */
+@Composable
+private fun ReferencePricesCard(
+    state: ZakatUiState.Ready,
+    viewModel: ZakatViewModel,
+    modifier: Modifier = Modifier,
+) {
+    SalahSectionCard(modifier = modifier) {
+        SectionHeading(resId = R.string.zakat_price_title)
         Text(
-            text = value.orEmpty(),
-            style = if (emphasised) {
-                MaterialTheme.typography.titleMedium
-            } else {
-                MaterialTheme.typography.bodyMedium
-            },
-            color = MaterialTheme.colorScheme.onSurface,
+            text = stringResource(R.string.zakat_price_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        state.referencePrices.forEach { price ->
+            ReferencePriceRow(price = price, onRestore = viewModel::onRestoreReferencePrice)
+        }
+        TextButton(
+            onClick = viewModel::refreshReferencePrices,
+            enabled = !state.refreshingReferencePrices,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+        ) {
+            Text(
+                text = stringResource(
+                    if (state.refreshingReferencePrices) {
+                        R.string.zakat_price_refreshing
+                    } else {
+                        R.string.zakat_price_refresh
+                    },
+                ),
+            )
+        }
+        Text(
+            text = stringResource(R.string.zakat_price_source_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * One metal's reference price: what it is, what it came from, and whether the user's own figure is in force.
+ *
+ * The price is shown with its unit rather than bare, because a rate without a unit is not a rate; and the
+ * source and the timestamps are shown only when the published record actually carries them.
+ */
+@Composable
+private fun ReferencePriceRow(
+    price: ZakatReferencePriceState,
+    onRestore: (ZakatFormField) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(price.metalRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            SalahStatusPill(
+                text = stringResource(price.statusRes),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val priceText = price.pricePerGram
+        if (priceText != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.zakat_price_per_gram),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = priceText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = stringResource(price.unitLabelRes, price.currencyCode),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        price.sourceLabel?.let { source ->
+            Text(
+                text = stringResource(R.string.zakat_price_source, source),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        price.effectiveLabel?.let { effective ->
+            Text(
+                text = stringResource(R.string.zakat_price_effective, effective),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        price.providerUpdatedLabel?.let { updated ->
+            Text(
+                text = stringResource(R.string.zakat_price_provider_update, updated),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        price.fetchedLabel?.let { fetched ->
+            Text(
+                text = stringResource(R.string.zakat_price_fetched, fetched),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        price.updatedLabel?.let { updated ->
+            Text(
+                text = stringResource(R.string.zakat_price_last_updated, updated),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        price.messageRes?.let { messageRes ->
+            Text(
+                text = stringResource(messageRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (price.manuallyEdited) {
+            Text(
+                text = stringResource(R.string.zakat_price_manual),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (price.canRestoreReference) {
+            TextButton(
+                onClick = { onRestore(price.priceField) },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.zakat_price_restore, stringResource(price.metalRes)),
+                )
+            }
+        }
     }
 }
 
