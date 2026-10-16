@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.localization
 
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -28,9 +29,9 @@ import java.io.File
  * The same treatment was later extended to the two surfaces this change localised: **Tools** and
  * **Settings**. Every `tools_*`, `settings_*`, calculation-option and location string, and every
  * notification string, is asserted to have a non-blank Bengali value written in Bengali script, with
- * its format arguments intact — and a scan of the Tools, Settings, Notifications, Location, Qibla and
- * Ramadan composables asserts none of them renders a hardcoded sentence. Home, the Calendar, Tools and
- * every Settings screen are therefore localised in full, not partially.
+ * its format arguments intact — and a scan of the Tools, Settings, Notifications, Location, Qibla,
+ * Ramadan and Tasbih composables asserts none of them renders a hardcoded sentence. Home, the Calendar,
+ * Tools, every Settings screen and the Tasbih counter are therefore localised in full, not partially.
  */
 class LocalizationResourcesTest {
 
@@ -363,6 +364,68 @@ class LocalizationResourcesTest {
     }
 
     @Test
+    fun `the Tasbih counter's own strings exist in both languages`() {
+        // The counter is a screen of its own with its own words: the reading, its actions, three
+        // confirmations, the target picker, the history and its empty state, and the haptics setting.
+        // Every one of them has to exist in both files, or the screen would be half in one language
+        // whichever is selected — and the note that lists what Salah does not offer is on this list
+        // because the Tasbih row is what changed it.
+        val english = englishStrings()
+        val bengali = bengaliStrings()
+
+        listOf(
+            "tasbih_title",
+            "tasbih_subtitle",
+            "tools_tasbih_description",
+            "tasbih_count_label",
+            "tasbih_count_accessibility",
+            "tasbih_action_count",
+            "tasbih_action_undo",
+            "tasbih_action_reset",
+            "tasbih_action_new_session",
+            "tasbih_reset_dialog_title",
+            "tasbih_reset_dialog_body",
+            "tasbih_reset_dialog_confirm",
+            "tasbih_new_session_dialog_title",
+            "tasbih_new_session_dialog_body",
+            "tasbih_new_session_dialog_confirm",
+            "tasbih_cancel",
+            "tasbih_status_remaining",
+            "tasbih_status_complete",
+            "tasbih_status_complete_continue",
+            "tasbih_target_section_title",
+            "tasbih_target_value",
+            "tasbih_history_title",
+            "tasbih_history_empty",
+            "tasbih_history_clear",
+            "tasbih_history_clear_dialog_body",
+            "tasbih_haptics_title",
+            "tasbih_haptics_body",
+            "tasbih_save_failed",
+            "tools_unavailable_note",
+        ).forEach { key ->
+            assertTrue("$key is missing from the English resources", english.containsKey(key))
+            assertTrue("$key is missing from the Bengali resources", bengali.containsKey(key))
+            assertTrue("$key has an empty English value", english.getValue(key).isNotBlank())
+            assertTrue("$key has an empty Bengali value", bengali.getValue(key).isNotBlank())
+        }
+    }
+
+    @Test
+    fun `the Tools screen's note no longer claims the counter is missing`() {
+        // The note states what Salah does not offer, and the counter is now offered by a row on the same
+        // screen. A note that still listed it would be the screen contradicting itself, in both languages.
+        assertFalse(
+            "the English Tools note still lists Tasbih as absent",
+            englishStrings().getValue("tools_unavailable_note").contains("Tasbih"),
+        )
+        assertFalse(
+            "the Bengali Tools note still lists Tasbih as absent",
+            bengaliStrings().getValue("tools_unavailable_note").contains("তাসবিহ"),
+        )
+    }
+
+    @Test
     fun `the Settings categories and their subpages are named in Bengali`() {
         // The overview draws a row per category and each row opens a screen; the names on the way in
         // and the headings of the screens themselves are the strings a reader navigates with, so they
@@ -538,6 +601,7 @@ class LocalizationResourcesTest {
          */
         val TOOLS_SETTINGS_PREFIXES = listOf(
             "tools_",
+            "tasbih_",
             "settings_",
             "method_",
             "asr_",
@@ -557,6 +621,9 @@ class LocalizationResourcesTest {
          */
         val TOOLS_SETTINGS_LATIN_ONLY = setOf(
             "settings_language_english",
+            // A pair of localised numerals with a separator between them carries no words of its own;
+            // the sentence that reads them is the entry's accessibility description, which is checked.
+            "tasbih_history_values",
             "qibla_location_updated",
             "qibla_coordinates",
             "qibla_location_line",
@@ -572,6 +639,7 @@ class LocalizationResourcesTest {
          */
         val TOOLS_SETTINGS_PACKAGES = listOf(
             "tools",
+            "tasbih",
             "settings",
             "notifications",
             "location",
@@ -604,6 +672,9 @@ class LocalizationResourcesTest {
             "RamadanUiState.kt",
             "RamadanUiStateFactory.kt",
             "RamadanViewModel.kt",
+            "TasbihUiState.kt",
+            "TasbihUiStateFactory.kt",
+            "TasbihViewModel.kt",
         )
 
         /** The `feature` directory, relative to the repository root or the module directory. */

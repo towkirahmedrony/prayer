@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -137,6 +138,67 @@ fun SalahStatusPill(
             style = MaterialTheme.typography.labelMedium,
             color = contentColor,
         )
+    }
+}
+
+/**
+ * A progress track: a filled bar on a muted rail, both rounded to the pill shape Salah uses for its
+ * small status marks.
+ *
+ * ## Why it is drawn here rather than taken from Material
+ *
+ * Material's own progress indicator is a component with its own animation, its own stop indicator and its
+ * own minimum visible fraction; a track that is redrawn several times a second, in either direction, is a
+ * different thing from a determinate progress readout, and Salah wants the plain one. Two nested boxes are
+ * the whole of it, they re-theme with the colour roles like every other surface here, and there is no
+ * behaviour to configure because there is none to get wrong.
+ *
+ * ## Deliberately not animated
+ *
+ * The fraction is drawn where it is, with no interpolated transition. A count is a discrete event the
+ * number beside the bar already states exactly, and a bar that eases towards its new position would spend
+ * part of every count disagreeing with the number. It also means a burst of counts costs nothing but
+ * drawing.
+ *
+ * [fraction] is clamped, so a caller cannot draw a bar wider than its rail or a negative width. A fraction
+ * of zero draws the rail alone.
+ *
+ * [contentDescription] is what a screen reader announces for the track. It is a parameter rather than
+ * something derived, because what the progress *means* belongs to the screen using it — and `null` leaves
+ * the track silent, which is the right answer when the same fact is already stated in words beside it.
+ */
+@Composable
+fun SalahProgressBar(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
+    val safeFraction = fraction.coerceIn(0f, 1f)
+    val description = contentDescription
+    val trackShape = RoundedCornerShape(100.dp)
+
+    Box(
+        modifier = modifier
+            .height(10.dp)
+            .clip(trackShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .then(
+                if (description == null) {
+                    Modifier
+                } else {
+                    Modifier.semantics { contentDescription = description }
+                },
+            ),
+    ) {
+        if (safeFraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(safeFraction)
+                    .fillMaxHeight()
+                    .clip(trackShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
     }
 }
 

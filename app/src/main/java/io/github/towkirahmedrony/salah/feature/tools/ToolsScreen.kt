@@ -27,6 +27,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.ChevronRightGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.TasbihBeadsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 
@@ -43,9 +44,10 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavail
  * does the user want. They are rendered as a single column rather than a grid so a description can be
  * read without wrapping into a tile's width.
  *
- * **What is not here is stated, not implied.** Salah has no Quran, Dua or Tasbih feature, and the note at
- * the bottom says so instead of leaving a user to conclude the tools are hidden somewhere. The list
- * itself contains no disabled row and no placeholder: every entry opens a screen that exists.
+ * **What is not here is stated, not implied.** Salah has no Quran or Dua feature, and the note at the
+ * bottom says so instead of leaving a user to conclude the tools are hidden somewhere. The list itself
+ * contains no disabled row and no placeholder: every entry opens a screen that exists, and the note names
+ * only what is still missing — the Tasbih row is on this screen, so it is no longer on that list.
  *
  * There is no back action: Tools is a top-level destination in the bottom bar, so the system back
  * gesture leaves it the way it leaves Home and Calendar.
@@ -149,5 +151,7 @@ private fun ToolsEntryGlyph(entry: ToolsEntry, tint: Color) {
         ToolsEntry.PRAYER_TIMES -> LanternGlyph(tint = tint)
         ToolsEntry.QIBLA -> QiblaGlyph(tint = tint)
         ToolsEntry.RAMADAN -> RamadanGlyph(tint = tint)
+        // The counter's own mark, not the Tools tab's: see TasbihBeadsGlyph for why the two differ.
+        ToolsEntry.TASBIH -> TasbihBeadsGlyph(tint = tint)
     }
 }

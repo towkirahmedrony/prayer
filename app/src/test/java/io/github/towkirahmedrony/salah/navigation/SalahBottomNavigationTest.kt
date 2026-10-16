@@ -153,6 +153,22 @@ class SalahBottomNavigationTest {
     }
 
     @Test
+    fun `the Tasbih counter is offered as a tool and is not a bottom-bar tab`() {
+        // The counter is reached from Tools and from nowhere else, so its row there is the whole of its
+        // navigation contract: one row, opening a destination that is not a tab the user already has.
+        assertEquals(
+            "no Tools row opens the Tasbih counter",
+            1,
+            ToolsEntry.entries.count { entry -> entry.destination == SalahDestination.TASBIH },
+        )
+        assertFalse(
+            "the counter is a bottom-bar tab, which the user already has",
+            SalahDestination.TASBIH.inBottomBar,
+        )
+        assertEquals("tasbih", SalahDestination.TASBIH.route)
+    }
+
+    @Test
     fun `every screen that was reachable from the bar is still reachable`() {
         // The bar before this change was Home, Prayer, Calendar and Settings. Three of them are still
         // items; Prayer is the one that moved, and it must have moved to Tools rather than nowhere.

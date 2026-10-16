@@ -57,7 +57,7 @@ screen it opens.
 | Qibla | `qibla` | `QiblaScreen` | Bearing to the Kaaba, the sensor in use and its limits |
 | Ramadan | `ramadan` | `RamadanScreen` | The estimated Ramadan window and the daily Sehri and Iftar table |
 
-Every row opens a screen that already existed. The rows are the Settings overview's own pattern
+Every row opens a screen that exists. The rows are the Settings overview's own pattern
 (`SalahSectionCard` with an icon chip, two lines of text and a chevron) so the two lists read as one
 system, and they are a single column rather than a grid so a description is readable without wrapping
 into a tile's width.
@@ -65,8 +65,10 @@ into a tile's width.
 **Deliberately not listed.** A tool row is a navigation control, so a row without somewhere to go would
 be a button that does nothing:
 
-- **Quran, Dua and Tasbih** are not implemented in Salah. The screen says so in one sentence
-  (`tools_unavailable_note`) instead of leaving a user to conclude they are hidden elsewhere.
+- **Quran and Dua** are not implemented in Salah. The screen says so in one sentence
+  (`tools_unavailable_note`) instead of leaving a user to conclude they are hidden elsewhere. The note
+  names only what is still missing, so it stopped mentioning Tasbih when the counter was added
+  (`docs/TASBIH_COUNTER.md`).
 - **Location and prayer notifications** are Settings categories. Listing them again would open the same
   destination from two top-level tabs, which is the duplication this structure exists to avoid.
 - **Prohibited prayer times and today's prayer strip** are content on the Home screen, not screens; the

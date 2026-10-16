@@ -97,7 +97,7 @@ io.github.towkirahmedrony.salah
 │   ├── model/                  Pure data: PrayerName, SolarEvent, PrayerSchedule,
 │   │                           PrayerCalculationMethod/Profile/Settings, LocationInfo,
 │   │                           CalendarSnapshot, ProhibitedPeriod, DataSourceInfo,
-│   │                           ThemeMode, UnavailabilityReason
+│   │                           ThemeMode, UnavailabilityReason, TasbihSession
 │   ├── domain/
 │   │   ├── prayer/             PrayerTimesProvider (port), PrayerScheduleRequest/State
 │   │   ├── prohibited/         ProhibitedWindowKind/RuleSet/RuleBook + ProhibitedPeriodCalculator,
@@ -124,13 +124,15 @@ io.github.towkirahmedrony.salah
 │   │   │                       GeomagneticDeclinationProvider, LocationProvider +
 │   │   │                       LocationPermissionChecker + LocationProviderSelection,
 │   │   │                       QiblaPhase / CalibrationAdvice / QiblaStateReducer
+│   │   ├── tasbih/             Tasbih counter policy, Android-free: TasbihCounter
+│   │   │                       (count / undo / reset / retarget / restart, archiving, retention)
 │   │   ├── location/           Bangladesh location domain, Android-free:
 │   │   │                       BangladeshLocationDataset (parser), BangladeshArea/Level/Ref models,
 │   │   │                       AreaResolver + AreaSelection + AreaResolution,
 │   │   │                       BangladeshLocationPolicy + BangladeshCheck,
 │   │   │                       DeviceFixAdoptionPolicy, LocationSetup, GeoMath, LocationFreshness
 │   │   ├── repository/         Repository interfaces (location, preferences, schedule,
-│   │   │                       calendar, prohibited periods, notification settings)
+│   │   │                       calendar, prohibited periods, notification settings, tasbih)
 │   │   ├── DiagnosticsLogger   Structured diagnostics port + SalahDiagnosticEvents
 │   │   ├── NextPrayerResolver  Pure next-prayer resolution
 │   │   ├── TimeFormatting      Shared clock-format helper (Home + notifications)
@@ -146,6 +148,8 @@ io.github.towkirahmedrony.salah
 │   │                           local-midnight and time-zone refresh, and the conversion of every
 │   │                           day it lays out
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
+│   ├── tasbih/                 DataStoreTasbihRepository + TasbihSessionCodec: the counter's
+│   │                           session, its history and its haptics preference, in the one DataStore
 │   ├── prohibited/             Rule-book-backed repository (documented policy)
 │   ├── qibla/                  Android side of the Qibla feature:
 │   │                           AndroidCompassSensorSource (SensorManager, three sensor families,
@@ -170,6 +174,7 @@ io.github.towkirahmedrony.salah
 │   ├── settings/               Settings state, view model, screen
 │   ├── notifications/          Prayer notification settings state, view model, screen
 │   ├── qibla/                  Qibla state, view model, screen, labels, compass dial
+│   ├── tasbih/                 Tasbih state, state factory, view model, screen, confirmations
 │   └── common/                 PlannedFeatureScreen, LocationFormState, resource mappers
 └── navigation/                 SalahDestination, SalahNavHost, SalahApp
 ```
@@ -199,8 +204,10 @@ Enforced rules:
    only.
 2. **ViewModels contain no astronomical or calendar computation.** `NextPrayerResolver`,
    `CountdownFormatter` and `ProhibitedPeriodCalculator` live in `core/domain` and are pure.
-3. **UI never formats dates or counts down by itself.** Formatting happens in
-   `HomeUiStateFactory`; the countdown is a string produced from a resolved `Duration`.
+3. **UI never formats dates, numbers or countdowns by itself.** Formatting happens in the state
+   factories — `HomeUiStateFactory`, `RamadanUiStateFactory`, `CalendarUiStateFactory`,
+   `TasbihUiStateFactory` — which need no `Context` and are unit-tested directly; the countdown is a
+   string produced from a resolved `Duration`.
 4. **Business logic depends on interfaces** (`PrayerTimesProvider`, `PrayerScheduleRepository`, …),
    never on a concrete client. The only place the Adhan engine is named outside its own file is
    `di/SalahModules.kt`.

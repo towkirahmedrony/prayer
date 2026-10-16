@@ -18,9 +18,9 @@ import io.github.towkirahmedrony.salah.navigation.SalahDestination
  * not a bottom-bar tab the user already has.
  *
  * Only features the repository actually implements are listed. Every entry below opens a screen that
- * already existed before Tools became a destination, which is why there is no Quran, Dua or Tasbih row:
- * Salah has no such feature, and a row for one would be a button that opens nothing. The screen states
- * that absence rather than filling the space.
+ * exists, which is why there is no Quran or Dua row: Salah has no such feature, and a row for one would be
+ * a button that opens nothing. The screen states that absence rather than filling the space — and states
+ * only what is still absent, which is why the note no longer mentions Tasbih: that row is now here.
  *
  * **Why the prayer screen is here.** Prayer used to be a bottom-bar item, and it is still the only place
  * the live prayer period and the full timetable are shown together. Removing the tab without a row here
@@ -52,6 +52,19 @@ enum class ToolsEntry(
         destination = SalahDestination.RAMADAN,
         titleRes = R.string.nav_ramadan,
         descriptionRes = R.string.shortcut_ramadan_subtitle,
+    ),
+
+    /**
+     * The counting screen: a count, a target, and the history of finished sessions.
+     *
+     * Its own name rather than a shared `shortcut_`, because there is no other row that opens it — the Home
+     * daily-tools row does not carry a Tasbih tile, and adding one is a change to Home that this phase did
+     * not make. The row is the counter's only way in, which is what the Tools screen is for.
+     */
+    TASBIH(
+        destination = SalahDestination.TASBIH,
+        titleRes = R.string.tasbih_title,
+        descriptionRes = R.string.tools_tasbih_description,
     ),
     ;
 }

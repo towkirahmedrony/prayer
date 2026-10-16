@@ -220,8 +220,13 @@ class CalendarFormatting {
      * Only the digits the platform left in Western form are replaced, and Bengali and Arabic-Indic
      * digits are already outside `'0'..'9'`, so a string that arrives correctly localised is returned
      * unchanged. That is what makes this safe to apply to platform output on both Android and the JVM.
+     *
+     * Public because the rule is Salah's, not the calendar's: a *time* the platform formatted has the
+     * same problem as a date, and the Tasbih history renders one beside a date it formats here. Widening
+     * it is preferable to a second copy of the script-to-table choice, which is the thing that would
+     * drift — see [numerals] for the same reasoning about numbers.
      */
-    private fun localizeDigits(text: String, locale: Locale): String = when (locale.language) {
+    fun localizeDigits(text: String, locale: Locale): String = when (locale.language) {
         BANGLA_LANGUAGE -> BanglaNumerals.substitute(text)
         ARABIC_LANGUAGE -> ArabicNumerals.substitute(text)
         else -> text

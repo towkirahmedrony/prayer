@@ -188,7 +188,70 @@
     <string name="tools_subtitle">Prayer and worship tools available in Salah.</string>
     <string name="tools_prayer_times_title">Prayer times</string>
     <string name="tools_prayer_times_description">The current prayer period and today\'s full timetable</string>
-    <string name="tools_unavailable_note">Quran, Dua and Tasbih are not part of Salah yet, so they are not listed here. Every tool above opens a real screen.</string>
+    <string name="tools_unavailable_note">Quran and Dua are not part of Salah yet, so they are not listed here. Every tool above opens a real screen.</string>
+    <string name="tools_tasbih_description">Count with a target, and keep a history of finished sessions</string>
+
+    <!--
+      Tasbih: the counting screen and its session history.
+
+      The counter counts and records; it carries no dhikr text, no wording to recite and no claim about
+      how many times anything should be said. Every string below is about counting, a target, or a saved
+      session, and none of them states or implies religious content — see docs/TASBIH_COUNTER.md §1.
+
+      The numbers that appear inside these phrases are the app's localised numerals, formatted before they
+      reach here, so a Bengali screen reads "৩৩" wherever an English one reads "33".
+    -->
+    <string name="tasbih_title">Tasbih counter</string>
+    <string name="tasbih_subtitle">Count on this device. Nothing is sent anywhere.</string>
+    <string name="tasbih_back">Back</string>
+    <string name="tasbih_count_label">Current count</string>
+    <string name="tasbih_count_accessibility">Current count %1$s, target %2$s</string>
+    <string name="tasbih_progress_accessibility">Progress towards the target</string>
+    <string name="tasbih_status_remaining">%1$s to go</string>
+    <string name="tasbih_status_complete">Target reached</string>
+    <string name="tasbih_status_complete_continue">Keep counting if you wish — Salah does not stop at the target.</string>
+    <string name="tasbih_action_count">Count</string>
+    <string name="tasbih_action_undo">Undo</string>
+    <string name="tasbih_action_reset">Reset count</string>
+    <string name="tasbih_action_new_session">New session</string>
+
+    <!-- The two confirmations. Neither action can be reached without passing through one of them. -->
+    <string name="tasbih_reset_dialog_title">Reset the count?</string>
+    <string name="tasbih_reset_dialog_body">The count returns to zero. The target stays as it is, and nothing is added to the history.</string>
+    <string name="tasbih_reset_dialog_confirm">Reset</string>
+    <string name="tasbih_new_session_dialog_title">Start a new session?</string>
+    <string name="tasbih_new_session_dialog_body">This session is saved to the history and a new one begins at zero, keeping the same target.</string>
+    <string name="tasbih_new_session_dialog_confirm">Start</string>
+    <string name="tasbih_cancel">Cancel</string>
+
+    <!-- The target picker. -->
+    <string name="tasbih_target_section_title">Target</string>
+    <string name="tasbih_target_section_body">How many counts this session is counting towards. Changing it never changes the count.</string>
+    <!-- The target, named. Used both as the line under the count and as an option's description. -->
+    <string name="tasbih_target_value">Target %1$s</string>
+
+    <!-- The session history. -->
+    <string name="tasbih_history_title">History</string>
+    <string name="tasbih_history_retention">Salah keeps the most recent %1$s finished sessions.</string>
+    <string name="tasbih_history_empty">No finished sessions yet. Starting a new session saves the one you are counting into this list.</string>
+    <!--
+      The count and target a finished session ended on, as a pair of localised numerals. A separator rather
+      than a phrase, like the timetable's own time range: the words are in the entry's accessibility
+      description below, which is where they can be read as a sentence.
+    -->
+    <string name="tasbih_history_values">%1$s / %2$s</string>
+    <string name="tasbih_history_completed">Reached the target</string>
+    <string name="tasbih_history_incomplete">Target not reached</string>
+    <string name="tasbih_history_entry_accessibility">Session from %1$s, count %2$s of target %3$s, %4$s</string>
+    <string name="tasbih_history_clear">Clear history</string>
+    <string name="tasbih_history_clear_dialog_title">Clear the history?</string>
+    <string name="tasbih_history_clear_dialog_body">Every finished session is removed from this device. The count in progress is not affected.</string>
+    <string name="tasbih_history_clear_dialog_confirm">Clear</string>
+
+    <!-- Haptics. Optional, on by default, and never required for counting. -->
+    <string name="tasbih_haptics_title">Haptic feedback</string>
+    <string name="tasbih_haptics_body">A short vibration on each count, where the device supports it. Counting works the same with it off.</string>
+    <string name="tasbih_save_failed">That change could not be saved to this device.</string>
 
     <!-- Calculation methods (names of the conventions the local engine implements) -->
     <string name="method_karachi">University of Islamic Sciences, Karachi</string>

@@ -11,7 +11,7 @@ import io.github.towkirahmedrony.salah.R
  *
  * The bottom bar shows Home, Calendar, Tools and Settings. Qibla and Ramadan are available from the
  * Tools screen and from the Home screen's daily tools; the Prayer screen is reached from Tools and
- * from Home's "View all" and "View details".
+ * from Home's "View all" and "View details", and the Tasbih counter from Tools alone.
  *
  * Settings is an overview of categories rather than a list of every preference, so each category is
  * a destination of its own: the four declared below, plus prayer notifications, location and the
@@ -96,6 +96,17 @@ enum class SalahDestination(
     LOCATION("location", R.string.nav_location, inBottomBar = false),
 
     QIBLA("qibla", R.string.shortcut_qibla, inBottomBar = false),
+
+    /**
+     * The Tasbih counter: the count, the target, and the history of finished sessions.
+     *
+     * A tool rather than a tab, and reached from the Tools screen alone. Counting is something a user
+     * opens when they mean to count and leaves when they are done — it is not a place to dwell, and it has
+     * no time or date on it that would go stale while it was not being looked at. Its state is kept anyway,
+     * because the one thing a counter must survive is the user leaving the screen mid-count. See
+     * `docs/TASBIH_COUNTER.md`.
+     */
+    TASBIH("tasbih", R.string.tasbih_title, inBottomBar = false),
     ;
 
     companion object {

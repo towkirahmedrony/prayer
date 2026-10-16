@@ -117,6 +117,44 @@ fun TasbihGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifi
     drawLine(tint, Offset(12f, 18.5f), Offset(12f, 22f), strokeWidth = 2.2f)
 }
 
+/**
+ * The Tasbih counter's own mark: a ring of beads with a tassel.
+ *
+ * Separate from [TasbihGlyph] rather than shared with it. That glyph is the *Tools tab's* mark in the
+ * bottom bar, and drawing it again on the Tools screen's Tasbih row would put the tab's own icon on one of
+ * the tab's rows — a reader would reasonably conclude that the row goes back where they came from. This
+ * one is the counter: the beads are drawn individually so the mark reads as something being counted rather
+ * than as a closed loop, and the tassel is what makes it a misbaha at a glance and not a clock face.
+ *
+ * Same canvas language as every other glyph in this file — a 24-unit box, scaled to the size the caller
+ * gives it, painted in the caller's tint — so it re-themes with the rest of the design system and adds no
+ * icon dependency.
+ */
+@Composable
+fun TasbihBeadsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val centre = Offset(12f, 11.5f)
+    repeat(COUNTING_BEADS) { index ->
+        // The first bead sits at the top, so the ring has a clear "start" and the tassel hangs opposite it.
+        val angle = (2.0 * PI * index / COUNTING_BEADS) - (PI / 2.0)
+        drawCircle(
+            color = tint,
+            radius = 1.8f,
+            center = Offset(
+                x = centre.x + (BEAD_RING_RADIUS * cos(angle)).toFloat(),
+                y = centre.y + (BEAD_RING_RADIUS * sin(angle)).toFloat(),
+            ),
+        )
+    }
+    // The tassel, drawn clear of the lowest bead rather than through it.
+    drawLine(tint, Offset(12f, 20.5f), Offset(12f, 22.5f), strokeWidth = 1.6f)
+}
+
+/** How many beads the counter's mark is drawn with — enough to read as a strand at 24dp. */
+private const val COUNTING_BEADS = 8
+
+/** Radius of the bead ring in the glyph's own 24-unit box. */
+private const val BEAD_RING_RADIUS = 7.5f
+
 @Composable
 fun GearGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
     drawCircle(tint, radius = 8f, center = Offset(12f, 12f), style = Stroke(width = 1.7f))

@@ -405,7 +405,59 @@
     <string name="tools_subtitle">সালাহতে উপলব্ধ নামাজ ও ইবাদতের টুল।</string>
     <string name="tools_prayer_times_title">নামাজের সময়সূচি</string>
     <string name="tools_prayer_times_description">বর্তমান নামাজের ওয়াক্ত ও আজকের সম্পূর্ণ সময়সূচি</string>
-    <string name="tools_unavailable_note">কুরআন, দুআ ও তাসবিহ এখনও সালাহর অংশ নয়, তাই এগুলো এখানে তালিকাভুক্ত করা হয়নি। উপরের প্রতিটি টুল একটি প্রকৃত স্ক্রিন খোলে।</string>
+    <string name="tools_unavailable_note">কুরআন ও দুআ এখনও সালাহর অংশ নয়, তাই এগুলো এখানে তালিকাভুক্ত করা হয়নি। উপরের প্রতিটি টুল একটি প্রকৃত স্ক্রিন খোলে।</string>
+    <string name="tools_tasbih_description">লক্ষ্য ঠিক করে গণনা করুন, আর শেষ হওয়া সেশনগুলোর হিসাব রাখুন</string>
+
+    <!--
+      তাসবিহ: গণনার স্ক্রিন ও সেশনের হিসাব।
+
+      কাউন্টার শুধু গুনে রাখে। এখানে কোনো জিকিরের পাঠ, উচ্চারণের লেখা বা কতবার বলতে হবে এমন কোনো
+      দাবি নেই — বিস্তারিত docs/TASBIH_COUNTER.md §1-এ।
+
+      বাক্যের ভেতরের সংখ্যাগুলো আগেই স্থানীয় অঙ্কে রূপান্তরিত হয়ে আসে, তাই বাংলা স্ক্রিনে যেখানে ইংরেজিতে
+      "33" থাকে সেখানে "৩৩" দেখা যায়।
+    -->
+    <string name="tasbih_title">তাসবিহ কাউন্টার</string>
+    <string name="tasbih_subtitle">এই ডিভাইসেই গণনা করুন। কোথাও কিছু পাঠানো হয় না।</string>
+    <string name="tasbih_back">ফিরে যান</string>
+    <string name="tasbih_count_label">বর্তমান গণনা</string>
+    <string name="tasbih_count_accessibility">বর্তমান গণনা %1$s, লক্ষ্য %2$s</string>
+    <string name="tasbih_progress_accessibility">লক্ষ্যের দিকে অগ্রগতি</string>
+    <string name="tasbih_status_remaining">%1$s বাকি</string>
+    <string name="tasbih_status_complete">লক্ষ্য পূর্ণ হয়েছে</string>
+    <string name="tasbih_status_complete_continue">ইচ্ছে হলে গণনা চালিয়ে যান — লক্ষ্যে সালাহ থেমে যায় না।</string>
+    <string name="tasbih_action_count">গণনা</string>
+    <string name="tasbih_action_undo">ফিরিয়ে নিন</string>
+    <string name="tasbih_action_reset">গণনা রিসেট করুন</string>
+    <string name="tasbih_action_new_session">নতুন সেশন</string>
+
+    <string name="tasbih_reset_dialog_title">গণনা রিসেট করবেন?</string>
+    <string name="tasbih_reset_dialog_body">গণনা শূন্যে ফিরে যাবে। লক্ষ্য আগের মতোই থাকবে, আর হিসাবে কিছু যোগ হবে না।</string>
+    <string name="tasbih_reset_dialog_confirm">রিসেট</string>
+    <string name="tasbih_new_session_dialog_title">নতুন সেশন শুরু করবেন?</string>
+    <string name="tasbih_new_session_dialog_body">এই সেশনটি হিসাবে সংরক্ষিত হবে এবং একই লক্ষ্য নিয়ে শূন্য থেকে নতুন একটি সেশন শুরু হবে।</string>
+    <string name="tasbih_new_session_dialog_confirm">শুরু করুন</string>
+    <string name="tasbih_cancel">বাতিল</string>
+
+    <string name="tasbih_target_section_title">লক্ষ্য</string>
+    <string name="tasbih_target_section_body">এই সেশনটি কত গণনার দিকে এগোবে। লক্ষ্য বদলালে গণনার সংখ্যা বদলায় না।</string>
+    <string name="tasbih_target_value">লক্ষ্য %1$s</string>
+
+    <string name="tasbih_history_title">হিসাব</string>
+    <string name="tasbih_history_retention">সালাহ সর্বশেষ %1$sটি সম্পন্ন সেশন সংরক্ষণ করে।</string>
+    <string name="tasbih_history_empty">এখনও কোনো সম্পন্ন সেশন নেই। নতুন সেশন শুরু করলে আপনি যেটি গণনা করছেন সেটি এই তালিকায় সংরক্ষিত হবে।</string>
+    <string name="tasbih_history_values">%1$s / %2$s</string>
+    <string name="tasbih_history_completed">লক্ষ্য পূর্ণ হয়েছে</string>
+    <string name="tasbih_history_incomplete">লক্ষ্য পূর্ণ হয়নি</string>
+    <string name="tasbih_history_entry_accessibility">%1$s তারিখের সেশন, গণনা %2$s, লক্ষ্য %3$s, %4$s</string>
+    <string name="tasbih_history_clear">হিসাব মুছে ফেলুন</string>
+    <string name="tasbih_history_clear_dialog_title">হিসাব মুছে ফেলবেন?</string>
+    <string name="tasbih_history_clear_dialog_body">সম্পন্ন সব সেশন এই ডিভাইস থেকে মুছে যাবে। চলমান গণনা এতে প্রভাবিত হবে না।</string>
+    <string name="tasbih_history_clear_dialog_confirm">মুছে ফেলুন</string>
+
+    <string name="tasbih_haptics_title">স্পর্শ-কম্পন</string>
+    <string name="tasbih_haptics_body">ডিভাইসে সমর্থিত হলে প্রতি গণনায় ছোট একটি কম্পন হবে। বন্ধ রাখলেও গণনা একইভাবে কাজ করে।</string>
+    <string name="tasbih_save_failed">পরিবর্তনটি এই ডিভাইসে সংরক্ষণ করা যায়নি।</string>
 
     <!--
       Settings: Appearance. The theme is the only appearance preference, offered as three named modes.

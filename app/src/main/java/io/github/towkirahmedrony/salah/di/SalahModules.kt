@@ -55,6 +55,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.TasbihRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
@@ -85,6 +86,7 @@ import io.github.towkirahmedrony.salah.data.prayerconfig.FilePrayerConfigStore
 import io.github.towkirahmedrony.salah.data.prayerconfig.remote.SupabaseRemotePrayerConfigSource
 import io.github.towkirahmedrony.salah.data.prayerconfig.sync.FilePrayerConfigSyncStateStore
 import io.github.towkirahmedrony.salah.data.prohibited.RuleBookProhibitedPeriodsRepository
+import io.github.towkirahmedrony.salah.data.tasbih.DataStoreTasbihRepository
 import io.github.towkirahmedrony.salah.data.qibla.AndroidCompassSensorSource
 import io.github.towkirahmedrony.salah.data.qibla.AndroidGeomagneticDeclinationProvider
 import io.github.towkirahmedrony.salah.data.qibla.AndroidLocationPermissionChecker
@@ -102,6 +104,8 @@ import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanUiStateFactory
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanViewModel
 import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
+import io.github.towkirahmedrony.salah.feature.tasbih.TasbihUiStateFactory
+import io.github.towkirahmedrony.salah.feature.tasbih.TasbihViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -312,6 +316,20 @@ val salahModules = module {
     single<PrayerNotificationPreferencesRepository> {
         DataStorePrayerNotificationPreferencesRepository(get())
     }
+
+    // Tasbih counter ----------------------------------------------------------
+    // The counter's session, its history and its haptics preference are stored in the *same* single
+    // DataStore as every other preference, under the counter's own keys. No second file is created for
+    // them: a session is not large enough or hot enough to justify one, and keeping the app's own data in
+    // one place is what makes the backup rules and the corruption story single answers. See
+    // DataStoreTasbihRepository for why the settings repository was not simply extended instead.
+    //
+    // The binding is against the port, so the screen could be driven by a fake while the app runs against
+    // the store — and so the counter's storage could be moved without touching the view model.
+    single<TasbihRepository> { DataStoreTasbihRepository(dataStore = get(), clock = get()) }
+    // The same CalendarFormatting instance every other screen formats through, so the numerals on the
+    // counter's history are written by the one rule the dates beside them were.
+    single { TasbihUiStateFactory(formatting = get()) }
 
     // Start-up snapshot -------------------------------------------------------
     // The two values the location gate and Home need before they can render anything correct, read
@@ -584,6 +602,17 @@ val salahModules = module {
             coordinator = get(),
             soundPreviewer = get(),
             azanPlayback = get(),
+        )
+    }
+    // The Tasbih counter's one view model, and the only holder of its state. The counter is not read by
+    // Home, the reminders or anything else, so there is nothing that could end up with a second copy of a
+    // session to disagree with this one.
+    viewModel {
+        TasbihViewModel(
+            repository = get(),
+            userPreferencesRepository = get(),
+            uiStateFactory = get(),
+            clock = get(),
         )
     }
 }

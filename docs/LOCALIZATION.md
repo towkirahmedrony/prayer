@@ -348,14 +348,18 @@ label:
 
 A hardcoded sentence in a composable, which was one of Home's three causes (§10), was **not** found on
 any of these screens: the audit scanned every composable under `tools`, `settings`, `notifications`,
-`location`, `qibla`, `ramadan` and `common` for a rendered literal, and the only literals with a space
+`location`, `qibla`, `ramadan`, `tasbih` and `common` for a rendered literal, and the only literals with a space
 are a separator (`" · "`) and a space (`" "`), not copy. So the fix here really was the resources — and
 the test that now guards that (below) makes a pasted sentence a failure rather than a silent one.
 
 ### What was localised
 
-* **Tools** — the heading, its description, all three tool rows (name and one-line description), and the
-  note that states Quran, Dua and Tasbih are not part of Salah yet.
+* **Tools** — the heading, its description, every tool row (name and one-line description), and the
+  note that states what Salah does not yet offer.
+* **The Tasbih counter** — the whole screen: the reading and its target, the four actions, three
+  confirmation dialogs, the target picker, the haptics setting, the history, its empty state, its retention
+  sentence, and every accessibility description. Counts and timestamps are rendered in the interface
+  language's numerals through the same rule the calendar uses — see `docs/TASBIH_COUNTER.md` §9.
 * **The Tools destinations** — the Prayer screen (already covered by the Home keys), the whole Qibla
   screen and the whole Ramadan screen, including their explanatory paragraphs, error descriptions, the
   manual-coordinate form and the accessibility descriptions of the dial.

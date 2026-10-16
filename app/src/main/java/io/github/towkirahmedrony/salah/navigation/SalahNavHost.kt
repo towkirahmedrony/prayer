@@ -19,6 +19,7 @@ import io.github.towkirahmedrony.salah.feature.settings.SettingsAppearanceScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsGeneralScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsPrayerTimesScreen
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
+import io.github.towkirahmedrony.salah.feature.tasbih.TasbihScreen
 import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
 
 /**
@@ -90,6 +91,13 @@ fun SalahNavHost(
 
         composable(SalahDestination.QIBLA.route) {
             QiblaScreen()
+        }
+
+        // The Tasbih counter. Opened from the Tools screen and left by the back gesture, which returns to
+        // Tools through the same `popBackStack` every other tool uses — there is no second back stack, so a
+        // repeated visit cannot leave a duplicate of the counter behind.
+        composable(SalahDestination.TASBIH.route) {
+            TasbihScreen(onBack = { navController.popBackStack() })
         }
 
         // Settings: the overview, then one destination per category. Each category screen is declared
