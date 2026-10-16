@@ -174,7 +174,6 @@ fun SalahProgressBar(
     contentDescription: String? = null,
 ) {
     val safeFraction = fraction.coerceIn(0f, 1f)
-    val description = contentDescription
     val trackShape = RoundedCornerShape(100.dp)
 
     Box(
@@ -182,13 +181,7 @@ fun SalahProgressBar(
             .height(10.dp)
             .clip(trackShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .then(
-                if (description == null) {
-                    Modifier
-                } else {
-                    Modifier.semantics { contentDescription = description }
-                },
-            ),
+            .describedAs(contentDescription),
     ) {
         if (safeFraction > 0f) {
             Box(
@@ -201,6 +194,18 @@ fun SalahProgressBar(
         }
     }
 }
+
+/**
+ * Applies [text] as this node's semantic description, or leaves the node silent when it is `null`.
+ *
+ * A helper rather than an inline `semantics { }` because of a name-resolution footgun: inside a lambda with
+ * a receiver, a local declaration of the same name wins over the receiver's own property. Writing
+ * `semantics { contentDescription = contentDescription }` beside a parameter called `contentDescription`
+ * therefore binds the left-hand side to the *parameter* — which is a value and cannot be assigned. Naming
+ * the parameter `text` here removes the ambiguity instead of relying on which of the two Kotlin picks.
+ */
+private fun Modifier.describedAs(text: String?): Modifier =
+    if (text == null) this else semantics { contentDescription = text }
 
 /**
  * Explains why a section has no data.

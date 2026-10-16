@@ -477,10 +477,11 @@ private fun TargetChip(
                     MaterialTheme.colorScheme.surfaceVariant
                 },
             )
+            // `selectable` carries no `onClickLabel` of its own, so the option's meaning is stated once, by
+            // the semantics below — which is also the node a screen reader reads when the chip is focused.
             .selectable(
                 selected = choice.selected,
                 role = Role.RadioButton,
-                onClickLabel = choiceDescription,
                 onClick = { onSelect(choice.target) },
             )
             .semantics { contentDescription = choiceDescription }

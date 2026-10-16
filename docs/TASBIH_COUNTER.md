@@ -140,6 +140,11 @@ because a second store could disagree with the first (`di/SalahModules.kt`). `Da
 the counter adds only the counter's own keys, and leaves the theme, the calculation settings and the interface
 language exactly where they were.
 
+The counter's session and history are therefore covered by Salah's existing backup configuration, which
+includes `file/datastore/` wholesale (`app/src/main/res/xml/backup_rules.xml`). A device transfer carries the
+count and the history across, which is the intended outcome: they are the user's own data, the counter is
+still not an account system, and there is nothing to sign in to.
+
 The counter is *not* folded into `DataStoreUserPreferencesRepository` either. That class is the settings
 repository — options a user chooses once — while the active session is the data a screen is built around. The
 two share the store, which is what keeps "one file" true; they do not share a class, which is what keeps each
