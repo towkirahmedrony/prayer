@@ -97,7 +97,7 @@ io.github.towkirahmedrony.salah
 │   ├── model/                  Pure data: PrayerName, SolarEvent, PrayerSchedule,
 │   │                           PrayerCalculationMethod/Profile/Settings, LocationInfo,
 │   │                           CalendarSnapshot, ProhibitedPeriod, DataSourceInfo,
-│   │                           ThemeMode, UnavailabilityReason, TasbihSession
+│   │                           ThemeMode, UnavailabilityReason, TasbihSession, Zakat
 │   ├── domain/
 │   │   ├── prayer/             PrayerTimesProvider (port), PrayerScheduleRequest/State
 │   │   ├── prohibited/         ProhibitedWindowKind/RuleSet/RuleBook + ProhibitedPeriodCalculator,
@@ -179,6 +179,7 @@ io.github.towkirahmedrony.salah
 │   ├── notifications/          Prayer notification settings state, view model, screen
 │   ├── qibla/                  Qibla state, view model, screen, labels, compass dial
 │   ├── tasbih/                 Tasbih state, state factory, view model, screen, confirmations
+│   ├── zakat/                  Zakat form, state factory, view model, screen, methodology choices
 │   └── common/                 PlannedFeatureScreen, LocationFormState, resource mappers
 └── navigation/                 SalahDestination, SalahNavHost, SalahApp
 ```
@@ -210,7 +211,7 @@ Enforced rules:
    `CountdownFormatter` and `ProhibitedPeriodCalculator` live in `core/domain` and are pure.
 3. **UI never formats dates, numbers or countdowns by itself.** Formatting happens in the state
    factories — `HomeUiStateFactory`, `RamadanUiStateFactory`, `CalendarUiStateFactory`,
-   `TasbihUiStateFactory` — which need no `Context` and are unit-tested directly; the countdown is a
+   `TasbihUiStateFactory`, `ZakatUiStateFactory` — which need no `Context` and are unit-tested directly; the countdown is a
    string produced from a resolved `Duration`.
 4. **Business logic depends on interfaces** (`PrayerTimesProvider`, `PrayerScheduleRepository`, …),
    never on a concrete client. The only place the Adhan engine is named outside its own file is

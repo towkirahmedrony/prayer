@@ -134,12 +134,25 @@ class ZakatViewModel(
         private const val MAX_DECIMAL_PLACES = 12
 
         /**
-         * Keeps what a numeric field can hold and drops the rest.
+         * Keeps what a numeric field can hold and drops the rest, writing every digit in Western form.
          *
-         * A filter rather than a validation, so the field never contains something it cannot represent: pasting
-         * `12,000.50` yields `12000.50`, a second decimal point is ignored, and a stray letter never reaches the
-         * form. A negative sign is dropped too — no amount in this feature can be negative, and letting one in
-         * only to reject it later would report an error where a correction is what is wanted.
+         * A filter rather than a validation, so the field never contains something it cannot be turned into a
+         * number: pasting `12,000.50` yields `12000.50`, a second decimal point is ignored, and a stray letter
+         * never reaches the form. A negative sign is dropped too — no amount in this feature can be negative, and
+         * letting one in only to reject it later would report an error where a correction is what is wanted.
+         *
+         * ## Why the digits are rewritten
+         *
+         * A Bengali keyboard produces Bengali numerals, and so does an Arabic one. `BigDecimal` reads neither, so
+         * a user typing `১২৫০০` on their own keyboard would be told their number is not a number — an error about
+         * the interface rather than about what they typed. Every digit in the ranges below is therefore mapped to
+         * its Western equivalent as it is typed, and the field shows `12500` while the user's keyboard is still
+         * Bengali. The *display* of amounts stays in the interface language's numerals, which is a separate rule
+         * applied by [ZakatUiStateFactory].
+         *
+         * The mapping is arithmetic rather than a lookup table: each of these ranges is ten consecutive code
+         * points in ascending digit order, so the offset within the range *is* the digit. A table would be ten
+         * numbers per script with the chance of a typo in any of them.
          *
          * What survives is still *text*, and it is still the factory that decides whether it is a number: the
          * filter makes typing pleasant, and [io.github.towkirahmedrony.salah.core.model.ZakatMoney.parse] remains
@@ -151,14 +164,15 @@ class ZakatViewModel(
             var decimals = 0
 
             value.forEach { character ->
+                val digit = westernDigit(character)
                 when {
-                    character.isDigit() && (!seenPoint || decimals < MAX_DECIMAL_PLACES) -> {
-                        builder.append(character)
+                    digit != null && (!seenPoint || decimals < MAX_DECIMAL_PLACES) -> {
+                        builder.append(digit)
                         if (seenPoint) decimals += 1
                     }
 
                     character == '.' && !seenPoint && builder.isNotEmpty() -> {
-                        builder.append(character)
+                        builder.append('.')
                         seenPoint = true
                     }
 
@@ -166,6 +180,19 @@ class ZakatViewModel(
                 }
             }
             return builder.toString()
+        }
+
+        /**
+         * [character] as a Western digit, or `null` when it is not a digit in any script this field accepts.
+         *
+         * Western, Bengali (U+09E6) and Arabic-Indic (U+0660) are the three scripts Salah's own language support
+         * can produce, which is why they are the three mapped.
+         */
+        private fun westernDigit(character: Char): Char? = when (character) {
+            in '0'..'9' -> character
+            in '\u09E6'..'\u09EF' -> '0' + (character - '\u09E6')
+            in '\u0660'..'\u0669' -> '0' + (character - '\u0660')
+            else -> null
         }
     }
 }
