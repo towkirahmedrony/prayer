@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
+import io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
