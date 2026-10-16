@@ -149,6 +149,30 @@ fun TasbihBeadsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, m
     drawLine(tint, Offset(12f, 20.5f), Offset(12f, 22.5f), strokeWidth = 1.6f)
 }
 
+/**
+ * The Zakat calculator's mark: a balance, chosen for what it says and for what it does not.
+ *
+ * A scale reads as *weighing* and *measuring* — which is what this screen does — without making a claim
+ * about worship. Salah carries no religious content for this feature (see `docs/ZAKAT_METHODOLOGY.md` §1),
+ * and a devotional motif would be a claim this project is not in a position to make.
+ *
+ * Same canvas language as every other glyph here: a 24-unit box, scaled to the size the caller gives it,
+ * painted in the caller's tint, so it re-themes with the design system and adds no icon dependency.
+ */
+@Composable
+fun ZakatScaleGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    // The post and its base.
+    drawLine(tint, Offset(12f, 3.5f), Offset(12f, 20.5f), strokeWidth = 1.8f)
+    drawLine(tint, Offset(8f, 21f), Offset(16f, 21f), strokeWidth = 1.8f)
+    // The beam.
+    drawLine(tint, Offset(4.5f, 6.5f), Offset(19.5f, 6.5f), strokeWidth = 1.8f)
+    // Two cords, and the two pans they carry.
+    drawLine(tint, Offset(4.5f, 6.5f), Offset(4.5f, 10f), strokeWidth = 1.4f)
+    drawLine(tint, Offset(2.5f, 10.5f), Offset(6.5f, 10.5f), strokeWidth = 1.8f)
+    drawLine(tint, Offset(19.5f, 6.5f), Offset(19.5f, 10f), strokeWidth = 1.4f)
+    drawLine(tint, Offset(17.5f, 10.5f), Offset(21.5f, 10.5f), strokeWidth = 1.8f)
+}
+
 /** How many beads the counter's mark is drawn with — enough to read as a strand at 24dp. */
 private const val COUNTING_BEADS = 8
 

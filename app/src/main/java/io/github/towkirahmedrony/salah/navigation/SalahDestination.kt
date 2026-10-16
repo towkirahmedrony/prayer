@@ -107,6 +107,15 @@ enum class SalahDestination(
      * `docs/TASBIH_COUNTER.md`.
      */
     TASBIH("tasbih", R.string.tasbih_title, inBottomBar = false),
+
+    /**
+     * The Zakat calculator: the wealth the user enters, the methodology they chose, and the working.
+     *
+     * A tool rather than a tab, reached from the Tools screen alone. zakat is assessed once a lunar year,
+     * so a permanent tab would be a permanent prompt for something that is due annually — and the screen
+     * keeps nothing, so there is no state a tab would be preserving. See `docs/ZAKAT_METHODOLOGY.md`.
+     */
+    ZAKAT("zakat", R.string.zakat_title, inBottomBar = false),
     ;
 
     companion object {

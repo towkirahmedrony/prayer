@@ -66,5 +66,17 @@ enum class ToolsEntry(
         titleRes = R.string.tasbih_title,
         descriptionRes = R.string.tools_tasbih_description,
     ),
+
+    /**
+     * The Zakat calculator.
+     *
+     * Its own name and description rather than a shared `shortcut_`, because no other screen opens it. The
+     * row is the calculator's only way in.
+     */
+    ZAKAT(
+        destination = SalahDestination.ZAKAT,
+        titleRes = R.string.zakat_title,
+        descriptionRes = R.string.tools_zakat_description,
+    ),
     ;
 }

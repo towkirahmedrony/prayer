@@ -411,12 +411,30 @@ neither defaulted silently.
 
 ### 8.4 Persistence and privacy
 
-**Every amount the user enters is stored locally in Salah's existing DataStore, and nowhere else.** There is
-no remote service, no account, no analytics, and no logging of any financial amount — the same rule the
-Tasbih counter follows (`docs/TASBIH_COUNTER.md` §5). Amounts are never written to log output. The screen
-offers a confirmed "clear all" that removes every entered value.
+**Nothing is saved. There is no repository, no DataStore key, no file.**
 
----
+Every figure a user enters lives in the calculator's view model, is recalculated on each keystroke, and is gone
+when the screen closes. The brief permits this explicitly — §12 asks for the behaviour to be explained rather
+than for persistence — and it is the strongest privacy posture available: data that is never written cannot leak,
+cannot be backed up, cannot be recovered from a discarded device, and cannot be subpoenaed from a synchronised
+account.
+
+The consequences, stated rather than hidden:
+
+* **The values do not survive the process.** Backgrounding Salah long enough for Android to kill the process
+  returns the user to an empty form. This is the real cost of the choice, and it is the reason the screen has a
+  confirmed "clear everything" — retyping a dozen figures is a genuine loss, so the action that discards them is
+  deliberate.
+* **Nothing is logged.** No amount, holding or debt is written to log output anywhere in this feature. The only
+  values that reach a log at all are the ones in failing test assertions.
+* **No network, no analytics, no account.** The calculator has no Internet permission use, no remote service, no
+  Supabase call and no telemetry. The `ZakatCalculator` is a pure function of its inputs and cannot reach a
+  network even in principle, because it has no dependency it could reach one through.
+* **The engine is offline by construction** — it is an `object` with no collaborators — so the calculation works
+  with no connection once the screen is open.
+
+If persistence is added later it must be local-only (the existing DataStore), must disclose what is stored, and
+must not be the vehicle for any synchronisation of financial data.
 
 ## 9. Limitations and unsupported cases
 

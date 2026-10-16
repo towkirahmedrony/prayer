@@ -106,6 +106,8 @@ import io.github.towkirahmedrony.salah.feature.ramadan.RamadanViewModel
 import io.github.towkirahmedrony.salah.feature.settings.SettingsViewModel
 import io.github.towkirahmedrony.salah.feature.tasbih.TasbihUiStateFactory
 import io.github.towkirahmedrony.salah.feature.tasbih.TasbihViewModel
+import io.github.towkirahmedrony.salah.feature.zakat.ZakatUiStateFactory
+import io.github.towkirahmedrony.salah.feature.zakat.ZakatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -330,6 +332,16 @@ val salahModules = module {
     // The same CalendarFormatting instance every other screen formats through, so the numerals on the
     // counter's history are written by the one rule the dates beside them were.
     single { TasbihUiStateFactory(formatting = get()) }
+
+    // Zakat -------------------------------------------------------------------
+    // The calculator has no repository and no stored state on purpose. The values a user enters are the
+    // most sensitive data the app ever handles, and the strongest privacy posture is not to keep them:
+    // nothing is written, so nothing can leak, be backed up or be recovered from the device. The screen
+    // says so, and the inputs live in the view model for as long as the screen is open. See
+    // docs/ZAKAT_METHODOLOGY.md §8.4.
+    //
+    // The engine itself is a pure object with no dependencies, so there is nothing to bind for it.
+    single { ZakatUiStateFactory(formatting = get()) }
 
     // Start-up snapshot -------------------------------------------------------
     // The two values the location gate and Home need before they can render anything correct, read
@@ -610,6 +622,12 @@ val salahModules = module {
     viewModel {
         TasbihViewModel(
             repository = get(),
+            userPreferencesRepository = get(),
+            uiStateFactory = get(),
+            clock = get(),
+        )
+    }    viewModel {
+        ZakatViewModel(
             userPreferencesRepository = get(),
             uiStateFactory = get(),
             clock = get(),

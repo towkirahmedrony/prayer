@@ -190,6 +190,7 @@
     <string name="tools_prayer_times_description">The current prayer period and today\'s full timetable</string>
     <string name="tools_unavailable_note">Quran and Dua are not part of Salah yet, so they are not listed here. Every tool above opens a real screen.</string>
     <string name="tools_tasbih_description">Count with a target, and keep a history of finished sessions</string>
+    <string name="tools_zakat_description">Work out zakat on cash, gold, silver, stock and debts, with the rule behind every figure shown</string>
 
     <!--
       Tasbih: the counting screen and its session history.
@@ -252,6 +253,105 @@
     <string name="tasbih_haptics_title">Haptic feedback</string>
     <string name="tasbih_haptics_body">A short vibration on each count, where the device supports it. Counting works the same with it off.</string>
     <string name="tasbih_save_failed">That change could not be saved to this device.</string>
+
+    <!--
+      Zakat: the calculation screen.
+
+      These strings carry no ruling. They name a field, describe what it holds, or state which of two
+      published positions the user selected — never which one is correct. Every rule behind them, with
+      the source that supports it, is in docs/ZAKAT_METHODOLOGY.md; where sources disagree the screen
+      says so rather than picking for the reader.
+
+      Salah is not religiously certified and no string here implies that it is.
+    -->
+    <string name="zakat_title">Zakat calculator</string>
+    <string name="zakat_back">Back</string>
+    <string name="zakat_intro">Work out the zakat on what you enter. Salah shows which rule each figure came from, saves nothing and sends nothing.</string>
+
+    <string name="zakat_section_assets">Assets</string>
+    <string name="zakat_section_liabilities">Liabilities</string>
+    <string name="zakat_section_method">Method</string>
+    <string name="zakat_section_result">Calculation</string>
+
+    <string name="zakat_field_cash">Cash and bank balances</string>
+    <string name="zakat_help_cash">Savings, current and fixed-deposit balances, as at the valuation date.</string>
+    <string name="zakat_field_foreign_amount">Amount in another currency</string>
+    <string name="zakat_field_foreign_rate">Rate you used</string>
+    <string name="zakat_help_foreign">Enter the amount and the rate you converted it at. Salah does not fetch a rate.</string>
+    <string name="zakat_field_gold_weight">Gold weight</string>
+    <string name="zakat_field_gold_price">Gold price per gram</string>
+    <string name="zakat_field_silver_weight">Silver weight</string>
+    <string name="zakat_field_silver_price">Silver price per gram</string>
+    <string name="zakat_help_metals">Enter the net weight of metal you hold; some Bangladeshi organisations allow stone weight to be excluded. You enter the price — Salah never fetches one.</string>
+    <string name="zakat_field_unit">Weight unit</string>
+    <string name="zakat_unit_gram">Gram</string>
+    <string name="zakat_unit_tola">Tola</string>
+    <string name="zakat_unit_vori">Vori</string>
+    <string name="zakat_field_inventory">Stock held for sale</string>
+    <string name="zakat_field_inventory_basis">Stock valued at</string>
+    <string name="zakat_inventory_market">Market value</string>
+    <string name="zakat_inventory_landed">Landed cost</string>
+    <string name="zakat_field_collectible">Money owed to you that will be paid</string>
+    <string name="zakat_help_collectible">A debt the borrower acknowledges and intends to repay.</string>
+    <string name="zakat_field_doubtful">Money owed to you that may not be paid</string>
+    <string name="zakat_help_doubtful">Not counted: the Hanafi ruling treats ownership of such a debt as incomplete.</string>
+
+    <string name="zakat_field_deductible">Debts due within the year</string>
+    <string name="zakat_help_deductible">Loans and payments falling due in the coming year, and tax payable now.</string>
+    <string name="zakat_field_long_term">Longer-term debt outstanding</string>
+    <string name="zakat_help_long_term">Never deducted. Only the part due within the year belongs in the row above.</string>
+
+    <string name="zakat_field_currency">Currency</string>
+    <string name="zakat_field_nisab_weight">Nisab weights</string>
+    <string name="zakat_nisab_international">87.48 g gold / 612.36 g silver</string>
+    <string name="zakat_nisab_bangladesh">85 g gold / 595 g silver</string>
+    <string name="zakat_help_nisab_weight">Two weight pairs are published for the nisab. They differ by about 2.9%, which can decide whether zakat is due at all. Choose the one whose methodology you follow.</string>
+    <string name="zakat_field_nisab_metal">Measure against</string>
+    <string name="zakat_nisab_gold">Gold nisab</string>
+    <string name="zakat_nisab_silver">Silver nisab</string>
+    <string name="zakat_help_nisab_metal">The silver threshold is lower. Many scholars prefer it, since more reaches those in need; others prefer the gold one. If you hold only one of the two metals, its nisab is used.</string>
+    <string name="zakat_nisab_metal_forced">You hold only %1$s, so its nisab is applied.</string>
+    <string name="zakat_field_jewellery">Personal jewellery</string>
+    <string name="zakat_jewellery_zakatable">Zakatable, including worn jewellery (Hanafi)</string>
+    <string name="zakat_jewellery_exempt">Exempt for personal use (majority)</string>
+    <string name="zakat_help_jewellery">The schools differ: the Hanafi ruling includes gold and silver jewellery that is worn, the majority ruling exempts it. Both are recognised positions.</string>
+    <string name="zakat_field_debts">Debts and the nisab</string>
+    <string name="zakat_debts_deduct">Deducted before comparing (Hanafi)</string>
+    <string name="zakat_debts_keep">Not deducted (Shafi'i)</string>
+    <string name="zakat_help_debts">The schools differ on whether a debt can prevent the obligation, so the same figures can give different answers.</string>
+    <string name="zakat_field_hawl">Date your wealth first reached the nisab</string>
+    <string name="zakat_help_hawl">Optional. Used only to estimate the next anniversary, which you must check yourself. Salah does not state that a payment is due.</string>
+    <string name="zakat_hawl_estimate">Estimated next anniversary %1$s — about %2$s days after your date.</string>
+
+    <string name="zakat_result_total_assets">Total eligible assets</string>
+    <string name="zakat_result_deductions">Deductible liabilities</string>
+    <string name="zakat_result_net">Net zakatable wealth</string>
+    <string name="zakat_result_nisab">Nisab</string>
+    <string name="zakat_result_nisab_detail">%1$s g at %2$s per gram</string>
+    <string name="zakat_result_over">At or above the nisab</string>
+    <string name="zakat_result_under">Below the nisab</string>
+    <string name="zakat_result_due">Zakat due</string>
+    <string name="zakat_result_rate">Rate %1$s</string>
+    <string name="zakat_result_price_note">The nisab depends on the price you entered. Salah does not fetch or verify prices.</string>
+    <string name="zakat_result_needs">Still needed before an amount can be worked out:</string>
+    <string name="zakat_status_calculated">Calculated</string>
+    <string name="zakat_status_estimate">Estimate</string>
+    <string name="zakat_status_nothing">Enter your assets to see a calculation.</string>
+    <string name="zakat_line_included">Counted</string>
+    <string name="zakat_line_excluded">Not counted</string>
+    <string name="zakat_line_incomplete">Needs a value</string>
+    <string name="zakat_field_invalid">Enter a number, for example 12500 or 12500.50</string>
+
+    <string name="zakat_clear">Clear everything</string>
+    <string name="zakat_clear_title">Clear everything?</string>
+    <string name="zakat_clear_body">Every value you entered is removed. Nothing was saved, so it cannot be recovered.</string>
+    <string name="zakat_clear_confirm">Clear</string>
+    <string name="zakat_cancel">Cancel</string>
+
+    <string name="zakat_limits_title">What this does not calculate</string>
+    <string name="zakat_limits_body">Agricultural produce, livestock, minerals, shares, provident funds and property held for resale are not included: each has its own rate or its own trigger. The Maliki and Hanbali treatments are not offered.</string>
+    <string name="zakat_not_certified">Salah is not religiously certified. This is arithmetic, not a ruling — check with a scholar you trust.</string>
+    <string name="zakat_sources">The rules follow published guidance from Islamic Relief Worldwide, SeekersGuidance, the National Zakat Foundation and Dhaka Ahsania Mission, among others. Where they differ, the choice is yours.</string>
 
     <!-- Calculation methods (names of the conventions the local engine implements) -->
     <string name="method_karachi">University of Islamic Sciences, Karachi</string>

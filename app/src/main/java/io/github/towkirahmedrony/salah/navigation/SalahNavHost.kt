@@ -21,6 +21,7 @@ import io.github.towkirahmedrony.salah.feature.settings.SettingsPrayerTimesScree
 import io.github.towkirahmedrony.salah.feature.settings.SettingsScreen
 import io.github.towkirahmedrony.salah.feature.tasbih.TasbihScreen
 import io.github.towkirahmedrony.salah.feature.tools.ToolsScreen
+import io.github.towkirahmedrony.salah.feature.zakat.ZakatScreen
 
 /**
  * The navigation graph.
@@ -98,6 +99,12 @@ fun SalahNavHost(
         // repeated visit cannot leave a duplicate of the counter behind.
         composable(SalahDestination.TASBIH.route) {
             TasbihScreen(onBack = { navController.popBackStack() })
+        }
+
+        // The Zakat calculator. Like the counter, opened from Tools and left by the back gesture. It has no
+        // saved state to restore, so nothing depends on how it is entered.
+        composable(SalahDestination.ZAKAT.route) {
+            ZakatScreen(onBack = { navController.popBackStack() })
         }
 
         // Settings: the overview, then one destination per category. Each category screen is declared

@@ -407,6 +407,7 @@
     <string name="tools_prayer_times_description">বর্তমান নামাজের ওয়াক্ত ও আজকের সম্পূর্ণ সময়সূচি</string>
     <string name="tools_unavailable_note">কুরআন ও দুআ এখনও সালাহর অংশ নয়, তাই এগুলো এখানে তালিকাভুক্ত করা হয়নি। উপরের প্রতিটি টুল একটি প্রকৃত স্ক্রিন খোলে।</string>
     <string name="tools_tasbih_description">লক্ষ্য ঠিক করে গণনা করুন, আর শেষ হওয়া সেশনগুলোর হিসাব রাখুন</string>
+    <string name="tools_zakat_description">নগদ, স্বর্ণ, রূপা, ব্যবসার মাল ও ঋণের যাকাত হিসাব করুন, প্রতিটি অঙ্কের নিয়মসহ</string>
 
     <!--
       তাসবিহ: গণনার স্ক্রিন ও সেশনের হিসাব।
@@ -458,6 +459,104 @@
     <string name="tasbih_haptics_title">স্পর্শ-কম্পন</string>
     <string name="tasbih_haptics_body">ডিভাইসে সমর্থিত হলে প্রতি গণনায় ছোট একটি কম্পন হবে। বন্ধ রাখলেও গণনা একইভাবে কাজ করে।</string>
     <string name="tasbih_save_failed">পরিবর্তনটি এই ডিভাইসে সংরক্ষণ করা যায়নি।</string>
+
+    <!--
+      যাকাত: হিসাবের স্ক্রিন।
+
+      এই লেখাগুলো কোনো মত প্রতিষ্ঠা করে না। এগুলো ঘরের নাম, তার ব্যাখ্যা, বা দুটি প্রকাশিত মতের মধ্যে
+      ব্যবহারকারী কোনটি বেছেছেন সেটি জানায় — কোনটি সঠিক তা নয়। প্রতিটি নিয়ম ও তার সূত্র
+      docs/ZAKAT_METHODOLOGY.md-এ লেখা; মতভেদ থাকলে স্ক্রিন সেটি জানায়, নিজে সিদ্ধান্ত নেয় না।
+
+      সালাহ কোনো ধর্মীয় অনুমোদনপ্রাপ্ত অ্যাপ নয়, এবং এখানে কোনো লেখা তা বোঝায় না।
+    -->
+    <string name="zakat_title">যাকাত ক্যালকুলেটর</string>
+    <string name="zakat_back">ফিরে যান</string>
+    <string name="zakat_intro">আপনি যা লিখবেন তার উপর যাকাত হিসাব করুন। সালাহ দেখায় কোন হিসাব কোন নিয়ম থেকে এসেছে; কিছু সংরক্ষণ করে না, কোথাও পাঠায়ও না।</string>
+
+    <string name="zakat_section_assets">সম্পদ</string>
+    <string name="zakat_section_liabilities">দায়</string>
+    <string name="zakat_section_method">পদ্ধতি</string>
+    <string name="zakat_section_result">হিসাব</string>
+
+    <string name="zakat_field_cash">নগদ ও ব্যাংক ব্যালেন্স</string>
+    <string name="zakat_help_cash">সঞ্চয়, চলতি ও স্থায়ী আমানতের ব্যালেন্স, হিসাবের তারিখ অনুযায়ী।</string>
+    <string name="zakat_field_foreign_amount">অন্য মুদ্রায় রক্ষিত অর্থ</string>
+    <string name="zakat_field_foreign_rate">আপনার ব্যবহৃত হার</string>
+    <string name="zakat_help_foreign">অঙ্ক ও যে হারে রূপান্তর করেছেন তা লিখুন। সালাহ কোনো বিনিময় হার আনে না।</string>
+    <string name="zakat_field_gold_weight">স্বর্ণের ওজন</string>
+    <string name="zakat_field_gold_price">প্রতি গ্রাম স্বর্ণের দাম</string>
+    <string name="zakat_field_silver_weight">রূপার ওজন</string>
+    <string name="zakat_field_silver_price">প্রতি গ্রাম রূপার দাম</string>
+    <string name="zakat_help_metals">আপনার কাছে থাকা নিট ওজন লিখুন; কিছু বাংলাদেশি সংস্থা পাথরের ওজন বাদ দেওয়ার সুযোগ দেয়। দাম আপনি নিজেই লিখবেন — সালাহ কখনো দাম আনে না।</string>
+    <string name="zakat_field_unit">ওজনের একক</string>
+    <string name="zakat_unit_gram">গ্রাম</string>
+    <string name="zakat_unit_tola">তোলা</string>
+    <string name="zakat_unit_vori">ভরি</string>
+    <string name="zakat_field_inventory">বিক্রয়ের জন্য রাখা মাল</string>
+    <string name="zakat_field_inventory_basis">মালের মূল্য</string>
+    <string name="zakat_inventory_market">বাজারমূল্যে</string>
+    <string name="zakat_inventory_landed">ক্রয়মূল্যে</string>
+    <string name="zakat_field_collectible">আপনার পাওনা, যা আদায় হবে</string>
+    <string name="zakat_help_collectible">যে ঋণ গ্রহীতা স্বীকার করে এবং শোধ করার ইচ্ছা রাখে।</string>
+    <string name="zakat_field_doubtful">আপনার পাওনা, যা আদায় নাও হতে পারে</string>
+    <string name="zakat_help_doubtful">গণনায় ধরা হয় না: হানাফি মত অনুযায়ী এমন পাওনার মালিকানা অসম্পূর্ণ।</string>
+
+    <string name="zakat_field_deductible">বছরের মধ্যে পরিশোধযোগ্য ঋণ</string>
+    <string name="zakat_help_deductible">আগামী বছরে পরিশোধযোগ্য কিস্তি ও ঋণ, এবং এখন পরিশোধযোগ্য কর।</string>
+    <string name="zakat_field_long_term">দীর্ঘমেয়াদি বাকি ঋণ</string>
+    <string name="zakat_help_long_term">কখনো বাদ দেওয়া হয় না। বছরের মধ্যে পরিশোধযোগ্য অংশটুকু উপরের ঘরে লিখুন।</string>
+
+    <string name="zakat_field_currency">মুদ্রা</string>
+    <string name="zakat_field_nisab_weight">নিসাবের ওজন</string>
+    <string name="zakat_nisab_international">৮৭.৪৮ গ্রাম স্বর্ণ / ৬১২.৩৬ গ্রাম রূপা</string>
+    <string name="zakat_nisab_bangladesh">৮৫ গ্রাম স্বর্ণ / ৫৯৫ গ্রাম রূপা</string>
+    <string name="zakat_help_nisab_weight">নিসাবের জন্য দুই জোড়া ওজন প্রকাশিত। পার্থক্য প্রায় ২.৯ শতাংশ, যা যাকাত ওয়াজিব হবে কি না তা নির্ধারণ করতে পারে। আপনি যে পদ্ধতি মানেন সেটি বেছে নিন।</string>
+    <string name="zakat_field_nisab_metal">যার সাথে মাপা হবে</string>
+    <string name="zakat_nisab_gold">স্বর্ণের নিসাব</string>
+    <string name="zakat_nisab_silver">রূপার নিসাব</string>
+    <string name="zakat_help_nisab_metal">রূপার নিসাব কম। অনেক আলিম এটি পছন্দ করেন, কারণ এতে বেশি মানুষের কাছে পৌঁছায়; আবার কেউ স্বর্ণের নিসাব পছন্দ করেন। দুই ধাতুর একটি থাকলে সেটিরই নিসাব ধরা হয়।</string>
+    <string name="zakat_nisab_metal_forced">আপনার কাছে কেবল %1$s আছে, তাই সেটির নিসাব ধরা হয়েছে।</string>
+    <string name="zakat_field_jewellery">ব্যক্তিগত অলংকার</string>
+    <string name="zakat_jewellery_zakatable">যাকাত প্রযোজ্য, পরিধেয় অলংকারসহ (হানাফি)</string>
+    <string name="zakat_jewellery_exempt">ব্যক্তিগত ব্যবহারে মাফ (সর্বাধিক মত)</string>
+    <string name="zakat_help_jewellery">মতভেদ আছে: হানাফি মত অনুযায়ী পরিধেয় স্বর্ণ ও রূপার অলংকারও যাকাতযোগ্য, আর সর্বাধিক মত অনুযায়ী তা মাফ। দুটিই স্বীকৃত মত।</string>
+    <string name="zakat_field_debts">ঋণ ও নিসাব</string>
+    <string name="zakat_debts_deduct">তুলনার আগে বাদ দেওয়া হয় (হানাফি)</string>
+    <string name="zakat_debts_keep">বাদ দেওয়া হয় না (শাফেয়ি)</string>
+    <string name="zakat_help_debts">ঋণ যাকাত ওয়াজিব হওয়া রোধ করতে পারে কি না — এ নিয়ে মতভেদ আছে, তাই একই হিসাবে উত্তর ভিন্ন হতে পারে।</string>
+    <string name="zakat_field_hawl">যে তারিখে আপনার সম্পদ প্রথম নিসাবে পৌঁছেছিল</string>
+    <string name="zakat_help_hawl">ঐচ্ছিক। শুধু পরবর্তী বর্ষপূর্তির আনুমানিক তারিখ বের করতে ব্যবহৃত, যা আপনাকেই যাচাই করতে হবে। সালাহ বলে না যে যাকাত এখন ওয়াজিব।</string>
+    <string name="zakat_hawl_estimate">আনুমানিক পরবর্তী বর্ষপূর্তি %1$s — আপনার তারিখের প্রায় %2$s দিন পরে।</string>
+
+    <string name="zakat_result_total_assets">মোট যাকাতযোগ্য সম্পদ</string>
+    <string name="zakat_result_deductions">বাদযোগ্য দায়</string>
+    <string name="zakat_result_net">নিট যাকাতযোগ্য সম্পদ</string>
+    <string name="zakat_result_nisab">নিসাব</string>
+    <string name="zakat_result_nisab_detail">%1$s গ্রাম, প্রতি গ্রাম %2$s</string>
+    <string name="zakat_result_over">নিসাবের সমান বা তার বেশি</string>
+    <string name="zakat_result_under">নিসাবের কম</string>
+    <string name="zakat_result_due">প্রদেয় যাকাত</string>
+    <string name="zakat_result_rate">হার %1$s</string>
+    <string name="zakat_result_price_note">নিসাব নির্ভর করে আপনি যে দাম লিখেছেন তার উপর। সালাহ কোনো দাম আনে না, যাচাইও করে না।</string>
+    <string name="zakat_result_needs">অঙ্ক বের করার আগে যা এখনো দরকার:</string>
+    <string name="zakat_status_calculated">হিসাবকৃত</string>
+    <string name="zakat_status_estimate">আনুমানিক</string>
+    <string name="zakat_status_nothing">হিসাব দেখতে আপনার সম্পদের মান লিখুন।</string>
+    <string name="zakat_line_included">গণনায় আছে</string>
+    <string name="zakat_line_excluded">গণনায় নেই</string>
+    <string name="zakat_line_incomplete">মান দরকার</string>
+    <string name="zakat_field_invalid">একটি সংখ্যা লিখুন, যেমন ১২৫০০ বা ১২৫০০.৫০</string>
+
+    <string name="zakat_clear">সব মুছে ফেলুন</string>
+    <string name="zakat_clear_title">সব মুছে ফেলবেন?</string>
+    <string name="zakat_clear_body">আপনার লেখা প্রতিটি মান মুছে যাবে। কিছুই সংরক্ষণ করা ছিল না, তাই ফিরিয়ে আনা যাবে না।</string>
+    <string name="zakat_clear_confirm">মুছুন</string>
+    <string name="zakat_cancel">বাতিল</string>
+
+    <string name="zakat_limits_title">যা এতে হিসাব হয় না</string>
+    <string name="zakat_limits_body">কৃষিপণ্য, পশুসম্পদ, খনিজ, শেয়ার, সঞ্চয়পত্র ও ভবিষ্যৎ তহবিল, এবং বিক্রয়ের জন্য রাখা সম্পত্তি এতে নেই: প্রতিটির হার বা শর্ত আলাদা। মালিকি ও হাম্বলি মত এখানে দেওয়া হয়নি।</string>
+    <string name="zakat_not_certified">সালাহ কোনো ধর্মীয় অনুমোদনপ্রাপ্ত অ্যাপ নয়। এটি শুধু হিসাব, ফতোয়া নয় — বিশ্বস্ত আলিমের সাথে যাচাই করে নিন।</string>
+    <string name="zakat_sources">নিয়মগুলো ইসলামিক রিলিফ ওয়ার্ল্ডওয়াইড, সিকার্স গাইডেন্স, ন্যাশনাল যাকাত ফাউন্ডেশন ও ঢাকা আহ্ছানিয়া মিশনসহ প্রকাশিত নির্দেশনার উপর ভিত্তি করে। তাদের মত ভিন্ন হলে সিদ্ধান্ত আপনার।</string>
 
     <!--
       Settings: Appearance. The theme is the only appearance preference, offered as three named modes.

@@ -602,6 +602,7 @@ class LocalizationResourcesTest {
         val TOOLS_SETTINGS_PREFIXES = listOf(
             "tools_",
             "tasbih_",
+            "zakat_",
             "settings_",
             "method_",
             "asr_",
@@ -640,6 +641,7 @@ class LocalizationResourcesTest {
         val TOOLS_SETTINGS_PACKAGES = listOf(
             "tools",
             "tasbih",
+            "zakat",
             "settings",
             "notifications",
             "location",
@@ -675,6 +677,9 @@ class LocalizationResourcesTest {
             "TasbihUiState.kt",
             "TasbihUiStateFactory.kt",
             "TasbihViewModel.kt",
+            "ZakatUiState.kt",
+            "ZakatUiStateFactory.kt",
+            "ZakatViewModel.kt",
         )
 
         /** The `feature` directory, relative to the repository root or the module directory. */

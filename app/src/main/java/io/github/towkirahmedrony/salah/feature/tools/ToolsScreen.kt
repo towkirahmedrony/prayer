@@ -28,6 +28,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihBeadsGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.ZakatScaleGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 
@@ -153,5 +154,6 @@ private fun ToolsEntryGlyph(entry: ToolsEntry, tint: Color) {
         ToolsEntry.RAMADAN -> RamadanGlyph(tint = tint)
         // The counter's own mark, not the Tools tab's: see TasbihBeadsGlyph for why the two differ.
         ToolsEntry.TASBIH -> TasbihBeadsGlyph(tint = tint)
+        ToolsEntry.ZAKAT -> ZakatScaleGlyph(tint = tint)
     }
 }
