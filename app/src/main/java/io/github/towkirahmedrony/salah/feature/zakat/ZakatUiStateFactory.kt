@@ -168,7 +168,11 @@ class ZakatUiStateFactory(
             silverWeight = amount(ZakatFormField.SILVER_WEIGHT),
             silverPricePerGram = amount(ZakatFormField.SILVER_PRICE),
             metalUnit = form.unit,
-            preciousMetalsArePersonalJewellery = form.preciousMetalsArePersonalJewellery,
+            // Choosing the majority ruling is the statement that the metals entered are personal jewellery rather
+            // than savings — that is what the option's own label says, and Salah offers no separate switch for it.
+            // The engine takes the two facts apart so a future screen could; this one derives one from the other.
+            preciousMetalsArePersonalJewellery =
+                form.jewelleryTreatment == ZakatJewelleryTreatment.PERSONAL_USE_EXEMPT,
             inventoryValue = amount(ZakatFormField.INVENTORY),
             inventoryBasis = form.inventoryBasis,
             collectibleReceivables = amount(ZakatFormField.COLLECTIBLE_RECEIVABLES),

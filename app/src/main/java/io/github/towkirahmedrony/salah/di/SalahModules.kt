@@ -626,7 +626,9 @@ val salahModules = module {
             uiStateFactory = get(),
             clock = get(),
         )
-    }    viewModel {
+    }
+
+    viewModel {
         ZakatViewModel(
             userPreferencesRepository = get(),
             uiStateFactory = get(),

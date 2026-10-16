@@ -317,7 +317,7 @@
     <string name="zakat_help_jewellery">The schools differ: the Hanafi ruling includes gold and silver jewellery that is worn, the majority ruling exempts it. Both are recognised positions.</string>
     <string name="zakat_field_debts">Debts and the nisab</string>
     <string name="zakat_debts_deduct">Deducted before comparing (Hanafi)</string>
-    <string name="zakat_debts_keep">Not deducted (Shafi'i)</string>
+    <string name="zakat_debts_keep">Not deducted (Shafi\'i)</string>
     <string name="zakat_help_debts">The schools differ on whether a debt can prevent the obligation, so the same figures can give different answers.</string>
     <string name="zakat_field_hawl">Date your wealth first reached the nisab</string>
     <string name="zakat_help_hawl">Optional. Used only to estimate the next anniversary, which you must check yourself. Salah does not state that a payment is due.</string>
