@@ -126,6 +126,8 @@ io.github.towkirahmedrony.salah
 │   │   │                       QiblaPhase / CalibrationAdvice / QiblaStateReducer
 │   │   ├── tasbih/             Tasbih counter policy, Android-free: TasbihCounter
 │   │   │                       (count / undo / reset / retarget / restart, archiving, retention)
+│   │   ├── zakat/              Zakat calculation, Android-free: ZakatCalculator (the flow of
+│   │   │                       docs/ZAKAT_METHODOLOGY.md §6, pure and deterministic)
 │   │   ├── location/           Bangladesh location domain, Android-free:
 │   │   │                       BangladeshLocationDataset (parser), BangladeshArea/Level/Ref models,
 │   │   │                       AreaResolver + AreaSelection + AreaResolution,
@@ -148,6 +150,8 @@ io.github.towkirahmedrony.salah
 │   │                           local-midnight and time-zone refresh, and the conversion of every
 │   │                           day it lays out
 │   ├── prayer/                 AdhanPrayerTimesProvider + offline-first schedule repository
+│   ├── (zakat has no data package: the engine is pure and its inputs arrive from the screen —
+│   │    see docs/ZAKAT_METHODOLOGY.md §8.4 on what is and is not stored)
 │   ├── tasbih/                 DataStoreTasbihRepository + TasbihSessionCodec: the counter's
 │   │                           session, its history and its haptics preference, in the one DataStore
 │   ├── prohibited/             Rule-book-backed repository (documented policy)

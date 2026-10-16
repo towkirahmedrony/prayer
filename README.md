@@ -218,6 +218,7 @@ The calculation engine and its pinned version are explained in
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
 ├── docs/DATA_RELIABILITY.md                   offline guarantees, sync lifecycle, retry/backoff, freshness, recovery
 ├── docs/TASBIH_COUNTER.md                     counting and session rules, storage format, history retention, haptics, localisation
+├── docs/ZAKAT_METHODOLOGY.md                  Zakat rules, source register, scholarly disagreements, independent reference cases
 ├── docs/QIBLA_COMPASS.md                      bearing formula, sensors, declination, limits
 ├── docs/QIBLA_COMPASS_TESTING.md              automated coverage + the manual device checklist
 ├── docs/TECH_STACK.md                         real versions + compatibility decisions
