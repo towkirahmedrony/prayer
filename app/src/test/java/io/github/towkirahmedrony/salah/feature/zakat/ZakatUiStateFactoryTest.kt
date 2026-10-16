@@ -1,11 +1,11 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
 import io.github.towkirahmedrony.salah.core.model.ZakatLineField
-import io.github.towkirahmedrony.salah.core.model.ZakatLineTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -175,29 +175,50 @@ class ZakatUiStateFactoryTest {
 
     @Test
     fun `each valued category appears as a row with its amount`() {
-        val ready = state(goldAtTwelveThousand())
+        val ready = state(
+            formWith(
+                ZakatFormField.CASH to "500000",
+                ZakatFormField.GOLD_WEIGHT to "100",
+                ZakatFormField.GOLD_PRICE to "12000",
+            ),
+        )
 
         val gold = ready.result.rows.single { row -> row.field == ZakatLineField.GOLD }
         assertEquals("1200000.00", gold.amount)
-        assertEquals(ZakatLineTreatment.INCLUDED, gold.treatmentRes)
         assertFalse(gold.isDeduction)
-        // The price row is an input, not a result line: it does not appear twice in the breakdown.
-        assertEquals(1, ready.result.rows.size)
+        // The price row is an input, not a result line, so two valued categories produce two rows and no more.
+        assertEquals(2, ready.result.rows.size)
+        // Both rows were counted, so both carry the same treatment. Identity between them is the assertion —
+        // the state carries a resource id rather than the domain enum, and naming that id here would restate a
+        // mapping this file deliberately does not depend on.
+        assertEquals(1, ready.result.rows.map { row -> row.treatmentRes }.distinct().size)
     }
 
     @Test
     fun `an excluded row still shows the amount the ruling removed`() {
         // The majority ruling on personal jewellery: the gold is out of the total, and the row says how much it
-        // was worth, so the user can see what their choice cost them.
+        // was worth, so the user can see what their choice cost them. The cash beside it shows the contrast —
+        // one row counts, one does not, and the difference is visible in the treatment each row carries.
         val ready = state(
-            formWith(ZakatFormField.GOLD_WEIGHT to "100", ZakatFormField.GOLD_PRICE to "12000")
-                .copy(jewelleryTreatment = io.github.towkirahmedrony.salah.core.model.ZakatJewelleryTreatment.PERSONAL_USE_EXEMPT),
+            formWith(
+                ZakatFormField.CASH to "500000",
+                ZakatFormField.GOLD_WEIGHT to "100",
+                ZakatFormField.GOLD_PRICE to "12000",
+            ).copy(
+                jewelleryTreatment = ZakatJewelleryTreatment.PERSONAL_USE_EXEMPT,
+            ),
         )
 
         val gold = ready.result.rows.single { row -> row.field == ZakatLineField.GOLD }
-        assertEquals(ZakatLineTreatment.EXCLUDED, gold.treatmentRes)
+        val cash = ready.result.rows.single { row -> row.field == ZakatLineField.CASH }
         assertEquals("1200000.00", gold.amount)
-        assertEquals("0.00", ready.result.totalAssets)
+        assertNotEquals(
+            "an excluded row must not carry the treatment of a counted one",
+            cash.treatmentRes,
+            gold.treatmentRes,
+        )
+        // The total holds the cash and none of the gold, which is what "excluded" means here.
+        assertEquals("500000.00", ready.result.totalAssets)
         assertNull(ready.result.due)
     }
 
