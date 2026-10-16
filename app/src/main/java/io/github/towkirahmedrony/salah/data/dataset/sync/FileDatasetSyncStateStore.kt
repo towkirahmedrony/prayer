@@ -49,6 +49,8 @@ class FileDatasetSyncStateStore(
             var lastAttempt: Long? = null
             var publicationId: String? = null
             var failureCode: String? = null
+            var lastSuccess: Long? = null
+            var consecutiveFailures = 0
             for (rawLine in text.lineSequence()) {
                 val line = rawLine.trim()
                 if (line.isEmpty() || line.startsWith("#")) continue
@@ -58,12 +60,20 @@ class FileDatasetSyncStateStore(
                     KEY_LAST_ATTEMPT -> lastAttempt = fields[1].trim().toLongOrNull()
                     KEY_PUBLICATION -> publicationId = fields[1].trim().takeIf { it.isNotEmpty() }
                     KEY_FAILURE -> failureCode = fields[1].trim().takeIf { it.isNotEmpty() }
+                    // Fields written by newer builds. A file from an older build simply lacks them, which
+                    // must read as the defaults rather than as an error — the store is forward- and
+                    // backward-compatible by construction.
+                    KEY_LAST_SUCCESS -> lastSuccess = fields[1].trim().toLongOrNull()
+                    KEY_CONSECUTIVE_FAILURES ->
+                        consecutiveFailures = fields[1].trim().toIntOrNull()?.coerceAtLeast(0) ?: 0
                 }
             }
             DatasetSyncState(
                 lastAttemptAtEpochMillis = lastAttempt,
                 lastAttemptedPublicationId = publicationId,
                 lastFailureCode = failureCode,
+                lastSuccessAtEpochMillis = lastSuccess,
+                consecutiveFailures = consecutiveFailures,
             )
         }
     }
@@ -75,6 +85,10 @@ class FileDatasetSyncStateStore(
                 state.lastAttemptAtEpochMillis?.let { appendLine("$KEY_LAST_ATTEMPT\t$it") }
                 state.lastAttemptedPublicationId?.let { appendLine("$KEY_PUBLICATION\t$it") }
                 state.lastFailureCode?.let { appendLine("$KEY_FAILURE\t$it") }
+                state.lastSuccessAtEpochMillis?.let { appendLine("$KEY_LAST_SUCCESS\t$it") }
+                if (state.consecutiveFailures > 0) {
+                    appendLine("$KEY_CONSECUTIVE_FAILURES\t${state.consecutiveFailures}")
+                }
             }
             file.parentFile?.mkdirs()
             val temporary = File(file.parentFile, "${file.name}.tmp")
@@ -94,6 +108,8 @@ class FileDatasetSyncStateStore(
         const val KEY_LAST_ATTEMPT = "last_attempt_at_epoch_millis"
         const val KEY_PUBLICATION = "last_attempted_publication_id"
         const val KEY_FAILURE = "last_failure_code"
+        const val KEY_LAST_SUCCESS = "last_success_at_epoch_millis"
+        const val KEY_CONSECUTIVE_FAILURES = "consecutive_failures"
         const val HEADER =
             "# Salah dataset sync state. Machine state only; not user data, and not backed up."
     }

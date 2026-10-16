@@ -4,6 +4,8 @@ import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
+import io.github.towkirahmedrony.salah.core.domain.network.AlwaysOnlineNetworkStatusProvider
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfig
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ManifestParseResult
@@ -62,6 +64,11 @@ class PrayerConfigSynchronizer(
     private val throttle: PrayerConfigThrottlePolicy = PrayerConfigThrottlePolicy(),
     /** Invoked after a validated configuration becomes active, so the app can reapply effective settings. */
     private val onActivated: suspend (ActivePrayerConfig) -> Unit = {},
+    /**
+     * Whether the device has a network. Consulted before any request so a plainly-offline device is not
+     * made to attempt one. Defaulted to "always online" for the same reason as the dataset synchroniser.
+     */
+    private val networkStatus: NetworkStatusProvider = AlwaysOnlineNetworkStatusProvider,
 ) {
 
     private val mutex = Mutex()
@@ -89,6 +96,16 @@ class PrayerConfigSynchronizer(
                 mapOf("trigger" to trigger.name, "lastAttemptAt" to state.lastAttemptAtEpochMillis),
             )
             return PrayerConfigSyncOutcome.Throttled
+        }
+
+        // See the dataset synchroniser: a clearly-offline device skips the request, the skip is not an
+        // attempt, and the last-success timestamp is left alone.
+        if (!networkStatus.isOnline()) {
+            logger.info(
+                SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_OFFLINE,
+                mapOf("trigger" to trigger.name),
+            )
+            return PrayerConfigSyncOutcome.Offline
         }
 
         logger.info(
@@ -400,12 +417,20 @@ class PrayerConfigSynchronizer(
             is PrayerConfigSyncOutcome.Rejected -> outcome.problems.firstOrNull()?.code ?: REJECTED_CODE
             else -> null
         }
+        val transientFailure = outcome is PrayerConfigSyncOutcome.Failed && outcome.reason.transient
+        val consecutiveFailures = when {
+            outcome.isSuccess -> 0
+            transientFailure -> previous.consecutiveFailures + 1
+            else -> previous.consecutiveFailures
+        }
         runCatching {
             stateStore.write(
                 PrayerConfigSyncState(
                     lastAttemptAtEpochMillis = now,
                     lastAttemptedRevisionId = revisionId ?: previous.lastAttemptedRevisionId,
                     lastFailureCode = failureCode,
+                    lastSuccessAtEpochMillis = if (outcome.isSuccess) now else previous.lastSuccessAtEpochMillis,
+                    consecutiveFailures = consecutiveFailures,
                 ),
             )
         }.onFailure {
@@ -429,11 +454,25 @@ class PrayerConfigSynchronizer(
                 SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_REJECTED,
                 mapOf("codes" to outcome.problems.map { it.code }.distinct().sorted()),
             )
-            is PrayerConfigSyncOutcome.Failed -> logger.warn(
-                SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_FAILED,
-                mapOf("reason" to outcome.reason.code, "detail" to outcome.detail),
-            )
-            PrayerConfigSyncOutcome.NotConfigured, PrayerConfigSyncOutcome.Throttled -> Unit
+            is PrayerConfigSyncOutcome.Failed -> {
+                logger.warn(
+                    SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_FAILED,
+                    mapOf("reason" to outcome.reason.code, "detail" to outcome.detail),
+                )
+                if (outcome.reason.transient) {
+                    logger.info(
+                        SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_RETRY_SCHEDULED,
+                        mapOf(
+                            "reason" to outcome.reason.code,
+                            "consecutiveFailures" to consecutiveFailures,
+                        ),
+                    )
+                }
+            }
+            PrayerConfigSyncOutcome.NotConfigured,
+            PrayerConfigSyncOutcome.Throttled,
+            PrayerConfigSyncOutcome.Offline,
+            -> Unit
         }
 
         return outcome

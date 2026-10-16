@@ -46,6 +46,8 @@ class FilePrayerConfigSyncStateStore(
             var lastAttempt: Long? = null
             var revisionId: String? = null
             var failureCode: String? = null
+            var lastSuccess: Long? = null
+            var consecutiveFailures = 0
             for (rawLine in text.lineSequence()) {
                 val line = rawLine.trim()
                 if (line.isEmpty() || line.startsWith("#")) continue
@@ -55,12 +57,19 @@ class FilePrayerConfigSyncStateStore(
                     KEY_LAST_ATTEMPT -> lastAttempt = fields[1].trim().toLongOrNull()
                     KEY_REVISION -> revisionId = fields[1].trim().takeIf { it.isNotEmpty() }
                     KEY_FAILURE -> failureCode = fields[1].trim().takeIf { it.isNotEmpty() }
+                    // Fields a newer build writes. An older file that lacks them reads as the defaults,
+                    // so the state file is backward-compatible rather than a migration hazard.
+                    KEY_LAST_SUCCESS -> lastSuccess = fields[1].trim().toLongOrNull()
+                    KEY_CONSECUTIVE_FAILURES ->
+                        consecutiveFailures = fields[1].trim().toIntOrNull()?.coerceAtLeast(0) ?: 0
                 }
             }
             PrayerConfigSyncState(
                 lastAttemptAtEpochMillis = lastAttempt,
                 lastAttemptedRevisionId = revisionId,
                 lastFailureCode = failureCode,
+                lastSuccessAtEpochMillis = lastSuccess,
+                consecutiveFailures = consecutiveFailures,
             )
         }
     }
@@ -72,6 +81,10 @@ class FilePrayerConfigSyncStateStore(
                 state.lastAttemptAtEpochMillis?.let { appendLine("$KEY_LAST_ATTEMPT\t$it") }
                 state.lastAttemptedRevisionId?.let { appendLine("$KEY_REVISION\t$it") }
                 state.lastFailureCode?.let { appendLine("$KEY_FAILURE\t$it") }
+                state.lastSuccessAtEpochMillis?.let { appendLine("$KEY_LAST_SUCCESS\t$it") }
+                if (state.consecutiveFailures > 0) {
+                    appendLine("$KEY_CONSECUTIVE_FAILURES\t${state.consecutiveFailures}")
+                }
             }
             file.parentFile?.mkdirs()
             val temporary = File(file.parentFile, "${file.name}.tmp")
@@ -91,6 +104,8 @@ class FilePrayerConfigSyncStateStore(
         const val KEY_LAST_ATTEMPT = "last_attempt_at_epoch_millis"
         const val KEY_REVISION = "last_attempted_revision_id"
         const val KEY_FAILURE = "last_failure_code"
+        const val KEY_LAST_SUCCESS = "last_success_at_epoch_millis"
+        const val KEY_CONSECUTIVE_FAILURES = "consecutive_failures"
         const val HEADER =
             "# Salah prayer-config sync state. Machine state only; not user data, and not backed up."
     }

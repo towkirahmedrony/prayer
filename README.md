@@ -55,7 +55,7 @@ without an account.
 | Calendar settings: default view, Hijri adjustment, date language (Bangla or Latin script and numerals) | Implemented, persisted locally |
 | Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla and Ramadan reached from Tools and from Home, and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
-| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the dataset publication path, the prayer-configuration path, the bottom navigation and the Settings structure | Implemented (1 107 `@Test` methods in `app/src/test`) |
+| Unit tests for engine, domain, data, location, calendar, Ramadan, the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the dataset publication path, the prayer-configuration path, the bottom navigation, the Settings structure, and the offline-sync reliability hardening (backoff, offline gating, freshness, state-file migration) | Implemented (over 1 200 `@Test` methods in `app/src/test`) |
 | GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
@@ -146,7 +146,7 @@ requires an actual comparison for the same location and date, which has not been
 | Sensors | `SensorManager` — rotation vector, geomagnetic rotation vector, or accelerometer + magnetometer; 10 Hz sampling; no foreground service |
 | Location | `LocationManagerCompat.getCurrentLocation` — one-shot and cancellable, no Play Services dependency |
 | Declination | `GeomagneticField` — the platform's World Magnetic Model, on device |
-| Permissions | `INTERNET` (only for the two optional publication checks), `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION` — no background location |
+| Permissions | `INTERNET` (only for the two optional publication checks), `ACCESS_NETWORK_STATE` (a one-shot "clearly offline?" check before a sync attempt — no continuous observer), `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION` — no background location |
 | Tests | JUnit 4 + kotlinx-coroutines-test |
 
 Full version list, official references and compatibility decisions: [`docs/TECH_STACK.md`](docs/TECH_STACK.md).
@@ -215,6 +215,7 @@ The calculation engine and its pinned version are explained in
 ├── docs/DATABASE-SCHEMA.md                    the Supabase tables, views and policies (dataset + prayer config)
 ├── docs/SUPABASE_SETUP.md                     how to configure the project and publish a revision, and what still needs a live test
 ├── docs/PRAYER_NOTIFICATIONS_TESTING.md       automated coverage + the manual device checklist
+├── docs/DATA_RELIABILITY.md                   offline guarantees, sync lifecycle, retry/backoff, freshness, recovery
 ├── docs/QIBLA_COMPASS.md                      bearing formula, sensors, declination, limits
 ├── docs/QIBLA_COMPASS_TESTING.md              automated coverage + the manual device checklist
 ├── docs/TECH_STACK.md                         real versions + compatibility decisions

@@ -855,15 +855,30 @@ throttle, never a loop.
 
 A check is attempted at application start-up and when the app comes to the foreground, both off the main
 thread and after Home's own work, so neither can delay the first frame or the location gate.
-`SyncThrottlePolicy` allows at most one background check per 12 hours after a success and one per 15
-minutes after a failure; a user-initiated (`forced`) check is never suppressed. This is deliberately *not*
-a poll: there is no timer, and nothing checks on a recomposition or a UI event.
+`SyncThrottlePolicy` allows at most one background check per 12 hours after a success; after a failure it
+retries in 15 minutes and **doubles that wait on each consecutive transient failure**, capped at 6 hours, so
+a device that stays offline is not retried on every foreground trip and does not produce a retry storm when
+it reconnects. A small injected jitter (up to a fifth of the interval) spreads retries across devices. A
+user-initiated (`forced`) check is never suppressed. This is deliberately *not* a poll: there is no timer,
+and nothing checks on a recomposition or a UI event.
 
-`FileDatasetSyncStateStore` keeps only `lastAttemptAtEpochMillis`, `lastAttemptedPublicationId` and
-`lastFailureCode`, under `files/datasets/` — machine state, outside the backup set (§12.7). It also lets a
-publication that was downloaded and then *terminally* declined (a malformed manifest, an unsupported
-schema, a checksum mismatch, a rejected candidate) avoid being re-downloaded on every launch, while a
-transient failure is retried promptly.
+Before any request, both synchronisers ask `NetworkStatusProvider` whether the device is *clearly* offline;
+if it is, the attempt returns `Offline` without touching the network and **without recording an attempt**, so
+returning to connectivity is not delayed by a backoff window. The check fails open — a captive portal passes
+it and is caught by the transport — and there is no continuous connectivity observer.
+
+`FileDatasetSyncStateStore` keeps `lastAttemptAtEpochMillis` (moved by every attempt), `lastSuccessAtEpochMillis`
+(moved **only** by a success, so a failed request is never reported as fresh), `lastAttemptedPublicationId`,
+`lastFailureCode` and `consecutiveFailures`, under `files/datasets/` — machine state, outside the backup set
+(§12.7). The file is forward/backward-compatible: a file written before the freshness fields existed reads
+them as defaults. It also lets a publication that was downloaded and then *terminally* declined (a malformed
+manifest, an unsupported schema, a checksum mismatch, a rejected candidate) avoid being re-downloaded on
+every launch, while a transient failure is retried with the bounded backoff above.
+
+The full reliability contract — offline guarantees, the synchronisation lifecycle, manifest and checksum
+validation, retry/timeout policy, cache freshness, atomic activation and recovery, temporary-file cleanup,
+the diagnostic events and the tests that pin each claim — is documented in
+[`DATA_RELIABILITY.md`](DATA_RELIABILITY.md).
 
 ### 13.5 Bundled fallback and first install
 

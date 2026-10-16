@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailureKind
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfig
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigProblem
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigurationScope
@@ -280,6 +281,54 @@ class PrayerConfigSynchronizerTest {
         assertTrue(outcome.toString(), outcome is PrayerConfigSyncOutcome.Activated)
     }
 
+    // Offline, freshness and backoff --------------------------------------------
+
+    @Test
+    fun `an offline device does not attempt a request and records no attempt`() = runTest {
+        val source = FakeRemotePrayerConfigSource(manifest = RemoteFetch.Success("[]"))
+        val synchronizer = synchronizer(source, networkStatus = FakeNetworkStatusProvider(online = false))
+
+        val outcome = synchronizer.synchronize(PrayerConfigSyncTrigger.APP_START)
+
+        assertTrue(outcome.toString(), outcome is PrayerConfigSyncOutcome.Offline)
+        assertEquals(0, source.manifestCalls)
+        assertNull("an offline skip is not an attempt", stateStore.state.lastAttemptAtEpochMillis)
+        assertTrue(logger.has(SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_OFFLINE))
+    }
+
+    @Test
+    fun `a successful check records the last success and clears the failure count`() = runTest {
+        stateStore.state = PrayerConfigSyncState(
+            lastFailureCode = "content_unavailable",
+            consecutiveFailures = 3,
+        )
+        val snapshot = sampleSnapshot(revisionId = "rev-0002", revisionNumber = 2)
+        val source = FakeRemotePrayerConfigSource(
+            manifest = RemoteFetch.Success(manifestJson(snapshot)),
+            content = RemoteFetch.Success(payloadOf(snapshot)),
+        )
+
+        synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START, forced = true)
+
+        assertEquals(
+            Instant.parse("2026-10-15T00:00:00Z").toEpochMilli(),
+            stateStore.state.lastSuccessAtEpochMillis,
+        )
+        assertEquals(0, stateStore.state.consecutiveFailures)
+        assertNull(stateStore.state.lastFailureCode)
+    }
+
+    @Test
+    fun `a failed check keeps the previous last success and counts the failure`() = runTest {
+        stateStore.state = PrayerConfigSyncState(lastSuccessAtEpochMillis = 42L)
+        val source = FakeRemotePrayerConfigSource(manifest = RemoteFetch.NetworkFailure(NetworkFailureKind.CONNECTION))
+
+        synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START, forced = true)
+
+        assertEquals("a failed request is not a fresh success", 42L, stateStore.state.lastSuccessAtEpochMillis)
+        assertEquals(1, stateStore.state.consecutiveFailures)
+    }
+
     // Helpers ----------------------------------------------------------------------------------
 
     private fun synchronizer(
@@ -290,6 +339,7 @@ class PrayerConfigSynchronizerTest {
             failureIntervalMillis = 0,
         ),
         onActivated: suspend (ActivePrayerConfig) -> Unit = {},
+        networkStatus: NetworkStatusProvider = FakeNetworkStatusProvider(online = true),
     ): PrayerConfigSynchronizer = PrayerConfigSynchronizer(
         config = config,
         source = source,
@@ -300,10 +350,15 @@ class PrayerConfigSynchronizerTest {
         clock = Clock.fixed(Instant.parse("2026-10-15T00:00:00Z"), ZoneOffset.UTC),
         throttle = throttle,
         onActivated = onActivated,
+        networkStatus = networkStatus,
     )
 
     private fun failure(outcome: PrayerConfigSyncOutcome): PrayerConfigFailureReason {
         assertTrue("expected a failure, got $outcome", outcome is PrayerConfigSyncOutcome.Failed)
         return (outcome as PrayerConfigSyncOutcome.Failed).reason
+    }
+
+    private class FakeNetworkStatusProvider(var online: Boolean) : NetworkStatusProvider {
+        override suspend fun isOnline(): Boolean = online
     }
 }

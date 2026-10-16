@@ -53,6 +53,12 @@ sealed interface PrayerConfigSyncOutcome {
     /** A check ran too recently, so nothing was fetched. */
     data object Throttled : PrayerConfigSyncOutcome
 
+    /**
+     * The device is clearly offline, so no request was attempted. Distinct from [Failed]: nothing failed,
+     * the last-success timestamp is unchanged, and it is not counted as an attempt.
+     */
+    data object Offline : PrayerConfigSyncOutcome
+
     /** Nothing needed to change: the accepted revision already matches, or the publication was already declined. */
     data class UpToDate(val active: ActivePrayerConfig?) : PrayerConfigSyncOutcome
 
@@ -81,13 +87,24 @@ sealed interface PrayerConfigSyncOutcome {
 }
 
 /**
- * The small amount of state a synchronisation keeps between runs: when the last check ran, which revision
- * it evaluated, and the failure code if it failed. Machine state only — not user data, and not backed up.
+ * The small amount of state a synchronisation keeps between runs: when the last check ran, when one last
+ * *succeeded*, which revision it evaluated, how many attempts in a row have failed, and the failure code
+ * if it failed. Machine state only — not user data, and not backed up.
+ *
+ * Last attempt and last success are separate facts on purpose: a failed request must never be reported as
+ * a fresh synchronisation, and the accepted configuration's freshness is the freshness of the last
+ * revision that was actually applied.
  */
 data class PrayerConfigSyncState(
     val lastAttemptAtEpochMillis: Long? = null,
     val lastAttemptedRevisionId: String? = null,
     val lastFailureCode: String? = null,
+
+    /** When a check last confirmed or adopted the active configuration, or `null` when none ever has. */
+    val lastSuccessAtEpochMillis: Long? = null,
+
+    /** Consecutive *transient* failures since the last success; drives the exponential backoff. */
+    val consecutiveFailures: Int = 0,
 )
 
 /** Where the synchroniser keeps [PrayerConfigSyncState]. A port so the synchroniser is testable in memory. */
@@ -103,24 +120,50 @@ interface PrayerConfigSyncStateStore {
 /**
  * How often a check may run, mirroring the dataset throttle policy and its constants.
  *
- * A successful check suppresses the next one for [successIntervalMillis]; a failed check for the shorter
- * [failureIntervalMillis], because a failure may simply have been offline. A user-initiated check
- * (`forced`) is never suppressed.
+ * A successful check suppresses the next one for [successIntervalMillis]; a failed check is retried after
+ * [failureIntervalMillis], doubled on each consecutive transient failure and capped at
+ * [maxFailureIntervalMillis], so a device that stays offline is not retried at a fixed rate and does not
+ * produce a retry storm when it reconnects. [jitter] spreads retries that would otherwise coincide; it is
+ * injected so tests are deterministic. A user-initiated check (`forced`) is never suppressed.
  */
 class PrayerConfigThrottlePolicy(
     val successIntervalMillis: Long = DEFAULT_SUCCESS_INTERVAL_MILLIS,
     val failureIntervalMillis: Long = DEFAULT_FAILURE_INTERVAL_MILLIS,
+    val maxFailureIntervalMillis: Long = DEFAULT_MAX_FAILURE_INTERVAL_MILLIS,
+    val maxBackoffSteps: Int = DEFAULT_MAX_BACKOFF_STEPS,
+    val jitter: (Long) -> Long = { 0L },
 ) {
 
     fun shouldCheck(state: PrayerConfigSyncState, nowEpochMillis: Long, forced: Boolean): Boolean {
         if (forced) return true
         val lastAttempt = state.lastAttemptAtEpochMillis ?: return true
-        val interval = if (state.lastFailureCode != null) failureIntervalMillis else successIntervalMillis
-        return nowEpochMillis - lastAttempt >= interval
+        return nowEpochMillis - lastAttempt >= delayMillis(state)
+    }
+
+    /** The suppression window after the last attempt, in milliseconds, including any injected jitter. */
+    fun delayMillis(state: PrayerConfigSyncState): Long {
+        val base = if (state.lastFailureCode == null) {
+            successIntervalMillis.coerceAtLeast(0L)
+        } else {
+            failureBackoffMillis(state.consecutiveFailures)
+        }
+        return base + jitter(base).coerceAtLeast(0L)
+    }
+
+    private fun failureBackoffMillis(consecutiveFailures: Int): Long {
+        val ceiling = maxFailureIntervalMillis.coerceAtLeast(0L)
+        var value = failureIntervalMillis.coerceAtLeast(0L).coerceAtMost(ceiling)
+        var steps = consecutiveFailures.coerceIn(0, maxBackoffSteps)
+        while (steps-- > 0 && value < ceiling) {
+            value = (value * 2).coerceAtMost(ceiling)
+        }
+        return value
     }
 
     companion object {
         const val DEFAULT_SUCCESS_INTERVAL_MILLIS: Long = 12L * 60 * 60 * 1000
         const val DEFAULT_FAILURE_INTERVAL_MILLIS: Long = 15L * 60 * 1000
+        const val DEFAULT_MAX_FAILURE_INTERVAL_MILLIS: Long = 6L * 60 * 60 * 1000
+        const val DEFAULT_MAX_BACKOFF_STEPS: Int = 5
     }
 }

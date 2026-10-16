@@ -82,6 +82,15 @@ sealed interface DatasetSyncOutcome {
     data object Throttled : DatasetSyncOutcome
 
     /**
+     * The device is clearly offline, so no request was attempted.
+     *
+     * Distinct from [Failed]: nothing was tried, so nothing failed, and the last-success timestamp is
+     * deliberately left unchanged. It is not counted as an attempt either, so returning to connectivity
+     * does not have to wait out a backoff window before the next real check.
+     */
+    data object Offline : DatasetSyncOutcome
+
+    /**
      * Nothing needed to change: either the active dataset already matches the remote publication, or the
      * remote publication is one that was already attempted and declined. Either way no payload was
      * downloaded.
@@ -107,13 +116,22 @@ sealed interface DatasetSyncOutcome {
 /**
  * The small amount of state a synchronisation keeps between runs.
  *
- * **Why it is stored at all.** Two questions cannot be answered from the dataset alone: *when* the last
- * check happened (for throttling) and *which* remote publication was last attempted (so a publication
- * that was downloaded and then declined is not downloaded again on every launch). Neither is user data
- * and neither is backed up; see `docs/ARCHITECTURE.md` §13.
+ * **Why it is stored at all.** Four questions cannot be answered from the dataset alone: *when* the last
+ * check happened (for throttling and backoff), *when* it last *succeeded* (so the freshness the UI
+ * reports is the freshness of real data, not of a failed attempt), *which* remote publication was last
+ * attempted (so a publication that was downloaded and then declined is not downloaded again on every
+ * launch), and *how many* attempts in a row have failed (so consecutive transient failures back off
+ * instead of retrying at a fixed rate). None of it is user data and none of it is backed up; see
+ * `docs/ARCHITECTURE.md` §13 and `docs/DATA_RELIABILITY.md`.
+ *
+ * **Last attempt and last success are different facts.** [lastAttemptAtEpochMillis] moves on every
+ * attempt, success or failure; [lastSuccessAtEpochMillis] moves only when the active dataset was
+ * confirmed or replaced by a validated publication. Reporting the former as if it were the latter is
+ * how a UI ends up claiming "synced just now" after a failed request — which is exactly the confusion
+ * keeping them apart prevents.
  */
 data class DatasetSyncState(
-    /** When a check last ran, or `null` when one never has. */
+    /** When a check last ran — success or failure — or `null` when one never has. */
     val lastAttemptAtEpochMillis: Long? = null,
 
     /** The publication id the last attempt evaluated, or `null`. */
@@ -121,6 +139,23 @@ data class DatasetSyncState(
 
     /** The failure code of the last attempt, or `null` when the last attempt succeeded. */
     val lastFailureCode: String? = null,
+
+    /**
+     * When a check last confirmed or adopted the active dataset, or `null` when none ever has.
+     *
+     * Left untouched by a failed or refused attempt, so valid-but-stale data is reported as stale rather
+     * than as freshly synchronised.
+     */
+    val lastSuccessAtEpochMillis: Long? = null,
+
+    /**
+     * How many consecutive *transient* failures have occurred since the last success.
+     *
+     * Drives the exponential backoff in [SyncThrottlePolicy]. Reset to `0` by any success. A terminal
+     * failure (a malformed manifest, a checksum mismatch, a refused candidate) does not grow it: repeating
+     * the same fetch could not fix it, so backing off further would only delay a legitimate new publication.
+     */
+    val consecutiveFailures: Int = 0,
 )
 
 /**
@@ -149,33 +184,84 @@ interface DatasetSyncStateStore {
 /**
  * How often a check may run.
  *
- * Two intervals, because the two cases cost very different things: a *successful* check has just adopted
- * (or confirmed) the current publication and there is nothing to gain from asking again soon, while a
- * *failed* check may simply have been offline and deserves a prompt retry. A user-initiated check
- * (`forced`) is never suppressed — an explicit "check now" that silently did nothing would be worse than
- * a redundant request.
+ * Two regimes, because the two cases cost very different things:
  *
- * This is deliberately not a poll: the app checks at start-up and on foreground, at most once per
+ *  - a **successful** check has just adopted (or confirmed) the current publication, so there is nothing
+ *    to gain from asking again soon and the next one is suppressed for [successIntervalMillis];
+ *  - a **failed** check may simply have been offline, so it is retried after [failureIntervalMillis] —
+ *    but each *consecutive* transient failure doubles that wait (exponential backoff, capped at
+ *    [maxFailureIntervalMillis]), which is what stops a device that has been offline for an hour from
+ *    issuing a retry on every foreground trip and producing a retry storm the moment connectivity returns.
+ *
+ * A user-initiated check (`forced`) is never suppressed — an explicit "check now" that silently did
+ * nothing would be worse than a redundant request.
+ *
+ * **Jitter.** [jitter] adds a small, bounded amount to the computed delay so two devices that failed at
+ * the same instant do not retry at the same instant. It is injected rather than drawn from a global RNG so
+ * a test can pin it to zero and assert exact thresholds.
+ *
+ * This is deliberately not a poll: the app checks at start-up and on foreground, at most once per computed
  * interval, and never on a timer or a recomposition.
  */
 class SyncThrottlePolicy(
     /** How long a successful check suppresses the next one. Twelve hours by default. */
     val successIntervalMillis: Long = DEFAULT_SUCCESS_INTERVAL_MILLIS,
 
-    /** How long a failed check suppresses the next one. Fifteen minutes by default. */
+    /** The delay after the first failed check, doubled on each further consecutive failure. */
     val failureIntervalMillis: Long = DEFAULT_FAILURE_INTERVAL_MILLIS,
+
+    /** The ceiling the exponential failure backoff approaches but never exceeds. Six hours by default. */
+    val maxFailureIntervalMillis: Long = DEFAULT_MAX_FAILURE_INTERVAL_MILLIS,
+
+    /** The largest number of doublings applied, so the growth is provably bounded. */
+    val maxBackoffSteps: Int = DEFAULT_MAX_BACKOFF_STEPS,
+
+    /**
+     * Extra milliseconds added to a computed delay, as a function of that delay (so it scales with the
+     * interval). Defaults to none, which is what the deterministic tests rely on; the production wiring
+     * supplies a small random fraction.
+     */
+    val jitter: (Long) -> Long = { 0L },
 ) {
 
     /** True when a check should run now. */
     fun shouldCheck(state: DatasetSyncState, nowEpochMillis: Long, forced: Boolean): Boolean {
         if (forced) return true
         val lastAttempt = state.lastAttemptAtEpochMillis ?: return true
-        val interval = if (state.lastFailureCode != null) failureIntervalMillis else successIntervalMillis
-        return nowEpochMillis - lastAttempt >= interval
+        return nowEpochMillis - lastAttempt >= delayMillis(state)
+    }
+
+    /**
+     * The suppression window after the last attempt, in milliseconds.
+     *
+     * Exposed so the retry policy is observable and directly testable rather than only implied by
+     * [shouldCheck]. The value is the base interval for a success, or the exponentially-backed-off
+     * interval for a failure, plus the injected [jitter].
+     */
+    fun delayMillis(state: DatasetSyncState): Long {
+        val base = if (state.lastFailureCode == null) {
+            successIntervalMillis.coerceAtLeast(0L)
+        } else {
+            failureBackoffMillis(state.consecutiveFailures)
+        }
+        return base + jitter(base).coerceAtLeast(0L)
+    }
+
+    /** The failure interval after [consecutiveFailures] consecutive transient failures, capped. */
+    private fun failureBackoffMillis(consecutiveFailures: Int): Long {
+        val ceiling = maxFailureIntervalMillis.coerceAtLeast(0L)
+        var value = failureIntervalMillis.coerceAtLeast(0L).coerceAtMost(ceiling)
+        var steps = consecutiveFailures.coerceIn(0, maxBackoffSteps)
+        while (steps-- > 0 && value < ceiling) {
+            value = (value * 2).coerceAtMost(ceiling)
+        }
+        return value
     }
 
     companion object {
         const val DEFAULT_SUCCESS_INTERVAL_MILLIS: Long = 12L * 60 * 60 * 1000
         const val DEFAULT_FAILURE_INTERVAL_MILLIS: Long = 15L * 60 * 1000
+        const val DEFAULT_MAX_FAILURE_INTERVAL_MILLIS: Long = 6L * 60 * 60 * 1000
+        const val DEFAULT_MAX_BACKOFF_STEPS: Int = 5
     }
 }

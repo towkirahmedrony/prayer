@@ -39,6 +39,8 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetRemoteC
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncStateStore
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
+import io.github.towkirahmedrony.salah.core.domain.dataset.sync.SyncThrottlePolicy
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigResolver
@@ -46,6 +48,7 @@ import io.github.towkirahmedrony.salah.core.domain.prayerconfig.remote.PrayerCon
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.remote.RemotePrayerConfigSource
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSyncStateStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSynchronizer
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigThrottlePolicy
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
@@ -71,6 +74,7 @@ import io.github.towkirahmedrony.salah.data.notification.AndroidPrayerNotificati
 import io.github.towkirahmedrony.salah.data.notification.BundledAzanAudioSource
 import io.github.towkirahmedrony.salah.data.notification.DataStorePrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.data.notification.MediaPlayerAudioPlaybackEngine
+import io.github.towkirahmedrony.salah.data.network.AndroidNetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationDeliverer
 import io.github.towkirahmedrony.salah.data.preferences.DataStoreUserPreferencesRepository
@@ -93,6 +97,7 @@ import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
 import io.github.towkirahmedrony.salah.feature.location.LocationViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
+import kotlin.random.Random
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanUiStateFactory
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanViewModel
@@ -131,6 +136,18 @@ private const val APPLIED_PRAYER_CONFIG_DIRECTORY = "prayer_config"
 
 /** Where the prayer-configuration synchronisation state is kept, beside the stored configuration. */
 private const val PRAYER_CONFIG_SYNC_STATE_FILE = "prayer_config.sync"
+
+/**
+ * A small, bounded jitter added to a synchronisation backoff interval, so two devices that failed at the
+ * same instant do not retry at the same instant. Capped at a fifth of the interval, which spreads retries
+ * without letting one drift far enough to look like "offline". A non-positive interval yields no jitter.
+ */
+private fun backoffJitter(baseMillis: Long): Long {
+    if (baseMillis <= 0L) return 0L
+    val bound = baseMillis / 5
+    if (bound <= 0L) return 0L
+    return Random.nextLong(-bound, bound + 1)
+}
 
 /**
  * Single dependency container for Salah.
@@ -206,6 +223,9 @@ val salahModules = module {
         )
     }
     single<HttpTransport> { UrlConnectionHttpTransport() }
+    // The cheap "is there obviously no network?" hint the two synchronisers consult before a request. It is
+    // a single synchronous lookup, not a registered callback, so no continuous connectivity observer runs.
+    single<NetworkStatusProvider> { AndroidNetworkStatusProvider(androidContext()) }
     single<RemoteDatasetSource> { SupabaseRemoteDatasetSource(transport = get(), config = get()) }
     single<DatasetSyncStateStore> {
         FileDatasetSyncStateStore(
@@ -224,6 +244,10 @@ val salahModules = module {
             stateStore = get(),
             logger = get(),
             clock = get(),
+            // Deterministic defaults for the intervals; the jitter is the only randomness, so two devices
+            // that failed together do not retry together. Bounded to a fifth of the interval.
+            throttle = SyncThrottlePolicy(jitter = { base -> backoffJitter(base) }),
+            networkStatus = get(),
         )
     }
 
@@ -275,9 +299,13 @@ val salahModules = module {
             stateStore = get(),
             logger = get(),
             clock = get(),
+            // Same bounded jitter as the dataset synchroniser; separate instance because the two slots
+            // keep separate state and may be throttled independently.
+            throttle = PrayerConfigThrottlePolicy(jitter = { base -> backoffJitter(base) }),
             // After a validated revision becomes active, the effective settings are reapplied so the
             // recalculation and the reminder reconciliation that follow use the new profile.
             onActivated = { get<PrayerConfigApplier>().apply() },
+            networkStatus = get(),
         )
     }
 

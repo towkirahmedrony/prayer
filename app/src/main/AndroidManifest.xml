@@ -24,6 +24,13 @@
         VIBRATE               Required for notification vibration. Salah offers a per-prayer
                               vibration preference, so the permission is used.
 
+        ACCESS_NETWORK_STATE  Normal (install-time) permission used to ask, cheaply, whether the
+                              device has any network before the optional dataset/prayer-config
+                              synchronisers attempt a request. It is a hint only: the app never
+                              assumes a connected network reaches the internet, and every remote
+                              call is written to survive a captive portal, a DNS failure or a
+                              timeout. There is no continuous connectivity observer.
+
         ACCESS_COARSE_LOCATION
         ACCESS_FINE_LOCATION  The Qibla screen can ask the device for a position instead of
                               making the user type coordinates. Both are declared so that the
@@ -52,6 +59,7 @@
     -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />

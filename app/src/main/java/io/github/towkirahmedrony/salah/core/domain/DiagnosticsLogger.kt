@@ -229,6 +229,15 @@ object SalahDiagnosticEvents {
     /** A check ran too recently and was suppressed by the throttle policy. */
     const val DATASET_SYNC_THROTTLED = "dataset_sync_throttled"
 
+    /**
+     * The device was clearly offline, so no request was attempted. Expected operation, not a failure:
+     * the active dataset is untouched and the last-success timestamp is unchanged.
+     */
+    const val DATASET_SYNC_OFFLINE = "dataset_sync_offline"
+
+    /** A transient failure was recorded and a later retry was scheduled with exponential backoff. */
+    const val DATASET_SYNC_RETRY_SCHEDULED = "dataset_sync_retry_scheduled"
+
     // Remote prayer-configuration synchronisation ------------------------------
     // Separate from the dataset events on purpose, and with the same discipline: events record the trigger,
     // the configuration slot, the revision id and failure codes. Never a credential, a raw payload or a
@@ -254,6 +263,12 @@ object SalahDiagnosticEvents {
 
     /** A check ran too recently and was suppressed by the throttle policy. */
     const val PRAYER_CONFIG_SYNC_THROTTLED = "prayer_config_sync_throttled"
+
+    /** The device was clearly offline, so no request was attempted. Not a failure. */
+    const val PRAYER_CONFIG_SYNC_OFFLINE = "prayer_config_sync_offline"
+
+    /** A transient failure was recorded and a later retry was scheduled with exponential backoff. */
+    const val PRAYER_CONFIG_SYNC_RETRY_SCHEDULED = "prayer_config_sync_retry_scheduled"
 
     /** The stored prayer configuration could not be read, so the bundled defaults are used. */
     const val PRAYER_CONFIG_STORED_UNAVAILABLE = "prayer_config_stored_unavailable"

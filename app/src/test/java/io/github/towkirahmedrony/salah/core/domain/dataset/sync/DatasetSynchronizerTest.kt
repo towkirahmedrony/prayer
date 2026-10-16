@@ -12,11 +12,14 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetRemoteC
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailureKind
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import io.github.towkirahmedrony.salah.testing.RecordingLogger
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -404,13 +407,103 @@ class DatasetSynchronizerTest {
         assertEquals("the second check must not reach the network", 1, source.manifestCalls)
     }
 
+    // Offline, freshness and concurrency ----------------------------------------
+
+    @Test
+    fun `an offline device does not attempt a request and records no attempt`() = runTest {
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.Success(manifest()))
+        val synchroniser = synchronizer(source, networkStatus = FakeNetworkStatusProvider(online = false))
+
+        val outcome = synchroniser.synchronize(DatasetSyncTrigger.APP_START)
+
+        assertTrue(outcome.toString(), outcome is DatasetSyncOutcome.Offline)
+        assertEquals("an offline skip must not reach the network", 0, source.manifestCalls)
+        assertNull("an offline skip is not an attempt", stateStore.state.lastAttemptAtEpochMillis)
+        assertTrue(logger.has(SalahDiagnosticEvents.DATASET_SYNC_OFFLINE))
+    }
+
+    @Test
+    fun `returning to connectivity allows the next check immediately`() = runTest {
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NotFound)
+        val network = FakeNetworkStatusProvider(online = false)
+        val synchroniser = synchronizer(source, networkStatus = network)
+
+        synchroniser.synchronize(DatasetSyncTrigger.APP_START)
+        network.online = true
+        val outcome = synchroniser.synchronize(DatasetSyncTrigger.FOREGROUND)
+
+        assertTrue(outcome.toString(), outcome is DatasetSyncOutcome.UpToDate)
+        assertEquals("the offline skip must not have consumed a backoff window", 1, source.manifestCalls)
+    }
+
+    @Test
+    fun `a successful check records the last success time and clears the failure count`() = runTest {
+        stateStore.state = DatasetSyncState(
+            lastAttemptAtEpochMillis = 1L,
+            lastFailureCode = "manifest_unavailable",
+            consecutiveFailures = 4,
+        )
+        val source = FakeRemoteDatasetSource(
+            manifest = RemoteFetch.Success(manifest()),
+            payload = RemoteFetch.Success(payloadBytes()),
+        )
+
+        synchronizer(source).synchronize(DatasetSyncTrigger.APP_START, forced = true)
+
+        val state = stateStore.state
+        assertEquals(clockMillis(), state.lastSuccessAtEpochMillis)
+        assertEquals(0, state.consecutiveFailures)
+        assertNull(state.lastFailureCode)
+    }
+
+    @Test
+    fun `a failed check keeps the previous last success and counts the failure`() = runTest {
+        stateStore.state = DatasetSyncState(lastSuccessAtEpochMillis = 111L)
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NetworkFailure(NetworkFailureKind.CONNECTION))
+
+        synchronizer(source).synchronize(DatasetSyncTrigger.APP_START, forced = true)
+
+        val state = stateStore.state
+        assertEquals("a failed request is not a fresh success", 111L, state.lastSuccessAtEpochMillis)
+        assertEquals(1, state.consecutiveFailures)
+    }
+
+    @Test
+    fun `a terminal failure does not grow the backoff`() = runTest {
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.Success(manifest(schema = 2)))
+
+        synchronizer(source).synchronize(DatasetSyncTrigger.APP_START, forced = true)
+
+        assertEquals("a terminal failure must not inflate the retry wait", 0, stateStore.state.consecutiveFailures)
+    }
+
+    @Test
+    fun `two triggers close together download the payload once`() = runTest {
+        val source = FakeRemoteDatasetSource(
+            manifest = RemoteFetch.Success(manifest()),
+            payload = RemoteFetch.Success(payloadBytes()),
+        )
+        val synchroniser = synchronizer(source)
+
+        val first = async { synchroniser.synchronize(DatasetSyncTrigger.APP_START, forced = true) }
+        val second = async { synchroniser.synchronize(DatasetSyncTrigger.FOREGROUND, forced = true) }
+        first.await()
+        second.await()
+
+        assertEquals("concurrent triggers must be serialised", 1, source.payloadCalls)
+        assertEquals(1, store.activations)
+    }
+
     // Helpers ----------------------------------------------------------------------------------
+
+    private fun clockMillis(): Long = Instant.parse("2026-10-15T00:00:00Z").toEpochMilli()
 
     private fun synchronizer(
         source: RemoteDatasetSource,
         throttle: SyncThrottlePolicy = SyncThrottlePolicy(successIntervalMillis = 0, failureIntervalMillis = 0),
         config: DatasetRemoteConfig = this.config,
         maxPayloadBytes: Long = 8L * 1024 * 1024,
+        networkStatus: NetworkStatusProvider = FakeNetworkStatusProvider(online = true),
     ): DatasetSynchronizer = DatasetSynchronizer(
         config = config,
         source = source,
@@ -421,6 +514,7 @@ class DatasetSynchronizerTest {
         clock = Clock.fixed(Instant.parse("2026-10-15T00:00:00Z"), ZoneOffset.UTC),
         throttle = throttle,
         maxPayloadBytes = maxPayloadBytes,
+        networkStatus = networkStatus,
     )
 
     private fun failure(outcome: DatasetSyncOutcome): SyncFailureReason {
@@ -527,5 +621,9 @@ class DatasetSynchronizerTest {
         override suspend fun write(state: DatasetSyncState) {
             this.state = state
         }
+    }
+
+    private class FakeNetworkStatusProvider(var online: Boolean) : NetworkStatusProvider {
+        override suspend fun isOnline(): Boolean = online
     }
 }

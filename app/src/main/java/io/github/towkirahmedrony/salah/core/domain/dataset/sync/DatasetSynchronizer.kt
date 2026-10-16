@@ -15,6 +15,8 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.PublicationPro
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
+import io.github.towkirahmedrony.salah.core.domain.network.AlwaysOnlineNetworkStatusProvider
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,6 +67,12 @@ class DatasetSynchronizer(
     private val clock: Clock,
     private val throttle: SyncThrottlePolicy = SyncThrottlePolicy(),
     private val maxPayloadBytes: Long = MAX_PAYLOAD_BYTES,
+    /**
+     * Whether the device has a network. Consulted before any request so a plainly-offline device is not
+     * made to attempt one. Defaulted to "always online" so an existing caller keeps the previous
+     * behaviour and no test is accidentally suppressed.
+     */
+    private val networkStatus: NetworkStatusProvider = AlwaysOnlineNetworkStatusProvider,
 ) {
 
     private val mutex = Mutex()
@@ -99,6 +107,18 @@ class DatasetSynchronizer(
                 mapOf("trigger" to trigger.name, "lastAttemptAt" to state.lastAttemptAtEpochMillis),
             )
             return DatasetSyncOutcome.Throttled
+        }
+
+        // A plainly-offline device is not made to attempt a request it cannot complete. This cheap, local
+        // check sits *after* the throttle (a suppressed check should not consult connectivity at all) and
+        // *before* the attempt is recorded: an offline skip is not a failure, it leaves the last-success
+        // timestamp untouched, and returning to connectivity must not have to wait out a backoff window.
+        if (!networkStatus.isOnline()) {
+            logger.info(
+                SalahDiagnosticEvents.DATASET_SYNC_OFFLINE,
+                mapOf("trigger" to trigger.name),
+            )
+            return DatasetSyncOutcome.Offline
         }
 
         logger.info(
@@ -345,11 +365,22 @@ class DatasetSynchronizer(
             is DatasetSyncOutcome.Rejected -> REJECTED_CODE
             else -> null
         }
+        // Only a *transient* failure grows the backoff: a terminal one is not retried for the same
+        // publication anyway, so letting it inflate the failure count would only delay a legitimate new
+        // publication. A success resets it to zero.
+        val transientFailure = outcome is DatasetSyncOutcome.Failed && outcome.reason.transient
+        val consecutiveFailures = when {
+            outcome.isSuccess -> 0
+            transientFailure -> previous.consecutiveFailures + 1
+            else -> previous.consecutiveFailures
+        }
         writeState(
             DatasetSyncState(
                 lastAttemptAtEpochMillis = now,
                 lastAttemptedPublicationId = publicationId ?: previous.lastAttemptedPublicationId,
                 lastFailureCode = failureCode,
+                lastSuccessAtEpochMillis = if (outcome.isSuccess) now else previous.lastSuccessAtEpochMillis,
+                consecutiveFailures = consecutiveFailures,
             ),
         )
 
@@ -366,11 +397,25 @@ class DatasetSynchronizer(
                 SalahDiagnosticEvents.DATASET_SYNC_REJECTED,
                 mapOf("codes" to outcome.problems.map { it.code }.distinct().sorted()),
             )
-            is DatasetSyncOutcome.Failed -> logger.warn(
-                SalahDiagnosticEvents.DATASET_SYNC_FAILED,
-                mapOf("reason" to outcome.reason.code, "detail" to outcome.detail),
-            )
-            DatasetSyncOutcome.NotConfigured, DatasetSyncOutcome.Throttled -> Unit
+            is DatasetSyncOutcome.Failed -> {
+                logger.warn(
+                    SalahDiagnosticEvents.DATASET_SYNC_FAILED,
+                    mapOf("reason" to outcome.reason.code, "detail" to outcome.detail),
+                )
+                if (outcome.reason.transient) {
+                    logger.info(
+                        SalahDiagnosticEvents.DATASET_SYNC_RETRY_SCHEDULED,
+                        mapOf(
+                            "reason" to outcome.reason.code,
+                            "consecutiveFailures" to consecutiveFailures,
+                        ),
+                    )
+                }
+            }
+            DatasetSyncOutcome.NotConfigured,
+            DatasetSyncOutcome.Throttled,
+            DatasetSyncOutcome.Offline,
+            -> Unit
         }
 
         return outcome
