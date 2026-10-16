@@ -318,8 +318,13 @@ class ZakatCalculatorTest {
     @Test
     fun `exact amounts are not distorted by the rounding step`() {
         // 1,000,000 × 0.025 = 25,000 exactly. A half-up step must leave an exact amount alone.
-        val result = ZakatCalculator.calculate(inputs(cash = "1000000"))
+        // The silver nisab (91,854) is used so that the wealth is genuinely above the threshold: against the
+        // gold nisab of 1,049,760 a million would owe nothing and there would be no amount to round.
+        val result = ZakatCalculator.calculate(
+            inputs(cash = "1000000", nisabMetal = ZakatNisabMetal.SILVER),
+        )
 
+        assertEquals(ZakatStatus.CALCULATED, result.status)
         assertRoundedAmount("25000.00", result.zakatDue)
     }
 
@@ -681,8 +686,10 @@ class ZakatCalculatorTest {
         // There is no catch-all row, so the same holding cannot be entered in two places — the risk the brief
         // names is structural here rather than a warning the user has to heed.
         val fields = result.lines.map { line -> line.field }
-        assertEquals(fields.size, fields.distinct().size)
-        assertEquals(10, fields.size)
+        assertEquals("a category was reported twice", fields.size, fields.distinct().size)
+        // Every category the calculator knows about was supplied above, and each produced exactly one row —
+        // so the count is the enum's own size rather than a number that can drift when a field is added.
+        assertEquals(ZakatLineField.entries.size, fields.size)
     }
 
     @Test
