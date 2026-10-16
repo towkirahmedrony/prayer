@@ -14,6 +14,8 @@ import io.github.towkirahmedrony.salah.core.domain.calendar.GregorianCalendarGri
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
 import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
+import io.github.towkirahmedrony.salah.core.domain.night.NightPeriodCalculator
+import io.github.towkirahmedrony.salah.core.domain.solar.SolarDayResolver
 import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEngine
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanPlaybackManager
@@ -366,6 +368,14 @@ val salahModules = module {
         RuleBookProhibitedPeriodsRepository(ruleBook = get(), calculator = get())
     }
 
+    // Solar geometry and the night interval -----------------------------------
+    // Both are pure functions of the schedule the engine already produced: the solar resolver reads
+    // the offset-free solar events, and the night calculator reads the effective Maghrib and the
+    // following day's effective Fajr. Neither performs astronomy of its own, so Salah still has
+    // exactly one prayer-time engine. See docs/SOLAR_AND_NIGHT_PERIODS.md.
+    single { SolarDayResolver() }
+    single { NightPeriodCalculator() }
+
     // Notifications -----------------------------------------------------------
     // The planner is pure: it decides what should be scheduled and nothing else.
     single { PrayerNotificationPlanner() }
@@ -441,6 +451,8 @@ val salahModules = module {
             nextPrayerResolver = get(),
             currentPrayerResolver = get(),
             prohibitedStatusResolver = get(),
+            solarDayResolver = get(),
+            nightPeriodCalculator = get(),
         )
     }
 

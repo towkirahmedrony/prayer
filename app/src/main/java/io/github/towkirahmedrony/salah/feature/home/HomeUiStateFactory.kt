@@ -6,6 +6,8 @@ import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerStatus
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
+import io.github.towkirahmedrony.salah.core.domain.night.NightPeriodCalculator
+import io.github.towkirahmedrony.salah.core.domain.solar.SolarDayResolver
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
@@ -15,9 +17,11 @@ import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
+import io.github.towkirahmedrony.salah.core.model.NightPeriodsState
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
+import io.github.towkirahmedrony.salah.core.model.SolarDayState
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
@@ -52,6 +56,8 @@ class HomeUiStateFactory(
     private val nextPrayerResolver: NextPrayerResolver,
     private val currentPrayerResolver: CurrentPrayerPeriodResolver,
     private val prohibitedStatusResolver: ProhibitedPeriodStatusResolver,
+    private val solarDayResolver: SolarDayResolver = SolarDayResolver(),
+    private val nightPeriodCalculator: NightPeriodCalculator = NightPeriodCalculator(),
 ) {
 
     fun create(
@@ -127,6 +133,17 @@ class HomeUiStateFactory(
         )
         val daylight = daylightSpan(schedule)
 
+        // The day's solar geometry and the night interval are derived from the same schedule (and,
+        // for the night interval, the same following-day schedule) that everything else on the
+        // screen reads. Neither performs astronomy: they only read instants the engine produced, and
+        // they are a pure function of those instants and the displayed moment.
+        val solarDayUi = solarDaySection(solarDayResolver.resolve(schedule), timeFormatter)
+        val nightUi = nightSection(
+            state = nightPeriodCalculator.calculate(schedule, nextDaySchedule),
+            now = now,
+            timeFormatter = timeFormatter,
+        )
+
         return HomeUiState.Ready(
             gregorianDate = gregorian?.formattedDate,
             weekday = calendar?.weekdayLabel,
@@ -183,6 +200,8 @@ class HomeUiStateFactory(
                     timeLabel = schedule?.timeOf(event)?.let(timeFormatter::format),
                 )
             },
+            solarDay = solarDayUi,
+            night = nightUi,
             daylight = daylight,
             heroArc = heroArc,
             prohibited = prohibitedState.toSection(
@@ -428,6 +447,74 @@ class HomeUiStateFactory(
             // The reason travels with its detail so the screen can explain the exact gap
             // instead of falling back to a generic sentence about verified rules.
             unavailable = reason,
+        )
+    }
+
+    /**
+     * Maps the resolved solar geometry to its section.
+     *
+     * A field is left `null` when its event is genuinely absent; the section is only marked
+     * unavailable when no schedule exists to derive anything from, so a polar day that still has a
+     * transit and a measured span is shown as far as it honestly can be.
+     */
+    private fun solarDaySection(
+        state: SolarDayState,
+        timeFormatter: DateTimeFormatter,
+    ): SolarDaySection = when (state) {
+        is SolarDayState.Available -> SolarDaySection(
+            solarMidnightLabel = state.day.solarMidnight?.let(timeFormatter::format),
+            dayLengthLabel = state.day.dayLength?.let(CountdownFormatter::formatCompact),
+            nightLengthLabel = state.day.nightLength?.let(CountdownFormatter::formatCompact),
+            unavailable = null,
+        )
+
+        is SolarDayState.NotAvailable -> SolarDaySection(
+            solarMidnightLabel = null,
+            dayLengthLabel = null,
+            nightLengthLabel = null,
+            unavailable = state.reason,
+        )
+    }
+
+    /**
+     * Maps the resolved night interval to its section for the displayed moment.
+     *
+     * The phase, the upcoming boundary and the countdown all come from the same calculator, so the
+     * countdown can only ever target a boundary the interval actually has. When the interval cannot
+     * be built — today's Maghrib or the following Fajr is missing — every field is `null` and the
+     * reason is carried, never a fabricated boundary.
+     */
+    private fun nightSection(
+        state: NightPeriodsState,
+        now: ZonedDateTime,
+        timeFormatter: DateTimeFormatter,
+    ): NightSection = when (state) {
+        is NightPeriodsState.Available -> {
+            val periods = state.periods
+            val upcoming = nightPeriodCalculator.upcomingBoundary(periods, now)
+            NightSection(
+                phase = nightPeriodCalculator.phaseAt(periods, now),
+                durationLabel = CountdownFormatter.formatCompact(periods.duration),
+                islamicMidnightLabel = timeFormatter.format(periods.islamicMidnight),
+                lastThirdStartsLabel = timeFormatter.format(periods.lastThirdStartsAt),
+                tahajjudStartsLabel = timeFormatter.format(periods.tahajjudStartsAt),
+                nextBoundary = upcoming?.boundary,
+                countdown = upcoming?.let { CountdownFormatter.format(it.remaining) },
+                convention = state.convention,
+                unavailable = null,
+            )
+        }
+
+        is NightPeriodsState.NotAvailable -> NightSection(
+            phase = null,
+            durationLabel = null,
+            islamicMidnightLabel = null,
+            lastThirdStartsLabel = null,
+            tahajjudStartsLabel = null,
+            nextBoundary = null,
+            countdown = null,
+            convention = null,
+            unavailable = state.reason,
         )
     }
 

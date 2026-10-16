@@ -77,6 +77,32 @@
     <string name="prohibited_convention_title">Configured convention</string>
     <string name="prohibited_convention_not_reviewed">These boundaries are Salah\'s own documented policy, shown as such. They have not been confirmed by a qualified reviewer, and the minute values differ between scholarly conventions.</string>
     <string name="prohibited_convention_reviewed">These boundaries were confirmed by a qualified reviewer, together with the references recorded for them.</string>
+
+    <!--
+      Home: the night-period card. The interval is Maghrib to the following Fajr; the boundaries are
+      derived from it. Tahajjud is voluntary night prayer and its start is a documented convention,
+      not a ruling, which is why the note says so instead of asserting it.
+    -->
+    <string name="home_night_title">Night periods</string>
+    <string name="home_night_note">The night interval runs from Maghrib to the next Fajr. Islamic midnight and the last third are derived from that interval. Tahajjud is voluntary night prayer; Salah begins it at the last third, which is one convention among several.</string>
+    <string name="home_night_duration">Night interval</string>
+    <string name="home_night_islamic_midnight">Islamic midnight</string>
+    <string name="home_night_last_third">Last third begins</string>
+    <string name="home_night_tahajjud">Tahajjud begins</string>
+    <string name="home_night_phase_early">First half of the night</string>
+    <string name="home_night_phase_late">Second half of the night</string>
+    <string name="home_night_phase_last_third">Last third of the night</string>
+    <string name="home_night_outside">No night interval is open now; it begins at Maghrib.</string>
+    <string name="home_night_countdown_midnight">Islamic midnight in %1$s</string>
+    <string name="home_night_countdown_last_third">Last third in %1$s</string>
+    <string name="home_night_countdown_fajr">Fajr in %1$s</string>
+
+    <!-- Home: the solar-geometry card. Solar midnight is the anti-transit, distinct from both civil and Islamic midnight. -->
+    <string name="home_solar_geometry_title">Solar geometry</string>
+    <string name="home_solar_midnight">Solar midnight</string>
+    <string name="home_solar_day_length">Day length</string>
+    <string name="home_solar_night_length">Night length</string>
+    <string name="home_solar_geometry_note">Solar noon is the sun\'s transit, which is not clock noon and not the Dhuhr prayer time. Solar midnight is the anti-transit, twelve hours from it, and is distinct from civil and Islamic midnight.</string>
     <string name="prohibited_kind_sunrise_ascent">Sunrise ascent</string>
     <string name="prohibited_kind_zenith_decline">Solar noon (zawal)</string>
     <string name="prohibited_kind_sunset_setting">Sunset setting</string>

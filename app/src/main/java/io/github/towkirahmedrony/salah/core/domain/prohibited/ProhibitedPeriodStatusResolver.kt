@@ -57,6 +57,27 @@ class ProhibitedPeriodStatusResolver {
     fun classify(periods: List<ProhibitedPeriod>, now: ZonedDateTime): List<ProhibitedPeriodStatus> =
         periods.map { period -> classify(period, now) }
 
+    /**
+     * The window that is open at [now], or `null` when none is.
+     *
+     * At most one window can be active at a moment because the configured policy's three windows do
+     * not overlap, but this returns the first active one regardless, so a caller that supplied
+     * overlapping windows still gets a definite answer rather than a silently dropped interval.
+     */
+    fun active(periods: List<ProhibitedPeriod>, now: ZonedDateTime): ProhibitedPeriodStatus? =
+        classify(periods, now).firstOrNull { it.phase == ProhibitedPeriodPhase.ACTIVE }
+
+    /**
+     * The next window to open after [now], or `null` when every window has already passed today.
+     *
+     * "Next" is the upcoming window with the smallest opening time, so the caller does not depend on
+     * the order the windows were supplied in.
+     */
+    fun next(periods: List<ProhibitedPeriod>, now: ZonedDateTime): ProhibitedPeriodStatus? =
+        classify(periods, now)
+            .filter { it.phase == ProhibitedPeriodPhase.UPCOMING }
+            .minByOrNull { it.startsIn?.seconds ?: Long.MAX_VALUE }
+
     fun classify(period: ProhibitedPeriod, now: ZonedDateTime): ProhibitedPeriodStatus {
         val moment = now.withZoneSameInstant(period.startsAt.zone)
         val startsAt = period.startsAt

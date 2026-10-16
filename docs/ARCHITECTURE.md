@@ -100,7 +100,13 @@ io.github.towkirahmedrony.salah
 │   │                           ThemeMode, UnavailabilityReason
 │   ├── domain/
 │   │   ├── prayer/             PrayerTimesProvider (port), PrayerScheduleRequest/State
-│   │   ├── prohibited/         ProhibitedWindowKind/RuleSet/RuleBook + ProhibitedPeriodCalculator
+│   │   ├── prohibited/         ProhibitedWindowKind/RuleSet/RuleBook + ProhibitedPeriodCalculator,
+│   │   │                       ProhibitedPeriodStatusResolver
+│   │   ├── solar/              SolarDayResolver: solar midnight and day/night lengths, derived
+│   │   │                       from the schedule's own events (docs/SOLAR_AND_NIGHT_PERIODS.md)
+│   │   ├── night/              NightPhase/Boundary, NightPeriodCalculator, ConfiguredNightConvention:
+│   │   │                       Islamic midnight, last third, Tahajjud from the Maghrib-to-Fajr
+│   │   │                       interval (docs/SOLAR_AND_NIGHT_PERIODS.md)
 │   │   ├── notification/       Notification subsystem, Android-free:
 │   │   │                       ReminderTarget, PrayerAlarmSlot, PrayerReminderKind,
 │   │   │                       PlannedPrayerNotification, PrayerNotificationIds,
@@ -494,6 +500,10 @@ data source.
 | Countdown formatting | `CountdownFormatterTest` | `Locale.ROOT`, negative clamped |
 | Prohibited-window calculus | `ProhibitedPeriodCalculatorTest` | Anchors, ordering, zone, refusal on an unreviewed rule set, loud failure on a missing anchor (synthetic rule set, not a religious source) |
 | Prohibited repository wiring | `RuleBookProhibitedPeriodsRepositoryTest` | Shipped policy → three windows plus the not-reviewed disclosure; reviewed set takes precedence; nothing applicable → `RULES_NOT_VERIFIED`; missing anchor → `NotAvailable` |
+| Prohibited active/next selection | `ProhibitedPeriodSelectionTest` | The active window and the nearest upcoming one across the day, at exact boundaries, and with an empty day |
+| Solar geometry | `SolarDayResolverTest` | Measured day/night lengths, solar noon vs clock noon, solar midnight as the anti-transit, leap day, next-local-date case, each field `null` when its event is absent, absent schedule |
+| Night periods | `NightPeriodCalculatorTest` | Maghrib-to-next-Fajr interval crossing midnight, Islamic midnight as the midpoint, the last third, both Tahajjud conventions, every phase boundary, cross-zone phases, the next boundary and countdown, missing/invalid input |
+| Night & solar Home mapping | `HomeNightSectionTest` | Both new sections mapped into `HomeUiState`, the advancing phase and countdown, missing-input cases |
 | Location validation | `LocationInfoTest` | Ranges, IANA zone, blank label, NaN |
 | Offline-first repository | `ProviderBackedPrayerScheduleRepositoryTest` | No location, engine not configured, cache reuse without re-calling the provider, recalculation on date/location/profile change, stale or wrong-place response rejection, exception → visible failure |
 | Settings persistence | `DataStoreUserPreferencesRepositoryTest` | Real DataStore: persists/restores every setting including the calendar preferences, transactional updates, the Hijri offset clamped on write and read, safe fallback on unknown values, and calendar/prayer/theme preferences not overwriting one another |
@@ -599,6 +609,10 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
 - Prohibited prayer windows are **implemented and configured** with this application's documented
   policy. Confirming the boundaries is a data change: add a reviewed `ProhibitedRuleSet`. See
   `docs/FORBIDDEN_PRAYER_TIMES.md`.
+- Solar midnight is an **approximation** of the true lower culmination (the transit plus twelve
+  hours), and Tahajjud's start is a **documented convention** (the last third), not a ruling. Both
+  are derived from the schedule's own events and neither is aligned to any authority timetable. See
+  `docs/SOLAR_AND_NIGHT_PERIODS.md`.
 
 ## 12. Local dataset foundation
 

@@ -794,6 +794,28 @@
     <string name="prohibited_convention_title">কনফিগার করা নিয়ম</string>
     <string name="prohibited_convention_not_reviewed">এই সীমাগুলো সালাহর নিজের নথিভুক্ত নীতি, এবং সেভাবেই দেখানো হয়েছে। কোনো যোগ্য পর্যালোচক এগুলো নিশ্চিত করেননি, এবং মিনিটের মান পণ্ডিতদের বিভিন্ন নিয়মে আলাদা হয়।</string>
     <string name="prohibited_convention_reviewed">একজন যোগ্য পর্যালোচক এই সীমাগুলো নিশ্চিত করেছেন, সাথে তাদের জন্য নথিভুক্ত রেফারেন্সসহ।</string>
+
+    <!-- রাতের সময়কাল: মাগরিব থেকে পরদিনের ফজর; তাহাজ্জুদ একটি নফল ইবাদত এবং তার সূচনা একটি নথিভুক্ত নিয়ম। -->
+    <string name="home_night_title">রাতের সময়গুলো</string>
+    <string name="home_night_note">রাতের বিরতি মাগরিব থেকে পরদিনের ফজর পর্যন্ত হিসাব করা হয়। ইসলামি মধ্যরাত ও শেষ তৃতীয়াংশ সেই বিরতি থেকেই নির্ণীত। তাহাজ্জুদ একটি নফল ইবাদত; সালাহ এটির সূচনা ধরে রাতের শেষ তৃতীয়াংশ থেকে, যা কয়েকটি নিয়মের একটি।</string>
+    <string name="home_night_duration">রাতের বিরতি</string>
+    <string name="home_night_islamic_midnight">ইসলামি মধ্যরাত</string>
+    <string name="home_night_last_third">শেষ তৃতীয়াংশ শুরু</string>
+    <string name="home_night_tahajjud">তাহাজ্জুদ শুরু</string>
+    <string name="home_night_phase_early">রাতের প্রথমার্ধ</string>
+    <string name="home_night_phase_late">রাতের দ্বিতীয়ার্ধ</string>
+    <string name="home_night_phase_last_third">রাতের শেষ তৃতীয়াংশ</string>
+    <string name="home_night_outside">এখন কোনো রাতের বিরতি চালু নেই; এটি মাগরিবে শুরু হয়।</string>
+    <string name="home_night_countdown_midnight">ইসলামি মধ্যরাত %1$s পরে</string>
+    <string name="home_night_countdown_last_third">শেষ তৃতীয়াংশ %1$s পরে</string>
+    <string name="home_night_countdown_fajr">ফজর %1$s পরে</string>
+
+    <!-- সৌর হিসাব: সৌর মধ্যরাত অ্যান্টি-ট্রানজিট, যা সাধারণ ও ইসলামি মধ্যরাত থেকে আলাদা। -->
+    <string name="home_solar_geometry_title">সৌর হিসাব</string>
+    <string name="home_solar_midnight">সৌর মধ্যরাত</string>
+    <string name="home_solar_day_length">দিনের দৈর্ঘ্য</string>
+    <string name="home_solar_night_length">রাতের দৈর্ঘ্য</string>
+    <string name="home_solar_geometry_note">সৌর দুপুর হলো সূর্যের ট্রানজিট, যা ঘড়ির দুপুর নয় এবং যোহরের নামাজের সময়ও নয়। সৌর মধ্যরাত হলো অ্যান্টি-ট্রানজিট, ট্রানজিট থেকে বারো ঘণ্টা পর, এবং এটি সাধারণ ও ইসলামি মধ্যরাত থেকে আলাদা।</string>
     <!-- মানচিত্র নির্বাচক সরানো হয়েছে; এই লেবেলটি আগের সংস্করণে সংরক্ষিত মানচিত্র-নির্বাচিত অবস্থানের জন্য রাখা হয়েছে। -->
     <string name="location_source_map">মানচিত্রে নির্বাচিত</string>
 

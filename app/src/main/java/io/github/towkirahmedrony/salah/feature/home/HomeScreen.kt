@@ -134,6 +134,13 @@ private fun HomeContent(
             )
         }
 
+        // The night interval's boundaries are the readings a reader acts on after Isha (the last
+        // third and Tahajjud), so the card sits on Home; the rest of the solar geometry is in the
+        // Prayer screen's detail, where the full day is already laid out.
+        item(key = "night-periods") {
+            NightPeriodsCard(state = state)
+        }
+
         item(key = "daily-tools") {
             DailyToolsSection(onNavigate = onNavigate)
         }

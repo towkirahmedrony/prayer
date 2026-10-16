@@ -6,8 +6,11 @@ import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
+import io.github.towkirahmedrony.salah.core.domain.night.NightBoundary
+import io.github.towkirahmedrony.salah.core.domain.night.NightPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
+import io.github.towkirahmedrony.salah.core.model.NightPeriodConvention
 import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.ProhibitedConvention
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
@@ -68,6 +71,10 @@ sealed interface HomeUiState {
         val nextPrayer: NextPrayerSection,
         val prayerRows: List<PrayerRow>,
         val solarRows: List<SolarRow>,
+        /** The day's solar geometry: solar midnight and the measured day and night lengths. */
+        val solarDay: SolarDaySection,
+        /** The night interval: Islamic midnight, the last third, Tahajjud and the next boundary. */
+        val night: NightSection,
         /**
          * The day's sunlight span — sunset minus sunrise — rendered as `11h 38m`, or `null` when the
          * schedule carries both solar events and the span can be measured. Never invented: without
@@ -236,6 +243,45 @@ data class PrayerRow(
 data class SolarRow(
     val event: SolarEvent,
     val timeLabel: String?,
+)
+
+/**
+ * The day's solar geometry, resolved for display.
+ *
+ * `null` on a field means the event it needs is genuinely unavailable — a polar schedule, or a
+ * schedule that does not carry the anchor — never that it was approximated. [unavailable] is set
+ * only when no geometry could be derived at all.
+ */
+data class SolarDaySection(
+    /** The anti-transit, i.e. solar midnight. Distinct from civil midnight and Islamic midnight. */
+    val solarMidnightLabel: String?,
+    /** Sunrise to sunset. */
+    val dayLengthLabel: String?,
+    /** The astronomical night, the complement of the day length within a 24-hour day. */
+    val nightLengthLabel: String?,
+    val unavailable: UnavailabilityReason?,
+)
+
+/**
+ * The night interval and its boundaries, resolved for the moment the screen is showing.
+ *
+ * Every label is already formatted: the composable decides nothing. [phase] is `null` when the
+ * displayed moment is outside the interval (between one Fajr and the following Maghrib), which is a
+ * fact about the timetable rather than a gap. [nextBoundary] and [countdown] are `null` once the
+ * interval has ended for the night.
+ */
+data class NightSection(
+    val phase: NightPhase?,
+    /** The length of the Maghrib-to-Fajr interval. */
+    val durationLabel: String?,
+    val islamicMidnightLabel: String?,
+    val lastThirdStartsLabel: String?,
+    val tahajjudStartsLabel: String?,
+    val nextBoundary: NightBoundary?,
+    val countdown: String?,
+    /** The convention the boundaries were derived under, so the screen can disclose it. */
+    val convention: NightPeriodConvention?,
+    val unavailable: UnavailabilityReason?,
 )
 
 /**
