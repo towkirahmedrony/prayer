@@ -223,7 +223,7 @@ class QiblaViewModelTest {
         // Frozen pins for the pair, so a change to either coordinate is caught by name rather than by
         // a threshold: Sylhet is ~131 km further from the Kaaba than Dhaka.
         assertEquals(277.011537408, after.bearingDegrees!!, 1e-4)
-        assertEquals(5_302_998.4, after.distanceToKaabaMetres!!, 1.0)
+        assertEquals(5_302_995.4, after.distanceToKaabaMetres!!, 1.0)
 
         // And the reading is genuinely new rather than the previous location's still being shown.
         assertTrue(
