@@ -320,7 +320,7 @@
     <string name="zakat_debts_keep">Not deducted (Shafi\'i)</string>
     <string name="zakat_help_debts">The schools differ on whether a debt can prevent the obligation, so the same figures can give different answers.</string>
     <string name="zakat_field_hawl">Date your wealth first reached the nisab</string>
-    <string name="zakat_help_hawl">Optional. Used only to estimate the next anniversary, which you must check yourself. Salah does not state that a payment is due.</string>
+    <string name="zakat_help_hawl">Optional, in YYYY-MM-DD form (for example 2026-01-01). Used only to estimate the next anniversary, which you must check yourself. Salah does not state that a payment is due.</string>
     <string name="zakat_hawl_estimate">Estimated next anniversary %1$s — about %2$s days after your date.</string>
 
     <string name="zakat_result_total_assets">Total eligible assets</string>

@@ -485,6 +485,13 @@ neither: choosing between two approvals would be inventing a policy. A row that 
 or rejected is never presented as a current approved rate, and a price is never inferred from the newest
 timestamp.
 
+A row that exists but is outside this basis — inactive, awaiting or refused verification, of another purity, or
+stated in another currency — is reported as **no published reference price**, the same state as an empty
+publication, because such a row is a price and simply not the one this app publishes from. A row that cannot be
+read as a price at all — a required field absent, or a price that is missing, zero or negative — is reported as
+**unusable published data** instead, so a broken publication is never mistaken for an empty one. The two states
+are told apart because they ask different things of whoever maintains the records.
+
 **The unit and the precision.** A reference price is **BDT per gram** as an exact decimal. The JSON number's
 own text is read into a `BigDecimal` — never through `Double` or `Float` — and a missing, malformed, zero or
 negative price is rejected rather than turned into zero. There is no hardcoded fallback rate anywhere in the

@@ -71,7 +71,7 @@ class SupabaseMetalPriceRepositoryTest {
                 "[" +
                     record("GOLD", price = "20000", purity = "K21") + "," +
                     record("GOLD", price = "18000", purity = "K18") + "," +
-                    record("GOLD", price = "19550.07", purity = "K22") +
+                    record("GOLD", price = "19550.07", purity = "K22") + "," +
                     record("GOLD", price = "17000", purity = "TRADITIONAL") +
                     "]",
             ),
@@ -81,6 +81,19 @@ class SupabaseMetalPriceRepositoryTest {
 
         assertEquals(MetalPurity.K22, gold.price.purity)
         assertEquals("19550.07", gold.price.pricePerGram.toPlainString())
+    }
+
+    @Test
+    fun `only a non-K22 purity being published is no published rate, not broken data`() = runTest {
+        // A K21 gold row is a perfectly well-formed price — it is just not the K22 basis this app selects from,
+        // exactly as an inactive or unverified K22 row is a well-formed price that is not published. Both leave
+        // the metal with no published reference rate rather than reporting the publication as unusable, which is
+        // the state a user is told about and the reason the two are kept apart.
+        val (repository, _) = repository(
+            RemoteFetch.Success("[${record("GOLD", price = "20000", purity = "K21")}]"),
+        )
+
+        assertEquals(ReferencePriceResult.NotPublished, repository.publishedReferencePrices().gold)
     }
 
     @Test
