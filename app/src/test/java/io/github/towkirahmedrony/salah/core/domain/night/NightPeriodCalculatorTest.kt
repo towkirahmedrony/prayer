@@ -96,8 +96,12 @@ class NightPeriodCalculatorTest {
 
         assertEquals(date, periods.startsAt.toLocalDate())
         assertEquals(date.plusDays(1), periods.endsAt.toLocalDate())
-        assertEquals(date.plusDays(1), periods.islamicMidnight.toLocalDate())
+        // Islamic midnight here is 23:07, before civil midnight, so it is still on the opening date;
+        // the last third begins at 00:58, on the following date. The interval's two ends therefore lie
+        // on different dates, which is what makes the crossing of civil midnight relevant.
+        assertEquals(date, periods.islamicMidnight.toLocalDate())
         assertEquals(date.plusDays(1), periods.lastThirdStartsAt.toLocalDate())
+        assertTrue(periods.startsAt.toLocalDate() != periods.endsAt.toLocalDate())
     }
 
     @Test
@@ -253,9 +257,10 @@ class NightPeriodCalculatorTest {
 
     @Test
     fun `a following Fajr that is not after Maghrib is refused, not silently reordered`() {
-        // Same-instant Fajr as Maghrib: the interval would be zero or negative, so it is unavailable.
-        val broken = schedule(date.plusDays(1), fajr = at(date.plusDays(1), 17, 36))
-        val state = calculator.calculate(today, broken)
+        // The schedule handed in as "the following day" is really today's: its Fajr (04:39) is before
+        // this day's Maghrib (17:36), so the interval would be negative and is refused rather than
+        // reordered into a valid-looking one.
+        val state = calculator.calculate(today, today)
 
         assertTrue(state is NightPeriodsState.NotAvailable)
     }
