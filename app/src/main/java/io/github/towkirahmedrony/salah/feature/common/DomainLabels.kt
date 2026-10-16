@@ -9,6 +9,7 @@ import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKi
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.DashboardCard
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.HijriDateSource
 import io.github.towkirahmedrony.salah.core.model.IslamicOccasion
@@ -233,6 +234,39 @@ fun PrayerConfigOrigin.labelRes(): Int = when (kind) {
     PrayerConfigOriginKind.PUBLISHED_GLOBAL -> R.string.settings_config_source_global
     PrayerConfigOriginKind.PUBLISHED_AREA -> R.string.settings_config_source_area
     PrayerConfigOriginKind.USER_OVERRIDE -> R.string.settings_config_source_user
+}
+
+/**
+ * The name of a Home dashboard card, shown in the customization list.
+ *
+ * A short name for the card itself, deliberately separate from the headings the card renders: the
+ * list names the card, the card names its own content.
+ */
+@StringRes
+fun DashboardCard.labelRes(): Int = when (this) {
+    DashboardCard.NEXT_PRAYER -> R.string.home_card_next_prayer_title
+    DashboardCard.TODAY_TIMETABLE -> R.string.home_card_timetable_title
+    DashboardCard.FORBIDDEN_TIMES -> R.string.home_card_forbidden_title
+    DashboardCard.CALENDAR -> R.string.home_card_calendar_title
+    DashboardCard.RAMADAN -> R.string.home_card_ramadan_title
+    DashboardCard.NIGHT_PERIODS -> R.string.home_card_night_title
+    DashboardCard.DAILY_TOOLS -> R.string.home_card_daily_tools_title
+    DashboardCard.SOLAR_GEOMETRY -> R.string.home_card_solar_geometry_title
+    DashboardCard.QIBLA -> R.string.home_card_qibla_title
+}
+
+/** One line stating what a Home dashboard card shows, so the customization list is readable. */
+@StringRes
+fun DashboardCard.descriptionRes(): Int = when (this) {
+    DashboardCard.NEXT_PRAYER -> R.string.home_card_next_prayer_description
+    DashboardCard.TODAY_TIMETABLE -> R.string.home_card_timetable_description
+    DashboardCard.FORBIDDEN_TIMES -> R.string.home_card_forbidden_description
+    DashboardCard.CALENDAR -> R.string.home_card_calendar_description
+    DashboardCard.RAMADAN -> R.string.home_card_ramadan_description
+    DashboardCard.NIGHT_PERIODS -> R.string.home_card_night_description
+    DashboardCard.DAILY_TOOLS -> R.string.home_card_daily_tools_description
+    DashboardCard.SOLAR_GEOMETRY -> R.string.home_card_solar_geometry_description
+    DashboardCard.QIBLA -> R.string.home_card_qibla_description
 }
 
 @StringRes

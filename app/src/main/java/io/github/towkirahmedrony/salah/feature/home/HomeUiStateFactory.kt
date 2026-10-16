@@ -8,9 +8,13 @@ import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.night.NightPeriodCalculator
 import io.github.towkirahmedrony.salah.core.domain.solar.SolarDayResolver
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.domain.timeFormatterFor
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
+import io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar
+import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaBearing
+import io.github.towkirahmedrony.salah.core.domain.qibla.QiblaCalculator
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
@@ -25,8 +29,11 @@ import io.github.towkirahmedrony.salah.core.model.SolarDayState
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
+import io.github.towkirahmedrony.salah.core.model.RamadanPhase
+import io.github.towkirahmedrony.salah.core.model.RamadanWindow
 import java.time.Duration
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -58,6 +65,14 @@ class HomeUiStateFactory(
     private val prohibitedStatusResolver: ProhibitedPeriodStatusResolver,
     private val solarDayResolver: SolarDayResolver = SolarDayResolver(),
     private val nightPeriodCalculator: NightPeriodCalculator = NightPeriodCalculator(),
+    /**
+     * The Qibla bearing, pure geography from the saved coordinates.
+     *
+     * Injected rather than re-implemented, so the Home card, the Qibla screen and their tests all
+     * read the same formula; the bearing needs no permission, sensor or network, which is why it can
+     * be resolved here rather than by the compass screen.
+     */
+    private val qiblaCalculator: QiblaCalculator = QiblaCalculator(),
 ) {
 
     fun create(
@@ -77,6 +92,14 @@ class HomeUiStateFactory(
          * the resolver can check that it really is tomorrow's before using it.
          */
         nextDaySchedule: PrayerSchedule? = null,
+        /** The user's saved dashboard layout, or the default when none has been stored. */
+        dashboard: DashboardConfig = DashboardConfig.DEFAULT,
+        /**
+         * The estimated Ramadan window containing today, or the next one after it, from the same
+         * `CalendarRepository` the Ramadan screen reads. `null` when the platform's Hijri table does
+         * not cover one — the honest case in which no Ramadan card is shown.
+         */
+        ramadanWindow: RamadanWindow? = null,
     ): HomeUiState {
         // `null` means the calendar snapshot has not been produced yet, which is a *pending* state,
         // not a failure: Home renders the prayer content and a placeholder date, and the calendar
@@ -216,7 +239,92 @@ class HomeUiStateFactory(
                 offlineReady = scheduleState.isAvailableOffline(),
             ),
             failureDetail = (scheduleState as? PrayerScheduleState.Failed)?.detail,
+            dashboard = dashboardState(dashboard),
+            ramadan = ramadanSection(window = ramadanWindow, schedule = schedule, timeFormatter = timeFormatter),
+            qibla = qiblaSection(location),
         )
+    }
+
+    /**
+     * The arranged cards, resolved from the persisted layout.
+     *
+     * Every supported card is carried — visible or not — because the management list needs a switch
+     * for each, while [DashboardState.enabled] is the subset the dashboard draws. The card is a
+     * domain value, never a label, so the arrangement is independent of the interface language.
+     */
+    private fun dashboardState(config: DashboardConfig): DashboardState {
+        val normalized = config.normalized()
+        return DashboardState(
+            cards = normalized.orderedCards().map { card ->
+                DashboardCardState(card = card, enabled = normalized.isEnabled(card))
+            },
+        )
+    }
+
+    /**
+     * The Ramadan reading for today.
+     *
+     * Context-aware by construction: the card is only visible while today is inside the estimated
+     * window or within [RamadanWindow.UPCOMING_WINDOW_DAYS] of it, so Salah never claims it is
+     * Ramadan when it is not. The Sehri and Iftar times are read from today's schedule through
+     * [RamadanCalendar] — the same rule the Ramadan screen uses — never recomputed here.
+     */
+    private fun ramadanSection(
+        window: RamadanWindow?,
+        schedule: PrayerSchedule?,
+        timeFormatter: DateTimeFormatter,
+    ): RamadanSection {
+        if (window == null || schedule == null) return RamadanSection.Hidden
+        val today = schedule.date
+        return when (window.phase(today)) {
+            RamadanPhase.IN_RAMADAN -> RamadanSection(
+                visible = true,
+                inRamadan = true,
+                dayNumber = window.dayNumber(today),
+                totalDays = window.dayCount,
+                sehriEndLabel = RamadanCalendar.sehriEndOf(schedule)?.let(timeFormatter::format),
+                iftarLabel = RamadanCalendar.iftarOf(schedule)?.let(timeFormatter::format),
+                daysUntilStart = null,
+                unavailable = null,
+            )
+
+            RamadanPhase.UPCOMING -> RamadanSection(
+                visible = true,
+                inRamadan = false,
+                dayNumber = null,
+                totalDays = null,
+                sehriEndLabel = null,
+                iftarLabel = null,
+                daysUntilStart = ChronoUnit.DAYS.between(today, window.start),
+                unavailable = null,
+            )
+
+            RamadanPhase.FAR_AWAY -> RamadanSection.Hidden
+        }
+    }
+
+    /**
+     * The Qibla bearing from the saved location.
+     *
+     * A missing location, or coordinates the calculator refuses (invalid, on the Kaaba reference or
+     * at its antipode), is reported as [QiblaSection.unavailable] rather than as a number — the card
+     * shows the reason instead of a fabricated direction.
+     */
+    private fun qiblaSection(location: LocationInfo?): QiblaSection {
+        if (location == null) return QiblaSection.Unavailable
+        return when (val bearing = qiblaCalculator.bearingFrom(location)) {
+            is QiblaBearing.Available -> QiblaSection(
+                bearingDegrees = bearing.degrees,
+                distanceKm = bearing.distanceMetres / METRES_PER_KILOMETRE,
+                unavailable = null,
+            )
+
+            is QiblaBearing.Unavailable -> QiblaSection(
+                bearingDegrees = null,
+                distanceKm = null,
+                unavailable = UnavailabilityReason.UNKNOWN,
+            )
+        }
     }
 
     /**
@@ -551,5 +659,10 @@ class HomeUiStateFactory(
         is PrayerScheduleState.Unavailable -> origin.isAvailableOffline
         is PrayerScheduleState.Failed -> origin.isAvailableOffline
         PrayerScheduleState.Loading -> false
+    }
+
+    private companion object {
+        /** Metres in a kilometre, for the Qibla card's distance reading. */
+        const val METRES_PER_KILOMETRE = 1_000.0
     }
 }

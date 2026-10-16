@@ -17,6 +17,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationPolicy
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.BangladeshAreaRef
@@ -318,6 +319,7 @@ class FakeUserPreferencesRepository(
     initialCalendarSettings: CalendarSettings = CalendarSettings.DEFAULT,
     initialAppLanguage: AppLanguage = AppLanguage.DEFAULT,
     initialOverrides: PrayerConfigOverrides = PrayerConfigOverrides.NONE,
+    initialDashboardConfig: DashboardConfig = DashboardConfig.DEFAULT,
 ) : UserPreferencesRepository {
 
     private val settingsState = MutableStateFlow(initialSettings)
@@ -325,6 +327,7 @@ class FakeUserPreferencesRepository(
     private val calendarState = MutableStateFlow(initialCalendarSettings)
     private val languageState = MutableStateFlow(initialAppLanguage)
     private val overridesState = MutableStateFlow(initialOverrides)
+    private val dashboardState = MutableStateFlow(initialDashboardConfig.normalized())
 
     /**
      * When set, the next [setAppLanguage] throws this instead of storing anything, which models a
@@ -364,6 +367,19 @@ class FakeUserPreferencesRepository(
     override suspend fun setAppLanguage(language: AppLanguage) {
         languageWriteFailure?.let { failure -> throw failure }
         languageState.value = language
+    }
+
+    /**
+     * The Home-dashboard layout, held and written separately like the real store, so a test can
+     * assert that reordering or hiding a card leaves the calculation, calendar and language
+     * preferences untouched.
+     */
+    val dashboardLayout: DashboardConfig get() = dashboardState.value
+
+    override val dashboardConfig: Flow<DashboardConfig> = dashboardState
+
+    override suspend fun updateDashboardConfig(transform: (DashboardConfig) -> DashboardConfig) {
+        dashboardState.value = transform(dashboardState.value).normalized()
     }
 
     /** Moves the stored Hijri offset, for a scenario where the user realigns the calendar. */

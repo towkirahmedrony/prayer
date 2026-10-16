@@ -1,5 +1,6 @@
 package io.github.towkirahmedrony.salah.core.domain.repository
 
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
@@ -86,4 +87,22 @@ interface UserPreferencesRepository {
      * read-modify-write-in-one-transaction guarantee as [updatePrayerSettings].
      */
     suspend fun updatePrayerConfigOverrides(transform: (PrayerConfigOverrides) -> PrayerConfigOverrides)
+
+    /**
+     * The Home dashboard layout: which cards are shown and in what order.
+     *
+     * Its own preference group, independent of the prayer calculation settings, the location, the
+     * language and the reminder settings — hiding a card must never disable the feature behind it,
+     * so those values are not touched here. The flow always emits a value (the default layout on a
+     * fresh install), and the value it emits is always [DashboardConfig.normalized], so a store
+     * written by an older build cannot put the dashboard into a state it cannot render.
+     */
+    val dashboardConfig: Flow<DashboardConfig>
+
+    /**
+     * Atomically rewrites [dashboardConfig] through [transform], with the same
+     * read-modify-write-in-one-transaction guarantee as [updatePrayerSettings], so two quick taps —
+     * or a toggle and a reorder — cannot lose one another's change.
+     */
+    suspend fun updateDashboardConfig(transform: (DashboardConfig) -> DashboardConfig)
 }

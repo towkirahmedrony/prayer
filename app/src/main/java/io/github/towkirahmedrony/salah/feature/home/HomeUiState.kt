@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.home
 
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
+import io.github.towkirahmedrony.salah.core.model.DashboardCard
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
 import io.github.towkirahmedrony.salah.core.model.LocationOrigin
 import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
@@ -87,7 +88,103 @@ sealed interface HomeUiState {
         val provenance: ProvenanceSection,
         /** Non-null when the configured provider failed; shown with a retry action. */
         val failureDetail: String?,
+        /**
+         * The arranged Home dashboard: which cards exist and which of them are shown.
+         *
+         * Resolved from the persisted layout, so the screen renders the user's own arrangement and
+         * nothing else. The cards carry stable [DashboardCard] values, never translated labels, so a
+         * language change can never be mistaken for a layout change.
+         */
+        val dashboard: DashboardState = DashboardState.Default,
+        /** The Ramadan reading for today, or the honest "not near Ramadan" state. */
+        val ramadan: RamadanSection = RamadanSection.Hidden,
+        /** The Qibla bearing from the saved location, or the reason it cannot be shown. */
+        val qibla: QiblaSection = QiblaSection.Unavailable,
     ) : HomeUiState
+}
+
+/**
+ * The resolved Home dashboard, in the order the cards should be rendered.
+ *
+ * A list rather than a set, because the order *is* the user's arrangement. Every supported card is
+ * present — visible or not — so the management list can offer a switch for each; [enabled] is the
+ * subset the dashboard itself draws.
+ */
+data class DashboardState(val cards: List<DashboardCardState>) {
+
+    /** The cards the dashboard draws, in order. Hidden cards are simply absent. */
+    val enabled: List<DashboardCardState> get() = cards.filter { card -> card.enabled }
+
+    companion object {
+        /** The default arrangement, used when nothing has been stored. */
+        val Default: DashboardState = DashboardState(
+            DashboardCard.entries.map { card -> DashboardCardState(card, card.defaultEnabled) },
+        )
+    }
+}
+
+/** One card and whether the user has it shown. */
+data class DashboardCardState(val card: DashboardCard, val enabled: Boolean)
+
+/**
+ * The Ramadan reading for the Home card.
+ *
+ * [visible] is `false` when Ramadan is neither in progress nor near, and the card is then not drawn
+ * at all — Salah never claims it is Ramadan when it is not, and does not put an empty card on the
+ * screen to say so. [inRamadan] is only ever `true` when today really falls inside the estimated
+ * window, and the times are the very ones the timetable already calculated: Sehri is Fajr and Iftar
+ * is Maghrib, read from today's schedule rather than recalculated.
+ */
+data class RamadanSection(
+    val visible: Boolean,
+    val inRamadan: Boolean,
+    val dayNumber: Int?,
+    val totalDays: Int?,
+    /** End of Sehri, i.e. the calculated Fajr time, or `null` when it could not be resolved. */
+    val sehriEndLabel: String?,
+    /** Iftar, i.e. the calculated Maghrib time, or `null` when it could not be resolved. */
+    val iftarLabel: String?,
+    /** Whole days until the estimated window begins, when it is upcoming. */
+    val daysUntilStart: Long?,
+    val unavailable: UnavailabilityReason?,
+) {
+    companion object {
+        /** Ramadan is far away: no card. */
+        val Hidden: RamadanSection = RamadanSection(
+            visible = false,
+            inRamadan = false,
+            dayNumber = null,
+            totalDays = null,
+            sehriEndLabel = null,
+            iftarLabel = null,
+            daysUntilStart = null,
+            unavailable = null,
+        )
+    }
+}
+
+/**
+ * The Qibla reading for the Home card.
+ *
+ * The bearing is pure geography from the saved coordinates, so it needs no permission, no sensor and
+ * no network. When there is no usable location, [unavailable] carries the reason and the card says
+ * so instead of a number.
+ */
+data class QiblaSection(
+    /** Initial great-circle bearing, degrees clockwise from true north, or `null`. */
+    val bearingDegrees: Double?,
+    /** Great-circle distance to the Kaaba, in kilometres, or `null`. */
+    val distanceKm: Double?,
+    val unavailable: UnavailabilityReason?,
+) {
+    companion object {
+        /** No location, so no bearing. */
+        val Unavailable: QiblaSection = QiblaSection(
+            bearingDegrees = null,
+            distanceKm = null,
+            unavailable = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+        )
+    }
 }
 
 /** One calendar representation on the Home screen. */

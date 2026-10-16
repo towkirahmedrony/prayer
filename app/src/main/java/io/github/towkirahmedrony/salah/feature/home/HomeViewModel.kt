@@ -11,11 +11,15 @@ import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsR
 import io.github.towkirahmedrony.salah.core.domain.startup.PrayerSettingsState
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
+import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
+import io.github.towkirahmedrony.salah.core.model.DashboardCard
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriodsState
+import io.github.towkirahmedrony.salah.core.model.RamadanWindow
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -88,6 +92,7 @@ class HomeViewModel(
     private val calendarRepository: CalendarRepository,
     private val prohibitedPeriodsRepository: ProhibitedPeriodsRepository,
     private val uiStateFactory: HomeUiStateFactory,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val clock: Clock,
 ) : ViewModel() {
 
@@ -289,20 +294,56 @@ class HomeViewModel(
             emit(ProhibitedPeriodsState.NotAvailable(reason = UnavailabilityReason.UNKNOWN))
         }
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        criticalInputs,
+    /**
+     * The user's Home-dashboard layout.
+     *
+     * Read from the one preference store, so it arrives before the first frame and cannot make the
+     * screen flicker: the very first [HomeUiState.Ready] already carries the saved arrangement. It
+     * is deliberately independent of the prayer data — a card's own state changing never reorders
+     * the dashboard — and hiding a card only changes this value, never the feature behind it.
+     */
+    private val dashboardConfig: Flow<DashboardConfig> = userPreferencesRepository.dashboardConfig
+
+    /**
+     * The estimated Ramadan window, from the same repository the Ramadan screen reads.
+     *
+     * On its own flow because it is a progressive input: the Ramadan card is context-aware and the
+     * rest of Home must not wait for it. Seeded with `null` so a window that has not arrived yet
+     * cannot hold the whole dashboard back — when it is late or unavailable the card is simply not
+     * shown, which is the honest "not near Ramadan" state rather than a claim about the calendar.
+     */
+    private val ramadanWindow: Flow<RamadanWindow?> = calendarRepository.observeRamadanWindow()
+        .onStart { emit(null) }
+
+    /**
+     * The inputs that are not on Home's critical path, gathered so the final combine stays within
+     * the library's typed overloads: the calendar snapshot, the prohibited windows, tomorrow's
+     * schedule and the Ramadan window.
+     */
+    private val contextInputs: Flow<ContextInputs> = combine(
         calendarFlow,
         prohibitedFlow,
         nextDaySchedule,
-    ) { critical, calendar, prohibited, tomorrowsSchedule ->
+        ramadanWindow,
+    ) { calendar, prohibited, tomorrowsSchedule, window ->
+        ContextInputs(calendar, prohibited, tomorrowsSchedule, window)
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        criticalInputs,
+        contextInputs,
+        dashboardConfig,
+    ) { critical, context, dashboard ->
         uiStateFactory.create(
-            calendar = calendar,
+            calendar = context.calendar,
             location = critical.location,
             settings = critical.settings,
             scheduleState = critical.scheduleState,
-            prohibitedState = prohibited,
+            prohibitedState = context.prohibited,
             now = critical.now,
-            nextDaySchedule = tomorrowsSchedule,
+            nextDaySchedule = context.nextDaySchedule,
+            dashboard = dashboard,
+            ramadanWindow = context.ramadanWindow,
         )
     }.onEach { state ->
         // The state becoming `Ready` is what makes Home renderable. The composable existing is not:
@@ -334,6 +375,45 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Shows or hides one dashboard card.
+     *
+     * Only the dashboard layout is written: the card's feature — its calculations, its reminder and
+     * its background work — is untouched, and stays reachable through the app's navigation whether
+     * or not the card is shown.
+     */
+    fun setCardEnabled(card: DashboardCard, enabled: Boolean) {
+        updateDashboard { config -> config.withCardEnabled(card, enabled) }
+    }
+
+    /** Moves one card by [delta] positions within the dashboard, clamped to the ends. */
+    fun moveCard(card: DashboardCard, delta: Int) {
+        updateDashboard { config -> config.moved(card, delta) }
+    }
+
+    /** Restores the default dashboard layout. Resets no unrelated preference. */
+    fun resetDashboard() {
+        updateDashboard { config -> config.resetToDefault() }
+    }
+
+    /**
+     * Writes a dashboard change, skipping the write when it changed nothing.
+     *
+     * The stored value is read first and compared against the normalised result, so a tap that
+     * leaves the layout exactly as it was — a move at the top of the list, a toggle to the state it
+     * is already in — does not touch the store. The read-modify-write itself happens inside the
+     * repository's single transaction, so this pre-read only decides *whether* to write.
+     */
+    private fun updateDashboard(transform: (DashboardConfig) -> DashboardConfig) {
+        viewModelScope.launch {
+            val stored = userPreferencesRepository.dashboardConfig.first()
+            val updated = transform(stored).normalized()
+            if (updated != stored.normalized()) {
+                userPreferencesRepository.updateDashboardConfig { updated }
+            }
+        }
+    }
+
     private data class SchedulePart(
         val settings: PrayerSettings,
         val state: PrayerScheduleState,
@@ -345,6 +425,14 @@ class HomeViewModel(
         val settings: PrayerSettings,
         val scheduleState: PrayerScheduleState,
         val now: ZonedDateTime,
+    )
+
+    /** The progressive, non-critical inputs, folded in as they arrive. */
+    private data class ContextInputs(
+        val calendar: CalendarSnapshot?,
+        val prohibited: ProhibitedPeriodsState,
+        val nextDaySchedule: PrayerSchedule?,
+        val ramadanWindow: RamadanWindow?,
     )
 
     private companion object {

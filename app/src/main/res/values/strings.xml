@@ -807,4 +807,45 @@
     <string name="location_search_in_progress">Searching…</string>
     <string name="location_search_empty">No matching location found.</string>
     <string name="location_search_error">Search could not run against the location dataset.</string>
+
+    <!-- Home dashboard: the customizable card layout. Card ids are stable and never stored as labels. -->
+    <string name="home_dashboard_customize">Customize</string>
+    <string name="home_dashboard_edit_title">Customize Home</string>
+    <string name="home_dashboard_edit_body">Turn cards on or off and move them up or down. Changes are saved as you make them.</string>
+    <string name="home_dashboard_done">Done</string>
+    <string name="home_dashboard_move_up">Move %1$s up</string>
+    <string name="home_dashboard_move_down">Move %1$s down</string>
+    <string name="home_dashboard_toggle_card">Show %1$s on Home</string>
+    <string name="home_dashboard_reset">Restore default layout</string>
+    <string name="home_dashboard_reset_title">Restore the default layout?</string>
+    <string name="home_dashboard_reset_body">This only resets which cards appear on Home and their order. Your prayer settings, location, language and reminders are not changed.</string>
+    <string name="home_dashboard_reset_confirm">Restore defaults</string>
+    <string name="home_dashboard_cancel">Cancel</string>
+    <string name="home_dashboard_all_hidden">Every card is hidden. Open Customize and turn on at least one card to see it here.</string>
+    <string name="home_card_next_prayer_title">Prayer now and next</string>
+    <string name="home_card_next_prayer_description">The prayer time that is open now, or the next one, with a countdown.</string>
+    <string name="home_card_timetable_title">Today\'s timetable</string>
+    <string name="home_card_timetable_description">Today\'s five prayer times, with the current and next prayer marked.</string>
+    <string name="home_card_forbidden_title">Prohibited prayer times</string>
+    <string name="home_card_forbidden_description">The prohibited intervals around the day\'s solar events.</string>
+    <string name="home_card_calendar_title">Today\'s date</string>
+    <string name="home_card_calendar_description">Today\'s Gregorian, Bangla and Hijri dates.</string>
+    <string name="home_card_ramadan_title">Ramadan</string>
+    <string name="home_card_ramadan_description">Sehri and Iftar while Ramadan is in progress or near.</string>
+    <string name="home_card_night_title">Night periods</string>
+    <string name="home_card_night_description">Islamic midnight, the last third and Tahajjud for tonight.</string>
+    <string name="home_card_daily_tools_title">Daily tools</string>
+    <string name="home_card_daily_tools_description">Shortcuts to the Qibla compass, calendar, Ramadan and tools.</string>
+    <string name="home_card_solar_geometry_title">Solar geometry</string>
+    <string name="home_card_solar_geometry_description">Solar midnight and the measured day and night lengths.</string>
+    <string name="home_card_qibla_title">Qibla</string>
+    <string name="home_card_qibla_description">The Qibla bearing from your saved location.</string>
+    <string name="home_ramadan_day">Ramadan day %1$d of %2$d</string>
+    <string name="home_ramadan_sehri">Sehri ends %1$s</string>
+    <string name="home_ramadan_iftar">Iftar %1$s</string>
+    <string name="home_ramadan_starts_in">Begins in %1$d days</string>
+    <string name="home_ramadan_open">Open Ramadan</string>
+    <string name="home_qibla_bearing">%1$s° from true north</string>
+    <string name="home_qibla_distance">%1$s km to the Kaaba</string>
+    <string name="home_qibla_open">Open compass</string>
 </resources>

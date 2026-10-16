@@ -8,6 +8,7 @@ import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
 import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerScheduleRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.ProhibitedPeriodsRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
@@ -27,6 +28,7 @@ import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.SolarEventEntry
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
+import io.github.towkirahmedrony.salah.testing.FakeUserPreferencesRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -405,6 +407,8 @@ class HomeViewModelTest {
         repository: PrayerScheduleRepository,
         /** The calendar the header reads, defaulting to the one that never produces a snapshot. */
         calendarRepository: CalendarRepository = UnproducedCalendar,
+        /** The preference store the dashboard layout is read from; the default layout by default. */
+        preferences: UserPreferencesRepository = FakeUserPreferencesRepository(),
     ): HomeViewModel = HomeViewModel(
         startup = StartupSnapshot(
             storedLocationSource = storedLocation,
@@ -419,6 +423,7 @@ class HomeViewModelTest {
             currentPrayerResolver = CurrentPrayerPeriodResolver(),
             prohibitedStatusResolver = ProhibitedPeriodStatusResolver(),
         ),
+        userPreferencesRepository = preferences,
         clock = clock,
     )
 

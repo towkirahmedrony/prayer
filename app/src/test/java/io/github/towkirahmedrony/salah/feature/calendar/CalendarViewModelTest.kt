@@ -4,6 +4,7 @@ import io.github.towkirahmedrony.salah.core.domain.location.LocationDayZone
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
@@ -401,6 +402,13 @@ class CalendarViewModelTest {
 
         override suspend fun updatePrayerConfigOverrides(
             transform: (PrayerConfigOverrides) -> PrayerConfigOverrides,
+        ) = Unit
+
+        // The calendar view model never touches the dashboard layout; the default is enough.
+        override val dashboardConfig: Flow<DashboardConfig> = MutableStateFlow(DashboardConfig.DEFAULT)
+
+        override suspend fun updateDashboardConfig(
+            transform: (DashboardConfig) -> DashboardConfig,
         ) = Unit
     }
 }

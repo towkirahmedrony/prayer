@@ -826,4 +826,45 @@
     <string name="location_search_in_progress">খোঁজা হচ্ছে…</string>
     <string name="location_search_empty">কোনো মিল পাওয়া যায়নি।</string>
     <string name="location_search_error">অবস্থান তালিকা দিয়ে অনুসন্ধান করা যায়নি।</string>
+
+    <!-- হোম ড্যাশবোর্ড: সাজানো যায় এমন কার্ডের বিন্যাস। কার্ড আইডি স্থির, কখনো লেবেল নয়। -->
+    <string name="home_dashboard_customize">সাজান</string>
+    <string name="home_dashboard_edit_title">হোম সাজান</string>
+    <string name="home_dashboard_edit_body">কার্ড চালু বা বন্ধ করুন এবং উপরে-নিচে সরান। পরিবর্তন সঙ্গে সঙ্গে সংরক্ষিত হয়।</string>
+    <string name="home_dashboard_done">সম্পন্ন</string>
+    <string name="home_dashboard_move_up">%1$s উপরে সরান</string>
+    <string name="home_dashboard_move_down">%1$s নিচে সরান</string>
+    <string name="home_dashboard_toggle_card">হোমে %1$s দেখান</string>
+    <string name="home_dashboard_reset">ডিফল্ট বিন্যাস ফিরিয়ে আনুন</string>
+    <string name="home_dashboard_reset_title">ডিফল্ট বিন্যাস ফিরিয়ে আনবেন?</string>
+    <string name="home_dashboard_reset_body">এটি শুধু হোমে কোন কার্ড দেখাবে ও তাদের ক্রম পুনরায় সেট করে। আপনার নামাজের সেটিং, অবস্থান, ভাষা ও রিমাইন্ডার বদলাবে না।</string>
+    <string name="home_dashboard_reset_confirm">ডিফল্ট ফিরিয়ে আনুন</string>
+    <string name="home_dashboard_cancel">বাতিল</string>
+    <string name="home_dashboard_all_hidden">সব কার্ড লুকানো। সাজান খুলে অন্তত একটি কার্ড চালু করুন।</string>
+    <string name="home_card_next_prayer_title">এখন ও পরবর্তী নামাজ</string>
+    <string name="home_card_next_prayer_description">এখন চলমান নামাজ বা পরবর্তী নামাজ, কাউন্টডাউনসহ।</string>
+    <string name="home_card_timetable_title">আজকের সময়সূচি</string>
+    <string name="home_card_timetable_description">আজকের পাঁচ ওয়াক্তের সময়, চলমান ও পরবর্তী নামাজ চিহ্নিত।</string>
+    <string name="home_card_forbidden_title">নামাজের নিষিদ্ধ সময়</string>
+    <string name="home_card_forbidden_description">দিনের সৌর ঘটনাগুলির আশপাশের নিষিদ্ধ সময়।</string>
+    <string name="home_card_calendar_title">আজকের তারিখ</string>
+    <string name="home_card_calendar_description">আজকের গ্রেগরিয়ান, বাংলা ও হিজরি তারিখ।</string>
+    <string name="home_card_ramadan_title">রমজান</string>
+    <string name="home_card_ramadan_description">রমজান চলাকালে বা নিকটে থাকলে সেহরি ও ইফতার।</string>
+    <string name="home_card_night_title">রাতের সময়</string>
+    <string name="home_card_night_description">ইসলামিক মধ্যরাত, শেষ তৃতীয়াংশ ও তাহাজ্জুদ।</string>
+    <string name="home_card_daily_tools_title">দৈনন্দিন টুল</string>
+    <string name="home_card_daily_tools_description">কিবলা, ক্যালেন্ডার, রমজান ও টুলের শর্টকাট।</string>
+    <string name="home_card_solar_geometry_title">সৌর হিসাব</string>
+    <string name="home_card_solar_geometry_description">সৌর মধ্যরাত ও দিন-রাতের দৈর্ঘ্য।</string>
+    <string name="home_card_qibla_title">কিবলা</string>
+    <string name="home_card_qibla_description">সংরক্ষিত অবস্থান থেকে কিবলার দিক।</string>
+    <string name="home_ramadan_day">রমজানের %1$d তম দিন, মোট %2$d</string>
+    <string name="home_ramadan_sehri">সেহরি শেষ %1$s</string>
+    <string name="home_ramadan_iftar">ইফতার %1$s</string>
+    <string name="home_ramadan_starts_in">শুরু হবে %1$d দিন পরে</string>
+    <string name="home_ramadan_open">রমজান খুলুন</string>
+    <string name="home_qibla_bearing">সত্য উত্তর থেকে %1$s°</string>
+    <string name="home_qibla_distance">কাবার দূরত্ব %1$s কিমি</string>
+    <string name="home_qibla_open">কম্পাস খুলুন</string>
 </resources>

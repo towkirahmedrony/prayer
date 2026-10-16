@@ -453,6 +453,9 @@ val salahModules = module {
             prohibitedStatusResolver = get(),
             solarDayResolver = get(),
             nightPeriodCalculator = get(),
+            // The Home Qibla card reads the same bearing calculator the Qibla screen does, so the two
+            // can never disagree about the direction to the Kaaba.
+            qiblaCalculator = get(),
         )
     }
 
@@ -485,6 +488,9 @@ val salahModules = module {
             calendarRepository = get(),
             prohibitedPeriodsRepository = get(),
             uiStateFactory = get(),
+            // The dashboard layout is read and written through the one preference store, so it
+            // survives process death and stays independent of the prayer and location settings.
+            userPreferencesRepository = get(),
             clock = get(),
         )
     }

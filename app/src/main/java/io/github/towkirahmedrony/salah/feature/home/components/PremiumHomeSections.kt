@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -37,6 +39,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.LocationPinGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.NightGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.SlidersGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunrisePrayerGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunsetGlyph
@@ -69,9 +72,13 @@ fun HomeHeader(
     state: HomeUiState.Ready,
     onOpenLocation: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onCustomize: () -> Unit,
+    isEditing: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // Resolved here rather than inside the `semantics` block, which is not composable.
+    val customizeLabel = stringResource(R.string.home_dashboard_customize)
     val label = state.location.label
         ?: stringResource(state.location.unavailable?.messageRes() ?: R.string.home_location_none_title)
     val primary = label.substringBefore(',').trim()
@@ -117,6 +124,25 @@ fun HomeHeader(
             ChevronDownGlyph(tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
         Spacer(modifier = Modifier.width(10.dp))
+        // The customize control is the discoverable way into the dashboard editor. It is the place
+        // the reader already reaches for a Home-level action, beside the reminder bell, and it
+        // states which mode it is in so the screen never looks the same in both.
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(if (isEditing) scheme.primaryContainer else scheme.surface)
+                .border(1.dp, scheme.outlineVariant, CircleShape)
+                .clickable(onClick = onCustomize)
+                .semantics { contentDescription = customizeLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            SlidersGlyph(
+                tint = if (isEditing) scheme.onPrimaryContainer else scheme.onSurface,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Box(
             modifier = Modifier
                 .size(44.dp)

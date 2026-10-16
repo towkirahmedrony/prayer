@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
@@ -210,6 +211,42 @@ class DataStoreUserPreferencesRepository(
             .toMap(),
     )
 
+    // --- Home dashboard layout --------------------------------------------------
+
+    /**
+     * The Home dashboard layout, normalised on read.
+     *
+     * Nothing here is allowed to fail on a store this build does not understand: an unknown card id
+     * is dropped, a duplicate is removed, a card introduced since the layout was written is appended,
+     * and an absent layout reads as the documented default. An absent order reads as the default
+     * order and an absent hidden set as the default hidden set, so a fresh install opens on the
+     * documented arrangement rather than on an empty dashboard.
+     */
+    override val dashboardConfig: Flow<DashboardConfig> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences -> preferences.toDashboardConfig() }
+
+    override suspend fun updateDashboardConfig(transform: (DashboardConfig) -> DashboardConfig) {
+        dataStore.edit { preferences ->
+            val updated = transform(preferences.toDashboardConfig()).normalized()
+            preferences[Keys.DASHBOARD_CONFIG_VERSION] = updated.version
+            preferences[Keys.DASHBOARD_CARD_ORDER] = updated.order.joinToString(CARD_ID_SEPARATOR)
+            // Sorted so the stored value is stable: the same layout always serialises to the same
+            // bytes, which keeps an unchanged layout from producing a difference later.
+            preferences[Keys.DASHBOARD_HIDDEN_CARDS] =
+                updated.hidden.sorted().joinToString(CARD_ID_SEPARATOR)
+        }
+    }
+
+    private fun Preferences.toDashboardConfig(): DashboardConfig = DashboardConfig(
+        version = this[Keys.DASHBOARD_CONFIG_VERSION] ?: DashboardConfig.CURRENT_VERSION,
+        order = this[Keys.DASHBOARD_CARD_ORDER]?.toCardIds() ?: DashboardConfig.DEFAULT.order,
+        hidden = this[Keys.DASHBOARD_HIDDEN_CARDS]?.toCardIds()?.toSet() ?: DashboardConfig.DEFAULT.hidden,
+    ).normalized()
+
+    private fun String.toCardIds(): List<String> =
+        split(CARD_ID_SEPARATOR).filter { id -> id.isNotBlank() }
+
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
@@ -222,7 +259,15 @@ class DataStoreUserPreferencesRepository(
         val HIJRI_ADJUSTMENT_DAYS = intPreferencesKey("calendar_hijri_adjustment_days")
         val DATE_LANGUAGE = stringPreferencesKey("calendar_date_language")
         val IMSAK_MINUTES_BEFORE_FAJR = intPreferencesKey("calendar_imsak_minutes_before_fajr")
+        val DASHBOARD_CONFIG_VERSION = intPreferencesKey("dashboard_config_version")
+        val DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
+        val DASHBOARD_HIDDEN_CARDS = stringPreferencesKey("dashboard_hidden_cards")
 
         fun adjustment(prayer: PrayerName) = intPreferencesKey("prayer_adjustment_${prayer.name}")
+    }
+
+    private companion object {
+        /** Separates card ids within the one stored string. Never appears inside an id. */
+        const val CARD_ID_SEPARATOR = ","
     }
 }

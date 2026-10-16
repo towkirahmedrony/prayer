@@ -206,6 +206,7 @@ The calculation engine and its pinned version are explained in
 │   ├── src/main/res/raw/salah_chime.wav       bundled reminder tone (see the note below)
 │   └── src/test/…                             unit tests
 ├── docs/BOTTOM_NAVIGATION.md                  the four bottom-bar destinations, the Tools screen, back-stack rules
+├── docs/HOME_DASHBOARD.md                     the configurable Home cards, their ids, persistence and recovery
 ├── docs/CALENDAR_SYSTEM.md                    Gregorian, Bangladesh Bangla, Hijri, Ramadan, Sehri/Iftar
 ├── docs/LOCATION_SYSTEM.md                    setup flow, GPS/manual selection, country policy, dataset, limits
 ├── docs/PRAYER_CALCULATION.md                 engine, methods, zones, limits, prohibited windows
