@@ -179,7 +179,7 @@ class ZakatUiStateFactoryTest {
 
         val gold = ready.result.rows.single { row -> row.field == ZakatLineField.GOLD }
         assertEquals("1200000.00", gold.amount)
-        assertEquals(ZakatLineTreatment.INCLUDED, gold.treatment)
+        assertEquals(ZakatLineTreatment.INCLUDED, gold.treatmentRes)
         assertFalse(gold.isDeduction)
         // The price row is an input, not a result line: it does not appear twice in the breakdown.
         assertEquals(1, ready.result.rows.size)
@@ -195,7 +195,7 @@ class ZakatUiStateFactoryTest {
         )
 
         val gold = ready.result.rows.single { row -> row.field == ZakatLineField.GOLD }
-        assertEquals(ZakatLineTreatment.EXCLUDED, gold.treatment)
+        assertEquals(ZakatLineTreatment.EXCLUDED, gold.treatmentRes)
         assertEquals("1200000.00", gold.amount)
         assertEquals("0.00", ready.result.totalAssets)
         assertNull(ready.result.due)
@@ -213,7 +213,7 @@ class ZakatUiStateFactoryTest {
         val liability = ready.result.rows.single { row -> row.field == ZakatLineField.DEDUCTIBLE_LIABILITIES }
         assertTrue(liability.isDeduction)
         // 1,200,000 − 200,000 = 1,000,000, which is below the gold nisab of 1,049,760.
-        assertEquals("1000000.00", ready.result.netZakatableWealth)
+        assertEquals("1000000.00", ready.result.netWealth)
         assertNull(ready.result.due)
     }
 
@@ -343,10 +343,10 @@ class ZakatUiStateFactoryTest {
 
         assertFalse(ready.hawlDateInvalid)
         // The date is formatted by the calendar rule, so the year is in Bengali numerals.
-        assertNotNull(ready.hawlEstimateDate)
-        assertTrue(ready.hawlEstimateDate!!.contains("২০২৬"))
+        assertNotNull(ready.result.hawlEstimateDate)
+        assertTrue(ready.result.hawlEstimateDate!!.contains("২০২৬"))
         // 2026-01-01 + 354 days = 2026-12-21, and the day count is localised too.
-        assertEquals("৩৫৪", ready.hawlEstimateDays)
+        assertEquals("৩৫৪", ready.result.hawlEstimateDays)
     }
 
     @Test
@@ -354,8 +354,8 @@ class ZakatUiStateFactoryTest {
         val ready = state(ZakatForm().copy(hawlSeedDateText = "next Ramadan"))
 
         assertTrue(ready.hawlDateInvalid)
-        assertNull(ready.hawlEstimateDate)
-        assertNull(ready.hawlEstimateDays)
+        assertNull(ready.result.hawlEstimateDate)
+        assertNull(ready.result.hawlEstimateDays)
     }
 
     @Test
@@ -363,7 +363,7 @@ class ZakatUiStateFactoryTest {
         val ready = state(ZakatForm())
 
         assertFalse(ready.hawlDateInvalid)
-        assertNull(ready.hawlEstimateDate)
+        assertNull(ready.result.hawlEstimateDate)
     }
 
     // --- Clearing -------------------------------------------------------------------------------

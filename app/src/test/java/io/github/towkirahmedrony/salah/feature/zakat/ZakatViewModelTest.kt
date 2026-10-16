@@ -122,8 +122,9 @@ class ZakatViewModelTest {
     // --- The form -------------------------------------------------------------------------------
 
     @Test
-    fun `the screen starts loading and becomes ready once the language is known`() {
+    fun `the screen starts loading and becomes ready once the language is known`() = runTest(mainDispatcher) {
         val viewModel = viewModel()
+        // Nothing has collected the flow yet, so the state is still the one it was created with.
         assertEquals(ZakatUiState.Loading, viewModel.uiState.value)
 
         observe(viewModel)
