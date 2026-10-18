@@ -19,7 +19,21 @@ enum class PrayerConfigSyncTrigger {
 /** Why a check did not produce a new active configuration. Mirrors the dataset vocabulary. */
 enum class PrayerConfigFailureReason(val code: String, val transient: Boolean) {
 
+    /** The manifest could not be fetched (network or an HTTP error). */
     MANIFEST_UNAVAILABLE("manifest_unavailable", transient = true),
+
+    /**
+     * The manifest endpoint itself does not exist (PostgREST 404). An empty slot is `200 []` and is
+     * "nothing published"; a 404 means no manifest was read at all and must not be reported as up to date.
+     */
+    ENDPOINT_NOT_FOUND("endpoint_not_found", transient = false),
+
+    /** The project refused the read (HTTP 401/403): a key, policy or grant problem, not a network one. */
+    ACCESS_DENIED("access_denied", transient = false),
+
+    /** The request exceeded its timeout. Transient, and distinct from a refused connection. */
+    TIMEOUT("timeout", transient = true),
+
     MANIFEST_MALFORMED("manifest_malformed", transient = false),
     UNSUPPORTED_SCHEMA("unsupported_schema_version", transient = false),
     PUBLICATION_NOT_PUBLISHED("publication_not_published", transient = false),
@@ -28,6 +42,12 @@ enum class PrayerConfigFailureReason(val code: String, val transient: Boolean) {
     REVISION_REUSED("revision_reused_with_different_content", transient = false),
     STALE_REVISION("stale_revision", transient = false),
     CONTENT_UNAVAILABLE("content_unavailable", transient = true),
+
+    /**
+     * The payload for the named revision is not served (404, or a revision that stopped being current
+     * between the manifest and the content request). Not transient: the same fetch would fail again.
+     */
+    CONTENT_NOT_FOUND("content_not_found", transient = false),
     CONTENT_MALFORMED("content_malformed", transient = false),
     CHECKSUM_MISMATCH("checksum_mismatch", transient = false),
     INVALID_CONFIGURATION("invalid_configuration", transient = false),

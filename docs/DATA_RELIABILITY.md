@@ -232,6 +232,15 @@ Outcomes of interest are recorded through the existing `DiagnosticsLogger` port,
 | `dataset_sync_throttled` / `prayer_config_sync_throttled` | Suppressed by the throttle/backoff. |
 | `dataset_sync_offline` / `prayer_config_sync_offline` | Clearly offline; no request attempted. |
 | `dataset_sync_retry_scheduled` / `prayer_config_sync_retry_scheduled` | A transient failure scheduled a backed-off retry. |
+| `dataset_sync_cached_data_used` / `prayer_config_sync_cached_data_used` | A check failed or was refused; logged with the reason code and what remains in force (dataset source and version, or configuration revision / `none`). |
+
+**Failure vocabulary.** Each outcome names the category rather than collapsing them into "unavailable":
+`not_configured` (no usable endpoint/key), `offline` (no request attempted), `timeout`, `access_denied`
+(HTTP 401/403), `endpoint_not_found` (the view/table is missing — *not* an empty slot, which is `200 []`
+and `up_to_date`), `manifest_malformed` / `content_malformed` (unreadable JSON), `checksum_mismatch`,
+`revision_reused_with_different_content` / `stale_revision`, and `payload_not_found` / `content_not_found`
+(a publication row naming a payload that is not served). A failed check never writes `last_success`, so a
+later `up_to_date` is the only thing that reports a fresh success.
 
 **Never logged:** the anon key (it is a request header and is never passed to the logger — asserted by
 `the publishable key is never written to the log` in both synchroniser tests), any payload content, or any

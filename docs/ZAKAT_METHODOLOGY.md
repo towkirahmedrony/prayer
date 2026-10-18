@@ -529,9 +529,11 @@ entry is used — which is the behaviour the tests pin. No end-to-end live retri
 The server side of this contract is now defined in the repository rather than only implied by the client:
 `supabase/migrations/20261018000000_metal_prices.sql` declares the table, its column types, the
 one-active-rate-per-basis index and the read-only grant, and `SupabaseContractParityTest` keeps its columns
-equal to the ones this client selects. **The migration has not been applied** — see
-`docs/SUPABASE_CONTRACT_MATRIX.md` for the verification status of every remote contract, and for why the app
-discloses each record's own dates instead of applying an age limit.
+equal to the ones this client selects. The live project already answers the client's exact column list with
+published rows (verified 2026-10-18); whether that table came from this migration is unknown, and its grants
+are narrower than the migration's, so the migration is a definition for a fresh deployment rather than
+something to apply blindly. See `docs/SUPABASE_CONTRACT_MATRIX.md` §2.3 and §5 for the verification status of
+every remote contract, and for why the app discloses each record's own dates instead of applying an age limit.
 
 ## 9. Limitations and unsupported cases
 

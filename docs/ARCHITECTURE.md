@@ -860,8 +860,11 @@ unavailable.
 manifest, unsupported schema, unpublished release, oversized payload, invalid checksum, truncated archive,
 invalid TSV, duplicate ids, a missing saved location, a local write failure and interrupted activation are
 all handled as *values*: `DatasetSyncOutcome` distinguishes "no update available" (`UpToDate`) from "the
-sync failed" (`Failed`) and from "the candidate was unacceptable" (`Rejected`). Retries are bounded by the
-throttle, never a loop.
+sync failed" (`Failed`) and from "the candidate was unacceptable" (`Rejected`). `Failed` carries a reason
+that names the category — `timeout`, `access_denied` for a 401/403, `endpoint_not_found` for a missing view,
+`manifest_malformed`, `checksum_mismatch`, and so on. **A 404 is never reported as `UpToDate`:** an empty
+publication is `200 []`, and conflating the two would claim a check that read nothing succeeded. Retries are
+bounded by the throttle, never a loop.
 
 ### 13.4 Triggers and throttling
 

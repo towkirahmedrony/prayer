@@ -5,13 +5,13 @@ datasets through, and the access model that keeps it read-only for app clients. 
 mirror of `supabase/migrations/20260515000000_dataset_publications.sql` and of the Android contract in
 `app/src/main/java/io/github/towkirahmedrony/salah/core/domain/dataset/remote/DatasetPublication.kt`.
 
-> **Status.** The migration is authored and reviewable in this repository. It has **not** been applied to
-> any Supabase project, so no live database change has been made and no remote publication has been served.
-> The Android build does now carry the Salah project's public endpoint and publishable key by default
-> (`docs/SUPABASE_SETUP.md` §1), which means the app *attempts* the read described below — a read of an
-> object that does not exist yet returns an HTTP error, and the bundled dataset keeps working. Configuring
-> the client is not the same as deploying the schema. See `docs/SUPABASE_SETUP.md` for the exact steps to
-> apply it. Nothing in this document claims a deployed database.
+> **Status.** The migration is authored and reviewable in this repository. On 2026-10-18 the live Salah
+> project answered an `anon` read of `dataset_current_publication` with **HTTP 200 and `[]`**: the view
+> exists, exposes every column the client selects, and has **no current publication**. Whether it was
+> created by this migration or by another route cannot be determined without SQL access, and no release has
+> been published, so no payload has ever been served and no adoption is verified. Configuring the client is
+> not the same as publishing a release. See `docs/SUPABASE_SETUP.md` for the steps to apply the migration
+> and publish, and `docs/SUPABASE_CONTRACT_MATRIX.md` §5 for exactly what the live read established.
 >
 > **Phase 3 adds a second published slot.** The remote prayer-time calculation configuration has its own
 > migration, `supabase/migrations/20260601000000_prayer_config_publications.sql`, its own tables and view,

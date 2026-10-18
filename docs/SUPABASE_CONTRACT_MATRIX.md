@@ -5,14 +5,22 @@ What the Salah Android app asks the Supabase project for, what this repository d
 server exposes, and a parser that says what the app requires. This document is the one place the pairs are
 listed side by side, so a mismatch has somewhere to show up other than a live request.
 
-> **Scope of the verification.** Nothing in this document has been checked against the live project. The
-> workspace this was written in has no authorized database access (no credentials in the environment, and the
-> repository's Actions variables/secrets are not readable with the managed GitHub credential), and a
-> publishable key is not placed on a command line or in a log. So: **every statement below is either derived
-> from source in this repository or marked as an assumption.** The repository-side facts — the endpoints, the
-> field names, the SQL that defines the expected read surfaces — are verified by
-> `SupabaseContractParityTest`, which reads the migrations and the Kotlin constants and fails if they
-> disagree. The live half is listed in §5 and is unverified.
+> **Scope of the verification.** The repository-side facts — endpoints, field names, and the SQL that defines
+> the expected read surfaces — are verified by `SupabaseContractParityTest`, which reads the migrations and
+> the Kotlin constants and fails if they disagree. The **live half was read on 2026-10-18 with the app's own
+> publishable key** (the credential the APK ships with), read-only, with `GET` requests only:
+>
+> - `dataset_current_publication` and `prayer_config_current_publication` both answer **HTTP 200** and every
+>   column this app selects exists; both currently return **`[]`** (no publication has been published).
+> - `metal_prices` answers **HTTP 200** for the exact column list the price client selects and holds **five
+>   active, verified rows**, including one `K22`/`BDT` rate per metal.
+> - The `datasets` Storage bucket answers **404 "Object not found"** for a nonexistent path, which is the
+>   bucket being reachable rather than absent.
+>
+> What that does **not** establish: whether these objects were created by the migrations in this repository
+> (there is no service-role or SQL access here, so the DDL cannot be read back), that any row is published
+> for the two revisioned slots, or that the app adopts a release end to end. Those remain marked below. No
+> credential appears in this document, and no request wrote anything.
 
 ## 1. Status vocabulary
 
@@ -44,7 +52,7 @@ Used exactly as written, and never conflated:
 | **Required read permission** | `select` on the view for `anon`/`authenticated` (plus the `storage.objects` read policy for the `datasets` bucket). The base tables are RLS-enabled with **no** client policy and have their privileges revoked |
 | **Local caching** | The accepted payload is activated locally under `filesDir` (`datasets/bd_locations`), checksum- and count-verified before activation; sync state (throttle, last attempt, failures) is kept beside it |
 | **Fallback** | Bundled Bangladesh assets remain the permanent floor. Any failure leaves the active dataset exactly as it was; the synchroniser never writes user data |
-| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · server side **UNABLE TO VERIFY** |
+| **Verification status** | CONTRACT IMPLEMENTED · **ENDPOINT REACHABLE** and **DATABASE READ VERIFIED** (200 on every selected column) · no publication row exists, so activation and the payload read are **UNABLE TO VERIFY** · whether the migration created the live object is unverified |
 
 ### 2.2 Prayer calculation configuration
 
@@ -60,7 +68,7 @@ Used exactly as written, and never conflated:
 | **Required read permission** | `select` on the view for `anon`/`authenticated`; base tables RLS-enabled with no client policy and revoked privileges |
 | **Local caching** | The accepted snapshot is stored under `filesDir` (`prayer_config`) with its own sync state; the applier writes only the non-user-overridden fields into the one preference store |
 | **Fallback** | Bundled calculation defaults. A rejected/stale/unparsed revision leaves the active configuration untouched, and a user's own override of a field always wins over a published value |
-| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · live object **UNABLE TO VERIFY** |
+| **Verification status** | CONTRACT IMPLEMENTED · **ENDPOINT REACHABLE** and **DATABASE READ VERIFIED** (200 on the manifest columns *and* on `payload`) · no revision exists, so the payload download, checksum check and activation are **UNABLE TO VERIFY** |
 
 **The competing scope-per-row design.** The audit reported a `prayer_calculation_configs` table that stores
 one configuration per scope. That object is **not** read by this app and is **not defined in this
@@ -84,7 +92,7 @@ active) all require an immutable revision row and a checksum. See §3 for the de
 | **Required read permission** | `select` on the table for `anon`/`authenticated` through a row-level-security select policy. No write privilege is granted to any client role |
 | **Local caching** | None. Nothing is persisted: the Zakat screen reads once on creation and on an explicit refresh, and a user's typed price is an in-memory session value that a published rate never overwrites |
 | **Fallback** | Manual entry. Manual entry stays available, a missing or unusable rate never becomes zero, one metal's failure never stops the other metal's rate, and a request failure leaves the calculator exactly as usable as it was |
-| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · live object **UNABLE TO VERIFY** (the audit did not find `metal_prices`) |
+| **Verification status** | CONTRACT IMPLEMENTED · **ENDPOINT REACHABLE** and **DATABASE READ VERIFIED**: the live table answers 200 for the selected column list and holds five active verified rows, including `K22`/`BDT` gold (19550) and silver (360). **Publishing and the app's display are unverified** — nothing here wrote a price or ran the screen. |
 
 **Gold and silver are one contract, not two.** The client issues one query and resolves the two metals
 independently from one response, so the table, endpoint, permission and fallback behaviour are identical;
@@ -100,6 +108,16 @@ published date with a fresher one. It also applies **no age threshold**: no sour
 one, and `MetalPriceRepository` is documented as refusing to infer a current price from the newest timestamp,
 so inventing a cutoff would be inventing policy. See §4.
 
+**The live table is not the migration's table, and the migration must not be applied blindly.** The live
+`metal_prices` answers the client's column list, but refuses `select=*` with `42501` ("permission denied for
+table metal_prices"): the publishable key holds **column-level** `select` on exactly the contract's columns,
+not table-level `select`. The prepared migration's `grant select on public.metal_prices to anon` would grant
+every column of the existing table — including the surrogate key and audit timestamps the app never reads.
+It also carries check constraints written for upper-case values, while the live rows store `gold`, `silver`
+and `verified` in lower case (the client accepts both, case-insensitively). Applying it to this project would
+therefore not be additive in the way its header claims. It remains a definition of the contract for a fresh
+deployment; reconciling it with this table belongs to the table's owner.
+
 ## 3. The integration strategy, and the options rejected
 
 **Chosen: keep the Android read contracts as they are, and close the server-side gap with additive SQL.**
@@ -108,9 +126,10 @@ so inventing a cutoff would be inventing policy. See §4.
    `SupabaseContractParityTest` now proves it column by column, so this is a checked claim rather than a
    reading. Renaming a client field to match a speculation about the live schema would have broken a working
    contract on the strength of an assumption.
-2. **The dataset and prayer-config migrations stay as they are.** They already define complete, read-only,
-   RLS-consistent surfaces for their clients; the missing piece is that they have not been applied, which is
-   a deployment step, not a schema redesign.
+2. **The dataset and prayer-config migrations stay as they are.** They define complete, read-only,
+   RLS-consistent surfaces for their clients, and the live project already answers both views with every
+   column the clients select. What both slots still lack is a **published row**, which is a publishing step,
+   not a schema redesign.
 3. **One new migration, for the one contract with no SQL at all.** The price slot is the only read whose
    surface existed solely as Kotlin constants and prose, so it is the only one where a reviewer could not see
    what the server was supposed to expose. `20261018000000_metal_prices.sql` pins it, additively.
@@ -140,20 +159,31 @@ Options considered and rejected:
 - **No new configuration, HTTP client or credential.** All three reads use the two `BuildConfig` values and
   the shared `SupabaseConfiguration` rule from Phase 1 and the one `HttpTransport`.
 
-## 5. What is not verified, and how to verify it
+## 5. What was verified live, and what remains
 
-| Unverified | How it would be verified |
+Read on 2026-10-18 with the publishable key, `GET` only, no writes:
+
+| Check | Result |
 | --- | --- |
-| Whether the two earlier migrations have been applied | `select * from public.dataset_current_publication limit 1;` and the same for the prayer-config view, with the publishable key |
-| Whether the three read surfaces exist with these columns live | The same read, or PostgREST's `/rest/v1/` OpenAPI document, which lists exposed tables, views and columns |
-| Whether `metal_prices` already exists under a different shape | The OpenAPI document, or `information_schema.columns`. If it exists, this migration is a no-op and the mismatch must be closed by that object's owner (a read-only view in *their* migration) |
-| Whether anon's `select` grants and the RLS policies behave as written | A read with the publishable key; a 401/403 or an empty array tells the three apart from a 404 |
-| Whether a row is ever published for any slot | The corresponding `insert`/`update` in the administrator workflow, then a read |
-| Whether the app adopts a published release end to end | Publish, then run the app and read the `dataset_sync_*` / `prayer_config_sync_*` events |
+| Project host reachable | **Yes** — REST and Storage both answer |
+| Publishable key accepted for the app's reads | **Yes** — 200 on all three read surfaces (the bare `/rest/v1/` root refusing a publishable key is expected and is not one of the app's reads) |
+| `dataset_current_publication` exists with every selected column | **Yes** — 200 |
+| `prayer_config_current_publication` exists with the manifest columns and `payload` | **Yes** — 200 for both |
+| A publication exists for either revisioned slot | **No** — both answer `[]` |
+| `metal_prices` exists with every selected column and readable by `anon` | **Yes** — 200, five active verified rows |
+| A `K22`/`BDT` rate is published for each metal | **Yes** — gold 19550, silver 360 BDT per gram |
+| `datasets` Storage bucket exists and is reachable | **Yes** — a nonexistent object answers `404 Object not found` |
+| The live table grants match the prepared migration | **No** — column-level grants; `select=*` is refused (`42501`). See §2.3 |
+| The live objects were created by these migrations | **Unknown** — no SQL/service-role access, so the DDL cannot be read back |
+| A dataset payload downloads and activates | **Not verified** — no publication to download |
+| A prayer revision downloads, checks and activates | **Not verified** — no revision to download |
+| The app displays a price or adopts a release on a device | **Not verified** — no device/emulator in this environment |
+| An administrator can publish (writes succeed under RLS) | **Not verified** — writes were neither attempted nor authorized |
 
-Status of the whole remote path today: **CONTRACT IMPLEMENTED**, **MIGRATION PREPARED**, endpoint
-**ENDPOINT REACHABLE**, and **MIGRATION APPLIED AND VERIFIED**, **DATABASE READ VERIFIED** and
-**FEATURE DATA FLOW VERIFIED** are all still **UNABLE TO VERIFY**.
+Status of the whole remote path today: **CONTRACT IMPLEMENTED**, **ENDPOINT REACHABLE**, **DATABASE READ
+VERIFIED** (the empty publication reads and the price rows). **FEATURE DATA FLOW VERIFIED** is still
+**UNABLE TO VERIFY** for the two publication slots, because nothing is published for them; for prices the
+read and selection are verified but the on-device display is not.
 
 ## 6. Where each contract is defined
 

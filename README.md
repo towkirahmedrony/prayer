@@ -34,8 +34,8 @@ without an account.
 | Location from the device on request (approximate or precise) with timeouts, permission and service states | Implemented |
 | Manual coordinates that need no permission and no network, stored in the existing location repository | Implemented |
 | **Bundled Bangladesh administrative dataset** — 8 divisions, 64 districts and 507 upazilas/thanas with published reference coordinates, plus the simplified national boundary | **Implemented, offline** |
-| **Remote location-dataset publication** (Supabase) — an immutable, checksummed dataset revision is checked for, downloaded, validated and activated atomically, with the bundled data as the permanent fallback | **Implemented, unit-tested against fakes; not live-verified** |
-| **Remote prayer configuration** (Supabase) — published, immutable calculation-profile revisions that supply the engine's *inputs* (method, Asr convention, high-latitude rule, per-prayer corrections). Resolved for the user's Bangladesh division, district or upazila, with an explicit user choice always winning and the bundled default as the floor | **Implemented, unit-tested against fakes; not live-verified** |
+| **Remote location-dataset publication** (Supabase) — an immutable, checksummed dataset revision is checked for, downloaded, validated and activated atomically, with the bundled data as the permanent fallback | **Implemented, unit-tested; read surface verified live, no publication published yet** |
+| **Remote prayer configuration** (Supabase) — published, immutable calculation-profile revisions that supply the engine's *inputs* (method, Asr convention, high-latitude rule, per-prayer corrections). Resolved for the user's Bangladesh division, district or upazila, with an explicit user choice always winning and the bundled default as the floor | **Implemented, unit-tested; read surface verified live, no revision published yet** |
 | **Named locality layer** — 1 216 urban neighbourhoods from OpenStreetMap, each joined to the district that contains it, so a device fix in a city reads *Mirpur, Dhaka* rather than a whole city corporation | **Implemented, offline** |
 | **One location display-name policy** — the locality, the upazila/thana or the district, de-duplicated, composed once and shown the same way on Home, Prayer, Qibla and Location | **Implemented** |
 | **Division → district → upazila picker** for choosing a location by area, with a search over the same bundled dataset above it — Bangla or English, matched and ranked in the interface language — and with no permission and no network | **Implemented** |
@@ -278,10 +278,11 @@ and no signing credentials.
   scales and a real device time-zone change are not.
 - Prohibited-time boundaries are this application's **configured policy**, disclosed as such on the
   screen that shows them; no source for the minute values has been verified in this repository.
-- **The remote publication path is not live-verified.** The build now supplies a Supabase project URL and
-  publishable key, so the app does attempt its remote checks, but the migrations are only authored and
-  reviewable in the repository: neither has been applied, no publication has been served or downloaded, and
-  the expected database objects were not found. See `docs/SUPABASE_SETUP.md`.
+- **The remote publication path is only partly live-verified.** The build supplies a Supabase project URL
+  and publishable key; on 2026-10-18 both publication views and the published-price table answered the
+  publishable key with the columns the app reads. Neither revisioned slot has a published row, so no payload
+  has been downloaded or adopted on a device, and whether the repository's migrations created the live
+  objects is unknown. See `docs/SUPABASE_CONTRACT_MATRIX.md` §5.
 - **A published revision carries no authenticity claim.** Its checksum detects accidental corruption,
   not a malicious publisher: there is no signature and no key management.
 - **Prayer-configuration resolution is by administrative area only.** It uses the stable area ids of

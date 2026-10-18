@@ -223,6 +223,13 @@ object SalahDiagnosticEvents {
     /** A synchronisation attempt failed, with its reason code. The active dataset is unchanged. */
     const val DATASET_SYNC_FAILED = "dataset_sync_failed"
 
+    /**
+     * A failed or refused check, and the dataset still in force. Logged with the reason code, the source
+     * (`bundled` or `applied`) and the version, so "the app is running on cached data because the check
+     * failed" is a statement in the log rather than an inference from the absence of an activation.
+     */
+    const val DATASET_SYNC_CACHED_DATA_USED = "dataset_sync_cached_data_used"
+
     /** No remote dataset is configured, so nothing was attempted. The app runs on local data. */
     const val DATASET_SYNC_NOT_CONFIGURED = "dataset_sync_not_configured"
 
@@ -257,6 +264,13 @@ object SalahDiagnosticEvents {
 
     /** A synchronisation attempt failed, with its reason code. The active configuration is unchanged. */
     const val PRAYER_CONFIG_SYNC_FAILED = "prayer_config_sync_failed"
+
+    /**
+     * A failed or refused check, and the configuration still in force — the accepted revision id, or
+     * `none` when the app is on bundled defaults. The prayer-configuration counterpart of
+     * [DATASET_SYNC_CACHED_DATA_USED].
+     */
+    const val PRAYER_CONFIG_SYNC_CACHED_DATA_USED = "prayer_config_sync_cached_data_used"
 
     /** No remote prayer configuration is configured, so nothing was attempted. */
     const val PRAYER_CONFIG_SYNC_NOT_CONFIGURED = "prayer_config_sync_not_configured"

@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetPublica
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetPublicationValidator
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.DatasetRemoteConfig
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.ManifestParseResult
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailureKind
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.PublicationProblem
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteDatasetSource
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
@@ -131,16 +132,26 @@ class DatasetSynchronizer(
         // 1. The manifest.
         val body = when (val fetch = source.fetchManifest(config.datasetId)) {
             is RemoteFetch.Success -> fetch.value
+            // A 404 means the view (or its grant) is absent, not that the slot is empty: an empty slot is
+            // `200 []` and is handled by the parser below as "no publication". Treating a missing endpoint
+            // as "up to date" would report a synchronisation that never read anything.
             RemoteFetch.NotFound -> return finish(
-                outcome = DatasetSyncOutcome.UpToDate(active),
+                outcome = DatasetSyncOutcome.Failed(
+                    SyncFailureReason.ENDPOINT_NOT_FOUND,
+                    "the publication endpoint is not available",
+                ),
                 now = now,
                 publicationId = null,
                 previous = state,
             )
             is RemoteFetch.HttpError -> return finish(
                 outcome = DatasetSyncOutcome.Failed(
-                    SyncFailureReason.MANIFEST_UNAVAILABLE,
-                    "HTTP ${fetch.status}",
+                    if (fetch.status == HTTP_UNAUTHORIZED || fetch.status == HTTP_FORBIDDEN) {
+                        SyncFailureReason.ACCESS_DENIED
+                    } else {
+                        SyncFailureReason.MANIFEST_UNAVAILABLE
+                    },
+                    "manifest HTTP ${fetch.status}",
                 ),
                 now = now,
                 publicationId = null,
@@ -148,8 +159,12 @@ class DatasetSynchronizer(
             )
             is RemoteFetch.NetworkFailure -> return finish(
                 outcome = DatasetSyncOutcome.Failed(
-                    SyncFailureReason.MANIFEST_UNAVAILABLE,
-                    fetch.kind.name,
+                    if (fetch.kind == NetworkFailureKind.TIMEOUT) {
+                        SyncFailureReason.TIMEOUT
+                    } else {
+                        SyncFailureReason.MANIFEST_UNAVAILABLE
+                    },
+                    "manifest ${fetch.kind.name.lowercase()}",
                 ),
                 now = now,
                 publicationId = null,
@@ -241,15 +256,22 @@ class DatasetSynchronizer(
         val bytes = when (val fetch = source.fetchPayload(publication.payloadPath, maxPayloadBytes)) {
             is RemoteFetch.Success -> fetch.value
             RemoteFetch.NotFound -> return finish(
-                outcome = DatasetSyncOutcome.Failed(SyncFailureReason.PAYLOAD_UNAVAILABLE, "not found"),
+                outcome = DatasetSyncOutcome.Failed(
+                    SyncFailureReason.PAYLOAD_NOT_FOUND,
+                    "the publication names a payload object that does not exist",
+                ),
                 now = now,
                 publicationId = publication.publicationId,
                 previous = state,
             )
             is RemoteFetch.HttpError -> return finish(
                 outcome = DatasetSyncOutcome.Failed(
-                    SyncFailureReason.PAYLOAD_UNAVAILABLE,
-                    "HTTP ${fetch.status}",
+                    if (fetch.status == HTTP_UNAUTHORIZED || fetch.status == HTTP_FORBIDDEN) {
+                        SyncFailureReason.ACCESS_DENIED
+                    } else {
+                        SyncFailureReason.PAYLOAD_UNAVAILABLE
+                    },
+                    "payload HTTP ${fetch.status}",
                 ),
                 now = now,
                 publicationId = publication.publicationId,
@@ -257,8 +279,12 @@ class DatasetSynchronizer(
             )
             is RemoteFetch.NetworkFailure -> return finish(
                 outcome = DatasetSyncOutcome.Failed(
-                    SyncFailureReason.PAYLOAD_UNAVAILABLE,
-                    fetch.kind.name,
+                    if (fetch.kind == NetworkFailureKind.TIMEOUT) {
+                        SyncFailureReason.TIMEOUT
+                    } else {
+                        SyncFailureReason.PAYLOAD_UNAVAILABLE
+                    },
+                    "payload ${fetch.kind.name.lowercase()}",
                 ),
                 now = now,
                 publicationId = publication.publicationId,
@@ -384,6 +410,21 @@ class DatasetSynchronizer(
             ),
         )
 
+        // A failed sync is not a successful one, but the app is still running on data. Saying so in one
+        // explicit event keeps "the active dataset is unchanged" observable instead of implied: the
+        // reason code says why the check failed, and these two fields say what is actually in use.
+        if (outcome.isFailure) {
+            val cached = runCatching { store.activeDataset() }.getOrNull()
+            logger.info(
+                SalahDiagnosticEvents.DATASET_SYNC_CACHED_DATA_USED,
+                mapOf(
+                    "reason" to failureCode,
+                    "source" to cached?.source?.name?.lowercase(),
+                    "version" to cached?.version?.value,
+                ),
+            )
+        }
+
         when (outcome) {
             is DatasetSyncOutcome.Activated -> logger.info(
                 SalahDiagnosticEvents.DATASET_SYNC_ACTIVATED,
@@ -445,6 +486,10 @@ class DatasetSynchronizer(
 
         /** The failure code recorded when an activation candidate was rejected. */
         const val REJECTED_CODE = "rejected"
+
+        /** The two statuses that mean "the project refused this read", not "the server broke". */
+        const val HTTP_UNAUTHORIZED = 401
+        const val HTTP_FORBIDDEN = 403
     }
 }
 

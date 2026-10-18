@@ -8,9 +8,12 @@
 -- pins it in SQL, exactly as `20260515000000_dataset_publications.sql` and
 -- `20260601000000_prayer_config_publications.sql` pin theirs.
 --
--- NOT APPLIED. This file is reviewed and version-controlled, but no Supabase project has been inspected or
--- migrated from here. See `docs/SUPABASE_CONTRACT_MATRIX.md` for what is verified from source and what is
--- not, and `docs/SUPABASE_SETUP.md` for how to apply a migration.
+-- NOT APPLIED. This file is reviewed and version-controlled; no migration was run from here. The live
+-- Salah project was *read* with the publishable key on 2026-10-18 and already answers the client's exact
+-- column list, but with column-level grants rather than the table-level grant below (`select=*` is refused).
+-- Applying this file to that project would therefore widen `anon` to every column of an existing table, so
+-- it is a definition for a fresh deployment, not a corrective step for the live one. See
+-- `docs/SUPABASE_CONTRACT_MATRIX.md` §2.3 and §5, and `docs/SUPABASE_SETUP.md` for how to apply a migration.
 --
 -- Why a table and not a view
 -- --------------------------

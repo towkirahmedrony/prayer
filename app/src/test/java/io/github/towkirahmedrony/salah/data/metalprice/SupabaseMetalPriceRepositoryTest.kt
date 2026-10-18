@@ -71,6 +71,37 @@ class SupabaseMetalPriceRepositoryTest {
     }
 
     @Test
+    fun `the rows the Salah project publishes select the K22 gold and silver rates`() = runTest {
+        // Captured from the live published-price read on 2026-10-18: the exact field names, the casing the
+        // table actually stores (lower-case metal and status, mixed-case purity) and a null effective_at.
+        // This is the response shape the app must accept; the prices are that day's published rates.
+        val liveResponse = """
+            [
+              {"metal_type":"gold","purity":"K18","price_per_gram":16035,"currency":"BDT","source":"https://www.bajus.org/gold-price","source_url":"https://www.bajus.org/gold-price","override_active":false,"is_active":true,"verification_status":"verified","effective_at":null,"provider_last_update":"2026-10-15T13:29:40+00:00","fetched_at":"2026-10-17T00:25:03.32+00:00","updated_at":"2026-10-17T00:25:20.606637+00:00"},
+              {"metal_type":"silver","purity":"K18","price_per_gram":295,"currency":"BDT","source":"https://www.bajus.org/gold-price","source_url":"https://www.bajus.org/gold-price","override_active":false,"is_active":true,"verification_status":"verified","effective_at":null,"provider_last_update":"2026-10-15T13:29:40+00:00","fetched_at":"2026-10-17T00:25:04.539+00:00","updated_at":"2026-10-17T00:32:00.468683+00:00"},
+              {"metal_type":"silver","purity":"TRADITIONAL","price_per_gram":225,"currency":"BDT","source":"https://www.bajus.org/gold-price","source_url":"https://www.bajus.org/gold-price","override_active":false,"is_active":true,"verification_status":"verified","effective_at":null,"provider_last_update":"2026-10-15T13:29:40+00:00","fetched_at":"2026-10-17T00:25:04.693+00:00","updated_at":"2026-10-17T00:32:22.10765+00:00"},
+              {"metal_type":"gold","purity":"K22","price_per_gram":19550,"currency":"BDT","source":"https://www.bajus.org/gold-price","source_url":"https://www.bajus.org/gold-price","override_active":false,"is_active":true,"verification_status":"verified","effective_at":null,"provider_last_update":"2026-10-18T05:47:43+00:00","fetched_at":"2026-10-18T06:00:02.923883+00:00","updated_at":"2026-10-18T06:00:02.923883+00:00"},
+              {"metal_type":"silver","purity":"K22","price_per_gram":360,"currency":"BDT","source":"Gold Price Bangladesh (BAJUS-based)","source_url":"https://gold-price.bd/","override_active":false,"is_active":true,"verification_status":"verified","effective_at":null,"provider_last_update":"2026-10-18T05:47:43+00:00","fetched_at":"2026-10-18T06:00:02.923883+00:00","updated_at":"2026-10-18T06:00:02.923883+00:00"}
+            ]
+        """.trimIndent()
+
+        val (repository, _) = repository(RemoteFetch.Success(liveResponse))
+
+        val prices = repository.publishedReferencePrices()
+        val gold = prices.gold as ReferencePriceResult.Available
+        val silver = prices.silver as ReferencePriceResult.Available
+
+        assertEquals(MetalPurity.K22, gold.price.purity)
+        assertEquals(MetalPurity.K22, silver.price.purity)
+        assertEquals(0, BigDecimal("19550").compareTo(gold.price.pricePerGram))
+        assertEquals(0, BigDecimal("360").compareTo(silver.price.pricePerGram))
+        assertEquals("BDT", gold.price.currency)
+        // The record carries no effective date, so none may be invented for it.
+        assertNull(gold.price.effectiveAt)
+        assertEquals("2026-10-18T05:47:43+00:00", gold.price.providerLastUpdate)
+    }
+
+    @Test
     fun `the K22 rate is the one selected when other purities are published too`() = runTest {
         val (repository, _) = repository(
             RemoteFetch.Success(

@@ -178,19 +178,24 @@ On start-up (and on foreground) the app performs a throttled manifest check off 
 
 Every step is logged with `dataset_sync_*` events (see `DiagnosticsLogger`'s event vocabulary). No credential
 is ever logged. **A successful configuration does not make this path successful:** if the objects in §4 have
-not been created, the manifest request returns an HTTP error (typically 404) and the run reports
-`dataset_sync_failed` with `manifest_unavailable` while the bundled dataset keeps working.
+not been created, the manifest request returns 404 and the run reports `dataset_sync_failed` with
+`endpoint_not_found` — not "up to date" — while the bundled dataset keeps working. A refusal (401/403) is
+reported as `access_denied`, and a timeout as `timeout`; the reason code names the failure rather than
+folding every HTTP outcome into "unavailable".
 
 ## 7. What still needs a live test
 
 These cannot be verified in CI without a real, populated project, and are listed so the gap is explicit:
 
-- the migration applied to a real project, and the RLS/grants behaving as this document claims;
-- the Storage read policy serving a payload to the publishable key and refusing a write;
-- the app's manifest fetch and payload download against the live PostgREST and Storage endpoints;
+- whether these migrations (rather than another route) created the live objects, and whether the RLS/grants
+  behave for **writes** as this document claims — only read-only requests were made;
+- the Storage read policy serving a payload to the publishable key: the bucket answers, but there is no
+  published payload object to fetch;
+- the app's own request and download from a device: the reads here were made with `curl`, not from the app;
 - an end-to-end "publish a new release, watch an app adopt it" run.
 
-Until those are done, treat the remote path as **implemented and unit-tested, not live-verified**.
+Until those are done, treat the remote path as **implemented, unit-tested, and its read surfaces verified
+live** — with adoption and publishing **not** verified.
 
 The distinct states, which must not be conflated:
 
@@ -199,9 +204,9 @@ The distinct states, which must not be conflated:
 | Configuration supplied | `BuildConfig` holds a well-formed URL and publishable key | **Yes**, from the defaults in §1 |
 | Client initialised | The three config holders report `isConfigured` | **Yes** — same values, same rule |
 | Network request attempted | A synchroniser passed its gate and called the transport | Yes, at run time, when a check is due |
-| Supabase endpoint reachable | The project host answers | **Yes** — the project ref resolves and the REST gateway responds (it answers 401 without a key) |
-| Database query successful | A read returned the publication row | **No** — the objects in §4 are not present |
-| Feature data flow operational | A published release is adopted by the app | **No** — nothing is published |
+| Supabase endpoint reachable | The project host answers | **Yes** — REST and Storage both respond |
+| Database query successful | A read returned a valid response for the contract | **Yes** — the two publication views answer 200 (with `[]`), and `metal_prices` returns its published rows (verified 2026-10-18) |
+| Feature data flow operational | A published release is adopted by the app, or a price is displayed | **No** — no dataset or prayer-configuration row is published, and no device run was possible. The price read itself is verified; its display is not |
 
 ## 8. Prayer-configuration publication
 
@@ -224,9 +229,10 @@ The same two configuration values from §1 enable both slots. With them supplied
 never blocking a screen) checks for a published revision, validates it, adopts it and reapplies the effective
 settings; with them blank, both slots report "not configured" and the app runs entirely offline.
 
-**What still needs a live test here too:** the prayer-config migration applied to a real project, the view's
-RLS behaviour, and an end-to-end "publish a revision, watch an app adopt it" run. Until then, treat this
-path as **implemented and unit-tested, not live-verified**.
+**What was verified live on 2026-10-18:** the view exists and answers the publishable key with 200, including
+the `payload` column the content query selects; it currently holds no revision (`[]`). **What still needs a
+live test:** applying the migration's DDL to a project where the object is absent, the view's behaviour for a
+populated revision, and an end-to-end "publish a revision, watch an app adopt it" run.
 
 ## 9. Known server-side gaps, and what this repository does about them
 
@@ -238,26 +244,30 @@ unknown here.
 
 What the audit reported, and what is now true of each:
 
-- **`dataset_current_publication` was not found.** The view the dataset client reads *is* defined by
-  `20260515000000_dataset_publications.sql`, with every field the client parses. The gap is that the migration
-  has not been applied — a deployment step, not a contract mismatch.
-- **`prayer_config_current_publication` was not found.** Same: defined by
-  `20260601000000_prayer_config_publications.sql`, including the `payload` column the content query selects and
-  the revision/checksum machinery the client validates.
+- **`dataset_current_publication` was reported missing.** It is defined by
+  `20260515000000_dataset_publications.sql` with every field the client parses, and on 2026-10-18 the live
+  project answered it with 200 for all of those columns. It exists; it has no current publication.
+- **`prayer_config_current_publication` was reported missing.** Same: defined by
+  `20260601000000_prayer_config_publications.sql`, including the `payload` column the content query selects,
+  and live it answers 200 for the manifest columns and `payload`, with no revision published.
 - **`prayer_calculation_configs` stores configuration scope-per-row.** That table is not defined in this
   repository and is not read by this app, so nothing here can be aligned to it without inventing its columns.
   The client's revision, revision-number and checksum rules are load-bearing (idempotence, refusal of reused
   or stale revisions), so the fix is *not* to weaken the client: if the flat table is the administrator's
   source of truth, the adapter that materialises it into a revisioned, checksummed publication belongs to the
   publishing workflow, outside this repository.
-- **The `metal_prices` contract was not found.** This was the one genuine schema gap: the price client
-  queried `metal_prices` while nothing in this repository defined it. It is now defined by
-  `20261018000000_metal_prices.sql` — additively, with a read-only select policy for client roles — and
-  `SupabaseContractParityTest` holds the table's column list equal to the columns the client selects.
+- **The `metal_prices` contract had no SQL in this repository.** The price client queried `metal_prices`
+  while nothing here defined it, which is why `20261018000000_metal_prices.sql` was written. On 2026-10-18
+  the live table answered the client's column list with five published rows, so the contract the client reads
+  is present. The live table grants `select` per column rather than per table, which the prepared migration
+  does not reproduce — applying it to this project would widen `anon` to every column. See
+  `docs/SUPABASE_CONTRACT_MATRIX.md` §2.3 before applying it anywhere.
 
-Applied and verified? **No.** No project was inspected or migrated from here, and no authenticated read was
-made, so all three migrations remain **prepared, not applied**. `docs/SUPABASE_CONTRACT_MATRIX.md` §5 lists
-the exact reads that would verify each one.
+Applied and verified? **Partly, and by observation rather than by DDL.** The two views and the price table
+exist and were read successfully with the publishable key; no publication is served for either revisioned
+slot, and no write or migration was performed from here. So the objects are **live and readable**, while
+whether these exact migrations created them, and whether the publishing workflow can write, remain
+unverified. `docs/SUPABASE_CONTRACT_MATRIX.md` §5 lists both halves.
 
 Each of these is a **data-flow** gap except the price definition, which was a contract gap. Configuring the
 URL and key correctly could not have closed any of them: a misconfigured client and an absent server object

@@ -103,14 +103,18 @@ class DatasetSynchronizerTest {
     // No publication, no change ----------------------------------------------------------------
 
     @Test
-    fun `a missing manifest leaves the active dataset unchanged`() = runTest {
+    fun `a missing publication endpoint is reported instead of being called up to date`() = runTest {
         val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NotFound)
 
         val outcome = synchronizer(source).synchronize(DatasetSyncTrigger.APP_START)
 
-        assertTrue(outcome.toString(), outcome is DatasetSyncOutcome.UpToDate)
+        // A 404 is a missing view/grant, not an empty slot. Calling it "up to date" would report a
+        // synchronisation that never read anything.
+        assertEquals(SyncFailureReason.ENDPOINT_NOT_FOUND, failure(outcome))
         assertEquals(0, source.payloadCalls)
         assertEquals("bundled-v1", store.active?.version?.value)
+        assertEquals("endpoint_not_found", stateStore.state.lastFailureCode)
+        assertTrue(logger.has(SalahDiagnosticEvents.DATASET_SYNC_CACHED_DATA_USED))
     }
 
     @Test
@@ -209,13 +213,46 @@ class DatasetSynchronizerTest {
     }
 
     @Test
-    fun `a timeout leaves the active dataset unchanged`() = runTest {
+    fun `a timeout is reported as a timeout, not as an unreachable host`() = runTest {
         val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NetworkFailure(NetworkFailureKind.TIMEOUT))
 
         val outcome = synchronizer(source).synchronize(DatasetSyncTrigger.APP_START)
 
-        assertEquals(SyncFailureReason.MANIFEST_UNAVAILABLE, failure(outcome))
+        assertEquals(SyncFailureReason.TIMEOUT, failure(outcome))
         assertTrue("a timeout is transient and worth retrying", failure(outcome).transient)
+        assertEquals("bundled-v1", store.active?.version?.value)
+    }
+
+    @Test
+    fun `a refused read is reported as access denied rather than as a network failure`() = runTest {
+        for (status in listOf(401, 403)) {
+            val source = FakeRemoteDatasetSource(manifest = RemoteFetch.HttpError(status))
+
+            val outcome = synchronizer(source).synchronize(DatasetSyncTrigger.APP_START, forced = true)
+
+            assertEquals(
+                "HTTP $status must be reported as a refusal, not as an unavailable manifest",
+                SyncFailureReason.ACCESS_DENIED,
+                failure(outcome),
+            )
+            assertEquals("bundled-v1", store.active?.version?.value)
+            assertEquals(0, source.payloadCalls)
+        }
+    }
+
+    @Test
+    fun `a publication naming a payload object that does not exist is refused`() = runTest {
+        val source = FakeRemoteDatasetSource(
+            manifest = RemoteFetch.Success(manifest()),
+            payload = RemoteFetch.NotFound,
+        )
+
+        val outcome = synchronizer(source).synchronize(DatasetSyncTrigger.APP_START)
+
+        assertEquals(SyncFailureReason.PAYLOAD_NOT_FOUND, failure(outcome))
+        assertFalse("a missing payload is not fixed by re-downloading the same path", failure(outcome).transient)
+        assertEquals(0, store.activations)
+        assertEquals("bundled-v1", store.active?.version?.value)
     }
 
     @Test
@@ -397,7 +434,7 @@ class DatasetSynchronizerTest {
 
     @Test
     fun `a second immediate check is throttled`() = runTest {
-        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NotFound)
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.Success("[]"))
         val synchroniser = synchronizer(source, throttle = SyncThrottlePolicy())
 
         synchroniser.synchronize(DatasetSyncTrigger.APP_START)
@@ -424,7 +461,7 @@ class DatasetSynchronizerTest {
 
     @Test
     fun `returning to connectivity allows the next check immediately`() = runTest {
-        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.NotFound)
+        val source = FakeRemoteDatasetSource(manifest = RemoteFetch.Success("[]"))
         val network = FakeNetworkStatusProvider(online = false)
         val synchroniser = synchronizer(source, networkStatus = network)
 

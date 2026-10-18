@@ -32,7 +32,14 @@ sealed interface RemoteFetch<out T> {
     /** The fetch succeeded; [value] is the response body. */
     data class Success<T>(val value: T) : RemoteFetch<T>
 
-    /** The resource does not exist — a 404, or an empty publication slot. */
+    /**
+     * The resource does not exist (HTTP 404) — a missing view/table, or a payload object the publication
+     * names but Storage does not hold.
+     *
+     * **Not an empty publication slot.** A slot with no current publication is a `200 []` body and is
+     * reported as [Success]; conflating the two would let "the endpoint is missing" be handled as "there
+     * is nothing to update".
+     */
     data object NotFound : RemoteFetch<Nothing>
 
     /** The server answered with an error status. */

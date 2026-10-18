@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync
 
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
 import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailureKind
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
 import io.github.towkirahmedrony.salah.core.domain.network.AlwaysOnlineNetworkStatusProvider
@@ -118,16 +119,25 @@ class PrayerConfigSynchronizer(
         // 1. The manifest.
         val body = when (val fetch = source.fetchManifest()) {
             is RemoteFetch.Success -> fetch.value
+            // 404 is a missing view/grant, not an empty slot: an empty slot is `200 []`, handled by the
+            // parser below. Reporting a missing endpoint as "up to date" would claim a check succeeded.
             RemoteFetch.NotFound -> return finish(
-                outcome = PrayerConfigSyncOutcome.UpToDate(active),
+                outcome = PrayerConfigSyncOutcome.Failed(
+                    PrayerConfigFailureReason.ENDPOINT_NOT_FOUND,
+                    "the prayer-configuration endpoint is not available",
+                ),
                 now = now,
                 revisionId = null,
                 previous = state,
             )
             is RemoteFetch.HttpError -> return finish(
                 outcome = PrayerConfigSyncOutcome.Failed(
-                    PrayerConfigFailureReason.MANIFEST_UNAVAILABLE,
-                    "HTTP ${fetch.status}",
+                    if (fetch.status == HTTP_UNAUTHORIZED || fetch.status == HTTP_FORBIDDEN) {
+                        PrayerConfigFailureReason.ACCESS_DENIED
+                    } else {
+                        PrayerConfigFailureReason.MANIFEST_UNAVAILABLE
+                    },
+                    "manifest HTTP ${fetch.status}",
                 ),
                 now = now,
                 revisionId = null,
@@ -135,8 +145,12 @@ class PrayerConfigSynchronizer(
             )
             is RemoteFetch.NetworkFailure -> return finish(
                 outcome = PrayerConfigSyncOutcome.Failed(
-                    PrayerConfigFailureReason.MANIFEST_UNAVAILABLE,
-                    fetch.kind.name,
+                    if (fetch.kind == NetworkFailureKind.TIMEOUT) {
+                        PrayerConfigFailureReason.TIMEOUT
+                    } else {
+                        PrayerConfigFailureReason.MANIFEST_UNAVAILABLE
+                    },
+                    "manifest ${fetch.kind.name.lowercase()}",
                 ),
                 now = now,
                 revisionId = null,
@@ -248,15 +262,22 @@ class PrayerConfigSynchronizer(
         val payloadText = when (val fetch = source.fetchContent(manifest.revisionId)) {
             is RemoteFetch.Success -> fetch.value
             RemoteFetch.NotFound -> return finish(
-                outcome = PrayerConfigSyncOutcome.Failed(PrayerConfigFailureReason.CONTENT_UNAVAILABLE, "not found"),
+                outcome = PrayerConfigSyncOutcome.Failed(
+                    PrayerConfigFailureReason.CONTENT_NOT_FOUND,
+                    "the revision's content is not served",
+                ),
                 now = now,
                 revisionId = manifest.revisionId,
                 previous = state,
             )
             is RemoteFetch.HttpError -> return finish(
                 outcome = PrayerConfigSyncOutcome.Failed(
-                    PrayerConfigFailureReason.CONTENT_UNAVAILABLE,
-                    "HTTP ${fetch.status}",
+                    if (fetch.status == HTTP_UNAUTHORIZED || fetch.status == HTTP_FORBIDDEN) {
+                        PrayerConfigFailureReason.ACCESS_DENIED
+                    } else {
+                        PrayerConfigFailureReason.CONTENT_UNAVAILABLE
+                    },
+                    "content HTTP ${fetch.status}",
                 ),
                 now = now,
                 revisionId = manifest.revisionId,
@@ -264,8 +285,12 @@ class PrayerConfigSynchronizer(
             )
             is RemoteFetch.NetworkFailure -> return finish(
                 outcome = PrayerConfigSyncOutcome.Failed(
-                    PrayerConfigFailureReason.CONTENT_UNAVAILABLE,
-                    fetch.kind.name,
+                    if (fetch.kind == NetworkFailureKind.TIMEOUT) {
+                        PrayerConfigFailureReason.TIMEOUT
+                    } else {
+                        PrayerConfigFailureReason.CONTENT_UNAVAILABLE
+                    },
+                    "content ${fetch.kind.name.lowercase()}",
                 ),
                 now = now,
                 revisionId = manifest.revisionId,
@@ -440,6 +465,19 @@ class PrayerConfigSynchronizer(
             )
         }
 
+        // What remains in force after a failed check: the accepted revision, or none (bundled defaults).
+        // An explicit event so "the configuration is unchanged" is observable rather than inferred.
+        if (outcome.isFailure) {
+            val cached = runCatching { store.active() }.getOrNull()
+            logger.info(
+                SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_CACHED_DATA_USED,
+                mapOf(
+                    "reason" to failureCode,
+                    "revisionId" to (cached?.revisionId ?: "none"),
+                ),
+            )
+        }
+
         when (outcome) {
             is PrayerConfigSyncOutcome.Activated -> logger.info(
                 SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_ACTIVATED,
@@ -489,6 +527,10 @@ class PrayerConfigSynchronizer(
 
     private companion object {
         const val REJECTED_CODE = "rejected"
+
+        /** The two statuses that mean "the project refused this read", not "the server broke". */
+        const val HTTP_UNAUTHORIZED = 401
+        const val HTTP_FORBIDDEN = 403
     }
 }
 

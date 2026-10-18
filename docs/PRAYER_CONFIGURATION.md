@@ -242,8 +242,9 @@ To publish a revision (service role or SQL editor):
 
 ## 11. Known limitations
 
-- **Not live-verified.** The migration is not applied to any project and the remote path has not been
-  exercised against a live endpoint; it is implemented and unit-tested against fakes.
+- **Only the read surface is live-verified.** On 2026-10-18 the publication view answered the publishable
+  key with 200 for every manifest column and for `payload`, and returned `[]` — no revision is published — so
+  the download, checksum and activation paths have been exercised only against fakes.
 - **No authenticity claim.** The checksum detects accidental corruption, not a malicious publisher. There is
   no signature and no key management.
 - **No admin panel.** Publishing is a service-role or SQL operation, as documented above.

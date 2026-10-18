@@ -25,8 +25,28 @@ enum class DatasetSyncTrigger {
 /** Why a check did not produce a new active dataset. */
 enum class SyncFailureReason(val code: String, val transient: Boolean) {
 
-    /** The manifest could not be fetched (network, timeout or an HTTP error). */
+    /** The manifest could not be fetched (network or an HTTP error). */
     MANIFEST_UNAVAILABLE("manifest_unavailable", transient = true),
+
+    /**
+     * The manifest endpoint itself does not exist — PostgREST answered 404 for the view.
+     *
+     * **Not the same as "no update".** An empty publication makes PostgREST answer `200 []`, which the
+     * parser reports as no publication; a 404 means the view (or the grant that exposes it) is absent, so
+     * no manifest was read at all. Reporting that as [DatasetSyncOutcome.UpToDate] would claim a
+     * synchronisation that never happened. The active dataset is untouched either way.
+     */
+    ENDPOINT_NOT_FOUND("endpoint_not_found", transient = false),
+
+    /**
+     * The project refused the read (HTTP 401 or 403): a key, policy or grant problem rather than a
+     * network one. It is not transient — repeating the same request cannot fix it — but it is retried on
+     * the ordinary failure interval because a deployment change can.
+     */
+    ACCESS_DENIED("access_denied", transient = false),
+
+    /** The request exceeded its timeout. Transient, and reported separately from a refused connection. */
+    TIMEOUT("timeout", transient = true),
 
     /** The manifest response could not be read as a manifest. */
     MANIFEST_MALFORMED("manifest_malformed", transient = false),
@@ -39,6 +59,15 @@ enum class SyncFailureReason(val code: String, val transient: Boolean) {
 
     /** The payload object could not be fetched. */
     PAYLOAD_UNAVAILABLE("payload_unavailable", transient = true),
+
+    /**
+     * The payload object named by the publication does not exist (HTTP 404).
+     *
+     * A publication row that points at a missing object is an integrity problem with the release, not a
+     * transient network failure: re-downloading the same path would fail identically, so it is reported
+     * as terminal and not retried on every check.
+     */
+    PAYLOAD_NOT_FOUND("payload_not_found", transient = false),
 
     /** The payload exceeded the size this build accepts. */
     PAYLOAD_TOO_LARGE("payload_too_large", transient = false),

@@ -175,6 +175,63 @@ class PrayerConfigSynchronizerTest {
     }
 
     @Test
+    fun `a missing configuration endpoint is reported instead of being called up to date`() = runTest {
+        val source = FakeRemotePrayerConfigSource(manifest = RemoteFetch.NotFound)
+
+        val outcome = synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START)
+
+        assertEquals(PrayerConfigFailureReason.ENDPOINT_NOT_FOUND, failure(outcome))
+        assertEquals(0, source.contentCalls)
+        assertNull(store.current)
+        assertEquals("endpoint_not_found", stateStore.state.lastFailureCode)
+        assertTrue(logger.has(SalahDiagnosticEvents.PRAYER_CONFIG_SYNC_CACHED_DATA_USED))
+    }
+
+    @Test
+    fun `a refused read is reported as access denied, not as a network failure`() = runTest {
+        for (status in listOf(401, 403)) {
+            val source = FakeRemotePrayerConfigSource(manifest = RemoteFetch.HttpError(status))
+
+            val outcome = synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START, forced = true)
+
+            assertEquals(
+                "HTTP $status must be reported as a refusal",
+                PrayerConfigFailureReason.ACCESS_DENIED,
+                failure(outcome),
+            )
+            assertEquals(0, source.contentCalls)
+        }
+    }
+
+    @Test
+    fun `a timeout is reported as a timeout`() = runTest {
+        val source = FakeRemotePrayerConfigSource(
+            manifest = RemoteFetch.NetworkFailure(NetworkFailureKind.TIMEOUT),
+        )
+
+        val outcome = synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START)
+
+        assertEquals(PrayerConfigFailureReason.TIMEOUT, failure(outcome))
+        assertTrue("a timeout is transient and worth retrying", failure(outcome).transient)
+    }
+
+    @Test
+    fun `content that is not served is refused without activating anything`() = runTest {
+        val snapshot = sampleSnapshot(revisionId = "rev-0002", revisionNumber = 2)
+        val source = FakeRemotePrayerConfigSource(
+            manifest = RemoteFetch.Success(manifestJson(snapshot)),
+            content = RemoteFetch.NotFound,
+        )
+
+        val outcome = synchronizer(source).synchronize(PrayerConfigSyncTrigger.APP_START)
+
+        assertEquals(PrayerConfigFailureReason.CONTENT_NOT_FOUND, failure(outcome))
+        assertFalse("a missing payload is not a transient network fault", failure(outcome).transient)
+        assertEquals(0, store.activations)
+        assertNull(store.current)
+    }
+
+    @Test
     fun `an unpublished revision is refused without downloading`() = runTest {
         val snapshot = sampleSnapshot()
         val source = FakeRemotePrayerConfigSource(
