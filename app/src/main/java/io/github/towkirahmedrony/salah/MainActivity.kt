@@ -9,6 +9,8 @@ import androidx.lifecycle.lifecycleScope
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncTrigger
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSyncTrigger
+import io.github.towkirahmedrony.salah.core.domain.prayerconfig.sync.PrayerConfigSynchronizer
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.navigation.SalahApp
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +51,23 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching {
                 GlobalContext.get().get<DatasetSynchronizer>().synchronize(DatasetSyncTrigger.FOREGROUND)
+            }
+        }
+
+        // The same foreground trigger for the remote prayer configuration. It is the counterpart of the
+        // dataset check above and of the trigger model the synchronisers document
+        // (`docs/DATA_RELIABILITY.md` §5): the published calculation configuration is re-checked when the
+        // app comes to the foreground, not only at the next cold start, so a revision that became current
+        // while the app was backgrounded is adopted on the next foreground. Shaped exactly like the dataset
+        // trigger — off the main thread, `runCatching`, not awaited anywhere — because the
+        // prayer-configuration synchroniser owns its own throttle, consults the same network gate before any
+        // request, and can only leave the active configuration unchanged when anything fails. Nothing on
+        // screen depends on it, so the first frame and the location gate never wait on it.
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                GlobalContext.get()
+                    .get<PrayerConfigSynchronizer>()
+                    .synchronize(PrayerConfigSyncTrigger.FOREGROUND)
             }
         }
 

@@ -185,8 +185,9 @@ The manifest query deliberately omits the payload column, so an unchanged revisi
 and no configuration content. It reuses the same `HttpTransport` as the location-dataset path — this phase
 adds a second published slot, not a second networking client. Synchronisation is throttled with the same
 conventions as the dataset path (a longer interval after success, a short one after failure, and no
-suppression of an explicit user check), runs off the main thread at app start, and never delays the location
-gate or the Home screen.
+suppression of an explicit user check), runs off the main thread at app start and when the app comes to the
+foreground (`PrayerConfigSyncTrigger.APP_START` and `FOREGROUND`, exactly as the dataset check does), and
+never delays the location gate or the Home screen.
 
 ## 9. Supabase schema and security
 
