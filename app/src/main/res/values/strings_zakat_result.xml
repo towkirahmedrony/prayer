@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_result_below_sentence">Your net zakatable wealth is below the nisab, under the settings you chose.</string>
+    <string name="zakat_result_over_sentence">Your net zakatable wealth reaches the nisab, under the settings you chose.</string>
+    <string name="zakat_result_incomplete_title">No amount yet</string>
+    <string name="zakat_result_meter_net">Net wealth</string>
+    <string name="zakat_result_meter_cd">Net wealth %1$s against a nisab of %2$s</string>
+    <string name="zakat_result_gap">%1$s %2$s below the nisab</string>
+    <string name="zakat_result_worked_out">HOW THIS WAS WORKED OUT</string>
+    <string name="zakat_result_nisab_missing">The nisab needs a price per gram.</string>
+    <plurals name="zakat_result_leftout">
+        <item quantity="one">%d item was left out</item>
+        <item quantity="other">%d items were left out</item>
+    </plurals>
+    <string name="zakat_result_settings_header">SETTINGS USED</string>
+    <string name="zakat_result_change">Change in step 3</string>
+    <string name="zakat_result_other_header">IF YOU CHOSE DIFFERENTLY</string>
+    <string name="zakat_result_other_net">Net %1$s</string>
+    <string name="zakat_result_still_under">Still below the nisab</string>
+    <string name="zakat_result_other_unknown">Needs a price to compare</string>
+    <string name="zakat_result_sources_title">Sources and method</string>
+    <string name="zakat_result_copy">Copy summary</string>
+    <string name="zakat_result_start_over">Start over</string>
+    <string name="zakat_result_copied">Summary copied</string>
+    <string name="zakat_result_done">Done</string>
+    <string name="zakat_result_nothing_saved">Nothing is saved when you leave this screen.</string>
+    <string name="zakat_result_summary_title">Zakat calculation (Salah)</string>
+</resources>

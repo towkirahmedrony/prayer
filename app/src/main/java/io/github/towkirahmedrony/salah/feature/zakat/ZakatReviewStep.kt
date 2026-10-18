@@ -108,7 +108,7 @@ internal fun ZakatReviewStep(
 
 private enum class ReviewSetting { DEBTS, JEWELLERY, NISAB_WEIGHT, NISAB_METAL, HAWL }
 
-private enum class Provenance { USER, REFERENCE, CALCULATED }
+internal enum class Provenance { USER, REFERENCE, CALCULATED }
 
 // ---------------------------------------------------------------------------------------------------------
 // Provenance marks and legend
@@ -116,7 +116,7 @@ private enum class Provenance { USER, REFERENCE, CALCULATED }
 
 /** Three shapes rather than three colours, so the meaning never depends on telling hues apart. */
 @Composable
-private fun ProvenanceMark(kind: Provenance, modifier: Modifier = Modifier) {
+internal fun ProvenanceMark(kind: Provenance, modifier: Modifier = Modifier) {
     val description = stringResource(
         when (kind) {
             Provenance.USER -> R.string.zakat_review_legend_user
@@ -187,10 +187,10 @@ private fun Legend(modifier: Modifier = Modifier) {
 // Readiness: what needs a look before calculating
 // ---------------------------------------------------------------------------------------------------------
 
-private data class AttentionPalette(val background: Color, val border: Color, val text: Color)
+internal data class AttentionPalette(val background: Color, val border: Color, val text: Color)
 
 @Composable
-private fun attentionPalette(): AttentionPalette {
+internal fun attentionPalette(): AttentionPalette {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     return if (dark) {
         AttentionPalette(Color(0xFF3A3220), Color(0xFF7A6430), Color(0xFFF0D9A0))
@@ -323,7 +323,7 @@ private fun OptionalHawlLine(color: Color) {
 }
 
 @Composable
-private fun issueText(issue: ZakatReviewIssue): String = when (issue) {
+internal fun issueText(issue: ZakatReviewIssue): String = when (issue) {
     is ZakatReviewIssue.Asset -> stringResource(
         R.string.zakat_review_issue_line,
         stringResource(categoryNameRes(issue.category)),
@@ -345,7 +345,7 @@ private fun issueText(issue: ZakatReviewIssue): String = when (issue) {
     ZakatReviewIssue.HawlDate -> stringResource(R.string.zakat_review_issue_hawl)
 }
 
-private fun issueFixRes(issue: ZakatReviewIssue): Int = when (issue) {
+internal fun issueFixRes(issue: ZakatReviewIssue): Int = when (issue) {
     is ZakatReviewIssue.Asset -> R.string.zakat_review_fix_step1
     is ZakatReviewIssue.Debt -> R.string.zakat_review_fix_step2
     ZakatReviewIssue.HawlDate -> R.string.zakat_review_fix_below
@@ -589,7 +589,7 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun ReviewRow(
+internal fun ReviewRow(
     provenance: Provenance,
     title: String,
     modifier: Modifier = Modifier,
@@ -670,7 +670,7 @@ private fun TotalRow(
 }
 
 @Composable
-private fun Amount(
+internal fun Amount(
     value: String,
     currency: String?,
     modifier: Modifier = Modifier,
@@ -1003,7 +1003,7 @@ private fun HelpText(resId: Int) {
 }
 
 @Composable
-private fun <T> selectedLabel(choices: List<ZakatChoice<T>>): String {
+internal fun <T> selectedLabel(choices: List<ZakatChoice<T>>): String {
     val choice = choices.firstOrNull { it.selected } ?: return ""
     return if (choice.labelIsValue) choice.value.toString() else stringResource(choice.labelRes)
 }

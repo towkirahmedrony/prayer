@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_result_below_sentence">আপনার বেছে নেওয়া পছন্দ অনুযায়ী নিট যাকাতযোগ্য সম্পদ নিসাবের নিচে।</string>
+    <string name="zakat_result_over_sentence">আপনার বেছে নেওয়া পছন্দ অনুযায়ী নিট যাকাতযোগ্য সম্পদ নিসাবে পৌঁছেছে।</string>
+    <string name="zakat_result_incomplete_title">এখনো কোনো অঙ্ক নেই</string>
+    <string name="zakat_result_meter_net">নিট সম্পদ</string>
+    <string name="zakat_result_meter_cd">নিসাব %2$s-এর বিপরীতে নিট সম্পদ %1$s</string>
+    <string name="zakat_result_gap">নিসাবের চেয়ে %1$s %2$s কম</string>
+    <string name="zakat_result_worked_out">হিসাব যেভাবে হলো</string>
+    <string name="zakat_result_nisab_missing">নিসাবের জন্য প্রতি গ্রামের দাম দরকার।</string>
+    <plurals name="zakat_result_leftout">
+        <item quantity="one">%dটি বিষয় হিসাবের বাইরে রাখা হয়েছে</item>
+        <item quantity="other">%dটি বিষয় হিসাবের বাইরে রাখা হয়েছে</item>
+    </plurals>
+    <string name="zakat_result_settings_header">ব্যবহৃত পছন্দ</string>
+    <string name="zakat_result_change">ধাপ ৩-এ বদলান</string>
+    <string name="zakat_result_other_header">অন্যভাবে বাছলে</string>
+    <string name="zakat_result_other_net">নিট %1$s</string>
+    <string name="zakat_result_still_under">তখনো নিসাবের নিচে</string>
+    <string name="zakat_result_other_unknown">তুলনার জন্য দাম দরকার</string>
+    <string name="zakat_result_sources_title">সূত্র ও পদ্ধতি</string>
+    <string name="zakat_result_copy">সারাংশ কপি করুন</string>
+    <string name="zakat_result_start_over">নতুন করে শুরু</string>
+    <string name="zakat_result_copied">সারাংশ কপি হয়েছে</string>
+    <string name="zakat_result_done">সম্পন্ন</string>
+    <string name="zakat_result_nothing_saved">এই স্ক্রিন ছাড়লে কিছুই সংরক্ষিত থাকে না।</string>
+    <string name="zakat_result_summary_title">যাকাতের হিসাব (Salah)</string>
+</resources>

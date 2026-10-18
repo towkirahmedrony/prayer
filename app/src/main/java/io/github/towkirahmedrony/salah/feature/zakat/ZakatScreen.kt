@@ -185,8 +185,13 @@ fun ZakatScreen(
 
                         else -> {
                             StepHeading(R.string.zakat_flow_result_title, null)
-                            ResultCard(state = state)
-                            LimitsCard()
+                            ZakatResultStep(
+                                state = state,
+                                issues = issues,
+                                onOpenIssue = openIssue,
+                                onChangeSettings = { step = STEP_REVIEW },
+                                onStartOver = { confirmingClear = true },
+                            )
                         }
                     }
                 }
@@ -196,6 +201,7 @@ fun ZakatScreen(
                     needsAttention = (step == STEP_ASSETS && attention != null) ||
                         (step == STEP_REVIEW && leftOut > 0),
                     attentionText = attentionText,
+                    onDone = onBack,
                     continueEnabled = !(step == STEP_REVIEW && reviewNothingToCalculate(state)),
                     canClear = state.canClear,
                     onReview = {
@@ -206,7 +212,7 @@ fun ZakatScreen(
                         }
                     },
                     onContinue = { step += 1 },
-                    onEdit = { step = STEP_ASSETS },
+                    onEdit = { step = STEP_REVIEW },
                     onClear = { confirmingClear = true },
                     onBack = { step -= 1 },
                 )
@@ -342,6 +348,7 @@ private fun ActionBar(
     onBack: () -> Unit,
     attentionText: String,
     continueEnabled: Boolean,
+    onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -396,26 +403,38 @@ private fun ActionBar(
                     }
                 }
             } else {
-                Button(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(18.dp),
+                Text(
+                    text = stringResource(R.string.zakat_result_nothing_saved),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.zakat_flow_edit_answers),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                if (canClear) {
-                    TextButton(
-                        onClick = onClear,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp),
+                    OutlinedButton(
+                        onClick = onEdit,
+                        modifier = Modifier.height(56.dp),
+                        shape = RoundedCornerShape(18.dp),
                     ) {
-                        Text(text = stringResource(R.string.zakat_clear))
+                        Text(
+                            text = stringResource(R.string.zakat_flow_edit_answers),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                    Button(
+                        onClick = onDone,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.zakat_result_done),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                     }
                 }
             }
@@ -481,263 +500,6 @@ private fun MethodCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, mod
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Step 4: result
-// ---------------------------------------------------------------------------------------------------------
-
-@Composable
-private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier) {
-    val result = state.result
-    var showBreakdown by remember { mutableStateOf(false) }
-
-    SalahSectionCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeading(resId = R.string.zakat_section_result, modifier = Modifier.weight(1f))
-            SalahStatusPill(
-                text = stringResource(result.statusRes),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        if (result.due != null) {
-            Text(
-                text = stringResource(R.string.zakat_result_due),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = result.due,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = result.currency,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-            }
-        } else {
-            Text(
-                text = stringResource(R.string.zakat_result_net),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = result.netWealth ?: "\u2014",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (result.netWealth != null) {
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(
-                        text = result.currency,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 3.dp),
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.zakat_result_rate, result.rateLabel),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        result.metRes?.let { metRes ->
-            Spacer(modifier = Modifier.height(8.dp))
-            SalahStatusPill(
-                text = stringResource(metRes),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (result.due != null) {
-            TotalRow(labelRes = R.string.zakat_result_net, value = result.netWealth, currency = result.currency)
-        }
-        TotalRow(labelRes = R.string.zakat_result_total_assets, value = result.totalAssets, currency = result.currency)
-        TotalRow(labelRes = R.string.zakat_result_deductions, value = result.deductions, currency = result.currency)
-        TotalRow(labelRes = R.string.zakat_result_nisab, value = result.nisabAmount, currency = result.currency)
-        if (result.nisabGramsLabel != null && result.nisabPriceLabel != null) {
-            Text(
-                text = stringResource(
-                    R.string.zakat_result_nisab_detail,
-                    result.nisabGramsLabel,
-                    result.nisabPriceLabel,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (result.incompleteLabels.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.zakat_result_needs),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            result.incompleteLabels.forEach { labelRes ->
-                Text(
-                    text = stringResource(labelRes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        if (result.showsPriceNote) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.zakat_result_price_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (result.hawlEstimateDate != null && result.hawlEstimateDays != null) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(
-                    R.string.zakat_hawl_estimate,
-                    result.hawlEstimateDate,
-                    result.hawlEstimateDays,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (result.rows.isNotEmpty()) {
-            TextButton(
-                onClick = { showBreakdown = !showBreakdown },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-            ) {
-                Text(
-                    text = stringResource(
-                        if (showBreakdown) R.string.zakat_breakdown_hide else R.string.zakat_breakdown_show,
-                    ),
-                )
-            }
-            if (showBreakdown) {
-                result.rows.forEach { row -> BreakdownRow(row = row) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TotalRow(
-    @StringRes labelRes: Int,
-    value: String?,
-    modifier: Modifier = Modifier,
-    currency: String? = null,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(labelRes),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = value.orEmpty(),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (value != null && currency != null) {
-            Spacer(modifier = Modifier.size(4.dp))
-            Text(
-                text = currency,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BreakdownRow(row: ZakatResultRowView, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(row.labelRes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = row.amount.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        SalahStatusPill(
-            text = stringResource(row.treatmentRes),
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun LimitsCard(modifier: Modifier = Modifier) {
-    SalahSectionCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ZakatScaleGlyph(
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.size(8.dp))
-            SectionHeading(resId = R.string.zakat_limits_title)
-        }
-        Text(
-            text = stringResource(R.string.zakat_limits_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.zakat_not_certified),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.zakat_sources),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

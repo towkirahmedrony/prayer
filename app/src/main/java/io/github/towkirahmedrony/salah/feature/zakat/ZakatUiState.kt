@@ -86,6 +86,8 @@ sealed interface ZakatUiState {
         val assetCategories: List<ZakatAssetCategoryState> = emptyList(),
         /** The debts step: the entries, their status, and how they move the total. */
         val debts: ZakatDebtsView = ZakatDebtsView(),
+        /** Arithmetic beside the engine's result: the nisab meter, and the other debt setting's outcome. */
+        val resultInsight: ZakatResultInsight? = null,
     ) : ZakatUiState
 }
 

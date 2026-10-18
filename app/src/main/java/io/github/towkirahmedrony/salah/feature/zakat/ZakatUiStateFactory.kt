@@ -154,6 +154,7 @@ class ZakatUiStateFactory(
             canClear = form.hasAnythingEntered(),
             assetCategories = buildAssetCategories(result, parsed.invalid) { amount -> money(amount, locale) },
             debts = buildDebtsView(effectiveForm, result) { amount -> money(amount, locale) },
+            resultInsight = buildResultInsight(result, effectiveForm) { amount -> money(amount, locale) },
         )
     }
 
