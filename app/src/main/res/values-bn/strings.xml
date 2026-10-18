@@ -562,6 +562,7 @@
     <string name="zakat_price_title">রেফারেন্স দাম</string>
     <string name="zakat_price_subtitle">প্রকাশিত বাংলাদেশি বাজারের রেফারেন্স দর। চাইলে যেকোনোটি নিজের লেখা দামে বদলে নিতে পারেন।</string>
     <string name="zakat_price_unit">%1$s প্রতি গ্রাম</string>
+    <string name="zakat_price_purity">পিউরিটি %1$s</string>
     <string name="zakat_price_source">উৎস: %1$s</string>
     <string name="zakat_price_effective">যাচাই %1$s</string>
     <string name="zakat_price_provider_update">প্রদানকারীর হালনাগাদ %1$s</string>
@@ -572,6 +573,12 @@
     <string name="zakat_price_status_unavailable">প্রকাশিত নয়</string>
     <string name="zakat_price_status_conflict">পরস্পরবিরোধী রেকর্ড</string>
     <string name="zakat_price_status_failed">পাওয়া যায়নি</string>
+    <string name="zakat_price_status_cached">সংরক্ষিত দর</string>
+    <string name="zakat_price_status_stale">সংরক্ষিত দর · যাচাই করুন</string>
+    <string name="zakat_price_saved_at">সংরক্ষিত %1$s</string>
+    <string name="zakat_price_cached_note">সর্বশেষ সংরক্ষিত প্রকাশিত দর দেখানো হচ্ছে। ইন্টারনেট ছাড়াই এটি পাওয়া যায়।</string>
+    <string name="zakat_price_stale_note">এই সংরক্ষিত দর এক সপ্তাহের বেশি পুরোনো। ভরসা করার আগে যাচাই করুন, অথবা নিজের দাম লিখুন।</string>
+    <string name="zakat_price_refresh_failed_saved">সর্বশেষ যাচাই ব্যর্থ হয়েছে, তাই সংরক্ষিত দর দেখানো হচ্ছে। চাইলে নিজের দাম লিখুন।</string>
     <string name="zakat_price_unavailable">প্রকাশিত কোনো রেফারেন্স দাম নেই। নিজেই একটি দাম লিখুন।</string>
     <string name="zakat_price_conflict">একাধিক প্রকাশিত দর পাওয়া গেছে, তাই কোনোটি নেওয়া হয়নি। নিজেই একটি দাম লিখুন।</string>
     <string name="zakat_price_invalid">প্রকাশিত দরটি ব্যবহার করা যায়নি। নিজেই একটি দাম লিখুন।</string>

@@ -90,7 +90,7 @@ active) all require an immutable revision row and a checksum. See §3 for the de
 | **Revision / version mechanism** | None. The rate is a *current* value, not a revision: the app selects exactly one active, `VERIFIED` row per metal in purity `K22` and `BDT`, and treats two usable rows as a conflict to report rather than a choice to make. A partial unique index on `(metal_type, purity, currency) where is_active and verification_status = 'VERIFIED'` makes that ambiguity unrepresentable |
 | **Publication rules** | A row is used only when `is_active` is true **and** `verification_status = 'VERIFIED'`; both are re-checked client-side. Rows are published by an administrator workflow outside this app — Salah never contacts the price provider and never writes a price |
 | **Required read permission** | `select` on the table for `anon`/`authenticated` through a row-level-security select policy. No write privilege is granted to any client role |
-| **Local caching** | None. Nothing is persisted: the Zakat screen reads once on creation and on an explicit refresh, and a user's typed price is an in-memory session value that a published rate never overwrites |
+| **Local caching** | The last validated K22/BDT rate per metal is persisted in `filesDir/metal_prices/cache.json`, one atomic rename per update, with a per-metal fetch time. The cache is read before the refresh on screen creation and used whenever the service cannot be reached or answers unusably. It never contains a user's figures; a typed price remains an in-memory session value that a published rate never overwrites |
 | **Fallback** | Manual entry. Manual entry stays available, a missing or unusable rate never becomes zero, one metal's failure never stops the other metal's rate, and a request failure leaves the calculator exactly as usable as it was |
 | **Verification status** | CONTRACT IMPLEMENTED · **ENDPOINT REACHABLE** and **DATABASE READ VERIFIED**: the live table answers 200 for the selected column list and holds five active verified rows, including `K22`/`BDT` gold (19550) and silver (360). **Publishing and the app's display are unverified** — nothing here wrote a price or ran the screen. |
 
@@ -104,9 +104,13 @@ other.
 by meaning: `effective_at` is the only one the screen may present as an effective/reviewed date,
 `provider_last_update` is the provider's own update, and `fetched_at`/`updated_at` describe retrieval and the
 row's own last change. The app never invents a date for a row that recorded none, and it never replaces a
-published date with a fresher one. It also applies **no age threshold**: no source in this repository states
-one, and `MetalPriceRepository` is documented as refusing to infer a current price from the newest timestamp,
-so inventing a cutoff would be inventing policy. See §4.
+published date with a fresher one.
+
+The *cached copy's* age is a separate statement, made by this device rather than by the record. A saved rate
+fetched within 24 hours is shown as a published rate; up to 7 days as a saved price; and beyond 7 days as a
+saved price that should be checked. All three remain usable and offline, and the screen always shows when the
+copy was saved. The thresholds label a stored rate; they never turn it into zero, delete it, or block the
+calculator. See §4 and `MetalPriceFreshnessPolicy`.
 
 **The live table is not the migration's table, and the migration must not be applied blindly.** The live
 `metal_prices` answers the client's column list, but refuses `select=*` with `42501` ("permission denied for
@@ -150,10 +154,11 @@ Options considered and rejected:
   object. If it is the administrator's source of truth for settings, the adapter that materialises it into a
   revisioned, checksummed publication belongs to the workflow that publishes — outside both this repository
   and the app.
-- **No staleness threshold was added to prices.** See §2.3. The phase brief requires stale prices not be
-  *silently* presented as current; the contract satisfies that by carrying the record's own dates through to
-  the screen and never fabricating one, which `SupabaseMetalPriceRepositoryTest` pins in both directions (an
-  old date survives unchanged; a missing date stays missing). Choosing an age limit is a product decision.
+- **A staleness *label*, not a staleness gate, was added to the offline cache.** See §2.3. The published
+  record's own dates still travel through unchanged (an old date survives, a missing date stays missing), and
+  the app still refuses to infer a current price from the newest timestamp. Separately, the cached copy is
+  labelled current within 24 hours, saved up to 7 days, and stale beyond 7 days; a stale rate remains usable
+  and is never presented as live. This governs only this device's stored copy, not the published contract.
 - **No authentication, Realtime, Storage writes or any write path was added.** Every read stays a single
   read-only GET with the publishable key, through the one existing transport.
 - **No new configuration, HTTP client or credential.** All three reads use the two `BuildConfig` values and
@@ -178,6 +183,7 @@ Read on 2026-10-18 with the publishable key, `GET` only, no writes:
 | A dataset payload downloads and activates | **Not verified** — no publication to download |
 | A prayer revision downloads, checks and activates | **Not verified** — no revision to download |
 | The app displays a price or adopts a release on a device | **Not verified** — no device/emulator in this environment |
+| The price cache is restored after a restart and serves a rate offline | **Unit-tested, not device-tested** — `FileMetalPriceCacheTest` and `SupabaseMetalPriceRepositoryCacheTest` cover the file and repository; no device was available |
 | An administrator can publish (writes succeed under RLS) | **Not verified** — writes were neither attempted nor authorized |
 
 Status of the whole remote path today: **CONTRACT IMPLEMENTED**, **ENDPOINT REACHABLE**, **DATABASE READ

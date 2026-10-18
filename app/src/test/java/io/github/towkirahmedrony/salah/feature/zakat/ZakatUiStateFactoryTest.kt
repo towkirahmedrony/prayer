@@ -1,5 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFreshness
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPurity
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalType
 import io.github.towkirahmedrony.salah.core.domain.metalprice.PublishedMetalPrice
@@ -19,6 +21,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
 import java.util.Locale
 
@@ -88,12 +91,29 @@ class ZakatUiStateFactoryTest {
     )
 
     /** A published-price reading with a rate for whichever metals are named. */
-    private fun publishedPrices(gold: String? = null, silver: String? = null): ReferencePrices = ReferencePrices(
+    private fun publishedPrices(
+        gold: String? = null,
+        silver: String? = null,
+        freshness: MetalPriceFreshness = MetalPriceFreshness.CURRENT,
+        cachedAt: Long? = null,
+    ): ReferencePrices = ReferencePrices(
         gold = gold
-            ?.let { price -> ReferencePriceResult.Available(publishedPrice(MetalType.GOLD, price)) }
+            ?.let { price ->
+                ReferencePriceResult.Available(
+                    publishedPrice(MetalType.GOLD, price),
+                    freshness = freshness,
+                    cachedAtEpochMillis = cachedAt,
+                )
+            }
             ?: ReferencePriceResult.NotPublished,
         silver = silver
-            ?.let { price -> ReferencePriceResult.Available(publishedPrice(MetalType.SILVER, price)) }
+            ?.let { price ->
+                ReferencePriceResult.Available(
+                    publishedPrice(MetalType.SILVER, price),
+                    freshness = freshness,
+                    cachedAtEpochMillis = cachedAt,
+                )
+            }
             ?: ReferencePriceResult.NotPublished,
     )
 
@@ -555,6 +575,7 @@ class ZakatUiStateFactoryTest {
         val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
         assertEquals(ZakatReferencePriceStatus.AVAILABLE, gold.status)
         assertEquals("19550", gold.pricePerGram)
+        assertEquals("K22", gold.purityLabel)
         assertEquals("BDT", gold.currencyCode)
         assertEquals("Salah test fixture", gold.sourceLabel)
         assertNotNull(gold.effectiveLabel)
@@ -643,5 +664,69 @@ class ZakatUiStateFactoryTest {
     @Test
     fun `the refresh flag reaches the state`() {
         assertTrue(state(ZakatForm(), refreshingReferencePrices = true).refreshingReferencePrices)
+    }
+
+    @Test
+    fun `a saved rate is labelled as cached and still fills the price field`() {
+        val cachedAt = Instant.parse("2026-10-15T07:30:00Z").toEpochMilli()
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5"),
+            referencePrices = publishedPrices(
+                gold = "19550.00",
+                freshness = MetalPriceFreshness.CACHED,
+                cachedAt = cachedAt,
+            ),
+        )
+
+        // Still an input like any other: a saved rate is usable, not a placeholder.
+        assertEquals("19550.00", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals("1710625.00", ready.result.totalAssets)
+
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertEquals(ZakatReferencePriceStatus.CACHED, gold.status)
+        assertNotNull(gold.lastRefreshLabel)
+        assertNotNull(gold.messageRes)
+    }
+
+    @Test
+    fun `a stale saved rate remains usable and is labelled as possibly out of date`() {
+        val cachedAt = Instant.parse("2026-09-01T07:30:00Z").toEpochMilli()
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5"),
+            referencePrices = publishedPrices(
+                gold = "19550.00",
+                freshness = MetalPriceFreshness.STALE,
+                cachedAt = cachedAt,
+            ),
+        )
+
+        // Stale is a label, not a gate: the calculation still uses the published figure and manual entry stays
+        // one tap away.
+        assertEquals("19550.00", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals("1710625.00", ready.result.totalAssets)
+
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertEquals(ZakatReferencePriceStatus.STALE, gold.status)
+        assertNotNull(gold.lastRefreshLabel)
+        assertNotNull(gold.messageRes)
+    }
+
+    @Test
+    fun `a failed refresh beside a saved rate still shows the rate, not a failure`() {
+        val ready = state(
+            form = formWith(ZakatFormField.GOLD_WEIGHT to "87.5"),
+            referencePrices = publishedPrices(
+                gold = "19550.00",
+                freshness = MetalPriceFreshness.CACHED,
+                cachedAt = Instant.parse("2026-10-17T07:30:00Z").toEpochMilli(),
+            ).copy(refreshFailure = MetalPriceFailure.TIMEOUT),
+        )
+
+        assertEquals("19550.00", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals(
+            ZakatReferencePriceStatus.CACHED,
+            ready.referencePrices.single { it.metal == ZakatMetal.GOLD }.status,
+        )
+        assertNotNull(ready.referencePrices.single { it.metal == ZakatMetal.GOLD }.messageRes)
     }
 }

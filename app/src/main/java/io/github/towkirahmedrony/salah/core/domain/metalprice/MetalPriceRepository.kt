@@ -7,14 +7,28 @@ package io.github.towkirahmedrony.salah.core.domain.metalprice
  * with them. There is no method that accepts a user's holding, a weight, a debt or a result, so personal
  * wealth cannot reach this boundary — the type makes the privacy rule structural.
  *
- * "Retrieve" rather than "cache": the repository may keep nothing between calls, and nothing in the Zakat
- * feature persists a price. A user's own edited price lives only in the calculator's view model for as long
- * as the screen is open.
+ * The repository stores only **published market rates** — never a user's holdings, weight or debt — so the
+ * offline cache is public data and the Zakat form remains purely in memory. A user's own edited price still
+ * lives only in the calculator's view model for as long as the screen is open.
  */
 interface MetalPriceRepository {
 
-    /** Reads the currently published reference prices. Read-only; safe to call more than once. */
+    /**
+     * Reads the currently published reference prices, refreshing the local cache when the service answers.
+     *
+     * Never throws for a remote failure. When the refresh cannot be used, the last validated cached set is
+     * returned and [ReferencePrices.refreshFailure] says why it is being shown instead of a fresh one.
+     */
     suspend fun publishedReferencePrices(): ReferencePrices
+
+    /**
+     * The last validated set stored on this device, or `null` when there is none.
+     *
+     * Performs no request, so the screen can show a saved rate immediately — before, and independently of, any
+     * refresh. The default is `null` so a repository with no storage (and every test fake) needs no change; it
+     * is not a statement that caching is optional in the shipping implementation.
+     */
+    suspend fun cachedReferencePrices(): ReferencePrices? = null
 
     companion object {
         /**
@@ -25,6 +39,7 @@ interface MetalPriceRepository {
          */
         val UNCONFIGURED: MetalPriceRepository = object : MetalPriceRepository {
             override suspend fun publishedReferencePrices(): ReferencePrices = ReferencePrices.notPublished()
+            override suspend fun cachedReferencePrices(): ReferencePrices? = null
         }
     }
 }
@@ -46,4 +61,13 @@ class LoadPublishedReferencePrices(
 
     /** The published reference prices, or the reason there are none. Never throws for a remote failure. */
     suspend operator fun invoke(): ReferencePrices = repository.publishedReferencePrices()
+
+    /**
+     * The last validated rates on this device, without a request.
+     *
+     * A separate operation rather than a flag on [invoke] so the two questions — "what is stored?" and "what
+     * does the service say now?" — cannot be confused at a call site, and so opening the screen can show a
+     * saved rate while the refresh is still in flight.
+     */
+    suspend fun cached(): ReferencePrices? = repository.cachedReferencePrices()
 }

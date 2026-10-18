@@ -39,6 +39,9 @@ enum class MetalPriceFailure {
 
     /** The response contained records, but none usable as a published rate for one metal. */
     INVALID_DATA,
+
+    /** The response held more than one usable rate for the same metal, purity and currency. */
+    CONFLICTING,
 }
 
 /**
@@ -53,8 +56,19 @@ sealed interface ReferencePriceResult {
     /** The retrieval is in flight. */
     data object Loading : ReferencePriceResult
 
-    /** One published, verified, active rate for the metal. */
-    data class Available(val price: PublishedMetalPrice) : ReferencePriceResult
+    /**
+     * One published, verified, active rate for the metal.
+     *
+     * [freshness] and [cachedAtEpochMillis] describe **where this copy came from**: a rate just fetched from
+     * the service is [MetalPriceFreshness.CURRENT]; a rate served from the local cache carries when it was
+     * fetched so the screen can say how old it is. Both are usable — a cached rate is not a failed one — and
+     * neither changes the exact value in [price].
+     */
+    data class Available(
+        val price: PublishedMetalPrice,
+        val freshness: MetalPriceFreshness = MetalPriceFreshness.CURRENT,
+        val cachedAtEpochMillis: Long? = null,
+    ) : ReferencePriceResult
 
     /**
      * The service answered, and has no published rate this app may use — either none at all, or none in the
@@ -66,8 +80,8 @@ sealed interface ReferencePriceResult {
      * The service returned more than one usable published rate for the same metal, purity and currency.
      *
      * Not a price to pick from: choosing one of two conflicting approvals would be inventing a policy. The
-     * app reports the conflict and falls back to manual entry, and the duplicate records are an
-     * administrator-side problem.
+     * app reports the conflict, keeps any previously stored rate for that metal, and leaves manual entry
+     * available; the duplicate records are an administrator-side problem.
      */
     data class Conflicting(val metal: MetalType, val detail: String) : ReferencePriceResult
 
@@ -85,6 +99,16 @@ sealed interface ReferencePriceResult {
 data class ReferencePrices(
     val gold: ReferencePriceResult,
     val silver: ReferencePriceResult,
+    /**
+     * Why the most recent refresh could not be fully used, when that is the case.
+     *
+     * It is set for a failed request, and also when one metal's row was unusable or ambiguous while the other
+     * was adopted. `null` means the refresh succeeded in full or that none has been attempted. It is carried
+     * beside the results, not inside them, because a failed check is a fact about the *request* while each
+     * metal's result is a fact about the *rate*: a failure must not turn a usable stored gold rate into a
+     * failed one.
+     */
+    val refreshFailure: MetalPriceFailure? = null,
 ) {
 
     /** The retrieval result for [metal]. */
@@ -114,6 +138,7 @@ data class ReferencePrices(
         fun failed(failure: MetalPriceFailure): ReferencePrices = ReferencePrices(
             gold = ReferencePriceResult.Failed(failure),
             silver = ReferencePriceResult.Failed(failure),
+            refreshFailure = failure,
         )
     }
 }

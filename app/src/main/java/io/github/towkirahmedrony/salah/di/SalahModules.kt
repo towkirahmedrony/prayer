@@ -41,6 +41,8 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSyncState
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.DatasetSynchronizer
 import io.github.towkirahmedrony.salah.core.domain.dataset.sync.SyncThrottlePolicy
 import io.github.towkirahmedrony.salah.core.domain.metalprice.LoadPublishedReferencePrices
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceCache
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFreshnessPolicy
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRemoteConfig
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
 import io.github.towkirahmedrony.salah.core.domain.metalprice.RemoteMetalPriceSource
@@ -69,6 +71,7 @@ import io.github.towkirahmedrony.salah.data.dataset.remote.SupabaseRemoteDataset
 import io.github.towkirahmedrony.salah.data.dataset.remote.UrlConnectionHttpTransport
 import io.github.towkirahmedrony.salah.data.dataset.sync.FileDatasetSyncStateStore
 import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
+import io.github.towkirahmedrony.salah.data.metalprice.FileMetalPriceCache
 import io.github.towkirahmedrony.salah.data.metalprice.SupabaseMetalPriceRepository
 import io.github.towkirahmedrony.salah.data.metalprice.SupabaseRemoteMetalPriceSource
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
@@ -148,6 +151,15 @@ private const val APPLIED_PRAYER_CONFIG_DIRECTORY = "prayer_config"
 
 /** Where the prayer-configuration synchronisation state is kept, beside the stored configuration. */
 private const val PRAYER_CONFIG_SYNC_STATE_FILE = "prayer_config.sync"
+
+/**
+ * Where the last validated published reference prices are kept, under `filesDir`.
+ *
+ * It holds published market rates only — never a user's holdings or debts — so it is replaceable data kept
+ * beside the files it belongs with rather than a preference. See
+ * [io.github.towkirahmedrony.salah.data.metalprice.FileMetalPriceCache].
+ */
+private const val METAL_PRICE_CACHE_DIRECTORY = "metal_prices"
 
 /**
  * A small, bounded jitter added to a synchronisation backoff interval, so two devices that failed at the
@@ -363,7 +375,21 @@ val salahModules = module {
         )
     }
     single<RemoteMetalPriceSource> { SupabaseRemoteMetalPriceSource(transport = get(), config = get()) }
-    single<MetalPriceRepository> { SupabaseMetalPriceRepository(source = get(), config = get()) }
+    // The last validated set survives process death and device restart, so the Zakat screen can offer a
+    // published rate with no connection. It is one file, replaced atomically, and it contains no user data.
+    single<MetalPriceCache> {
+        FileMetalPriceCache(root = File(androidContext().filesDir, METAL_PRICE_CACHE_DIRECTORY))
+    }
+    single { MetalPriceFreshnessPolicy() }
+    single<MetalPriceRepository> {
+        SupabaseMetalPriceRepository(
+            source = get(),
+            config = get(),
+            cache = get(),
+            clock = get(),
+            freshnessPolicy = get(),
+        )
+    }
     single { LoadPublishedReferencePrices(repository = get()) }
 
     // Zakat -------------------------------------------------------------------

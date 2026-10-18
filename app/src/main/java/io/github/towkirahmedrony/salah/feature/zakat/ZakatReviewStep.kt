@@ -528,8 +528,14 @@ private fun MetalsEvidence(state: ZakatUiState.Ready) {
                     }
                     val parts = listOfNotNull(
                         perGram + " " + stringResource(price.unitLabelRes, price.currencyCode),
+                        price.purityLabel?.let { purity -> stringResource(R.string.zakat_price_purity, purity) },
                         price.sourceLabel?.let { source -> stringResource(R.string.zakat_price_source, source) },
                         stamp?.let { (resId, value) -> stringResource(resId, value) },
+                        // When the figure came from the saved copy, the review says so too — the user is about
+                        // to rely on it, so its age belongs beside the number here as well as on the form.
+                        price.lastRefreshLabel?.let { savedAt ->
+                            stringResource(R.string.zakat_price_saved_at, savedAt)
+                        },
                     )
                     EvidenceLine(kind = Provenance.REFERENCE, text = parts.joinToString(" \u00B7 "))
                 }

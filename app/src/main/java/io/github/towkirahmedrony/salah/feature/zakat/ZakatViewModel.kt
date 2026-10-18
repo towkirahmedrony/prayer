@@ -54,11 +54,12 @@ import java.util.Locale
  *
  * ## The one thing it fetches, and why that changes nothing above
  *
- * The published gold and silver reference prices are read once when the screen is created and then only when
- * the user asks (see [refreshReferencePrices]). The calculator never waits for them: it is given whatever price
- * the form holds, a published rate is only *offered* into a price field the user has left alone, and a failed
- * read leaves manual entry exactly as it was. A published price is an input like any other, never a dependency
- * of the arithmetic.
+ * When the screen is created, the last validated published rates stored on the device are read first — with no
+ * request — and then one refresh runs (see [refreshReferencePrices]). A saved rate therefore appears while
+ * the refresh is still in flight, and a refresh that fails leaves it in place and labelled with its age. The
+ * calculator never waits for either: it is given whatever price the form holds, a published rate is only
+ * *offered* into a price field the user has left alone, and a failed read leaves manual entry exactly as it
+ * was. A published price is an input like any other, never a dependency of the arithmetic.
  */
 class ZakatViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
@@ -97,7 +98,9 @@ class ZakatViewModel(
     private val refreshingReferencePrices = MutableStateFlow(false)
 
     init {
-        refreshReferencePrices()
+        // A saved rate is shown before the refresh is attempted; the refresh itself is not awaited by
+        // anything on screen.
+        refresh(loadCachedFirst = true)
     }
 
     /**
@@ -129,16 +132,28 @@ class ZakatViewModel(
     )
 
     /**
-     * Reads the published reference prices again.
+     * Reads the published reference prices again, at the user's request.
      *
-     * Called once when the screen is created, and afterwards only when the user asks. It is never driven by a
-     * keystroke or a recomposition, and a second read is not started while one is in flight, so a screen opening
-     * and a user tapping refresh cannot produce two concurrent reads of the same thing.
+     * The screen's opening read goes through the same path with the stored copy loaded first. A read is never
+     * driven by a keystroke or a recomposition, and a second one is not started while one is in flight, so a
+     * screen opening and a user tapping refresh cannot produce two concurrent reads of the same thing.
      *
      * A user's own edited price is **never** replaced: the factory fills only a price field the user has left
-     * alone. A failure leaves the screen exactly as usable as it was.
+     * alone. A failure leaves the screen exactly as usable as it was, and any stored rate stays visible.
      */
     fun refreshReferencePrices() {
+        refresh(loadCachedFirst = false)
+    }
+
+    /**
+     * The one read path.
+     *
+     * [loadCachedFirst] is true only for the opening read: the stored set is published to the screen before
+     * the request starts, so a saved rate appears immediately and a slow or failed refresh cannot blank it.
+     * A user-requested refresh skips that step, so it can never briefly revert a fresh figure to an older
+     * stored one.
+     */
+    private fun refresh(loadCachedFirst: Boolean) {
         if (refreshingReferencePrices.value) return
         refreshingReferencePrices.value = true
         // Only a metal with no usable rate is marked in flight again, so a refresh does not blank out a rate the
@@ -162,6 +177,17 @@ class ZakatViewModel(
             }
         }
         viewModelScope.launch {
+            if (loadCachedFirst) {
+                val cached = try {
+                    loadReferencePrices.cached()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    null
+                }
+                if (cached != null) referencePrices.value = cached
+            }
+
             val result = try {
                 loadReferencePrices()
             } catch (cancellation: CancellationException) {

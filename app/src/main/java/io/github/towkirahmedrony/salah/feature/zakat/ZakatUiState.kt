@@ -92,16 +92,22 @@ sealed interface ZakatUiState {
 /**
  * How far one metal's published reference price has got.
  *
- * Four states rather than two, because "we have not asked yet", "we asked and there is nothing", "we asked
- * and could not get an answer" and "we have a rate" are four different things to tell a user, and collapsing
- * any two of them would state something the app does not know.
+ * The retrieval and the saved copy are separate facts, and both are stated: a rate can be available *and*
+ * saved from an earlier check. Collapsing those into one state would either present a week-old rate as live or
+ * hide a perfectly usable one.
  */
 enum class ZakatReferencePriceStatus {
     /** The retrieval is in flight. */
     LOADING,
 
-    /** A published, verified rate is available. */
+    /** A published, verified rate fetched within the current window. */
     AVAILABLE,
+
+    /** A published rate restored from the local cache, fetched earlier than the current window. */
+    CACHED,
+
+    /** A cached rate older than the stale threshold. Still usable, but labelled as possibly out of date. */
+    STALE,
 
     /** The service answered, and has no rate this app may use. */
     UNAVAILABLE,
@@ -136,6 +142,14 @@ data class ZakatReferencePriceState(
     val currencyCode: String,
     /** The reference price per gram, formatted, or `null` when there is no usable published rate. */
     val pricePerGram: String?,
+    /**
+     * The purity category the rate is stated in, when a rate is shown.
+     *
+     * Carried as the contract's own code (`K22`, …) rather than translated: a karat is a unit, and the
+     * published record states it in that form. It is shown beside the price so "BDT per gram" is never read
+     * without knowing *which* gold's gram it prices.
+     */
+    val purityLabel: String?,
     /** The organisation the price came from, when the record names one. Never invented. */
     val sourceLabel: String?,
     /** The reviewed/effective date, when the record records one. */
@@ -146,7 +160,14 @@ data class ZakatReferencePriceState(
     val fetchedLabel: String?,
     /** When the record was last updated, when the record has one. */
     val updatedLabel: String?,
-    /** The explanation to show for a state that is not [ZakatReferencePriceStatus.AVAILABLE]. */
+    /**
+     * When this copy was last fetched and saved on the device, when it came from the cache.
+     *
+     * Distinct from every label above: those are statements made by the published record, while this is a
+     * statement about this device's own successful check. `null` for a rate fetched just now by this screen.
+     */
+    val lastRefreshLabel: String?,
+    /** The explanation to show for a state that is not a current, successful published rate. */
     @StringRes val messageRes: Int?,
     /** True when the user has typed their own price for this metal this session. */
     val manuallyEdited: Boolean,

@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.feature.zakat
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFreshness
 import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
 import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
 import io.github.towkirahmedrony.salah.core.domain.zakat.ZakatCalculator
@@ -20,7 +21,9 @@ import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
 import io.github.towkirahmedrony.salah.core.model.ZakatResult
 import io.github.towkirahmedrony.salah.core.model.ZakatStatus
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeParseException
 import java.util.Locale
 
@@ -431,6 +434,7 @@ class ZakatUiStateFactory(
             priceField = ZakatFormField.GOLD_PRICE,
             result = referencePrices.gold,
             manualPriceFields = manualPriceFields,
+            refreshFailure = referencePrices.refreshFailure,
             locale = locale,
         ),
         referencePriceState(
@@ -438,6 +442,7 @@ class ZakatUiStateFactory(
             priceField = ZakatFormField.SILVER_PRICE,
             result = referencePrices.silver,
             manualPriceFields = manualPriceFields,
+            refreshFailure = referencePrices.refreshFailure,
             locale = locale,
         ),
     )
@@ -447,9 +452,15 @@ class ZakatUiStateFactory(
         priceField: ZakatFormField,
         result: ReferencePriceResult,
         manualPriceFields: Set<ZakatFormField>,
+        refreshFailure: MetalPriceFailure?,
         locale: Locale,
     ): ZakatReferencePriceState {
         val available = result as? ReferencePriceResult.Available
+        // A failure is reported against the rate it actually affects. A current gold rate must not be captioned
+        // "the last check failed" because silver's row was unusable: the silver card says that already.
+        val failureForThisMetal = refreshFailure.takeIf {
+            available == null || available.freshness != MetalPriceFreshness.CURRENT
+        }
         val manuallyEdited = priceField in manualPriceFields
         return ZakatReferencePriceState(
             metal = metal,
@@ -457,14 +468,22 @@ class ZakatUiStateFactory(
             priceField = priceField,
             status = when (result) {
                 ReferencePriceResult.Loading -> ZakatReferencePriceStatus.LOADING
-                is ReferencePriceResult.Available -> ZakatReferencePriceStatus.AVAILABLE
+                is ReferencePriceResult.Available -> when (result.freshness) {
+                    MetalPriceFreshness.CURRENT -> ZakatReferencePriceStatus.AVAILABLE
+                    MetalPriceFreshness.CACHED -> ZakatReferencePriceStatus.CACHED
+                    MetalPriceFreshness.STALE -> ZakatReferencePriceStatus.STALE
+                }
                 ReferencePriceResult.NotPublished -> ZakatReferencePriceStatus.UNAVAILABLE
                 is ReferencePriceResult.Conflicting -> ZakatReferencePriceStatus.FAILED
                 is ReferencePriceResult.Failed -> ZakatReferencePriceStatus.FAILED
             },
             statusRes = when (result) {
                 ReferencePriceResult.Loading -> R.string.zakat_price_status_loading
-                is ReferencePriceResult.Available -> R.string.zakat_price_status_available
+                is ReferencePriceResult.Available -> when (result.freshness) {
+                    MetalPriceFreshness.CURRENT -> R.string.zakat_price_status_available
+                    MetalPriceFreshness.CACHED -> R.string.zakat_price_status_cached
+                    MetalPriceFreshness.STALE -> R.string.zakat_price_status_stale
+                }
                 ReferencePriceResult.NotPublished -> R.string.zakat_price_status_unavailable
                 is ReferencePriceResult.Conflicting -> R.string.zakat_price_status_conflict
                 is ReferencePriceResult.Failed -> R.string.zakat_price_status_failed
@@ -475,21 +494,39 @@ class ZakatUiStateFactory(
             unitLabelRes = R.string.zakat_price_unit,
             currencyCode = available?.price?.currency ?: ZakatInputs.DEFAULT_CURRENCY,
             pricePerGram = available?.price?.pricePerGram?.let { price -> plain(price, locale) },
+            purityLabel = available?.price?.purity?.name,
             sourceLabel = available?.price?.source,
             effectiveLabel = available?.price?.effectiveAt?.let { raw -> timestampLabel(raw, locale) },
             providerUpdatedLabel = available?.price?.providerLastUpdate?.let { raw -> timestampLabel(raw, locale) },
             fetchedLabel = available?.price?.fetchedAt?.let { raw -> timestampLabel(raw, locale) },
             updatedLabel = available?.price?.updatedAt?.let { raw -> timestampLabel(raw, locale) },
-            messageRes = messageFor(result),
+            // Only labelled when it adds something: a rate fetched by this screen is simply current, while a
+            // saved copy (or a saved copy shown after a failed check) has to say when it was stored.
+            lastRefreshLabel = available
+                ?.takeIf { price -> price.freshness != MetalPriceFreshness.CURRENT || failureForThisMetal != null }
+                ?.cachedAtEpochMillis
+                ?.let { epoch -> epochDateLabel(epoch, locale) },
+            messageRes = messageFor(result, failureForThisMetal),
             manuallyEdited = manuallyEdited,
             canRestoreReference = manuallyEdited && available != null,
         )
     }
 
-    /** The explanation for a state that is not a usable published rate, or `null` when there is one. */
-    private fun messageFor(result: ReferencePriceResult): Int? = when (result) {
+    /**
+     * The explanation for a state that is not a current, successful published rate, or `null` when it is.
+     *
+     * A saved rate is never silent about its age: [MetalPriceFreshness.CACHED] says it is the stored copy,
+     * [MetalPriceFreshness.STALE] says it is old enough to check, and a failed refresh beside a usable saved
+     * rate says which of the two is being shown and why.
+     */
+    private fun messageFor(result: ReferencePriceResult, refreshFailure: MetalPriceFailure?): Int? = when (result) {
         ReferencePriceResult.Loading -> null
-        is ReferencePriceResult.Available -> null
+        is ReferencePriceResult.Available -> when {
+            refreshFailure != null -> R.string.zakat_price_refresh_failed_saved
+            result.freshness == MetalPriceFreshness.STALE -> R.string.zakat_price_stale_note
+            result.freshness == MetalPriceFreshness.CACHED -> R.string.zakat_price_cached_note
+            else -> null
+        }
         ReferencePriceResult.NotPublished -> R.string.zakat_price_unavailable
         is ReferencePriceResult.Conflicting -> R.string.zakat_price_conflict
         is ReferencePriceResult.Failed -> when (result.failure) {
@@ -500,6 +537,10 @@ class ZakatUiStateFactory(
             MetalPriceFailure.INVALID_DATA,
             -> R.string.zakat_price_invalid
 
+            // A duplicate pair is the ambiguity itself, not an unreadable row: it gets the conflict message
+            // whether it is reported per metal or, with no cache to fall back to, for the whole read.
+            MetalPriceFailure.CONFLICTING -> R.string.zakat_price_conflict
+
             MetalPriceFailure.TIMEOUT,
             MetalPriceFailure.CONNECTION,
             MetalPriceFailure.NETWORK,
@@ -507,6 +548,17 @@ class ZakatUiStateFactory(
             MetalPriceFailure.RESPONSE_TOO_LARGE,
             -> R.string.zakat_price_retrieval_failed
         }
+    }
+
+    /**
+     * [epochMillis] as the civil date it fell on in the device's zone, in the interface language's numerals.
+     *
+     * Only the date is shown: the cache records when *this device* completed a check, and the time of day adds
+     * no information a Zakat user needs while making the source of the figure unmistakable.
+     */
+    private fun epochDateLabel(epochMillis: Long, locale: Locale): String {
+        val date = Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+        return formatting.gregorianDayMonthYear(date, locale)
     }
 
     /**

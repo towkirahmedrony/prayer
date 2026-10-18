@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.feature.zakat
 
 import io.github.towkirahmedrony.salah.core.domain.metalprice.LoadPublishedReferencePrices
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
+import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFreshness
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPurity
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalType
@@ -17,6 +18,7 @@ import io.github.towkirahmedrony.salah.core.model.ZakatMetalUnit
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabMetal
 import io.github.towkirahmedrony.salah.core.model.ZakatNisabWeight
 import io.github.towkirahmedrony.salah.testing.FakeUserPreferencesRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -376,8 +378,72 @@ class ZakatViewModelTest {
         viewModel(priceRepository = repository)
         runCurrent()
 
-        // One read for the screen's lifetime so far: nothing reacts to a keystroke or a recomposition.
+        // One cache read and one refresh for the screen's lifetime so far: nothing reacts to a keystroke or a
+        // recomposition.
+        assertEquals(1, repository.cachedCalls)
         assertEquals(1, repository.calls)
+    }
+
+    @Test
+    fun `a saved price is shown before the refresh has finished`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        repository.cachedResult = prices(
+            gold = "18000",
+            freshness = MetalPriceFreshness.CACHED,
+            cachedAt = 1_700_000_000_000L,
+        )
+        repository.result = prices(gold = "19550")
+        val gate = CompletableDeferred<Unit>()
+        repository.gate = gate
+
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+        runCurrent()
+
+        // The request is still in flight, and the stored rate is already on screen and usable.
+        var state = ready(viewModel)
+        assertEquals("18000", state.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals(
+            ZakatReferencePriceStatus.CACHED,
+            state.referencePrices.single { it.metal == ZakatMetal.GOLD }.status,
+        )
+        assertTrue(state.refreshingReferencePrices)
+
+        gate.complete(Unit)
+        runCurrent()
+
+        state = ready(viewModel)
+        assertEquals("19550", state.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals(
+            ZakatReferencePriceStatus.AVAILABLE,
+            state.referencePrices.single { it.metal == ZakatMetal.GOLD }.status,
+        )
+    }
+
+    @Test
+    fun `the calculator works offline from the last saved price`() = runTest(mainDispatcher) {
+        val repository = FakeMetalPriceRepository()
+        // What the repository returns when every request failed but a validated cache survived.
+        repository.cachedResult = prices(
+            gold = "19550",
+            freshness = MetalPriceFreshness.CACHED,
+            cachedAt = 1_700_000_000_000L,
+        )
+        repository.result = repository.cachedResult!!.copy(refreshFailure = MetalPriceFailure.CONNECTION)
+        val viewModel = viewModel(priceRepository = repository)
+        observe(viewModel)
+
+        viewModel.onValueChange(ZakatFormField.GOLD_WEIGHT, "87.5")
+        runCurrent()
+
+        val state = ready(viewModel)
+        assertEquals("19550", state.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals("1710625.00", state.result.totalAssets)
+        assertEquals(
+            ZakatReferencePriceStatus.CACHED,
+            state.referencePrices.single { it.metal == ZakatMetal.GOLD }.status,
+        )
+        assertNotNull(state.referencePrices.single { it.metal == ZakatMetal.GOLD }.messageRes)
     }
 
     @Test
@@ -494,21 +560,49 @@ private class FakeMetalPriceRepository : MetalPriceRepository {
     var calls: Int = 0
         private set
 
+    var cachedCalls: Int = 0
+        private set
+
+    var cachedResult: ReferencePrices? = null
+
     var result: ReferencePrices = ReferencePrices.notPublished()
+
+    /** When set, a refresh waits on it, so the cache-first state can be observed mid-flight. */
+    var gate: CompletableDeferred<Unit>? = null
+
+    override suspend fun cachedReferencePrices(): ReferencePrices? {
+        cachedCalls += 1
+        return cachedResult
+    }
 
     override suspend fun publishedReferencePrices(): ReferencePrices {
         calls += 1
+        gate?.await()
         return result
     }
 }
 
 /** A reading with a published fixture rate for whichever metals are named. */
-private fun prices(gold: String? = null, silver: String? = null): ReferencePrices = ReferencePrices(
-    gold = gold?.let { price -> availablePrice(MetalType.GOLD, price) } ?: ReferencePriceResult.NotPublished,
-    silver = silver?.let { price -> availablePrice(MetalType.SILVER, price) } ?: ReferencePriceResult.NotPublished,
+private fun prices(
+    gold: String? = null,
+    silver: String? = null,
+    freshness: MetalPriceFreshness = MetalPriceFreshness.CURRENT,
+    cachedAt: Long? = null,
+): ReferencePrices = ReferencePrices(
+    gold = gold
+        ?.let { price -> availablePrice(MetalType.GOLD, price, freshness, cachedAt) }
+        ?: ReferencePriceResult.NotPublished,
+    silver = silver
+        ?.let { price -> availablePrice(MetalType.SILVER, price, freshness, cachedAt) }
+        ?: ReferencePriceResult.NotPublished,
 )
 
-private fun availablePrice(metal: MetalType, price: String): ReferencePriceResult =
+private fun availablePrice(
+    metal: MetalType,
+    price: String,
+    freshness: MetalPriceFreshness,
+    cachedAt: Long?,
+): ReferencePriceResult =
     ReferencePriceResult.Available(
         PublishedMetalPrice(
             metal = metal,
@@ -517,4 +611,6 @@ private fun availablePrice(metal: MetalType, price: String): ReferencePriceResul
             currency = "BDT",
             source = "Salah test fixture",
         ),
+        freshness = freshness,
+        cachedAtEpochMillis = cachedAt,
     )

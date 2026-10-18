@@ -439,7 +439,7 @@ neither defaulted silently.
 
 ### 8.4 Persistence and privacy
 
-**Nothing is saved. There is no repository, no DataStore key, no file.**
+**Nothing the user enters is saved. There is no repository, no DataStore key and no file for a form value.**
 
 Every figure a user enters lives in the calculator's view model, is recalculated on each keystroke, and is gone
 when the screen closes. The brief permits this explicitly — §12 asks for the behaviour to be explained rather
@@ -463,8 +463,10 @@ The consequences, stated rather than hidden:
 * **The engine is offline by construction**, so the calculation works with no connection once the screen is
   open, and a failed price read leaves the calculator exactly as usable as it was.
 
-If persistence is added later it must be local-only (the existing DataStore), must disclose what is stored, and
-must not be the vehicle for any synchronisation of financial data.
+The only thing this feature persists is **public published market data**: the last validated gold and silver
+reference rates described in §8.5, in one file under the app's private `filesDir`. No weight, balance, debt,
+receipt or result is written anywhere. That cache exists so a Zakat calculation never needs a connection; it is
+not — and cannot be — a vehicle for synchronising anything a user entered.
 
 ### 8.5 Published reference prices (Android)
 
@@ -480,10 +482,11 @@ outside this app**; the app never calls that provider, and never writes a price.
 **Which record is used.** For each metal the app selects a record that is published (**`is_active`**, and
 `verification_status = verified` — both re-checked client-side so a misconfigured database cannot serve an
 unreviewed row), in the default purity **K22**, and in **BDT**. Exactly one such record is used. If the response
-contains two usable records for the same metal, purity and currency, the app reports a conflict and uses
-neither: choosing between two approvals would be inventing a policy. A row that exists but is inactive, pending
-or rejected is never presented as a current approved rate, and a price is never inferred from the newest
-timestamp.
+contains two usable records for the same metal, purity and currency, the app reports a conflict and adopts
+neither: choosing between two approvals would be inventing a policy. A previously stored rate for that metal
+stays in use, labelled with its age; with nothing stored, manual entry is used. A row that exists but is
+inactive, pending or rejected is never presented as a current approved rate, and a price is never inferred
+from the newest timestamp.
 
 A row that exists but is outside this basis — inactive, awaiting or refused verification, of another purity, or
 stated in another currency — is reported as **no published reference price**, the same state as an empty
@@ -502,6 +505,38 @@ and the calculator is untouched by it: it still receives a price through the sam
 and stays a pure function (`ZakatNetworkIsolationTest` asserts it mentions no networking type). The read happens
 once when the screen is created and then only when the user asks to refresh; nothing fetches on a keystroke or a
 recomposition.
+
+**The offline cache.** The last validated K22/BDT rate for each metal is stored in
+`filesDir/metal_prices/cache.json`. The file is written to a sibling temporary file, flushed and synced, then
+renamed over the previous file, so the commit point is one rename: before it the old set is in force, after it
+the new one, and never a half-written mixture. Each rate carries its own `cache_fetched_at_epoch_millis`, so a
+preserved rate keeps its real age when the other metal is refreshed.
+
+The file is stored in the same field vocabulary as the published table, plus that cache timestamp, and is read
+back through `MetalPriceParser` — the same validator a downloaded response goes through. A hand-edited,
+truncated, unknown-version, non-BDT, inactive, unverified, duplicated or non-positive cached row is therefore
+discarded rather than used, and the app behaves as if it had never cached anything. `price_per_gram` is stored
+as a JSON string of the exact digits, so no intermediary can normalise it through a `Double`.
+
+A response is validated before anything is adopted. Each metal is then handled independently: a valid rate
+replaces the stored one, while a metal the response omits keeps the stored rate rather than being deleted — an
+omission is not evidence of withdrawal, and it is what prevents a partial response from erasing silver while
+refreshing gold. An unreadable or conflicting row keeps that metal's stored rate and is reported; it is never
+stored and never replaces a known-good one. An identical set is not written again. A failed request writes
+nothing at all, so a successful-refresh timestamp can only move when a validated response was actually accepted.
+
+**Freshness.** Age is stated, and never used to hide a usable rate:
+
+| Age since the rate was fetched | Label | Usable |
+|---|---|---|
+| 24 hours or less | Published rate | Yes |
+| More than 24 hours, up to 7 days | Saved price | Yes, and available with no connection |
+| More than 7 days | Saved price · check it | Yes, with a warning to check it or enter a price |
+
+A saved rate is loaded *before* the refresh starts, so it is on screen while the request is in flight and stays
+there if the request fails. The card names when the copy was saved and, when the latest check failed, says so
+beside the rate. A stale rate is not zero, is not treated as unavailable, and does not stop the calculator: the
+result is still produced from the published figure the user can see, and manual entry remains available.
 
 **Editing, and never overwriting an edit.** A user's own price is a local, in-memory session override. The app
 remembers only *which* price fields the user typed into — nothing about the value is written anywhere — and a

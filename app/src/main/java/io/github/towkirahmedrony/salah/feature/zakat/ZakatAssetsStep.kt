@@ -602,9 +602,38 @@ private fun ReferencePriceSummary(
             }
         }
 
+        // A saved or ageing rate is called out beside the figure it stands in for. The price itself is shown
+        // exactly as before; what changes is that the screen no longer presents it as today's check.
+        if (
+            price.status == ZakatReferencePriceStatus.CACHED ||
+            price.status == ZakatReferencePriceStatus.STALE
+        ) {
+            SalahStatusPill(
+                text = stringResource(price.statusRes),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Which gold the per-gram figure prices. "BDT per gram" alone does not say whether it is 22K.
+        price.purityLabel?.let { purity ->
+            Text(
+                text = stringResource(R.string.zakat_price_purity, purity),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         price.sourceLabel?.let { source ->
             Text(
                 text = stringResource(R.string.zakat_price_source, source),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // The device's own successful check, distinct from every timestamp the published record carries.
+        price.lastRefreshLabel?.let { savedAt ->
+            Text(
+                text = stringResource(R.string.zakat_price_saved_at, savedAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

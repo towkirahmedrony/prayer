@@ -97,6 +97,17 @@ object MetalPriceParser {
                 "The published-price response is neither a JSON array of records nor a single record.",
             )
         }
+        return parse(elements)
+    }
+
+    /**
+     * Reads already-parsed JSON records.
+     *
+     * The same row validation as [parse] over a list, used by the local cache reader so that a stored
+     * snapshot is re-validated on read by exactly the rules a downloaded response is validated by. An empty
+     * list is [MetalPriceReadResult.NoRecords], not malformed: a cache with no rows is a readable empty set.
+     */
+    fun parse(elements: List<JsonValue>): MetalPriceReadResult {
         if (elements.isEmpty()) return MetalPriceReadResult.NoRecords
 
         val prices = mutableListOf<PublishedMetalPrice>()
