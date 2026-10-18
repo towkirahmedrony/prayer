@@ -8,11 +8,17 @@ bundled data and its bundled calculation defaults, exactly as it did before the 
 > by default, so a build made from this repository is **configured** — the configuration gates evaluate true
 > and the remote checks are attempted. What that does *not* mean is that anything on the server side works:
 > the migrations in `supabase/migrations/` have **not** been applied to the project, so no publication is
-> served, and the Phase 1 read-only audit found that the expected `dataset_publications` and
-> `prayer_config_publications` surfaces and the expected `metal_prices` contract were **not present**. The
-> Android code paths are implemented and unit-tested against fakes; they have **not** been exercised against a
-> live, populated project. **Configuration supplied is not database access and is not feature integration** —
-> see §7. This document is the runbook for closing that gap.
+> served, and a read-only audit did not find the expected `dataset_current_publication` and
+> `prayer_config_current_publication` surfaces or the `metal_prices` contract. The Android code paths are
+> implemented and unit-tested against fakes; they have **not** been exercised against a live, populated
+> project. **Configuration supplied is not database access and is not feature integration** — see §7. This
+> document is the runbook for closing that gap.
+>
+> **The contracts themselves are no longer guesswork.** Each of the three reads pairs a migration with a
+> parser, and `SupabaseContractParityTest` now checks the two against each other column by column, so a
+> mismatch between this repository's SQL and its Kotlin fails the unit tests instead of a live request.
+> `docs/SUPABASE_CONTRACT_MATRIX.md` lists all four contracts with their fields, permissions, fallbacks and
+> what is verified — and it is the document to read before changing either half of a pair.
 
 ## 1. What the app needs, and how it reaches the app
 
@@ -115,6 +121,12 @@ reviewable and re-runnable (`create table if not exists`, `create or replace`,
 
 **Do not apply it to an unknown or production project.**
 
+There are three migrations in `supabase/migrations/` — the dataset publication above, the prayer-configuration
+publication (§8), and `20261018000000_metal_prices.sql`, which defines the published reference-price table the
+Zakat screen reads. Apply the ones whose features you want; each is additive and none depends on another.
+Before applying `metal_prices`, read its header: if the project already has a table of that name, the migration
+is a no-op and that table's shape decides, so the two must be reconciled rather than assumed compatible.
+
 ## 5. Publish the first dataset
 
 1. **Prepare the release** from the *already verified* bundled data (never from an external source):
@@ -216,18 +228,37 @@ settings; with them blank, both slots report "not configured" and the app runs e
 RLS behaviour, and an end-to-end "publish a revision, watch an app adopt it" run. Until then, treat this
 path as **implemented and unit-tested, not live-verified**.
 
-## 9. Known server-side gaps, deliberately left unchanged in this phase
+## 9. Known server-side gaps, and what this repository does about them
 
-Phase 1 supplies and validates the *client* configuration. It does **not** invent database objects, change
-the schema, or rewrite a client to match a table that does not exist. The following were reported by the
-read-only audit and remain open:
+The configuration phase supplied and validated the *client* configuration. The contract phase then compared
+what the Android clients require with what the SQL in this repository defines, and changed the *SQL* where a
+read had no definition at all. It did **not** invent a database object to match a guess about the live
+project, change a schema that belongs to another workflow, or rewrite a client to read a table whose shape is
+unknown here.
 
-- the view the dataset client reads (`dataset_current_publication`) was not found;
-- the view the prayer-configuration client reads (`prayer_config_current_publication`) was not found;
-- the Android prayer-configuration client expects a revisioned JSON payload, while the
-  `prayer_calculation_configs` table reportedly stores configuration scope-per-row — a contract mismatch, not
-  a configuration problem;
-- the `metal_prices` contract the price client expects was not found.
+What the audit reported, and what is now true of each:
 
-Each of these is a **data-flow** gap. Configuring the URL and key correctly cannot close one of them: a
-misconfigured client and an absent server object produce different diagnostics, and these are the latter.
+- **`dataset_current_publication` was not found.** The view the dataset client reads *is* defined by
+  `20260515000000_dataset_publications.sql`, with every field the client parses. The gap is that the migration
+  has not been applied — a deployment step, not a contract mismatch.
+- **`prayer_config_current_publication` was not found.** Same: defined by
+  `20260601000000_prayer_config_publications.sql`, including the `payload` column the content query selects and
+  the revision/checksum machinery the client validates.
+- **`prayer_calculation_configs` stores configuration scope-per-row.** That table is not defined in this
+  repository and is not read by this app, so nothing here can be aligned to it without inventing its columns.
+  The client's revision, revision-number and checksum rules are load-bearing (idempotence, refusal of reused
+  or stale revisions), so the fix is *not* to weaken the client: if the flat table is the administrator's
+  source of truth, the adapter that materialises it into a revisioned, checksummed publication belongs to the
+  publishing workflow, outside this repository.
+- **The `metal_prices` contract was not found.** This was the one genuine schema gap: the price client
+  queried `metal_prices` while nothing in this repository defined it. It is now defined by
+  `20261018000000_metal_prices.sql` — additively, with a read-only select policy for client roles — and
+  `SupabaseContractParityTest` holds the table's column list equal to the columns the client selects.
+
+Applied and verified? **No.** No project was inspected or migrated from here, and no authenticated read was
+made, so all three migrations remain **prepared, not applied**. `docs/SUPABASE_CONTRACT_MATRIX.md` §5 lists
+the exact reads that would verify each one.
+
+Each of these is a **data-flow** gap except the price definition, which was a contract gap. Configuring the
+URL and key correctly could not have closed any of them: a misconfigured client and an absent server object
+produce different diagnostics, and these are the latter.

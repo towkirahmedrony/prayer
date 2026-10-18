@@ -12,6 +12,7 @@ import io.github.towkirahmedrony.salah.core.domain.metalprice.RemoteMetalPriceSo
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -44,8 +45,13 @@ class SupabaseMetalPriceRepositoryTest {
         currency: String = "BDT",
         active: String = "true",
         status: String = "VERIFIED",
-    ): String = "{\"metal_type\":\"$metal\",\"purity\":\"$purity\",\"price_per_gram\":$price," +
-        "\"currency\":\"$currency\",\"is_active\":$active,\"verification_status\":\"$status\"}"
+        effectiveAt: String? = null,
+    ): String = buildString {
+        append("{\"metal_type\":\"$metal\",\"purity\":\"$purity\",\"price_per_gram\":$price,")
+        append("\"currency\":\"$currency\",\"is_active\":$active,\"verification_status\":\"$status\"")
+        if (effectiveAt != null) append(",\"effective_at\":\"$effectiveAt\"")
+        append("}")
+    }
 
     @Test
     fun `a published gold and silver rate are both selected exactly`() = runTest {
@@ -81,6 +87,38 @@ class SupabaseMetalPriceRepositoryTest {
 
         assertEquals(MetalPurity.K22, gold.price.purity)
         assertEquals("19550.07", gold.price.pricePerGram.toPlainString())
+    }
+
+    @Test
+    fun `an old effective date is carried through exactly as it was published`() = runTest {
+        // A published rate is never stamped with the moment it was read. The record's own effective date is
+        // what travels to the screen, unchanged, and it is the only date the screen may present as an
+        // effective one — `provider_last_update`, `fetched_at` and `updated_at` are labelled as what they
+        // are. Nothing here decides whether a price is too old to use: the contract states no age limit, and
+        // the app does not invent one. What it must never do is replace a date it was given with a fresher
+        // one, which is the failure this pins.
+        val (repository, _) = repository(
+            RemoteFetch.Success("[${record("GOLD", effectiveAt = "2019-04-14T00:00:00+06:00")}]"),
+        )
+
+        val gold = repository.publishedReferencePrices().gold as ReferencePriceResult.Available
+
+        assertEquals("2019-04-14T00:00:00+06:00", gold.price.effectiveAt)
+    }
+
+    @Test
+    fun `a published rate with no recorded timestamp has none invented for it`() = runTest {
+        // A publisher that recorded no date has said nothing about when the rate was reached, and the app
+        // must not fill that silence in — a fabricated "verified today" is a claim the record does not
+        // support. The rate stays usable and stays undated.
+        val (repository, _) = repository(RemoteFetch.Success("[${record("GOLD")}]") )
+
+        val gold = repository.publishedReferencePrices().gold as ReferencePriceResult.Available
+
+        assertNull(gold.price.effectiveAt)
+        assertNull(gold.price.providerLastUpdate)
+        assertNull(gold.price.fetchedAt)
+        assertNull(gold.price.updatedAt)
     }
 
     @Test

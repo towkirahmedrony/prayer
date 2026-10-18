@@ -1,0 +1,168 @@
+# Salah — Supabase Contract Matrix
+
+What the Salah Android app asks the Supabase project for, what this repository defines for each read, and
+**which parts of that are verified**. Every remote read in Salah is a pair: a migration that says what the
+server exposes, and a parser that says what the app requires. This document is the one place the pairs are
+listed side by side, so a mismatch has somewhere to show up other than a live request.
+
+> **Scope of the verification.** Nothing in this document has been checked against the live project. The
+> workspace this was written in has no authorized database access (no credentials in the environment, and the
+> repository's Actions variables/secrets are not readable with the managed GitHub credential), and a
+> publishable key is not placed on a command line or in a log. So: **every statement below is either derived
+> from source in this repository or marked as an assumption.** The repository-side facts — the endpoints, the
+> field names, the SQL that defines the expected read surfaces — are verified by
+> `SupabaseContractParityTest`, which reads the migrations and the Kotlin constants and fails if they
+> disagree. The live half is listed in §5 and is unverified.
+
+## 1. Status vocabulary
+
+Used exactly as written, and never conflated:
+
+| Status | Meaning |
+| --- | --- |
+| **CONTRACT IMPLEMENTED** | The Android read path and the SQL that defines its expected surface both exist in this repository and agree (checked by `SupabaseContractParityTest`). |
+| **MIGRATION PREPARED** | A reviewed migration exists in `supabase/migrations/` and has **not** been applied to any project. |
+| **MIGRATION APPLIED AND VERIFIED** | Someone with authorized access applied it and read the change back. **Nothing in this document is in this state.** |
+| **ENDPOINT REACHABLE** | The project host answers HTTP. Measured separately from any query. |
+| **DATABASE READ VERIFIED** | An authenticated read returned the rows the contract describes. |
+| **FEATURE DATA FLOW VERIFIED** | End to end: a published record is adopted/applied by the app. |
+| **UNABLE TO VERIFY** | No authorized access, or the object is not known from source. Recorded, not assumed away. |
+
+## 2. The four contracts
+
+### 2.1 Bangladesh location datasets
+
+| | |
+| --- | --- |
+| **Read surface** | `public.dataset_current_publication` (view) |
+| **Defined by** | `supabase/migrations/20260515000000_dataset_publications.sql` |
+| **Endpoint** | `GET {url}/rest/v1/dataset_current_publication?dataset_id=eq.bd_locations&limit=1&select=*`, then `GET {url}/storage/v1/object/datasets/{payload_path}` for the immutable archive |
+| **Required fields** | `dataset_id`, `publication_id`, `version`, `payload_schema_version`, `status`, `checksum`, `payload_path` (`payload_size_bytes`, `area_count`, `locality_count`, `boundary_ring_count`, `published_at`, `notes` are used when present) |
+| **Types** | `text` except `payload_schema_version`/`*_count` (`integer`) and `payload_size_bytes` (`bigint`); `published_at` is `timestamptz` |
+| **Revision / version mechanism** | One immutable row per `(dataset_id, publication_id)`; `payload_schema_version` is the payload *layout* version (the app supports `{1}`); `version` is descriptive only and never used for ordering; the app compares `checksum` (SHA-256 over the payload's logical parts) to decide "same release, nothing to do" |
+| **Publication rules** | Only `status = 'published'` may be served. A `dataset_current_publications` pointer row may only name a published release (trigger), and the view re-filters on status |
+| **Required read permission** | `select` on the view for `anon`/`authenticated` (plus the `storage.objects` read policy for the `datasets` bucket). The base tables are RLS-enabled with **no** client policy and have their privileges revoked |
+| **Local caching** | The accepted payload is activated locally under `filesDir` (`datasets/bd_locations`), checksum- and count-verified before activation; sync state (throttle, last attempt, failures) is kept beside it |
+| **Fallback** | Bundled Bangladesh assets remain the permanent floor. Any failure leaves the active dataset exactly as it was; the synchroniser never writes user data |
+| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · server side **UNABLE TO VERIFY** |
+
+### 2.2 Prayer calculation configuration
+
+| | |
+| --- | --- |
+| **Read surface** | `public.prayer_config_current_publication` (view) |
+| **Defined by** | `supabase/migrations/20260601000000_prayer_config_publications.sql` |
+| **Endpoint** | manifest: `GET {url}/rest/v1/prayer_config_current_publication?configuration_id=eq.bd_prayer&limit=1&select=configuration_id,revision_id,revision_number,schema_version,status,checksum,published_at,notes`; payload (only when the revision changed): the same view with `&revision_id=eq.{revision}&select=payload` |
+| **Required fields** | Manifest: the eight selected columns above. Payload (the `payload` text column, parsed as JSON): `configuration_id`, `revision_id`, `revision_number`, `schema_version`, `global`, optional `areas[]` with `area_id` and `scope`, and within a scope `method`, `asr_method`, `high_latitude_rule`, `adjustments` |
+| **Types** | Manifest columns `text`/`bigint`/`integer` as declared; the payload column is **`text`, not `jsonb`**, so the client receives the exact characters the published checksum was computed over. `adjustments` is an object of per-prayer integer minutes |
+| **Revision / version mechanism** | `revision_id` (opaque, compared for equality), `revision_number` (monotonic; a client refuses a revision that is not *newer*), `schema_version` (payload layout, app supports `{1}`), `checksum` (SHA-256 of the payload text). A `revision_id` whose checksum changed is rejected as a reused revision |
+| **Publication rules** | Only `status = 'published'` may be served; the pointer may only name a published revision (trigger); published rows are immutable and cannot be deleted (trigger); a new release is a new row |
+| **Required read permission** | `select` on the view for `anon`/`authenticated`; base tables RLS-enabled with no client policy and revoked privileges |
+| **Local caching** | The accepted snapshot is stored under `filesDir` (`prayer_config`) with its own sync state; the applier writes only the non-user-overridden fields into the one preference store |
+| **Fallback** | Bundled calculation defaults. A rejected/stale/unparsed revision leaves the active configuration untouched, and a user's own override of a field always wins over a published value |
+| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · live object **UNABLE TO VERIFY** |
+
+**The competing scope-per-row design.** The audit reported a `prayer_calculation_configs` table that stores
+one configuration per scope. That object is **not** read by this app and is **not defined in this
+repository** — nothing here describes its columns, its key or its lifecycle, so no adapter can be written
+against it without inventing schema. What can be said from source is why the revisioned contract cannot be
+replaced by it: the client's guarantees (refuse a non-newer revision, reject a reused revision id, verify a
+checksum over exact bytes, download nothing when the revision is unchanged, never re-activate what is already
+active) all require an immutable revision row and a checksum. See §3 for the decision that follows.
+
+### 2.3 Gold and silver reference prices
+
+| | |
+| --- | --- |
+| **Read surface** | `public.metal_prices` (table) |
+| **Defined by** | `supabase/migrations/20261018000000_metal_prices.sql` — **new in this phase**; before it, this contract existed only as Kotlin constants and prose |
+| **Endpoint** | `GET {url}/rest/v1/metal_prices?is_active=eq.true&select=metal_type,purity,price_per_gram,currency,source,source_url,override_active,is_active,verification_status,effective_at,provider_last_update,fetched_at,updated_at` |
+| **Required fields** | `metal_type`, `purity`, `price_per_gram`, `currency`, `is_active`, `verification_status`. Optional: `source`, `source_url`, `override_active` (absent reads as `false`), and the four timestamps |
+| **Types** | `metal_type`/`purity`/`currency`/`verification_status`/`source`/`source_url` `text`; `price_per_gram` **`numeric`** (exact, read into a `BigDecimal`, at most six decimal places accepted); `is_active`/`override_active` `boolean`; the four timestamps `timestamptz`. `currency` is `BDT` for the automatic basis; another currency is reported, not substituted |
+| **Revision / version mechanism** | None. The rate is a *current* value, not a revision: the app selects exactly one active, `VERIFIED` row per metal in purity `K22` and `BDT`, and treats two usable rows as a conflict to report rather than a choice to make. A partial unique index on `(metal_type, purity, currency) where is_active and verification_status = 'VERIFIED'` makes that ambiguity unrepresentable |
+| **Publication rules** | A row is used only when `is_active` is true **and** `verification_status = 'VERIFIED'`; both are re-checked client-side. Rows are published by an administrator workflow outside this app — Salah never contacts the price provider and never writes a price |
+| **Required read permission** | `select` on the table for `anon`/`authenticated` through a row-level-security select policy. No write privilege is granted to any client role |
+| **Local caching** | None. Nothing is persisted: the Zakat screen reads once on creation and on an explicit refresh, and a user's typed price is an in-memory session value that a published rate never overwrites |
+| **Fallback** | Manual entry. Manual entry stays available, a missing or unusable rate never becomes zero, one metal's failure never stops the other metal's rate, and a request failure leaves the calculator exactly as usable as it was |
+| **Verification status** | CONTRACT IMPLEMENTED · MIGRATION PREPARED (not applied) · live object **UNABLE TO VERIFY** (the audit did not find `metal_prices`) |
+
+**Gold and silver are one contract, not two.** The client issues one query and resolves the two metals
+independently from one response, so the table, endpoint, permission and fallback behaviour are identical;
+only the `metal_type` value differs. The two metals are kept as separate *results* in the domain
+(`ReferencePrices.gold` / `.silver`) precisely so a conflict or an unusable row for one never affects the
+other.
+
+**Staleness is disclosed, not gated.** The contract carries four timestamps and the client distinguishes them
+by meaning: `effective_at` is the only one the screen may present as an effective/reviewed date,
+`provider_last_update` is the provider's own update, and `fetched_at`/`updated_at` describe retrieval and the
+row's own last change. The app never invents a date for a row that recorded none, and it never replaces a
+published date with a fresher one. It also applies **no age threshold**: no source in this repository states
+one, and `MetalPriceRepository` is documented as refusing to infer a current price from the newest timestamp,
+so inventing a cutoff would be inventing policy. See §4.
+
+## 3. The integration strategy, and the options rejected
+
+**Chosen: keep the Android read contracts as they are, and close the server-side gap with additive SQL.**
+
+1. **No Android DTO or endpoint change.** The clients already ask for exactly what the migrations define.
+   `SupabaseContractParityTest` now proves it column by column, so this is a checked claim rather than a
+   reading. Renaming a client field to match a speculation about the live schema would have broken a working
+   contract on the strength of an assumption.
+2. **The dataset and prayer-config migrations stay as they are.** They already define complete, read-only,
+   RLS-consistent surfaces for their clients; the missing piece is that they have not been applied, which is
+   a deployment step, not a schema redesign.
+3. **One new migration, for the one contract with no SQL at all.** The price slot is the only read whose
+   surface existed solely as Kotlin constants and prose, so it is the only one where a reviewer could not see
+   what the server was supposed to expose. `20261018000000_metal_prices.sql` pins it, additively.
+
+Options considered and rejected:
+
+| Option | Why not |
+| --- | --- |
+| Make the price client read a differently-named admin table | Its name and columns are not known from source. Writing a view over an object nobody here has described is inventing schema, and the audit's "not found" is evidence about one name, not proof about the project. |
+| Rewrite the prayer-config client to read a scope-per-row table | It would drop revision ids, revision numbers and checksums — the app's idempotence ("unchanged revision downloads nothing") and its refusal of reused/stale revisions both depend on them. §6 of the phase brief forbids weakening revision and checksum validation, and an empty or unscoped response must never read as valid configuration. |
+| Introduce a generic translation/sync framework | Two published slots and one price read do not justify a framework, and the three contracts have genuinely different semantics (revisioned immutable payload vs. current value). |
+| Disable RLS, or grant write/`service_role` access, to make reads succeed | RLS is what makes a publishable key safe to embed. Every migration keeps it enabled with a narrow select grant, and no write privilege is granted to a client role. |
+| Duplicate price data into a second table for the app's convenience | Two copies of the same market data would be two things to keep correct. The app reads the published table it named. |
+
+## 4. Deliberate non-changes, and the reasoning
+
+- **`prayer_calculation_configs` is not touched, renamed, migrated or dropped.** It is not this repository's
+  object. If it is the administrator's source of truth for settings, the adapter that materialises it into a
+  revisioned, checksummed publication belongs to the workflow that publishes — outside both this repository
+  and the app.
+- **No staleness threshold was added to prices.** See §2.3. The phase brief requires stale prices not be
+  *silently* presented as current; the contract satisfies that by carrying the record's own dates through to
+  the screen and never fabricating one, which `SupabaseMetalPriceRepositoryTest` pins in both directions (an
+  old date survives unchanged; a missing date stays missing). Choosing an age limit is a product decision.
+- **No authentication, Realtime, Storage writes or any write path was added.** Every read stays a single
+  read-only GET with the publishable key, through the one existing transport.
+- **No new configuration, HTTP client or credential.** All three reads use the two `BuildConfig` values and
+  the shared `SupabaseConfiguration` rule from Phase 1 and the one `HttpTransport`.
+
+## 5. What is not verified, and how to verify it
+
+| Unverified | How it would be verified |
+| --- | --- |
+| Whether the two earlier migrations have been applied | `select * from public.dataset_current_publication limit 1;` and the same for the prayer-config view, with the publishable key |
+| Whether the three read surfaces exist with these columns live | The same read, or PostgREST's `/rest/v1/` OpenAPI document, which lists exposed tables, views and columns |
+| Whether `metal_prices` already exists under a different shape | The OpenAPI document, or `information_schema.columns`. If it exists, this migration is a no-op and the mismatch must be closed by that object's owner (a read-only view in *their* migration) |
+| Whether anon's `select` grants and the RLS policies behave as written | A read with the publishable key; a 401/403 or an empty array tells the three apart from a 404 |
+| Whether a row is ever published for any slot | The corresponding `insert`/`update` in the administrator workflow, then a read |
+| Whether the app adopts a published release end to end | Publish, then run the app and read the `dataset_sync_*` / `prayer_config_sync_*` events |
+
+Status of the whole remote path today: **CONTRACT IMPLEMENTED**, **MIGRATION PREPARED**, endpoint
+**ENDPOINT REACHABLE**, and **MIGRATION APPLIED AND VERIFIED**, **DATABASE READ VERIFIED** and
+**FEATURE DATA FLOW VERIFIED** are all still **UNABLE TO VERIFY**.
+
+## 6. Where each contract is defined
+
+| Contract | SQL | Kotlin client | Kotlin contract | Tests |
+| --- | --- | --- | --- | --- |
+| Location dataset | `supabase/migrations/20260515000000_dataset_publications.sql` | `data/dataset/remote/SupabaseRemoteDatasetSource.kt` | `core/domain/dataset/remote/DatasetPublication.kt` | `DatasetPublicationTest`, `DatasetSynchronizerTest`, `SupabaseContractParityTest` |
+| Prayer config | `supabase/migrations/20260601000000_prayer_config_publications.sql` | `data/prayerconfig/remote/SupabaseRemotePrayerConfigSource.kt` | `core/domain/prayerconfig/PrayerConfiguration.kt` | `PrayerConfigurationParserTest`, `PrayerConfigSynchronizerTest`, `SupabaseContractParityTest` |
+| Gold and silver prices | `supabase/migrations/20261018000000_metal_prices.sql` | `data/metalprice/SupabaseRemoteMetalPriceSource.kt` | `core/domain/metalprice/MetalPriceParser.kt` | `MetalPriceParserTest`, `SupabaseMetalPriceRepositoryTest`, `SupabaseRemoteMetalPriceSourceTest`, `SupabaseContractParityTest` |
+
+Related: `docs/SUPABASE_SETUP.md` (how to apply a migration), `docs/DATABASE-SCHEMA.md` (the dataset schema
+in full), `docs/PRAYER_CONFIGURATION.md` (the prayer-configuration contract in full),
+`docs/ZAKAT_METHODOLOGY.md` §8.5 (the price contract from the calculator's side).

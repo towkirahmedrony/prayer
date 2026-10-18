@@ -19,6 +19,13 @@ mirror of `supabase/migrations/20260515000000_dataset_publications.sql` and of t
 > here — immutable revisions, a single current-publication pointer, a definer view as the only client
 > surface, and read-only RLS for app clients — but the two slots are deliberately independent, so a change
 > to one cannot disturb the other. See `docs/PRAYER_CONFIGURATION.md`.
+>
+> **A third read, with a different shape.** The published gold and silver reference prices the Zakat screen
+> reads (`supabase/migrations/20261018000000_metal_prices.sql`) are a *current value* rather than a
+> revisioned publication, so that slot uses no pointer table, no revision id and no view: one table with a
+> read-only select policy, and an app that selects one active verified rate per metal, purity and currency.
+> `docs/SUPABASE_CONTRACT_MATRIX.md` lists all three contracts side by side with what is verified about each;
+> `SupabaseContractParityTest` checks each migration's columns against the client that reads them.
 
 ## 1. What the schema is for
 

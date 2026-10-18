@@ -526,6 +526,13 @@ table, the published records, and a read policy that permits this app's publisha
 deployment. If they do not, the app reports "no published reference price" (or the specific failure) and manual
 entry is used — which is the behaviour the tests pin. No end-to-end live retrieval is claimed here.
 
+The server side of this contract is now defined in the repository rather than only implied by the client:
+`supabase/migrations/20261018000000_metal_prices.sql` declares the table, its column types, the
+one-active-rate-per-basis index and the read-only grant, and `SupabaseContractParityTest` keeps its columns
+equal to the ones this client selects. **The migration has not been applied** — see
+`docs/SUPABASE_CONTRACT_MATRIX.md` for the verification status of every remote contract, and for why the app
+discloses each record's own dates instead of applying an age limit.
+
 ## 9. Limitations and unsupported cases
 
 Stated here, and stated in the app's own limitations section, because a calculator that hides these is
