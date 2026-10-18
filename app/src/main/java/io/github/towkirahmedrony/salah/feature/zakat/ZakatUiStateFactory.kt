@@ -236,6 +236,9 @@ class ZakatUiStateFactory(
     private fun resultView(result: ZakatResult, locale: Locale): ZakatResultView {
         val hasAnything = result.status != ZakatStatus.NOTHING_ENTERED
 
+        // Only show "still needed" labels for fields that are actually present in the result lines.
+        val presentFields = result.lines.map { it.field }.toSet()
+
         return ZakatResultView(
             statusRes = when (result.status) {
                 ZakatStatus.NOTHING_ENTERED -> R.string.zakat_status_nothing
@@ -274,7 +277,8 @@ class ZakatUiStateFactory(
             // A missing price is named as a missing **price**, and a missing rate as a missing **rate**: the
             // row's own weight label would say "gold weight" when the weight was typed and it is the price that
             // is absent, which points the user at the wrong field.
-            incompleteLabels = result.incompleteFields.map { field -> incompleteLabelFor(field) },
+            incompleteLabels = result.incompleteFields.filter { it in presentFields }
+                .map { field -> incompleteLabelFor(field) },
             hawlEstimateDate = result.hawl?.let { hawl ->
                 formatting.gregorianDayMonthYear(hawl.estimatedAnniversary, locale)
             },
