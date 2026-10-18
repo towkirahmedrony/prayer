@@ -114,7 +114,7 @@ class ZakatViewModel(
         refreshingReferencePrices,
     ) { current, language, prices, manualPrices, refreshing ->
         uiStateFactory.create(
-            form = current,
+            form = current.withDebtTotals(),
             // `null` is the "follow the device" choice, which an unset preference must still mean.
             locale = language.locale() ?: Locale.getDefault(),
             today = LocalDate.now(clock),
@@ -240,6 +240,41 @@ class ZakatViewModel(
         form.update { current -> current.copy(inventoryBasis = basis) }
     }
 
+    /** Adds an empty debt and returns its id so the screen can open it; `null` when the list is full. */
+    fun onAddDebt(): Long? {
+        var added: Long? = null
+        form.update { current ->
+            if (current.debts.size >= MAX_DEBTS) {
+                added = null
+                current
+            } else {
+                val id = (current.debts.maxOfOrNull { debt -> debt.id } ?: 0L) + 1L
+                added = id
+                current.copy(debts = current.debts + ZakatDebtEntry(id = id))
+            }
+        }
+        return added
+    }
+
+    fun onRemoveDebt(id: Long) {
+        form.update { current -> current.copy(debts = current.debts.filterNot { debt -> debt.id == id }) }
+    }
+
+    fun onDebtTypeChange(id: Long, type: ZakatDebtType) = updateDebt(id) { debt -> debt.copy(type = type) }
+
+    /** Same keystroke filter as every other amount, so a Bengali keyboard works here too. */
+    fun onDebtOwedChange(id: Long, value: String) =
+        updateDebt(id) { debt -> debt.copy(owedText = filterDecimalInput(value)) }
+
+    fun onDebtDueChange(id: Long, value: String) =
+        updateDebt(id) { debt -> debt.copy(dueText = filterDecimalInput(value)) }
+
+    private fun updateDebt(id: Long, change: (ZakatDebtEntry) -> ZakatDebtEntry) {
+        form.update { current ->
+            current.copy(debts = current.debts.map { debt -> if (debt.id == id) change(debt) else debt })
+        }
+    }
+
     /**
      * Empties the form.
      *
@@ -258,6 +293,9 @@ class ZakatViewModel(
     companion object {
         /** How long the state stays live after the screen stops observing it. */
         const val SUBSCRIBE_TIMEOUT_MILLIS: Long = 5_000L
+
+        /** The most debts one calculation can hold. */
+        const val MAX_DEBTS: Int = 20
 
         private const val MAX_DECIMAL_PLACES = 12
 
@@ -365,6 +403,8 @@ data class ZakatForm(
     val jewelleryTreatment: ZakatJewelleryTreatment = ZakatJewelleryTreatment.ZAKATABLE,
     val debtTreatment: ZakatDebtTreatment = ZakatDebtTreatment.DEDUCT,
     val hawlSeedDateText: String = "",
+    /** The debts step's entries. While it holds any, it owns both liability fields. */
+    val debts: List<ZakatDebtEntry> = emptyList(),
 ) {
     /** What [field] holds, or the empty string when nothing has been entered. */
     fun text(field: ZakatFormField): String = values[field].orEmpty()
@@ -410,5 +450,5 @@ data class ZakatForm(
      * counts, because the user would still lose it.
      */
     fun hasAnythingEntered(): Boolean =
-        values.values.any { value -> value.isNotBlank() } || hawlSeedDateText.isNotBlank()
+        values.values.any { value -> value.isNotBlank() } || hawlSeedDateText.isNotBlank() || debts.isNotEmpty()
 }

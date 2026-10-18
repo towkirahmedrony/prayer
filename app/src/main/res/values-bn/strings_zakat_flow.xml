@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_flow_step_assets">সম্পদ</string>
+    <string name="zakat_flow_step_liabilities">দেনা</string>
+    <string name="zakat_flow_step_method">যাচাই</string>
+    <string name="zakat_flow_step_result">ফলাফল</string>
+    <string name="zakat_flow_step_progress_named">ধাপ %1$d/%2$d · %3$s</string>
+    <string name="zakat_flow_assets_title">আপনার সম্পদ</string>
+    <string name="zakat_flow_assets_subtitle">যেগুলো আপনার প্রযোজ্য শুধু সেগুলো দিন, বাকিগুলো বাদ দিন। যেকোনো সময় ফিরে এসে বদলাতে পারবেন।</string>
+    <string name="zakat_flow_liabilities_title">আপনার দেনা</string>
+    <string name="zakat_flow_liabilities_subtitle">যা আপনি পরিশোধ করবেন তা লিখুন। কতটুকু হিসাবে ধরা হবে তা পরের ধাপে যাচাই করা পছন্দের ওপর নির্ভর করে।</string>
+    <string name="zakat_flow_method_title">হিসাবের পদ্ধতি</string>
+    <string name="zakat_flow_method_subtitle">কিছু বিষয়ে আলেমদের মত আলাদা। আপনি যে মত অনুসরণ করেন সেটি বেছে নিন — প্রতিটি পছন্দ ফলাফল বদলাতে পারে।</string>
+    <string name="zakat_flow_result_title">আপনার ফলাফল</string>
+    <string name="zakat_flow_total_label">এ পর্যন্ত গণনায় ধরা হয়েছে</string>
+    <string name="zakat_flow_categories_filled">%2$dটির মধ্যে %1$dটি দেওয়া হয়েছে</string>
+    <string name="zakat_flow_categories_header">বিভাগসমূহ</string>
+    <string name="zakat_flow_composition_cd">গণনায় ধরা মোটের মধ্যে প্রতিটি বিভাগের অংশ</string>
+    <string name="zakat_flow_percent">%1$d%%</string>
+    <string name="zakat_flow_share">মোটের %1$d%%</string>
+    <string name="zakat_flow_not_counted_amount">%1$s গণনায় ধরা হয়নি</string>
+    <string name="zakat_flow_cat_cash">নগদ ও ব্যাংক</string>
+    <string name="zakat_flow_cat_cash_desc">সঞ্চয়, চলতি ও মেয়াদি জমার ব্যালেন্স</string>
+    <string name="zakat_flow_cat_foreign">বৈদেশিক মুদ্রা</string>
+    <string name="zakat_flow_cat_foreign_desc">অন্য মুদ্রায় থাকা অর্থ</string>
+    <string name="zakat_flow_cat_metals">সোনা ও রুপা</string>
+    <string name="zakat_flow_cat_metals_desc">ওজন ও প্রকাশিত দাম</string>
+    <string name="zakat_flow_cat_stock">ব্যবসার পণ্য</string>
+    <string name="zakat_flow_cat_stock_desc">বিক্রির জন্য রাখা পণ্য</string>
+    <string name="zakat_flow_cat_owed">পাওনা টাকা</string>
+    <string name="zakat_flow_cat_owed_desc">যে ঋণ আপনি অন্যকে দিয়েছেন</string>
+    <string name="zakat_flow_status_incomplete">মান দরকার</string>
+    <string name="zakat_flow_status_not_counted">গণনায় ধরা হয়নি</string>
+    <string name="zakat_flow_status_invalid">সংখ্যাটি দেখুন</string>
+    <string name="zakat_flow_attention">কিছু তথ্য ঠিক করা দরকার</string>
+    <string name="zakat_flow_review">দেখুন</string>
+    <string name="zakat_flow_continue">এগিয়ে যান</string>
+    <string name="zakat_flow_see_result">ফলাফল দেখুন</string>
+    <string name="zakat_flow_edit_answers">তথ্য বদলান</string>
+    <string name="zakat_flow_done">সম্পন্ন</string>
+    <string name="zakat_flow_expand">%1$s খুলুন</string>
+    <string name="zakat_flow_collapse">%1$s বন্ধ করুন</string>
+    <string name="zakat_flow_metals_jewellery_note">পরিধেয় গয়না গণনায় ধরা হবে কি না তা পদ্ধতির ধাপে বেছে নেবেন।</string>
+    <string name="zakat_flow_own_price">নিজের দাম ব্যবহার করুন</string>
+    <string name="zakat_flow_hide_own_price">দামের ঘর লুকান</string>
+</resources>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_flow_back_btn">পিছনে</string>
+    <string name="zakat_debt_header">আপনার দেনা</string>
+    <string name="zakat_debt_count">%1$dটি যোগ হয়েছে</string>
+    <string name="zakat_debt_assets_label">গণনায় ধরা সম্পদ · ধাপ ১ থেকে</string>
+    <string name="zakat_debt_edit">বদলান</string>
+    <string name="zakat_debt_type_label">কী ধরনের দেনা?</string>
+    <string name="zakat_debt_type_loan">ঋণ / কিস্তি</string>
+    <string name="zakat_debt_type_card">ক্রেডিট কার্ড</string>
+    <string name="zakat_debt_type_borrowed">ধার</string>
+    <string name="zakat_debt_type_bill">বিল বা কর</string>
+    <string name="zakat_debt_type_other">অন্যান্য</string>
+    <string name="zakat_debt_owed_label">মোট বাকি</string>
+    <string name="zakat_debt_owed_help">এই দেনায় এখনো মোট যত টাকা শোধ করা বাকি।</string>
+    <string name="zakat_debt_due_label">আগামী ১২ মাসে দেয়</string>
+    <string name="zakat_debt_due_help">আগামী ১২ মাসের মধ্যে যে কিস্তি বা পাওনা শোধ করতে হবে, সঙ্গে যা আগেই বকেয়া হয়ে গেছে। না থাকলে ০ লিখুন।</string>
+    <string name="zakat_debt_total_owed">মোট বাকি</string>
+    <string name="zakat_debt_legend_due">১২ মাসের মধ্যে দেয়</string>
+    <string name="zakat_debt_legend_later">পরে দেয়</string>
+    <string name="zakat_debt_split_cd">মোট বাকি %2$s-এর মধ্যে ১২ মাসের মধ্যে দেয় %1$s</string>
+    <string name="zakat_debt_sum_line">%1$s + %2$s = %3$s বাকি</string>
+    <string name="zakat_debt_note">প্রতিটি দেনা পুরোপুরি যাকাত কমায় না। ধাপ ৩-এ আপনার বেছে নেওয়া পদ্ধতি অনুযায়ী কতটুকু ধরা হবে তা Salah ঠিক করবে।</string>
+    <string name="zakat_debt_remove">এই দেনা মুছুন</string>
+    <string name="zakat_debt_add">দেনা যোগ করুন</string>
+    <string name="zakat_debt_add_limit">একটি হিসাবে যত দেনা যোগ করা যায়, তার সর্বোচ্চ সীমায় পৌঁছেছেন।</string>
+    <string name="zakat_debt_empty_note">কোনো দেনা নেই? খালি রেখেই এগিয়ে যান — এতে কোনো সমস্যা নেই।</string>
+    <string name="zakat_debt_status_empty">এখনো পূরণ করা হয়নি</string>
+    <string name="zakat_debt_status_incomplete">বাকি অঙ্কটি দিন</string>
+    <string name="zakat_debt_fix">ঠিক করুন</string>
+    <string name="zakat_debt_error_owed">মোট অঙ্কটি সংখ্যায় লিখুন।</string>
+    <string name="zakat_debt_error_due">দেয় অঙ্কটি সংখ্যায় লিখুন, না থাকলে ০।</string>
+    <string name="zakat_debt_error_exceeds">দেয় অঙ্ক (%1$s) মোট বাকির (%2$s) চেয়ে বেশি। ঠিক না করা পর্যন্ত ধরা হবে না।</string>
+    <string name="zakat_debt_sum_title">এটি আপনার মোটকে কীভাবে বদলায়</string>
+    <string name="zakat_debt_sum_assets">গণনায় ধরা সম্পদ</string>
+    <string name="zakat_debt_sum_assets_sub">ধাপ ১ থেকে</string>
+    <string name="zakat_debt_sum_due">আগামী ১২ মাসে দেয়</string>
+    <string name="zakat_debt_sum_due_sub">কাটা হতে পারে · %1$dটি ধরা হয়েছে</string>
+    <string name="zakat_debt_sum_net">দেনা কাটলে নিট সম্পদ</string>
+    <string name="zakat_debt_sum_net_legend">নিট</string>
+    <string name="zakat_debt_sum_deducted_legend">কাটা হয়েছে</string>
+    <string name="zakat_debt_sum_later">১২ মাসের পরে দেয়: %1$s — কাটা হয় না।</string>
+    <string name="zakat_debt_sum_method">দেনা আদৌ কাটা হবে কি না তা ধাপ ৩-এ আপনার পছন্দ, কারণ এ বিষয়ে আলেমদের মত আলাদা।</string>
+    <string name="zakat_debt_sum_floor">নিট সম্পদ শূন্যের নিচে নামে না।</string>
+    <string name="zakat_debt_sum_skipped">এখনো ধরা হয়নি এমন দেনা: %1$d</string>
+</resources>

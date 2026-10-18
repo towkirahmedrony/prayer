@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_review_title">Check before we calculate</string>
+    <string name="zakat_review_subtitle">Tap any line to change it. Everything stays on this device.</string>
+    <string name="zakat_review_legend_user">You entered</string>
+    <string name="zakat_review_legend_ref">Published price</string>
+    <string name="zakat_review_legend_calc">Calculated by Salah</string>
+    <string name="zakat_review_ready_title">Ready to calculate</string>
+    <string name="zakat_review_ready_body">Everything you entered is complete.</string>
+    <string name="zakat_review_empty_title">Nothing to calculate yet</string>
+    <string name="zakat_review_empty_body">Add at least one asset in step 1 first.</string>
+    <string name="zakat_review_go_step1">Go to step 1</string>
+    <string name="zakat_review_fix_step1">Fix in step 1</string>
+    <string name="zakat_review_fix_step2">Fix in step 2</string>
+    <string name="zakat_review_fix_below">Fix below</string>
+    <string name="zakat_review_issue_line">%1$s: %2$s</string>
+    <string name="zakat_review_issue_hawl">The date your wealth reached the nisab is not a valid date (YYYY-MM-DD). Fix it below or leave it empty.</string>
+    <string name="zakat_review_leftout_note">Items listed here are left out of the calculation until they are fixed.</string>
+    <string name="zakat_review_optional_hawl">Optional: the date your wealth reached the nisab is not entered. Add it under settings if you know it.</string>
+    <string name="zakat_review_assets_header">ASSETS</string>
+    <string name="zakat_review_debts_header">DEBTS</string>
+    <string name="zakat_review_edit_step1">Edit in step 1</string>
+    <string name="zakat_review_edit_step2">Edit in step 2</string>
+    <string name="zakat_review_total_assets">Total counted assets</string>
+    <string name="zakat_review_not_entered">Not entered, so not counted: %1$s</string>
+    <string name="zakat_review_entered_weight">%1$s %2$s %3$s, as you entered</string>
+    <string name="zakat_review_price_own">Your own price: %1$s</string>
+    <string name="zakat_review_debts_counted">%1$d counted</string>
+    <string name="zakat_review_never_deducted">Never deducted in Salah</string>
+    <string name="zakat_review_no_debts">No debts entered</string>
+    <string name="zakat_review_left_out">Left out</string>
+    <string name="zakat_review_deducted_total">Deducted under your settings</string>
+    <string name="zakat_review_net_label">Net wealth under your settings</string>
+    <string name="zakat_review_net_formula">%1$s − %2$s</string>
+    <string name="zakat_review_net_next">Compared with the nisab in the next step.</string>
+    <string name="zakat_review_settings_header">YOUR SETTINGS</string>
+    <string name="zakat_review_settings_note">Scholars differ on these points, so each one is your choice. Change any and the net above updates.</string>
+    <string name="zakat_review_net_option">Net %1$s</string>
+    <string name="zakat_review_hawl_not_set">Not entered · optional</string>
+    <string name="zakat_review_calculate">Calculate zakat</string>
+    <plurals name="zakat_review_issue_count">
+        <item quantity="one">%d item to check</item>
+        <item quantity="other">%d items to check</item>
+    </plurals>
+    <plurals name="zakat_review_leftout">
+        <item quantity="one">%d item will be left out</item>
+        <item quantity="other">%d items will be left out</item>
+    </plurals>
+</resources>

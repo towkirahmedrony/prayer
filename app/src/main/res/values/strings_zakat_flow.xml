@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_flow_step_assets">Assets</string>
+    <string name="zakat_flow_step_liabilities">Liabilities</string>
+    <string name="zakat_flow_step_method">Review</string>
+    <string name="zakat_flow_step_result">Result</string>
+    <string name="zakat_flow_step_progress_named">Step %1$d of %2$d · %3$s</string>
+    <string name="zakat_flow_assets_title">Your assets</string>
+    <string name="zakat_flow_assets_subtitle">Add only what applies to you and skip the rest. You can come back and change anything.</string>
+    <string name="zakat_flow_liabilities_title">Your debts</string>
+    <string name="zakat_flow_liabilities_subtitle">Enter what you owe. How much of it counts depends on the settings you confirm next.</string>
+    <string name="zakat_flow_method_title">Your method</string>
+    <string name="zakat_flow_method_subtitle">Scholars differ on a few points. Choose the position you follow — each choice can change the result.</string>
+    <string name="zakat_flow_result_title">Your result</string>
+    <string name="zakat_flow_total_label">Counted so far</string>
+    <string name="zakat_flow_categories_filled">%1$d of %2$d added</string>
+    <string name="zakat_flow_categories_header">Categories</string>
+    <string name="zakat_flow_composition_cd">Share of each category in the counted total</string>
+    <string name="zakat_flow_percent">%1$d%%</string>
+    <string name="zakat_flow_share">%1$d%% of total</string>
+    <string name="zakat_flow_not_counted_amount">%1$s not counted</string>
+    <string name="zakat_flow_cat_cash">Cash and bank</string>
+    <string name="zakat_flow_cat_cash_desc">Savings, current and deposit balances</string>
+    <string name="zakat_flow_cat_foreign">Foreign currency</string>
+    <string name="zakat_flow_cat_foreign_desc">Money held in another currency</string>
+    <string name="zakat_flow_cat_metals">Gold and silver</string>
+    <string name="zakat_flow_cat_metals_desc">Weight, and the published price</string>
+    <string name="zakat_flow_cat_stock">Business stock</string>
+    <string name="zakat_flow_cat_stock_desc">Goods held for sale</string>
+    <string name="zakat_flow_cat_owed">Money owed to you</string>
+    <string name="zakat_flow_cat_owed_desc">Loans you have given</string>
+    <string name="zakat_flow_status_incomplete">Needs a value</string>
+    <string name="zakat_flow_status_not_counted">Not counted</string>
+    <string name="zakat_flow_status_invalid">Check the number</string>
+    <string name="zakat_flow_attention">Some entries need attention</string>
+    <string name="zakat_flow_review">Review</string>
+    <string name="zakat_flow_continue">Continue</string>
+    <string name="zakat_flow_see_result">See result</string>
+    <string name="zakat_flow_edit_answers">Edit my answers</string>
+    <string name="zakat_flow_done">Done</string>
+    <string name="zakat_flow_expand">Expand %1$s</string>
+    <string name="zakat_flow_collapse">Collapse %1$s</string>
+    <string name="zakat_flow_metals_jewellery_note">Whether worn jewellery counts is chosen in the method step.</string>
+    <string name="zakat_flow_own_price">Use my own price</string>
+    <string name="zakat_flow_hide_own_price">Hide my price fields</string>
+</resources>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_review_title">হিসাবের আগে মিলিয়ে নিন</string>
+    <string name="zakat_review_subtitle">যেকোনো সারিতে ট্যাপ করে বদলান। সবকিছু এই ডিভাইসেই থাকে।</string>
+    <string name="zakat_review_legend_user">আপনি দিয়েছেন</string>
+    <string name="zakat_review_legend_ref">প্রকাশিত দাম</string>
+    <string name="zakat_review_legend_calc">Salah হিসাব করেছে</string>
+    <string name="zakat_review_ready_title">হিসাবের জন্য প্রস্তুত</string>
+    <string name="zakat_review_ready_body">আপনার দেওয়া সব তথ্য সম্পূর্ণ।</string>
+    <string name="zakat_review_empty_title">এখনো হিসাব করার মতো কিছু নেই</string>
+    <string name="zakat_review_empty_body">আগে ধাপ ১-এ অন্তত একটি সম্পদ দিন।</string>
+    <string name="zakat_review_go_step1">ধাপ ১-এ যান</string>
+    <string name="zakat_review_fix_step1">ধাপ ১-এ ঠিক করুন</string>
+    <string name="zakat_review_fix_step2">ধাপ ২-এ ঠিক করুন</string>
+    <string name="zakat_review_fix_below">নিচে ঠিক করুন</string>
+    <string name="zakat_review_issue_line">%1$s: %2$s</string>
+    <string name="zakat_review_issue_hawl">যে তারিখে আপনার সম্পদ নিসাবে পৌঁছেছে সেটি সঠিক তারিখ নয় (YYYY-MM-DD)। নিচে ঠিক করুন, অথবা খালি রাখুন।</string>
+    <string name="zakat_review_leftout_note">এখানে যা তালিকাভুক্ত তা ঠিক না করা পর্যন্ত হিসাবের বাইরে থাকবে।</string>
+    <string name="zakat_review_optional_hawl">ঐচ্ছিক: সম্পদ নিসাবে পৌঁছানোর তারিখ দেওয়া হয়নি। জানা থাকলে পছন্দের অংশে যোগ করুন।</string>
+    <string name="zakat_review_assets_header">সম্পদ</string>
+    <string name="zakat_review_debts_header">দেনা</string>
+    <string name="zakat_review_edit_step1">ধাপ ১-এ বদলান</string>
+    <string name="zakat_review_edit_step2">ধাপ ২-এ বদলান</string>
+    <string name="zakat_review_total_assets">গণনায় ধরা মোট সম্পদ</string>
+    <string name="zakat_review_not_entered">দেওয়া হয়নি, তাই ধরা হয়নি: %1$s</string>
+    <string name="zakat_review_entered_weight">%1$s %2$s %3$s, আপনার দেওয়া</string>
+    <string name="zakat_review_price_own">আপনার নিজের দাম: %1$s</string>
+    <string name="zakat_review_debts_counted">%1$dটি ধরা হয়েছে</string>
+    <string name="zakat_review_never_deducted">Salah-এ কখনো কাটা হয় না</string>
+    <string name="zakat_review_no_debts">কোনো দেনা দেওয়া হয়নি</string>
+    <string name="zakat_review_left_out">বাদ</string>
+    <string name="zakat_review_deducted_total">আপনার পছন্দ অনুযায়ী কাটা হয়েছে</string>
+    <string name="zakat_review_net_label">আপনার পছন্দ অনুযায়ী নিট সম্পদ</string>
+    <string name="zakat_review_net_formula">%1$s − %2$s</string>
+    <string name="zakat_review_net_next">পরের ধাপে নিসাবের সঙ্গে তুলনা হবে।</string>
+    <string name="zakat_review_settings_header">আপনার পছন্দ</string>
+    <string name="zakat_review_settings_note">এসব বিষয়ে আলেমদের মত আলাদা, তাই প্রতিটি আপনার নিজের পছন্দ। যেকোনোটি বদলালে ওপরের নিট হালনাগাদ হবে।</string>
+    <string name="zakat_review_net_option">নিট %1$s</string>
+    <string name="zakat_review_hawl_not_set">দেওয়া হয়নি · ঐচ্ছিক</string>
+    <string name="zakat_review_calculate">যাকাত হিসাব করুন</string>
+    <plurals name="zakat_review_issue_count">
+        <item quantity="one">%dটি বিষয় দেখা দরকার</item>
+        <item quantity="other">%dটি বিষয় দেখা দরকার</item>
+    </plurals>
+    <plurals name="zakat_review_leftout">
+        <item quantity="one">%dটি বিষয় হিসাবের বাইরে থাকবে</item>
+        <item quantity="other">%dটি বিষয় হিসাবের বাইরে থাকবে</item>
+    </plurals>
+</resources>

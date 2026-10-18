@@ -82,6 +82,10 @@ sealed interface ZakatUiState {
         val refreshingReferencePrices: Boolean,
         /** True when something has been entered, so "clear" has something to clear. */
         val canClear: Boolean,
+        /** The five asset groups with their status and share of the counted total. */
+        val assetCategories: List<ZakatAssetCategoryState> = emptyList(),
+        /** The debts step: the entries, their status, and how they move the total. */
+        val debts: ZakatDebtsView = ZakatDebtsView(),
     ) : ZakatUiState
 }
 

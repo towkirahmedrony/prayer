@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zakat_flow_back_btn">Back</string>
+    <string name="zakat_debt_header">Your debts</string>
+    <string name="zakat_debt_count">%1$d added</string>
+    <string name="zakat_debt_assets_label">Counted assets · from step 1</string>
+    <string name="zakat_debt_edit">Edit</string>
+    <string name="zakat_debt_type_label">What kind of debt?</string>
+    <string name="zakat_debt_type_loan">Loan / EMI</string>
+    <string name="zakat_debt_type_card">Credit card</string>
+    <string name="zakat_debt_type_borrowed">Borrowed</string>
+    <string name="zakat_debt_type_bill">Bill or tax</string>
+    <string name="zakat_debt_type_other">Other</string>
+    <string name="zakat_debt_owed_label">Total still owed</string>
+    <string name="zakat_debt_owed_help">Everything left to repay on this debt, in total.</string>
+    <string name="zakat_debt_due_label">Due in the next 12 months</string>
+    <string name="zakat_debt_due_help">Instalments and payments falling due in the next 12 months, plus anything already overdue. Enter 0 if none.</string>
+    <string name="zakat_debt_total_owed">total owed</string>
+    <string name="zakat_debt_legend_due">Due within 12 months</string>
+    <string name="zakat_debt_legend_later">Later</string>
+    <string name="zakat_debt_split_cd">Due within 12 months: %1$s of %2$s owed</string>
+    <string name="zakat_debt_sum_line">%1$s + %2$s = %3$s owed</string>
+    <string name="zakat_debt_note">Not every debt reduces zakat in full. Salah decides how much counts from the method you choose in step 3.</string>
+    <string name="zakat_debt_remove">Remove this debt</string>
+    <string name="zakat_debt_add">Add a debt</string>
+    <string name="zakat_debt_add_limit">You have added the most debts one calculation can hold.</string>
+    <string name="zakat_debt_empty_note">No debts? Leave this empty and continue — that’s completely fine.</string>
+    <string name="zakat_debt_status_empty">Not filled in yet</string>
+    <string name="zakat_debt_status_incomplete">Add the missing amount</string>
+    <string name="zakat_debt_fix">Fix</string>
+    <string name="zakat_debt_error_owed">Enter the total as a number.</string>
+    <string name="zakat_debt_error_due">Enter the amount due as a number, or 0 if none.</string>
+    <string name="zakat_debt_error_exceeds">The amount due (%1$s) is more than the total owed (%2$s). Not included until fixed.</string>
+    <string name="zakat_debt_sum_title">How this changes your total</string>
+    <string name="zakat_debt_sum_assets">Counted assets</string>
+    <string name="zakat_debt_sum_assets_sub">from step 1</string>
+    <string name="zakat_debt_sum_due">Due in the next 12 months</string>
+    <string name="zakat_debt_sum_due_sub">may be deducted · %1$d counted</string>
+    <string name="zakat_debt_sum_net">Net if debts are deducted</string>
+    <string name="zakat_debt_sum_net_legend">Net</string>
+    <string name="zakat_debt_sum_deducted_legend">Deducted</string>
+    <string name="zakat_debt_sum_later">Later than 12 months: %1$s — not deducted.</string>
+    <string name="zakat_debt_sum_method">Whether debts are deducted at all is your choice in step 3, because scholars differ.</string>
+    <string name="zakat_debt_sum_floor">The net total cannot go below zero.</string>
+    <string name="zakat_debt_sum_skipped">Entries not included yet: %1$d</string>
+</resources>

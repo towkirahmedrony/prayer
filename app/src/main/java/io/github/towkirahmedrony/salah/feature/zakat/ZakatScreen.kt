@@ -1,5 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.zakat
 
+import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,21 +20,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -48,15 +58,23 @@ import org.koin.androidx.compose.koinViewModel
 
 private const val COMPACT_PER_ROW = 4
 
+private const val STEP_ASSETS = 0
+private const val STEP_LIABILITIES = 1
+private const val STEP_REVIEW = 2
+private const val STEP_RESULT = 3
+private const val STEP_COUNT = 4
+
 /**
- * The Zakat calculator screen.
+ * The Zakat calculator: four steps, one idea per page.
  *
- * Layout, top to bottom: the result, the gold/silver prices, assets, liabilities, method, limits.
+ * 1. Assets — what the user owns (see [ZakatAssetsStep]).
+ * 2. Liabilities — what the user owes.
+ * 3. Method — the rulings the user follows.
+ * 4. Result — the calculation and its breakdown.
  *
- * The gold and silver **price boxes are hidden by default**: the published reference price is fetched
- * automatically and shown as a one-line summary per metal. The boxes appear only when the user asks to adjust
- * the prices, or when no usable published price exists (so the calculator can never be left without a way to
- * get a price), or when the user has already typed their own price.
+ * The step number is screen state only (it survives rotation, nothing else is stored anywhere). The progress
+ * track and the action bar stay put while the content of a step scrolls, so the way forward is always under
+ * the thumb. System back goes one step back before it leaves the screen.
  */
 @Composable
 fun ZakatScreen(
@@ -65,70 +83,133 @@ fun ZakatScreen(
     viewModel: ZakatViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var step by rememberSaveable { mutableIntStateOf(STEP_ASSETS) }
+    var expandedName by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedDebtId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var confirmingClear by remember { mutableStateOf(false) }
+    val scroll = rememberScrollState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        SalahSubpageHeader(
-            title = stringResource(R.string.zakat_title),
-            backContentDescription = stringResource(R.string.zakat_back),
-            onBack = onBack,
-        )
-        Text(
-            text = stringResource(R.string.zakat_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    LaunchedEffect(step) { scroll.scrollTo(0) }
+    BackHandler(enabled = step > STEP_ASSETS) { step -= 1 }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp)) {
+            SalahSubpageHeader(
+                title = stringResource(R.string.zakat_title),
+                backContentDescription = stringResource(R.string.zakat_back),
+                onBack = { if (step > STEP_ASSETS) step -= 1 else onBack() },
+            )
+            StepTrack(step = step)
+        }
 
         when (val state = uiState) {
-            ZakatUiState.Loading -> ZakatLoading()
-            is ZakatUiState.Ready -> ZakatContent(state = state, viewModel = viewModel)
-        }
-    }
-}
+            ZakatUiState.Loading -> Column(modifier = Modifier.weight(1f).padding(20.dp)) { ZakatLoading() }
 
-@Composable
-private fun ZakatLoading(modifier: Modifier = Modifier) {
-    SalahSectionCard(modifier = modifier) {
-        SalahSkeletonBlock(height = 18.dp, modifier = Modifier.fillMaxWidth(0.4f))
-        Spacer(modifier = Modifier.height(14.dp))
-        SalahSkeletonBlock(height = 44.dp, modifier = Modifier.fillMaxWidth(0.7f))
-        Spacer(modifier = Modifier.height(14.dp))
-        SalahSkeletonBlock(height = 18.dp, modifier = Modifier.fillMaxWidth(0.6f))
-    }
-}
+            is ZakatUiState.Ready -> {
+                val expanded = expandedName?.let { name ->
+                    ZakatAssetCategory.entries.firstOrNull { category -> category.name == name }
+                }
+                val attention = state.assetCategories.firstOrNull { item ->
+                    item.status == ZakatCategoryStatus.INVALID || item.status == ZakatCategoryStatus.INCOMPLETE
+                }
+                val issues = reviewIssues(state)
+                val leftOut = issues.count { issue -> issue.isLeftOut() }
+                val openIssue: (ZakatReviewIssue) -> Unit = { issue ->
+                    when (issue) {
+                        is ZakatReviewIssue.Asset -> {
+                            expandedName = issue.category.name
+                            step = STEP_ASSETS
+                        }
 
-@Composable
-private fun ZakatContent(
-    state: ZakatUiState.Ready,
-    viewModel: ZakatViewModel,
-    modifier: Modifier = Modifier,
-) {
-    var confirmingClear by remember { mutableStateOf(false) }
+                        is ZakatReviewIssue.Debt -> {
+                            expandedDebtId = issue.entry.id
+                            step = STEP_LIABILITIES
+                        }
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        ResultCard(state = state)
-        PricesCard(state = state, viewModel = viewModel)
-        AssetsCard(state = state, viewModel = viewModel)
-        LiabilitiesCard(state = state, viewModel = viewModel)
-        MethodCard(state = state, viewModel = viewModel)
-        LimitsCard()
+                        ZakatReviewIssue.HawlDate -> Unit
+                    }
+                }
+                val attentionText = if (step == STEP_REVIEW) {
+                    LocalContext.current.resources.getQuantityString(R.plurals.zakat_review_leftout, leftOut, leftOut)
+                } else {
+                    stringResource(R.string.zakat_flow_attention)
+                }
 
-        if (state.canClear) {
-            TextButton(
-                onClick = { confirmingClear = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-            ) {
-                Text(text = stringResource(R.string.zakat_clear))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    when (step) {
+                        STEP_ASSETS -> {
+                            StepHeading(R.string.zakat_flow_assets_title, R.string.zakat_flow_assets_subtitle)
+                            ZakatAssetsStep(
+                                state = state,
+                                viewModel = viewModel,
+                                expanded = expanded,
+                                onExpandedChange = { category -> expandedName = category?.name },
+                            )
+                        }
+
+                        STEP_LIABILITIES -> {
+                            StepHeading(R.string.zakat_flow_liabilities_title, R.string.zakat_flow_liabilities_subtitle)
+                            ZakatLiabilitiesStep(
+                                state = state,
+                                viewModel = viewModel,
+                                expandedId = expandedDebtId,
+                                onExpandedChange = { id -> expandedDebtId = id },
+                                onEditAssets = { step = STEP_ASSETS },
+                            )
+                        }
+
+                        STEP_REVIEW -> {
+                            StepHeading(R.string.zakat_review_title, R.string.zakat_review_subtitle)
+                            ZakatReviewStep(
+                                state = state,
+                                viewModel = viewModel,
+                                issues = issues,
+                                onOpenIssue = openIssue,
+                                onEditAssets = { category ->
+                                    expandedName = category?.name
+                                    step = STEP_ASSETS
+                                },
+                                onEditDebts = { id ->
+                                    expandedDebtId = id
+                                    step = STEP_LIABILITIES
+                                },
+                            )
+                        }
+
+                        else -> {
+                            StepHeading(R.string.zakat_flow_result_title, null)
+                            ResultCard(state = state)
+                            LimitsCard()
+                        }
+                    }
+                }
+
+                ActionBar(
+                    step = step,
+                    needsAttention = (step == STEP_ASSETS && attention != null) ||
+                        (step == STEP_REVIEW && leftOut > 0),
+                    attentionText = attentionText,
+                    continueEnabled = !(step == STEP_REVIEW && reviewNothingToCalculate(state)),
+                    canClear = state.canClear,
+                    onReview = {
+                        if (step == STEP_REVIEW) {
+                            issues.firstOrNull { issue -> issue.isLeftOut() }?.let(openIssue)
+                        } else {
+                            attention?.let { item -> expandedName = item.category.name }
+                        }
+                    },
+                    onContinue = { step += 1 },
+                    onEdit = { step = STEP_ASSETS },
+                    onClear = { confirmingClear = true },
+                    onBack = { step -= 1 },
+                )
             }
         }
     }
@@ -143,6 +224,9 @@ private fun ZakatContent(
                     onClick = {
                         confirmingClear = false
                         viewModel.clearAll()
+                        step = STEP_ASSETS
+                        expandedName = null
+                        expandedDebtId = null
                     },
                 ) {
                     Text(text = stringResource(R.string.zakat_clear_confirm))
@@ -157,8 +241,252 @@ private fun ZakatContent(
     }
 }
 
+@Composable
+private fun ZakatLoading(modifier: Modifier = Modifier) {
+    SalahSectionCard(modifier = modifier) {
+        SalahSkeletonBlock(height = 18.dp, modifier = Modifier.fillMaxWidth(0.4f))
+        Spacer(modifier = Modifier.height(14.dp))
+        SalahSkeletonBlock(height = 44.dp, modifier = Modifier.fillMaxWidth(0.7f))
+        Spacer(modifier = Modifier.height(14.dp))
+        SalahSkeletonBlock(height = 18.dp, modifier = Modifier.fillMaxWidth(0.6f))
+    }
+}
+
 // ---------------------------------------------------------------------------------------------------------
-// Result
+// Flow chrome: progress track, step heading, action bar
+// ---------------------------------------------------------------------------------------------------------
+
+@Composable
+private fun StepTrack(step: Int, modifier: Modifier = Modifier) {
+    val names = listOf(
+        R.string.zakat_flow_step_assets,
+        R.string.zakat_flow_step_liabilities,
+        R.string.zakat_flow_step_method,
+        R.string.zakat_flow_step_result,
+    )
+    val label = stringResource(
+        R.string.zakat_flow_step_progress_named,
+        step + 1,
+        STEP_COUNT,
+        stringResource(names[step]),
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .semantics(mergeDescendants = true) { contentDescription = label },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            repeat(STEP_COUNT) { index ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            if (index <= step) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
+                )
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun StepHeading(
+    @StringRes titleRes: Int,
+    @StringRes subtitleRes: Int?,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        subtitleRes?.let { res ->
+            Text(
+                text = stringResource(res),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The bar pinned under every step: the way forward is always within thumb reach. */
+@Composable
+private fun ActionBar(
+    step: Int,
+    needsAttention: Boolean,
+    canClear: Boolean,
+    onReview: () -> Unit,
+    onContinue: () -> Unit,
+    onEdit: () -> Unit,
+    onClear: () -> Unit,
+    onBack: () -> Unit,
+    attentionText: String,
+    continueEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            if (needsAttention) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = attentionText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = onReview, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(text = stringResource(R.string.zakat_flow_review))
+                    }
+                }
+            }
+            if (step < STEP_RESULT) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (step > STEP_ASSETS) {
+                        OutlinedButton(
+                            onClick = onBack,
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(18.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.zakat_flow_back_btn),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = onContinue,
+                        enabled = continueEnabled,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(60.dp),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (step == STEP_REVIEW) R.string.zakat_review_calculate else R.string.zakat_flow_continue,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+            } else {
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.zakat_flow_edit_answers),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                if (canClear) {
+                    TextButton(
+                        onClick = onClear,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                    ) {
+                        Text(text = stringResource(R.string.zakat_clear))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Step 3: method
+// ---------------------------------------------------------------------------------------------------------
+
+@Composable
+private fun MethodCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, modifier: Modifier = Modifier) {
+    SalahSectionCard(modifier = modifier) {
+        ChoiceGroup(
+            titleRes = R.string.zakat_field_nisab_weight,
+            helpRes = R.string.zakat_help_nisab_weight,
+            choices = state.nisabWeightChoices,
+            onSelect = viewModel::onNisabWeightChange,
+        )
+        ChoiceGroup(
+            titleRes = R.string.zakat_field_nisab_metal,
+            helpRes = R.string.zakat_help_nisab_metal,
+            choices = state.nisabMetalChoices,
+            onSelect = viewModel::onNisabMetalChange,
+            compact = true,
+        )
+        if (state.nisabMetalOverridden && state.forcedNisabMetalRes != null) {
+            Text(
+                text = stringResource(
+                    R.string.zakat_nisab_metal_forced,
+                    stringResource(state.forcedNisabMetalRes),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        ChoiceGroup(
+            titleRes = R.string.zakat_field_jewellery,
+            helpRes = R.string.zakat_help_jewellery,
+            choices = state.jewelleryChoices,
+            onSelect = viewModel::onJewelleryChange,
+        )
+        ChoiceGroup(
+            titleRes = R.string.zakat_field_debts,
+            helpRes = R.string.zakat_help_debts,
+            choices = state.debtChoices,
+            onSelect = viewModel::onDebtTreatmentChange,
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+            value = state.hawlDateText,
+            onValueChange = viewModel::onHawlDateChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = state.hawlDateInvalid,
+            shape = RoundedCornerShape(14.dp),
+            label = { Text(text = stringResource(R.string.zakat_field_hawl)) },
+        )
+        Text(
+            text = stringResource(R.string.zakat_help_hawl),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Step 4: result
 // ---------------------------------------------------------------------------------------------------------
 
 @Composable
@@ -320,7 +648,7 @@ private fun ResultCard(state: ZakatUiState.Ready, modifier: Modifier = Modifier)
 
 @Composable
 private fun TotalRow(
-    @androidx.annotation.StringRes labelRes: Int,
+    @StringRes labelRes: Int,
     value: String?,
     modifier: Modifier = Modifier,
     currency: String? = null,
@@ -383,281 +711,6 @@ private fun BreakdownRow(row: ZakatResultRowView, modifier: Modifier = Modifier)
     }
 }
 
-// ---------------------------------------------------------------------------------------------------------
-// Gold and silver prices
-// ---------------------------------------------------------------------------------------------------------
-
-@Composable
-private fun PricesCard(
-    state: ZakatUiState.Ready,
-    viewModel: ZakatViewModel,
-    modifier: Modifier = Modifier,
-) {
-    var adjusting by remember { mutableStateOf(false) }
-
-    val noUsableRate = state.referencePrices.any { price ->
-        price.status == ZakatReferencePriceStatus.UNAVAILABLE || price.status == ZakatReferencePriceStatus.FAILED
-    }
-    val typedOwnPrice = state.referencePrices.any { price -> price.manuallyEdited }
-    // The boxes are hidden unless the user asked for them, or there is no published price to fall back on, or
-    // the user has already typed a price of their own.
-    val showFields = adjusting || noUsableRate || typedOwnPrice
-    val priceFields = state.assetFields.filter { field -> field.field in ZakatViewModel.PRICE_FIELDS }
-
-    SalahSectionCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeading(resId = R.string.zakat_price_title, modifier = Modifier.weight(1f))
-            TextButton(
-                onClick = viewModel::refreshReferencePrices,
-                enabled = !state.refreshingReferencePrices,
-            ) {
-                Text(
-                    text = stringResource(
-                        if (state.refreshingReferencePrices) {
-                            R.string.zakat_prices_updating
-                        } else {
-                            R.string.zakat_prices_refresh
-                        },
-                    ),
-                )
-            }
-        }
-
-        state.referencePrices.forEach { price ->
-            PriceSummaryRow(price = price, onRestore = viewModel::onRestoreReferencePrice)
-        }
-
-        if (noUsableRate) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.zakat_prices_manual_needed),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (!noUsableRate && !typedOwnPrice) {
-            TextButton(
-                onClick = { adjusting = !adjusting },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
-            ) {
-                Text(
-                    text = stringResource(
-                        if (adjusting) R.string.zakat_prices_hide else R.string.zakat_prices_adjust,
-                    ),
-                )
-            }
-        }
-
-        if (showFields) {
-            priceFields.forEach { field -> NumberField(state = field, viewModel = viewModel) }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.zakat_price_source_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun PriceSummaryRow(
-    price: ZakatReferencePriceState,
-    onRestore: (ZakatFormField) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(price.metalRes),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            val priceText = price.pricePerGram
-            if (priceText != null) {
-                Text(
-                    text = priceText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.size(4.dp))
-                Text(
-                    text = stringResource(price.unitLabelRes, price.currencyCode),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                SalahStatusPill(
-                    text = stringResource(price.statusRes),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        // One provenance line rather than five: the first statement the record actually makes, worded as what it
-        // is (a reviewed date, the provider's own update, a fetch time, or a last-changed time) and never as
-        // proof the market price was live at that moment.
-        price.sourceLabel?.let { source ->
-            Text(
-                text = stringResource(R.string.zakat_price_source, source),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val stamp: Pair<Int, String>? = when {
-            price.effectiveLabel != null -> R.string.zakat_price_effective to price.effectiveLabel
-            price.providerUpdatedLabel != null -> R.string.zakat_price_provider_update to price.providerUpdatedLabel
-            price.fetchedLabel != null -> R.string.zakat_price_fetched to price.fetchedLabel
-            price.updatedLabel != null -> R.string.zakat_price_last_updated to price.updatedLabel
-            else -> null
-        }
-        stamp?.let { (resId, value) ->
-            Text(
-                text = stringResource(resId, value),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        price.messageRes?.let { messageRes ->
-            Text(
-                text = stringResource(messageRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (price.manuallyEdited) {
-            Text(
-                text = stringResource(R.string.zakat_price_manual),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (price.canRestoreReference) {
-            TextButton(
-                onClick = { onRestore(price.priceField) },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Text(text = stringResource(R.string.zakat_price_restore, stringResource(price.metalRes)))
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Inputs
-// ---------------------------------------------------------------------------------------------------------
-
-@Composable
-private fun AssetsCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, modifier: Modifier = Modifier) {
-    SalahSectionCard(modifier = modifier) {
-        SectionHeading(resId = R.string.zakat_section_assets)
-
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_currency,
-            choices = state.currencyChoices,
-            onSelect = viewModel::onCurrencyChange,
-            compact = true,
-        )
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_unit,
-            choices = state.unitChoices,
-            onSelect = viewModel::onUnitChange,
-            compact = true,
-        )
-
-        // The two price fields live in the prices card above and are hidden there until needed.
-        state.assetFields
-            .filter { field -> field.field !in ZakatViewModel.PRICE_FIELDS }
-            .forEach { field -> NumberField(state = field, viewModel = viewModel) }
-
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_inventory_basis,
-            choices = state.inventoryBasisChoices,
-            onSelect = viewModel::onInventoryBasisChange,
-        )
-    }
-}
-
-@Composable
-private fun LiabilitiesCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, modifier: Modifier = Modifier) {
-    SalahSectionCard(modifier = modifier) {
-        SectionHeading(resId = R.string.zakat_section_liabilities)
-        state.liabilityFields.forEach { field -> NumberField(state = field, viewModel = viewModel) }
-    }
-}
-
-@Composable
-private fun MethodCard(state: ZakatUiState.Ready, viewModel: ZakatViewModel, modifier: Modifier = Modifier) {
-    SalahSectionCard(modifier = modifier) {
-        SectionHeading(resId = R.string.zakat_section_method)
-
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_nisab_weight,
-            helpRes = R.string.zakat_help_nisab_weight,
-            choices = state.nisabWeightChoices,
-            onSelect = viewModel::onNisabWeightChange,
-        )
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_nisab_metal,
-            helpRes = R.string.zakat_help_nisab_metal,
-            choices = state.nisabMetalChoices,
-            onSelect = viewModel::onNisabMetalChange,
-            compact = true,
-        )
-        if (state.nisabMetalOverridden && state.forcedNisabMetalRes != null) {
-            Text(
-                text = stringResource(
-                    R.string.zakat_nisab_metal_forced,
-                    stringResource(state.forcedNisabMetalRes),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_jewellery,
-            helpRes = R.string.zakat_help_jewellery,
-            choices = state.jewelleryChoices,
-            onSelect = viewModel::onJewelleryChange,
-        )
-        ChoiceGroup(
-            titleRes = R.string.zakat_field_debts,
-            helpRes = R.string.zakat_help_debts,
-            choices = state.debtChoices,
-            onSelect = viewModel::onDebtTreatmentChange,
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = state.hawlDateText,
-            onValueChange = viewModel::onHawlDateChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = state.hawlDateInvalid,
-            shape = RoundedCornerShape(14.dp),
-            label = { Text(text = stringResource(R.string.zakat_field_hawl)) },
-        )
-        Text(
-            text = stringResource(R.string.zakat_help_hawl),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
-
 @Composable
 private fun LimitsCard(modifier: Modifier = Modifier) {
     SalahSectionCard(modifier = modifier) {
@@ -689,8 +742,16 @@ private fun LimitsCard(modifier: Modifier = Modifier) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Shared inputs (also used by ZakatAssetsStep)
+// ---------------------------------------------------------------------------------------------------------
+
+/** The field state for [field], from whichever list holds it. */
+internal fun ZakatUiState.Ready.fieldOf(field: ZakatFormField): ZakatFieldState =
+    (assetFields + liabilityFields).first { state -> state.field == field }
+
 @Composable
-private fun SectionHeading(@androidx.annotation.StringRes resId: Int, modifier: Modifier = Modifier) {
+private fun SectionHeading(@StringRes resId: Int, modifier: Modifier = Modifier) {
     Text(
         text = stringResource(resId),
         style = MaterialTheme.typography.titleSmall,
@@ -701,7 +762,7 @@ private fun SectionHeading(@androidx.annotation.StringRes resId: Int, modifier: 
 }
 
 @Composable
-private fun NumberField(
+internal fun AmountField(
     state: ZakatFieldState,
     viewModel: ZakatViewModel,
     modifier: Modifier = Modifier,
@@ -743,16 +804,16 @@ private fun NumberField(
 /**
  * A titled group of mutually exclusive options.
  *
- * [compact] lays short options out as equal-width chips in rows of [COMPACT_PER_ROW] (currencies, units, the
- * nisab metal); long sentence-style options stay as stacked rows so their wording is never truncated.
+ * [compact] lays short options out as equal-width chips in rows of [COMPACT_PER_ROW]; long sentence-style
+ * options stay as stacked rows so their wording is never truncated.
  */
 @Composable
-private fun <T> ChoiceGroup(
-    @androidx.annotation.StringRes titleRes: Int,
+internal fun <T> ChoiceGroup(
+    @StringRes titleRes: Int,
     choices: List<ZakatChoice<T>>,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    @androidx.annotation.StringRes helpRes: Int? = null,
+    @StringRes helpRes: Int? = null,
     compact: Boolean = false,
 ) {
     Column(
@@ -813,7 +874,7 @@ private fun <T> ChoiceGroup(
 }
 
 @Composable
-private fun ChoiceChip(
+internal fun ChoiceChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,

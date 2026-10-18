@@ -149,6 +149,8 @@ class ZakatUiStateFactory(
             referencePrices = referencePricesView(referencePrices, manualPriceFields, locale),
             refreshingReferencePrices = refreshingReferencePrices,
             canClear = form.hasAnythingEntered(),
+            assetCategories = buildAssetCategories(result, parsed.invalid) { amount -> money(amount, locale) },
+            debts = buildDebtsView(effectiveForm, result) { amount -> money(amount, locale) },
         )
     }
 
