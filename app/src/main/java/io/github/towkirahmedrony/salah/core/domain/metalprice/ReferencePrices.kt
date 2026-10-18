@@ -142,12 +142,3 @@ data class ReferencePrices(
         )
     }
 }
-
-/**
- * The exact price text for a metal, or `null` when no published rate may be used.
- *
- * The text is [BigDecimal.toPlainString] of the exact value the service published — never a rounded or
- * reformatted approximation — because this is the string the calculator parses back into a `BigDecimal`.
- */
-fun ReferencePriceResult.availablePriceText(): String? =
-    (this as? ReferencePriceResult.Available)?.price?.pricePerGram?.toPlainString()

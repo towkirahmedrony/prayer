@@ -77,11 +77,15 @@ class ZakatUiStateFactoryTest {
      * Every value here is a clearly labelled fixture, never a real Bangladesh market price: the point of these
      * tests is which record is selected and how its fields are read, not what gold costs.
      */
-    private fun publishedPrice(metal: MetalType, price: String): PublishedMetalPrice = PublishedMetalPrice(
+    private fun publishedPrice(
+        metal: MetalType,
+        price: String,
+        currency: String = "BDT",
+    ): PublishedMetalPrice = PublishedMetalPrice(
         metal = metal,
         purity = MetalPurity.K22,
         pricePerGram = BigDecimal(price),
-        currency = "BDT",
+        currency = currency,
         source = "Salah test fixture",
         sourceUrl = "https://example.invalid/fixture",
         effectiveAt = "2026-09-30T00:00:00Z",
@@ -96,11 +100,12 @@ class ZakatUiStateFactoryTest {
         silver: String? = null,
         freshness: MetalPriceFreshness = MetalPriceFreshness.CURRENT,
         cachedAt: Long? = null,
+        currency: String = "BDT",
     ): ReferencePrices = ReferencePrices(
         gold = gold
             ?.let { price ->
                 ReferencePriceResult.Available(
-                    publishedPrice(MetalType.GOLD, price),
+                    publishedPrice(MetalType.GOLD, price, currency = currency),
                     freshness = freshness,
                     cachedAtEpochMillis = cachedAt,
                 )
@@ -109,7 +114,7 @@ class ZakatUiStateFactoryTest {
         silver = silver
             ?.let { price ->
                 ReferencePriceResult.Available(
-                    publishedPrice(MetalType.SILVER, price),
+                    publishedPrice(MetalType.SILVER, price, currency = currency),
                     freshness = freshness,
                     cachedAtEpochMillis = cachedAt,
                 )
@@ -587,6 +592,44 @@ class ZakatUiStateFactoryTest {
         assertFalse(gold.canRestoreReference)
         // Gold first, then silver, whatever the availability.
         assertEquals(listOf(ZakatMetal.GOLD, ZakatMetal.SILVER), ready.referencePrices.map { it.metal })
+    }
+
+    @Test
+    fun `a published rate in another currency is shown but never used in the calculation`() {
+        // A USD calculation holding 87.5 g of gold. The published rate is 19,550 BDT per gram; treating it as
+        // dollars would value the holding at 1,710,625 USD instead of about 14,000 USD.
+        val ready = state(
+            form = ZakatForm(currency = "USD").withValue(ZakatFormField.GOLD_WEIGHT, "87.5"),
+            referencePrices = publishedPrices(gold = "19550.00"),
+        )
+
+        // The rate itself is real and is described as what it is, in its own currency ...
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertEquals(ZakatReferencePriceStatus.AVAILABLE, gold.status)
+        assertEquals("19550", gold.pricePerGram)
+        assertEquals("BDT", gold.currencyCode)
+        assertFalse(gold.applicableToCalculation)
+        assertNotNull(gold.messageRes)
+
+        // ... but it is not a USD price, so the field stays empty and the weight is reported as still needing
+        // a price rather than being valued at an exchange rate Salah does not have.
+        assertEquals("", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        // The weight is reported as still needing a price, not valued at a taka rate taken as dollars.
+        assertEquals(1, ready.result.incompleteLabels.size)
+        assertNull(ready.result.due)
+    }
+
+    @Test
+    fun `a published rate is used when the calculation is in the rate's own currency`() {
+        val ready = state(
+            form = ZakatForm(currency = "BDT").withValue(ZakatFormField.GOLD_WEIGHT, "87.5"),
+            referencePrices = publishedPrices(gold = "19550.00"),
+        )
+
+        val gold = ready.referencePrices.single { it.metal == ZakatMetal.GOLD }
+        assertTrue(gold.applicableToCalculation)
+        assertEquals("19550.00", ready.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.value)
+        assertEquals("1710625.00", ready.result.totalAssets)
     }
 
     @Test

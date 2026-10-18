@@ -385,6 +385,7 @@
     <string name="zakat_price_table_unavailable">Reference prices are not published yet. Enter a price yourself.</string>
     <string name="zakat_price_access_denied">The published rates are not readable from this app. Enter a price yourself.</string>
     <string name="zakat_price_retrieval_failed">The reference prices could not be retrieved. Enter a price yourself.</string>
+    <string name="zakat_price_currency_mismatch">The published rate is stated in another currency, so enter your own price in the currency above.</string>
     <string name="zakat_price_refresh">Refresh reference prices</string>
     <string name="zakat_price_refreshing">Refreshing reference prices…</string>
     <string name="zakat_price_manual">You entered this price.</string>

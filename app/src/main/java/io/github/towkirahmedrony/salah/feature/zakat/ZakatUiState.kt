@@ -169,8 +169,24 @@ data class ZakatReferencePriceState(
      * statement about this device's own successful check. `null` for a rate fetched just now by this screen.
      */
     val lastRefreshLabel: String?,
-    /** The explanation to show for a state that is not a current, successful published rate. */
+    /**
+     * The explanation to show when the rate cannot simply be used as it stands.
+     *
+     * That covers every state that is not a current, successful published rate *and* the one current rate that
+     * is published in another currency. `null` means the rate is current and usable, so there is nothing to
+     * explain.
+     */
     @StringRes val messageRes: Int?,
+    /**
+     * True when this rate is stated in the currency the calculation is denominated in.
+     *
+     * A published rate is BDT per gram; the form may be in any supported currency. When the two differ the
+     * rate is still a real published rate and is still shown, with its own currency code, but it **must not**
+     * stand in for the price field: doing so would apply a taka figure as if it were dollars. False means the
+     * field is left empty and manual entry is offered instead.
+     */
+    val applicableToCalculation: Boolean,
+
     /** True when the user has typed their own price for this metal this session. */
     val manuallyEdited: Boolean,
     /** True when the offered control should be "use the published reference price". */

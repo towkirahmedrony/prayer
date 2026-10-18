@@ -506,6 +506,12 @@ and stays a pure function (`ZakatNetworkIsolationTest` asserts it mentions no ne
 once when the screen is created and then only when the user asks to refresh; nothing fetches on a keystroke or a
 recomposition.
 
+**Which currency it may fill.** A published rate is stated in BDT, while the calculator may be denominated in
+any of its supported currencies. A rate is offered into a price field only when the record's currency matches the
+form's; otherwise the rate is still described — with its own currency code and a note — but the field stays
+empty and manual entry applies. Salah holds no exchange rate of its own, and applying a taka figure to a dollar
+calculation would overstate the holding by roughly two orders of magnitude.
+
 **The offline cache.** The last validated K22/BDT rate for each metal is stored in
 `filesDir/metal_prices/cache.json`. The file is written to a sibling temporary file, flushed and synced, then
 renamed over the previous file, so the commit point is one rename: before it the old set is in force, after it
@@ -525,7 +531,9 @@ refreshing gold. An unreadable or conflicting row keeps that metal's stored rate
 stored and never replaces a known-good one. A stored rate that the current response did not serve — because the
 row is inactive, unverified or absent — is shown as a saved rate and never as current, even when it is recent.
 An identical set is not written again. A failed request writes nothing at all, so a successful-refresh
-timestamp can only move when a validated response was actually accepted.
+timestamp can only move when a validated response was actually accepted. A cache that cannot be written is not
+reported as a retrieval failure either: the validated rate stays usable for the session and the previous file is
+left untouched, because storage is an optimisation rather than a precondition.
 
 **Freshness.** Age is stated, and never used to hide a usable rate:
 

@@ -518,7 +518,7 @@ private fun MetalsEvidence(state: ZakatUiState.Ready) {
                             state.fieldOf(priceField).value + " " + stringResource(price.unitLabelRes, price.currencyCode),
                         ),
                     )
-                } else if (perGram != null) {
+                } else if (perGram != null && price.applicableToCalculation) {
                     val stamp: Pair<Int, String>? = when {
                         price.effectiveLabel != null -> R.string.zakat_price_effective to price.effectiveLabel
                         price.providerUpdatedLabel != null -> R.string.zakat_price_provider_update to price.providerUpdatedLabel

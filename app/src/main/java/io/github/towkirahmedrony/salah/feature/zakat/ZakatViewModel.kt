@@ -7,7 +7,6 @@ import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFailure
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
 import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResult
 import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
-import io.github.towkirahmedrony.salah.core.domain.metalprice.availablePriceText
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.ZakatDebtTreatment
 import io.github.towkirahmedrony.salah.core.model.ZakatInputs
@@ -441,10 +440,16 @@ data class ZakatForm(
     /**
      * This form with a published reference price standing in for a price field the user has left alone.
      *
-     * A price field is filled only when **all three** hold: the user has not typed into it this session (it is
-     * absent from [manualPriceFields]), it currently holds nothing, and a usable published rate exists for that
-     * metal. Anything else leaves the user's own text exactly as it is — a manually edited price is never
-     * silently replaced by a published one.
+     * A price field is filled only when **all four** hold: the user has not typed into it this session (it is
+     * absent from [manualPriceFields]), it currently holds nothing, a usable published rate exists for that
+     * metal, and that rate is stated in this form's own [currency]. Anything else leaves the user's own text
+     * exactly as it is — a manually edited price is never silently replaced by a published one.
+     *
+     * The currency condition is not a formality: the published records are BDT per gram, while the form may be
+     * denominated in any of [ZakatInputs.SUPPORTED_CURRENCIES]. Copying a BDT figure into a USD form would
+     * multiply the user's holding by roughly 120 and report a zakat obligation that does not exist. A rate in
+     * another currency is therefore shown for what it is and left out of the arithmetic; the price field stays
+     * empty and manual entry applies.
      *
      * The result is a *view* of the form for one rendering, not a write: nothing is stored, and the published
      * price disappears with the screen like every other value here. It lives here rather than in the state
@@ -460,8 +465,13 @@ data class ZakatForm(
         fun fill(field: ZakatFormField, result: ReferencePriceResult) {
             if (field in manualPriceFields) return
             if (!merged[field].isNullOrBlank()) return
-            val text = result.availablePriceText() ?: return
-            merged[field] = text
+            val available = result as? ReferencePriceResult.Available ?: return
+            // A published rate is stated in one currency and the form in another. The two are not
+            // interchangeable without an exchange rate, and Salah has none: the only foreign-currency
+            // conversion the calculator performs uses a rate the user typed themselves. So a rate in a
+            // different currency is not offered as this form's price — see this function's documentation.
+            if (!available.price.currency.equals(currency, ignoreCase = true)) return
+            merged[field] = available.price.pricePerGram.toPlainString()
         }
 
         fill(ZakatFormField.GOLD_PRICE, referencePrices.gold)

@@ -40,7 +40,7 @@ class SupabaseMetalPriceRepositoryCacheTest {
 
     private fun repository(
         source: FakeMetalPriceSource,
-        cache: FakeMetalPriceCache = FakeMetalPriceCache(),
+        cache: MetalPriceCache = FakeMetalPriceCache(),
         clock: Clock = clockAt(now),
     ): SupabaseMetalPriceRepository = SupabaseMetalPriceRepository(
         source = source,
@@ -254,6 +254,22 @@ class SupabaseMetalPriceRepositoryCacheTest {
     }
 
     @Test
+    fun `a cache that cannot be written does not turn a validated read into a failure`() = runTest {
+        val source = FakeMetalPriceSource(
+            RemoteFetch.Success(body(record("GOLD", "19550.07"), record("SILVER", "360.25"))),
+        )
+
+        val prices = repository(source, UnwritableMetalPriceCache()).publishedReferencePrices()
+
+        // The service answered and the records were valid, so the read succeeded. A full disk is a storage
+        // problem, not a price problem, and must not be reported as one.
+        assertNull(prices.refreshFailure)
+        val gold = prices.gold as ReferencePriceResult.Available
+        assertEquals("19550.07", gold.price.pricePerGram.toPlainString())
+        assertEquals(MetalPriceFreshness.CURRENT, gold.freshness)
+    }
+
+    @Test
     fun `an inactive record is never selected as a current price`() = runTest {
         val cache = FakeMetalPriceCache()
         val source = FakeMetalPriceSource(
@@ -361,6 +377,16 @@ private class FakeMetalPriceSource(private val response: RemoteFetch<String>) : 
     override suspend fun fetchPublishedRows(): RemoteFetch<String> {
         calls += 1
         return response
+    }
+}
+
+/** A cache whose writes always fail, standing in for a full disk or an unwritable directory. */
+private class UnwritableMetalPriceCache : MetalPriceCache {
+
+    override suspend fun read(): MetalPriceSnapshot? = null
+
+    override suspend fun write(snapshot: MetalPriceSnapshot) {
+        throw java.io.IOException("The cache directory is not writable.")
     }
 }
 

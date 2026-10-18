@@ -21,6 +21,7 @@ import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePriceResu
 import io.github.towkirahmedrony.salah.core.domain.metalprice.ReferencePrices
 import io.github.towkirahmedrony.salah.core.domain.metalprice.RemoteMetalPriceSource
 import io.github.towkirahmedrony.salah.core.domain.metalprice.asReferencePrices
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 
 /**
@@ -62,6 +63,10 @@ import java.time.Clock
  * An unchanged set is not written again. The response is still reported as a current, successful check for
  * this session ([MetalPriceFreshness.CURRENT]), but the file keeps the acquisition time of the content it
  * already holds, so an identical rate does not cause repeated disk writes.
+ *
+ * A storage failure is not a price failure. The validated set is written best-effort, so a full disk or an
+ * unwritable cache directory leaves the fetched rate usable for this session and the previous file untouched,
+ * rather than surfacing as "the prices could not be retrieved".
  *
  * ## What it never does
  *
@@ -157,7 +162,20 @@ class SupabaseMetalPriceRepository(
         // known-good snapshot stays exactly as it was, so the next launch cannot inherit a half-updated set.
         val snapshot = MetalPriceSnapshot(gold = gold.rate, silver = silver.rate)
         if (failure == null && !snapshot.isEmpty && !snapshot.hasSameRatesAs(cached)) {
-            cache.write(snapshot)
+            // Storage is an optimisation, not a precondition: a full disk or an unwritable directory must not
+            // turn a price the service just published and this app just validated into "the prices could not
+            // be retrieved". [MetalPriceCache] promises that a write never throws, and the promise is enforced
+            // here rather than assumed, because the caller of this method treats any exception as a failed
+            // read. The snapshot is simply not stored; the rate remains usable for this session and the
+            // previously stored set, if any, stays on disk untouched.
+            try {
+                cache.write(snapshot)
+            } catch (cancellation: CancellationException) {
+                // Cancellation is not a storage failure: the caller is shutting the read down and must see it.
+                throw cancellation
+            } catch (_: Exception) {
+                // Deliberately ignored: see above. The rate stays usable for this session.
+            }
         }
 
         return ReferencePrices(

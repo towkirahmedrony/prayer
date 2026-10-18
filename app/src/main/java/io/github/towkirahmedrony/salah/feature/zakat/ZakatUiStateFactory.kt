@@ -149,7 +149,12 @@ class ZakatUiStateFactory(
             hawlDateText = form.hawlSeedDateText,
             hawlDateInvalid = isHawlDateInvalid(ZakatDigits.toWestern(form.hawlSeedDateText), parsed.hawlDate),
             result = resultView(result, locale),
-            referencePrices = referencePricesView(referencePrices, manualPriceFields, locale),
+            referencePrices = referencePricesView(
+                referencePrices = referencePrices,
+                manualPriceFields = manualPriceFields,
+                locale = locale,
+                calculationCurrency = form.currency,
+            ),
             refreshingReferencePrices = refreshingReferencePrices,
             canClear = form.hasAnythingEntered(),
             assetCategories = buildAssetCategories(result, parsed.invalid) { amount -> money(amount, locale) },
@@ -424,11 +429,15 @@ class ZakatUiStateFactory(
      * Each metal is rendered from its own result, so one metal having no published rate or a conflicting one
      * changes nothing about the other. Nothing here invents a source, a timestamp or a price: a label is only
      * produced from a field the record actually carries.
+     *
+     * [calculationCurrency] decides whether a rate may stand in for the price field. A published rate in
+     * another currency is described, not applied — see [ZakatReferencePriceState.applicableToCalculation].
      */
     private fun referencePricesView(
         referencePrices: ReferencePrices,
         manualPriceFields: Set<ZakatFormField>,
         locale: Locale,
+        calculationCurrency: String,
     ): List<ZakatReferencePriceState> = listOf(
         referencePriceState(
             metal = ZakatMetal.GOLD,
@@ -437,6 +446,7 @@ class ZakatUiStateFactory(
             manualPriceFields = manualPriceFields,
             refreshFailure = referencePrices.refreshFailure,
             locale = locale,
+            calculationCurrency = calculationCurrency,
         ),
         referencePriceState(
             metal = ZakatMetal.SILVER,
@@ -445,6 +455,7 @@ class ZakatUiStateFactory(
             manualPriceFields = manualPriceFields,
             refreshFailure = referencePrices.refreshFailure,
             locale = locale,
+            calculationCurrency = calculationCurrency,
         ),
     )
 
@@ -455,8 +466,14 @@ class ZakatUiStateFactory(
         manualPriceFields: Set<ZakatFormField>,
         refreshFailure: MetalPriceFailure?,
         locale: Locale,
+        calculationCurrency: String,
     ): ZakatReferencePriceState {
         val available = result as? ReferencePriceResult.Available
+        // A rate is usable here only when it is stated in the currency the form is denominated in. The
+        // published records are BDT per gram; a USD or SAR calculation cannot take one without an exchange
+        // rate, and Salah has none to apply.
+        val applicable = available != null &&
+            available.price.currency.equals(calculationCurrency, ignoreCase = true)
         // A failure is reported against the rate it actually affects. A current gold rate must not be captioned
         // "the last check failed" because silver's row was unusable: the silver card says that already.
         val failureForThisMetal = refreshFailure.takeIf {
@@ -507,9 +524,12 @@ class ZakatUiStateFactory(
                 ?.takeIf { price -> price.freshness != MetalPriceFreshness.CURRENT || failureForThisMetal != null }
                 ?.cachedAtEpochMillis
                 ?.let { epoch -> epochDateLabel(epoch, locale) },
-            messageRes = messageFor(result, failureForThisMetal),
+            messageRes = messageFor(result, failureForThisMetal, applicable = applicable),
+            applicableToCalculation = applicable,
             manuallyEdited = manuallyEdited,
-            canRestoreReference = manuallyEdited && available != null,
+            // No "use the published price" control when the published rate is in another currency: it would
+            // offer to restore a figure the calculation cannot use, and leave the field empty after the tap.
+            canRestoreReference = manuallyEdited && applicable,
         )
     }
 
@@ -520,9 +540,16 @@ class ZakatUiStateFactory(
      * [MetalPriceFreshness.STALE] says it is old enough to check, and a failed refresh beside a usable saved
      * rate says which of the two is being shown and why.
      */
-    private fun messageFor(result: ReferencePriceResult, refreshFailure: MetalPriceFailure?): Int? = when (result) {
+    private fun messageFor(
+        result: ReferencePriceResult,
+        refreshFailure: MetalPriceFailure?,
+        applicable: Boolean,
+    ): Int? = when (result) {
         ReferencePriceResult.Loading -> null
         is ReferencePriceResult.Available -> when {
+            // Said before anything about freshness: the rate may be perfectly current and still unusable in
+            // this calculation, and the user's next step is to enter their own price, not to refresh.
+            !applicable -> R.string.zakat_price_currency_mismatch
             refreshFailure != null -> R.string.zakat_price_refresh_failed_saved
             result.freshness == MetalPriceFreshness.STALE -> R.string.zakat_price_stale_note
             result.freshness == MetalPriceFreshness.CACHED -> R.string.zakat_price_cached_note

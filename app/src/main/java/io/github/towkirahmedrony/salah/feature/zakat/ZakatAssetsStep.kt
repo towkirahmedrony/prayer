@@ -494,7 +494,17 @@ private fun InlineAmount(field: ZakatFieldState, viewModel: ZakatViewModel, modi
 @Composable
 private fun MetalsDetail(state: ZakatUiState.Ready, viewModel: ZakatViewModel) {
     var adjusting by rememberSaveable { mutableStateOf(false) }
+    // A rate stated in another currency is published but not usable *here*, so the price fields are offered
+    // exactly as they are when no rate exists at all. Without this the form would show a BDT rate above two
+    // hidden, empty price fields and no way to fill them.
     val noUsableRate = state.referencePrices.any { price ->
+        price.status == ZakatReferencePriceStatus.UNAVAILABLE ||
+            price.status == ZakatReferencePriceStatus.FAILED ||
+            !price.applicableToCalculation
+    }
+    // The generic "no automatic price" sentence is only true when no rate was published at all. A rate that
+    // exists in another currency has its own, more accurate explanation on its own card.
+    val noPublishedRate = state.referencePrices.any { price ->
         price.status == ZakatReferencePriceStatus.UNAVAILABLE || price.status == ZakatReferencePriceStatus.FAILED
     }
     val typedOwnPrice = state.referencePrices.any { price -> price.manuallyEdited }
@@ -514,7 +524,7 @@ private fun MetalsDetail(state: ZakatUiState.Ready, viewModel: ZakatViewModel) {
     }
 
     if (showPriceFields) {
-        if (noUsableRate) {
+        if (noPublishedRate) {
             Text(
                 text = stringResource(R.string.zakat_prices_manual_needed),
                 style = MaterialTheme.typography.bodySmall,

@@ -586,6 +586,7 @@
     <string name="zakat_price_table_unavailable">রেফারেন্স দাম এখনো প্রকাশিত হয়নি। নিজেই একটি দাম লিখুন।</string>
     <string name="zakat_price_access_denied">এই অ্যাপ থেকে প্রকাশিত দর পড়া যাচ্ছে না। নিজেই একটি দাম লিখুন।</string>
     <string name="zakat_price_retrieval_failed">রেফারেন্স দাম আনা যায়নি। নিজেই একটি দাম লিখুন।</string>
+    <string name="zakat_price_currency_mismatch">প্রকাশিত দরটি অন্য মুদ্রায় দেওয়া আছে, তাই উপরে নির্বাচিত মুদ্রায় নিজেই একটি দাম লিখুন।</string>
     <string name="zakat_price_refresh">রেফারেন্স দাম আবার আনুন</string>
     <string name="zakat_price_refreshing">রেফারেন্স দাম আনা হচ্ছে…</string>
     <string name="zakat_price_manual">এই দামটি আপনি নিজে লিখেছেন।</string>
