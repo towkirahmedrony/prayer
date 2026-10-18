@@ -576,7 +576,7 @@
     <string name="zakat_price_status_cached">সংরক্ষিত দর</string>
     <string name="zakat_price_status_stale">সংরক্ষিত দর · যাচাই করুন</string>
     <string name="zakat_price_saved_at">সংরক্ষিত %1$s</string>
-    <string name="zakat_price_cached_note">সর্বশেষ সংরক্ষিত প্রকাশিত দর দেখানো হচ্ছে। ইন্টারনেট ছাড়াই এটি পাওয়া যায়।</string>
+    <string name="zakat_price_cached_note">সর্বশেষ সংরক্ষিত প্রকাশিত দর দেখানো হচ্ছে। ইন্টারনেট ছাড়াই এটি পাওয়া যায় এবং এটিকে আজকের দর হিসেবে দেখানো হয় না।</string>
     <string name="zakat_price_stale_note">এই সংরক্ষিত দর এক সপ্তাহের বেশি পুরোনো। ভরসা করার আগে যাচাই করুন, অথবা নিজের দাম লিখুন।</string>
     <string name="zakat_price_refresh_failed_saved">সর্বশেষ যাচাই ব্যর্থ হয়েছে, তাই সংরক্ষিত দর দেখানো হচ্ছে। চাইলে নিজের দাম লিখুন।</string>
     <string name="zakat_price_unavailable">প্রকাশিত কোনো রেফারেন্স দাম নেই। নিজেই একটি দাম লিখুন।</string>

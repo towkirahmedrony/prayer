@@ -48,10 +48,10 @@ import java.time.Clock
  * Each metal is validated and adopted independently. The merged snapshot is written in one atomic commit only
  * when the whole response passed — a valid metal may be shown fresh for the session, but an unusable or
  * ambiguous row leaves the stored set untouched. A metal the response does not publish keeps the rate already
- * stored rather than being deleted: an
- * omitted rate is not evidence that the publisher withdrew it, and doing otherwise would let a partial
- * response erase silver while refreshing gold. A stored rate keeps its own acquisition time, so preserving
- * one metal never makes it look as fresh as the other.
+ * stored rather than being deleted: an omitted rate is not evidence that the publisher withdrew it, and doing
+ * otherwise would let a partial response erase silver while refreshing gold. A retained rate is **never
+ * labelled current**, even when it is recent — the current publication did not serve it — and it keeps its own
+ * acquisition time, so preserving one metal never makes it look as fresh as the other.
  *
  * On a read failure — no configuration, timeout, connection failure, HTTP error or malformed JSON — the
  * stored set is returned with [ReferencePrices.refreshFailure] describing why it is being shown. An unusable
@@ -189,39 +189,48 @@ class SupabaseMetalPriceRepository(
         // the ambiguity is reported; with nothing stored, the conflict itself is the result.
         is ReferencePriceResult.Conflicting -> MetalOutcome(
             rate = existing,
-            result = existing?.asAvailable(now) ?: selection,
+            result = existing?.asRetained(now) ?: selection,
             failure = MetalPriceFailure.CONFLICTING,
         )
 
         // Unreadable: the same rule, with the row's own failure reported.
         is ReferencePriceResult.Failed -> MetalOutcome(
             rate = existing,
-            result = existing?.asAvailable(now) ?: selection,
+            result = existing?.asRetained(now) ?: selection,
             failure = selection.failure,
         )
 
-        // Nothing published for this metal: keep what is stored, and do not pretend the old rate was just
-        // refreshed — its stored acquisition time is what the screen classifies it by.
+        // Nothing published for this metal: keep what is stored, but never present it as current. An inactive,
+        // unverified or omitted row is not a fresh price, so the retained rate is at best a saved one.
         ReferencePriceResult.NotPublished -> MetalOutcome(
             rate = existing,
-            result = existing?.asAvailable(now) ?: ReferencePriceResult.NotPublished,
+            result = existing?.asRetained(now) ?: ReferencePriceResult.NotPublished,
             failure = null,
         )
 
         // `select` never returns a loading result; the branch keeps the `when` total if that changes.
         ReferencePriceResult.Loading -> MetalOutcome(
             rate = existing,
-            result = existing?.asAvailable(now) ?: ReferencePriceResult.NotPublished,
+            result = existing?.asRetained(now) ?: ReferencePriceResult.NotPublished,
             failure = null,
         )
     }
 
-    private fun CachedMetalRate.asAvailable(now: Long): ReferencePriceResult =
-        ReferencePriceResult.Available(
+    /**
+     * A stored rate that this response did not republish or could not verify.
+     *
+     * It is usable, but it is **never labelled current**, even when it is only hours old: the current
+     * publication did not serve it, so calling it current would say something the response contradicts. The
+     * oldest it is called is [MetalPriceFreshness.CACHED].
+     */
+    private fun CachedMetalRate.asRetained(now: Long): ReferencePriceResult {
+        val age = freshnessPolicy.classify(fetchedAtEpochMillis, now)
+        return ReferencePriceResult.Available(
             price = price,
-            freshness = freshnessPolicy.classify(fetchedAtEpochMillis, now),
+            freshness = if (age == MetalPriceFreshness.CURRENT) MetalPriceFreshness.CACHED else age,
             cachedAtEpochMillis = fetchedAtEpochMillis,
         )
+    }
 
     /** The stored set when there is one, with [failure] recorded as the reason it is being shown. */
     private fun fallback(cached: MetalPriceSnapshot?, failure: MetalPriceFailure): ReferencePrices {

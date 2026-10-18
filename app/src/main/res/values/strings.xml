@@ -375,7 +375,7 @@
     <string name="zakat_price_status_cached">Saved price</string>
     <string name="zakat_price_status_stale">Saved price · check it</string>
     <string name="zakat_price_saved_at">Saved %1$s</string>
-    <string name="zakat_price_cached_note">Showing the last saved published price. It stays available without a connection.</string>
+    <string name="zakat_price_cached_note">Showing the last saved published price. It stays available without a connection and is never shown as today's rate.</string>
     <string name="zakat_price_stale_note">This saved price is more than a week old. Check it before relying on it, or enter your own.</string>
     <string name="zakat_price_refresh_failed_saved">The latest check failed, so the saved price is shown. Enter your own if you prefer.</string>
     <string name="zakat_price_unavailable">No published reference price. Enter one yourself.</string>

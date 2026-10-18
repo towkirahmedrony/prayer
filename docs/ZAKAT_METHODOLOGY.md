@@ -522,8 +522,10 @@ A response is validated before anything is adopted. Each metal is then handled i
 replaces the stored one, while a metal the response omits keeps the stored rate rather than being deleted — an
 omission is not evidence of withdrawal, and it is what prevents a partial response from erasing silver while
 refreshing gold. An unreadable or conflicting row keeps that metal's stored rate and is reported; it is never
-stored and never replaces a known-good one. An identical set is not written again. A failed request writes
-nothing at all, so a successful-refresh timestamp can only move when a validated response was actually accepted.
+stored and never replaces a known-good one. A stored rate that the current response did not serve — because the
+row is inactive, unverified or absent — is shown as a saved rate and never as current, even when it is recent.
+An identical set is not written again. A failed request writes nothing at all, so a successful-refresh
+timestamp can only move when a validated response was actually accepted.
 
 **Freshness.** Age is stated, and never used to hide a usable rate:
 

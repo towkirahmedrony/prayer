@@ -267,6 +267,25 @@ class SupabaseMetalPriceRepositoryCacheTest {
     }
 
     @Test
+    fun `a stored rate the current publication no longer serves is never labelled current`() = runTest {
+        // The cached gold rate is only twelve hours old, which would normally be current. But the service now
+        // returns that row as inactive, so it must be presented as a saved rate rather than as today's price.
+        val cache = FakeMetalPriceCache(cachedSnapshot(goldFetchedAt = now - ONE_DAY / 2))
+        val source = FakeMetalPriceSource(
+            RemoteFetch.Success(
+                body(record("GOLD", "19550", active = false), record("SILVER", "360")),
+            ),
+        )
+
+        val prices = repository(source, cache).publishedReferencePrices()
+
+        val gold = prices.gold as ReferencePriceResult.Available
+        assertEquals("18000", gold.price.pricePerGram.toPlainString())
+        assertEquals(MetalPriceFreshness.CACHED, gold.freshness)
+        assertEquals(now - ONE_DAY / 2, gold.cachedAtEpochMillis)
+    }
+
+    @Test
     fun `an unsupported gold purity is ignored rather than guessed at`() = runTest {
         val cache = FakeMetalPriceCache()
         val source = FakeMetalPriceSource(RemoteFetch.Success(body(record("GOLD", "20000", purity = "K21"))))
