@@ -465,8 +465,9 @@ private fun AddDebtButton(enabled: Boolean, onClick: () -> Unit, modifier: Modif
 }
 
 private fun Modifier.border1dp(color: Color): Modifier =
-    this.then(Modifier.background(color.copy(alpha = 0.06f), RoundedCornerShape(18.dp)))
-        .then(border(1.5.dp, color, RoundedCornerShape(18.dp)))
+    this
+        .background(color.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
+        .border(1.5.dp, color, RoundedCornerShape(18.dp))
 
 // ---------------------------------------------------------------------------------------------------------
 // Split bar and summary
