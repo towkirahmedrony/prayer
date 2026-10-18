@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.feature.zakat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -465,7 +466,7 @@ private fun AddDebtButton(enabled: Boolean, onClick: () -> Unit, modifier: Modif
 
 private fun Modifier.border1dp(color: Color): Modifier =
     this.then(Modifier.background(color.copy(alpha = 0.06f), RoundedCornerShape(18.dp)))
-        .then(androidx.compose.foundation.border(1.5.dp, color, RoundedCornerShape(18.dp)))
+        .then(border(1.5.dp, color, RoundedCornerShape(18.dp)))
 
 // ---------------------------------------------------------------------------------------------------------
 // Split bar and summary
