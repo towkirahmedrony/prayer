@@ -822,8 +822,12 @@ private fun ActionsRow(state: ZakatUiState.Ready, onStartOver: () -> Unit, modif
 private fun summaryText(state: ZakatUiState.Ready): String {
     val result = state.result
     val dash = "\u2014"
-    fun line(label: String, value: String?) = "$label: ${value ?: dash}" +
-        if (value != null) " ${result.currency}" else ""
+    // The label is a string resource; only the separators are written here, because a copied summary
+    // needs no translated punctuation and the value is a figure the engine produced. Keeping the
+    // separators as bare punctuation is also what stops this helper from reading as hardcoded copy —
+    // the same shape the option lines below already use.
+    fun line(label: String, value: String?): String =
+        if (value == null) label + ": " + dash else label + ": " + value + " " + result.currency
 
     return buildString {
         appendLine(stringResource(R.string.zakat_result_summary_title))
