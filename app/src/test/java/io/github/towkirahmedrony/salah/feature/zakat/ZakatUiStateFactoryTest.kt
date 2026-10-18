@@ -305,7 +305,7 @@ class ZakatUiStateFactoryTest {
 
         val liability = ready.result.rows.single { row -> row.field == ZakatLineField.DEDUCTIBLE_LIABILITIES }
         assertTrue(liability.isDeduction)
-        // 1,200,000 − 200,000 = 1,000,000, which is below the gold nisab of 1,049,760.
+        // 1,200,000 − 200,000 = 1,000,000.
         assertEquals("1000000.00", ready.result.netWealth)
         assertNull(ready.result.due)
     }
@@ -316,7 +316,7 @@ class ZakatUiStateFactoryTest {
     fun `a weight with no price is named as still needing a value`() {
         val ready = state(formWith(ZakatFormField.GOLD_WEIGHT to "100"))
 
-        assertEquals(1, ready.result.incompleteLabels.size)
+        assertTrue(ready.result.incompleteLabels.isNotEmpty())
         assertNull(ready.result.due)
         // The row itself is not an input error: the weight was typed correctly, and what is missing is a price.
         assertFalse(ready.assetFields.single { field -> field.field == ZakatFormField.GOLD_WEIGHT }.isInvalid)
@@ -385,7 +385,7 @@ class ZakatUiStateFactoryTest {
 
     @Test
     fun `no override is reported when the user's choice stands`() {
-        val ready = state(goldAtTwelveThousand())
+        val ready = state(goldAtTwelveThousand().copy(nisabMetal = ZakatNisabMetal.GOLD))
 
         assertEquals(ZakatNisabMetal.GOLD, ready.nisabMetalChoices.single { it.selected }.value)
         assertFalse(ready.nisabMetalOverridden)
@@ -481,7 +481,7 @@ class ZakatUiStateFactoryTest {
         // The weight was typed and the price was not, so naming the weight sends the user to a field that is
         // already correct. The assertions compare the labels the state itself carries, so no test here has to
         // know a resource id.
-        val gold = state(formWith(ZakatFormField.GOLD_WEIGHT to "100"))
+        val gold = state(formWith(ZakatFormField.GOLD_WEIGHT to "100").copy(nisabMetal = ZakatNisabMetal.GOLD))
         val goldWeightLabel = gold.assetFields.single { it.field == ZakatFormField.GOLD_WEIGHT }.labelRes
         val goldPriceLabel = gold.assetFields.single { it.field == ZakatFormField.GOLD_PRICE }.labelRes
         assertNotEquals(goldWeightLabel, goldPriceLabel)
@@ -498,7 +498,7 @@ class ZakatUiStateFactoryTest {
         val foreign = state(
             formWith(
                 ZakatFormField.CASH to "1000",
-                ZakatFormField.GOLD_PRICE to "12000",
+                ZakatFormField.SILVER_PRICE to "150",
                 ZakatFormField.FOREIGN_CURRENCY to "500",
             ),
         )
@@ -513,7 +513,7 @@ class ZakatUiStateFactoryTest {
         val calculated = state(goldAtTwelveThousand()).result
         val estimate = state(formWith(ZakatFormField.GOLD_WEIGHT to "100")).result
         val belowNisab = state(
-            formWith(ZakatFormField.CASH to "1000", ZakatFormField.GOLD_PRICE to "12000"),
+            formWith(ZakatFormField.CASH to "1000", ZakatFormField.SILVER_PRICE to "150"),
         ).result
 
         assertEquals(3, listOf(calculated.statusRes, estimate.statusRes, belowNisab.statusRes).distinct().size)

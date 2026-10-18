@@ -424,7 +424,7 @@ data class ZakatForm(
     val unit: ZakatMetalUnit = ZakatMetalUnit.GRAM,
     val inventoryBasis: ZakatInventoryBasis = ZakatInventoryBasis.MARKET_VALUE,
     val nisabWeight: ZakatNisabWeight = ZakatNisabWeight.INTERNATIONAL,
-    val nisabMetal: ZakatNisabMetal = ZakatNisabMetal.GOLD,
+    val nisabMetal: ZakatNisabMetal = ZakatNisabMetal.SILVER,
     val jewelleryTreatment: ZakatJewelleryTreatment = ZakatJewelleryTreatment.ZAKATABLE,
     val debtTreatment: ZakatDebtTreatment = ZakatDebtTreatment.DEDUCT,
     val hawlSeedDateText: String = "",

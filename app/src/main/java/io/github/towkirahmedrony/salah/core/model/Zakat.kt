@@ -357,8 +357,8 @@ data class ZakatInputs(
     /** Which published nisab weight pair is used. */
     val nisabWeight: ZakatNisabWeight = ZakatNisabWeight.INTERNATIONAL,
 
-    /** Which metal's nisab the wealth is measured against, when the user holds both. */
-    val nisabMetal: ZakatNisabMetal = ZakatNisabMetal.GOLD,
+    /** Which metal's nisab the wealth is measured against, when the user holds cash or mixed assets. */
+    val nisabMetal: ZakatNisabMetal = ZakatNisabMetal.SILVER,
 
     /** How personal jewellery is treated. */
     val jewelleryTreatment: ZakatJewelleryTreatment = ZakatJewelleryTreatment.ZAKATABLE,
