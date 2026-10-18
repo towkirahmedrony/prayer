@@ -481,7 +481,7 @@ private fun LedgerCard(
                 label = stringResource(R.string.zakat_review_deducted_total),
                 value = state.result.deductions,
                 currency = currency,
-                prefix = if (state.result.deductions != null) "\u2212 " else "",
+                prefix = if (state.result.deductions != null) "− " else "",
             )
         }
     }
