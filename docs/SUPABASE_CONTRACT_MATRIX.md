@@ -163,6 +163,6 @@ Status of the whole remote path today: **CONTRACT IMPLEMENTED**, **MIGRATION PRE
 | Prayer config | `supabase/migrations/20260601000000_prayer_config_publications.sql` | `data/prayerconfig/remote/SupabaseRemotePrayerConfigSource.kt` | `core/domain/prayerconfig/PrayerConfiguration.kt` | `PrayerConfigurationParserTest`, `PrayerConfigSynchronizerTest`, `SupabaseContractParityTest` |
 | Gold and silver prices | `supabase/migrations/20261018000000_metal_prices.sql` | `data/metalprice/SupabaseRemoteMetalPriceSource.kt` | `core/domain/metalprice/MetalPriceParser.kt` | `MetalPriceParserTest`, `SupabaseMetalPriceRepositoryTest`, `SupabaseRemoteMetalPriceSourceTest`, `SupabaseContractParityTest` |
 
-Related: `docs/SUPABASE_SETUP.md` (how to apply a migration), `docs/DATABASE-SCHEMA.md` (the dataset schema
+Related: `docs/SUPABASE_SETUP.md` (how to apply a migration), `DATABASE-SCHEMA.md` (the dataset schema
 in full), `docs/PRAYER_CONFIGURATION.md` (the prayer-configuration contract in full),
 `docs/ZAKAT_METHODOLOGY.md` §8.5 (the price contract from the calculator's side).
