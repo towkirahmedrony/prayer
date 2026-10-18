@@ -93,6 +93,12 @@ class UrlConnectionHttpTransport : HttpTransport {
                 connectTimeout = timeoutMillis.toInt()
                 readTimeout = timeoutMillis.toInt()
                 instanceFollowRedirects = false
+                // Never answer from the response cache. `HttpURLConnection` caches GETs by default, and
+                // every request here is a "has the publication changed?" question whose whole purpose is to
+                // observe a change: a cached manifest or payload would let an updated release stay invisible
+                // for as long as the cache entry lived. The checksum and revision checks above still protect
+                // the data; this protects the *observation* they are made from.
+                useCaches = false
                 // Ask for an identity body so the byte count that arrives is the byte count that was
                 // sent, and the size ceiling applies to the real payload rather than a compressed one.
                 setRequestProperty("Accept-Encoding", "identity")
@@ -113,8 +119,10 @@ class UrlConnectionHttpTransport : HttpTransport {
         } catch (timeout: SocketTimeoutException) {
             HttpTransportResult.Failure(NetworkFailureKind.TIMEOUT)
         } catch (io: IOException) {
-            // UnknownHostException, ConnectException, SSLException and a plain connection reset are all
-            // IOException subclasses; they are one outcome here for the reason given on NetworkFailureKind.
+            // UnknownHostException, ConnectException, SSLException, a plain connection reset and a
+            // MalformedURLException (a configured endpoint that could not even be parsed — the configuration
+            // gate should already have refused it) are all IOException subclasses; they are one outcome here
+            // for the reason given on NetworkFailureKind.
             HttpTransportResult.Failure(NetworkFailureKind.CONNECTION)
         } catch (error: Exception) {
             HttpTransportResult.Failure(NetworkFailureKind.UNKNOWN)

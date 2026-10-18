@@ -82,9 +82,15 @@ interface RemoteDatasetSource {
  * key or database password in the app would bypass every policy this design relies on. See
  * `docs/DATABASE-SCHEMA.md`.
  *
- * `isConfigured` is the guard the whole feature hangs off: an empty configuration is a normal state
- * (the repository ships none), and every code path treats it as "do nothing, keep working offline"
- * rather than as an error. The app must open and function with no remote configuration at all.
+ * `isConfigured` is the guard the whole feature hangs off: an empty configuration is a normal state (a build
+ * that supplies none, or a test constructing this type with its own defaults), and every code path treats it
+ * as "do nothing, keep working offline" rather than as an error. The app must open and function with no
+ * remote configuration at all, so the class defaults stay blank even though the shipped build supplies the
+ * project's own public endpoint and publishable key through `BuildConfig`.
+ *
+ * The URL and key are judged by [SupabaseConfiguration], the one definition of "configured" shared with the
+ * prayer-configuration and published-price slots, so a blank or malformed value makes *every* remote read
+ * decline to attempt a request rather than letting one of them build a URL that cannot resolve.
  */
 data class DatasetRemoteConfig(
     val baseUrl: String = "",
@@ -98,7 +104,10 @@ data class DatasetRemoteConfig(
 
     /** True when enough is configured to attempt a fetch. */
     val isConfigured: Boolean
-        get() = baseUrl.isNotBlank() && anonKey.isNotBlank() && bucket.isNotBlank() && datasetId.isNotBlank()
+        get() = SupabaseConfiguration.isValidBaseUrl(baseUrl) &&
+            SupabaseConfiguration.isValidClientKey(anonKey) &&
+            bucket.isNotBlank() &&
+            datasetId.isNotBlank()
 
     companion object {
         /** The dataset slot this phase synchronises. */

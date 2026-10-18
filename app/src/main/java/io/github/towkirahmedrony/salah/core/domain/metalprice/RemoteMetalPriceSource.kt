@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.metalprice
 
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.SupabaseConfiguration
 
 /**
  * The published reference-price source, as a port.
@@ -33,7 +34,9 @@ interface RemoteMetalPriceSource {
  *
  * `isConfigured` is the guard the feature hangs off: an unconfigured build is a normal state, treated as
  * "no published price, keep manual entry" rather than as an error. The app opens and calculates with no
- * remote configuration at all.
+ * remote configuration at all. The URL and key are judged by [SupabaseConfiguration] — the same rule the
+ * dataset and prayer-configuration slots use — so a malformed endpoint can never reach a request here while
+ * being refused everywhere else.
  */
 data class MetalPriceRemoteConfig(
     val baseUrl: String = "",
@@ -48,7 +51,9 @@ data class MetalPriceRemoteConfig(
 
     /** True when enough is configured to attempt a read. */
     val isConfigured: Boolean
-        get() = baseUrl.isNotBlank() && anonKey.isNotBlank() && table.isNotBlank()
+        get() = SupabaseConfiguration.isValidBaseUrl(baseUrl) &&
+            SupabaseConfiguration.isValidClientKey(anonKey) &&
+            table.isNotBlank()
 
     companion object {
         /** The published-price table named by the integration contract. */

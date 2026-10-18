@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.prayerconfig.remote
 
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.RemoteFetch
+import io.github.towkirahmedrony.salah.core.domain.dataset.remote.SupabaseConfiguration
 
 /**
  * The remote prayer-configuration publication source, as a port.
@@ -43,7 +44,9 @@ interface RemotePrayerConfigSource {
  * the publication slot (a future country or convention reuses the same schema under a different slot).
  *
  * [isConfigured] is the guard the whole feature hangs off: an empty configuration is a normal state, and
- * every code path treats it as "do nothing, keep working offline".
+ * every code path treats it as "do nothing, keep working offline". The URL and key are judged by
+ * [SupabaseConfiguration] — the same rule the dataset and published-price slots use — so the three slots
+ * cannot disagree about whether the app is configured.
  */
 data class PrayerConfigRemoteConfig(
     val baseUrl: String = "",
@@ -54,7 +57,9 @@ data class PrayerConfigRemoteConfig(
 
     /** True when enough is configured to attempt a fetch. */
     val isConfigured: Boolean
-        get() = baseUrl.isNotBlank() && anonKey.isNotBlank() && configurationId.isNotBlank()
+        get() = SupabaseConfiguration.isValidBaseUrl(baseUrl) &&
+            SupabaseConfiguration.isValidClientKey(anonKey) &&
+            configurationId.isNotBlank()
 
     companion object {
         /** The single slot this phase publishes. */

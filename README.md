@@ -278,9 +278,10 @@ and no signing credentials.
   scales and a real device time-zone change are not.
 - Prohibited-time boundaries are this application's **configured policy**, disclosed as such on the
   screen that shows them; no source for the minute values has been verified in this repository.
-- **The remote publication path is not live-verified.** The Supabase migrations are authored and
-  reviewable in the repository, but no project is configured for it, so neither migration has been
-  applied and no publication has been served or downloaded. See `docs/SUPABASE_SETUP.md`.
+- **The remote publication path is not live-verified.** The build now supplies a Supabase project URL and
+  publishable key, so the app does attempt its remote checks, but the migrations are only authored and
+  reviewable in the repository: neither has been applied, no publication has been served or downloaded, and
+  the expected database objects were not found. See `docs/SUPABASE_SETUP.md`.
 - **A published revision carries no authenticity claim.** Its checksum detects accidental corruption,
   not a malicious publisher: there is no signature and no key management.
 - **Prayer-configuration resolution is by administrative area only.** It uses the stable area ids of

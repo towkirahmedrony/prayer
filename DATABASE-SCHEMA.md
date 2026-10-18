@@ -6,10 +6,12 @@ mirror of `supabase/migrations/20260515000000_dataset_publications.sql` and of t
 `app/src/main/java/io/github/towkirahmedrony/salah/core/domain/dataset/remote/DatasetPublication.kt`.
 
 > **Status.** The migration is authored and reviewable in this repository. It has **not** been applied to
-> any Supabase project: no project is configured for this repository and no credentials exist in it, so
-> no live database change has been made and no remote publication has been served. See
-> `docs/SUPABASE_SETUP.md` for the exact steps to apply it. Nothing in this document claims a deployed
-> database.
+> any Supabase project, so no live database change has been made and no remote publication has been served.
+> The Android build does now carry the Salah project's public endpoint and publishable key by default
+> (`docs/SUPABASE_SETUP.md` §1), which means the app *attempts* the read described below — a read of an
+> object that does not exist yet returns an HTTP error, and the bundled dataset keeps working. Configuring
+> the client is not the same as deploying the schema. See `docs/SUPABASE_SETUP.md` for the exact steps to
+> apply it. Nothing in this document claims a deployed database.
 >
 > **Phase 3 adds a second published slot.** The remote prayer-time calculation configuration has its own
 > migration, `supabase/migrations/20260601000000_prayer_config_publications.sql`, its own tables and view,
@@ -145,8 +147,9 @@ references.
 is designed to be embedded in a client and is constrained by the policies above; it is *not* a substitute
 for them. A `service_role` key, secret key or database password must **never** appear in Android source,
 assets, resources, `BuildConfig`, or the APK — it would bypass every policy in this document. The app's
-build only ever reads two non-secret Gradle properties (`salah.supabase.url`, `salah.supabase.anonKey`);
-see `docs/SUPABASE_SETUP.md`.
+build resolves one endpoint and one publishable key (Gradle property → environment variable → committed
+default) into the two `BuildConfig` fields `SALAH_SUPABASE_URL` and `SALAH_SUPABASE_ANON_KEY`, which the three
+remote reads share; see `docs/SUPABASE_SETUP.md` §1.
 
 ## 6. How a release is published
 

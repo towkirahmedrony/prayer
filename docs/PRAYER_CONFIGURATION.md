@@ -10,10 +10,12 @@ It is the human-readable mirror of the Android contract in
 `supabase/migrations/20260601000000_prayer_config_publications.sql`.
 
 > **Status.** The migration is authored and reviewable in this repository. It has **not** been applied to
-> any Supabase project: no project is configured for this repository and no credentials exist in it, so no
-> live database change has been made and no remote configuration has been served. The Android code path is
-> implemented and unit-tested against fakes but has **not** been exercised against a live project. See
-> `docs/SUPABASE_SETUP.md` for the steps to close that gap. Nothing here claims a deployed database.
+> any Supabase project, so no live database change has been made and no remote configuration has been
+> served. The Android code path is implemented and unit-tested against fakes but has **not** been exercised
+> against a live project. The build does now carry the project URL and publishable key by default
+> (`docs/SUPABASE_SETUP.md` §1), so the check is *attempted* — against an object that does not exist yet it
+> fails and the bundled defaults keep working. See `docs/SUPABASE_SETUP.md` for the steps to close that gap.
+> Nothing here claims a deployed database.
 
 ## 1. What it is, and what it is not
 
@@ -218,7 +220,8 @@ for the other.
 The app needs the same two non-secret values the dataset source uses, supplied at build time (see
 `docs/SUPABASE_SETUP.md` §1): the Supabase project URL and the publishable key. With neither set,
 `PrayerConfigRemoteConfig.isConfigured` is false and the synchronizer reports "not configured" without
-touching the network.
+touching the network; with them set but the schema in §9 not deployed, the check is attempted and fails,
+which is a different diagnostic from "not configured".
 
 To publish a revision (service role or SQL editor):
 

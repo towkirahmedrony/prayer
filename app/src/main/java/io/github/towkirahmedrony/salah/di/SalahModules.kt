@@ -224,10 +224,13 @@ val salahModules = module {
     single<ActiveDatasetStore> { get<LocalDatasetStore>() }
 
     // Remote dataset publication ---------------------------------------------
-    // Supabase is the publication source for future remotely managed data; this phase wires only the
-    // location dataset. The endpoint and publishable key are compiled in (see app/build.gradle.kts) and
-    // are empty by default, which is the supported offline configuration: the synchroniser reports
-    // "not configured" and never reaches the network. No privileged key is ever placed here.
+    // Supabase is the publication source for the remotely managed data; this phase wires the location
+    // dataset, the prayer configuration and the published reference prices. All three are built from the
+    // *same* two compiled values (see app/build.gradle.kts): there is exactly one endpoint and one
+    // publishable key in the app, and no second source of truth for either. They are still blank-safe — a
+    // build that supplied neither leaves every gate reporting "not configured" and nothing reaches the
+    // network — and they are now shape-checked too, so a malformed endpoint is refused here rather than
+    // built into a request. No privileged key is ever placed here.
     single {
         DatasetRemoteConfig(
             baseUrl = BuildConfig.SALAH_SUPABASE_URL,
@@ -264,10 +267,12 @@ val salahModules = module {
     }
 
     // Remote prayer-configuration publication --------------------------------
-    // The same non-secret Supabase project and publishable key as the dataset source, and the same
-    // HttpTransport: this phase adds a second published slot, not a second networking client. The default
-    // build compiles the URL and key empty, so PrayerConfigRemoteConfig.isConfigured is false and the
-    // synchroniser reports "not configured" without touching the network.
+    // The same non-secret Supabase project and publishable key as the dataset source (the same two
+    // BuildConfig fields), the same configuration rule, and the same HttpTransport: this adds a second
+    // published slot, not a second networking client and not a second credential. With the values
+    // supplied, PrayerConfigRemoteConfig.isConfigured is true and the throttled check runs off the main
+    // thread; with them blank or malformed it is false and the synchroniser reports "not configured"
+    // without touching the network.
     single {
         PrayerConfigRemoteConfig(
             baseUrl = BuildConfig.SALAH_SUPABASE_URL,
@@ -340,15 +345,17 @@ val salahModules = module {
     single { TasbihUiStateFactory(formatting = get()) }
 
     // Published reference prices ----------------------------------------------
-    // The same non-secret Supabase project and publishable key the app's other remote reads use, and the
-    // same HttpTransport: this adds one read of already-published records, not a second networking client
-    // and not a second credential. No privileged key is placed here, and the app never contacts the
-    // upstream market-price provider — an administrator workflow reads the provider, reviews it and
-    // publishes the records, which is outside this app.
+    // The same non-secret Supabase project and publishable key the app's other remote reads use (the same
+    // two BuildConfig fields), the same configuration rule, and the same HttpTransport: this adds one read
+    // of already-published records, not a second networking client and not a second credential. No
+    // privileged key is placed here, and the app never contacts the upstream market-price provider — an
+    // administrator workflow reads the provider, reviews it and publishes the records, which is outside
+    // this app.
     //
-    // The default build compiles the URL and key empty, so MetalPriceRemoteConfig.isConfigured is false,
-    // the repository answers "not configured" without touching the network, and manual price entry is
-    // unaffected. See docs/ZAKAT_METHODOLOGY.md §8.5.
+    // With the values supplied, MetalPriceRemoteConfig.isConfigured is true and the read is a request the
+    // Zakat screen survives failing; with them blank or malformed the repository answers "not configured"
+    // without touching the network, and manual price entry is unaffected either way. See
+    // docs/ZAKAT_METHODOLOGY.md §8.5.
     single {
         MetalPriceRemoteConfig(
             baseUrl = BuildConfig.SALAH_SUPABASE_URL,

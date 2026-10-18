@@ -4,20 +4,41 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-// Remote dataset publication configuration.
+// Salah's Supabase client configuration.
 //
-// These two values are NON-SECRET by design: the Supabase project URL and the publishable/anon client
-// key. Both are meant to be embedded in a client, and both are constrained by the row-level security the
-// schema defines. A privileged key (service_role, secret, or the database password) must NEVER be placed
-// here: it would bypass every policy and hand a client the ability to publish datasets.
+// These two values are NON-SECRET by design: the Supabase project URL and the publishable/anon client key.
+// Both are meant to be embedded in a client, and both are constrained by the row-level security the schema
+// defines. A privileged key (service_role, secret, or the database password) must NEVER be placed here: it
+// would bypass every policy and hand a client the ability to publish datasets, prayer configurations or
+// reference prices. See docs/SUPABASE_SETUP.md.
 //
-// They are read from Gradle properties so the repository ships no credentials and the default build is the
-// supported offline configuration: with neither property set both values are empty, the app reports "no
-// remote dataset configured" and runs entirely on its bundled data. Supply them for a real build with
-// `-Psalah.supabase.url=... -Psalah.supabase.anonKey=...`, an uncommitted `local.properties`, or the CI
-// secret mechanism. See docs/SUPABASE_SETUP.md.
-val salahSupabaseUrl: String = (findProperty("salah.supabase.url") as String?)?.trim().orEmpty()
-val salahSupabaseAnonKey: String = (findProperty("salah.supabase.anonKey") as String?)?.trim().orEmpty()
+// The default below is the Salah project itself, so a plain `./gradlew assembleDebug` — locally or on a
+// GitHub Actions runner — produces a build that is configured for the same project. The two properties
+// remain the supported override, and the two environment variables are the mapping for a build environment
+// that supplies configuration through its environment instead of the command line:
+//
+//   1. Gradle property  `salah.supabase.url` / `salah.supabase.anonKey`
+//                       (`-P...`, an uncommitted `local.properties`, or `~/.gradle/gradle.properties`)
+//   2. Environment      `SALAH_SUPABASE_URL` / `SALAH_SUPABASE_ANON_KEY`
+//   3. The default below
+//
+// The environment names are Android-native on purpose. The web/admin panel's `NEXT_PUBLIC_SUPABASE_URL`
+// and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` hold the same public pair, but they are deliberately NOT read
+// straight into the Android build: the values are mapped onto the two names above, so a Next.js variable
+// can never be consumed here as if it were an Android one. An empty or whitespace-only override falls back
+// to the next source, so a blank value can never produce a request to an invalid endpoint.
+val salahSupabaseDefaultUrl: String = "https://aagyqdiwsokebmgexazj.supabase.co"
+val salahSupabaseDefaultAnonKey: String = "sb_publishable_w74K1UEYg5XirDjV_rLj7g_lY6VYOqh"
+
+val salahSupabaseUrl: String =
+    (findProperty("salah.supabase.url") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: providers.environmentVariable("SALAH_SUPABASE_URL").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: salahSupabaseDefaultUrl
+
+val salahSupabaseAnonKey: String =
+    (findProperty("salah.supabase.anonKey") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: providers.environmentVariable("SALAH_SUPABASE_ANON_KEY").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: salahSupabaseDefaultAnonKey
 
 android {
     namespace = "io.github.towkirahmedrony.salah"
@@ -33,8 +54,11 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        // Compiled into BuildConfig. Empty when unconfigured, which the app treats as "no remote
-        // dataset" rather than as an error; see DatasetRemoteConfig.isConfigured.
+        // Compiled into BuildConfig — the single source of truth for the endpoint and the public client
+        // key. A blank value (only possible if every source above is blank) is treated as "no remote
+        // publication configured": the app then runs entirely on its bundled data instead of failing, and
+        // a malformed one is rejected by the same configuration gate. See DatasetRemoteConfig.isConfigured
+        // and SupabaseConfiguration.
         buildConfigField(
             "String",
             "SALAH_SUPABASE_URL",

@@ -904,8 +904,9 @@ remain the permanent recovery floor. A missing configuration does not crash the 
 App clients read only through the `dataset_current_publication` view (and the read policy on the private
 `datasets` Storage bucket); the base tables have RLS enabled with no client policy and their privileges are
 revoked, so a client cannot publish, edit or delete. Publishing is a `service_role` operation. The APK
-carries only the publishable/anon key, supplied as two non-secret Gradle properties; a privileged key must
-never appear in the app. See `docs/DATABASE-SCHEMA.md` and `docs/SUPABASE_SETUP.md`.
+carries only the publishable/anon key, resolved into two non-secret `BuildConfig` fields from a Gradle
+property, an environment variable or the committed default; a privileged key must never appear in the app.
+See `docs/DATABASE-SCHEMA.md` and `docs/SUPABASE_SETUP.md`.
 
 ### 13.7 Networking choice
 
@@ -923,9 +924,11 @@ tables and view while following the same rules — without touching the prayer-t
 Theme presets, published Ramadan calendars, Hijri adjustments and general feature configuration remain
 future and would follow the same pattern.
 
-> **Status.** The remote path is implemented and unit-tested against fakes. No Supabase project is
-> configured for this repository, so neither migration has been applied and no remote publication or live
-> integration has been verified. See `docs/SUPABASE_SETUP.md` §5 for what still needs a live test.
+> **Status.** The remote path is implemented and unit-tested against fakes, and the build now carries the
+> project URL and publishable key by default, so a check is attempted at run time — but neither migration has
+> been applied, the expected database objects were not found, and no remote publication or live integration
+> has been verified. Configuration supplied is not database access. See `docs/SUPABASE_SETUP.md` §7 for what
+> still needs a live test.
 
 ## 14. Remote prayer configuration and settings resolution
 
@@ -1025,5 +1028,7 @@ applicable defaults** action that releases the user-owned fields. It exposes onl
 can apply, labels them in Bangla and English through the existing resources, and never shows a raw payload
 or a database detail.
 
-> **Status.** Implemented and unit-tested against fakes, like §13. Not verified against a live Supabase
-> project — see `docs/SUPABASE_SETUP.md` and `docs/PRAYER_CONFIGURATION.md` §11.
+> **Status.** Implemented and unit-tested against fakes, like §13. The build now carries a Supabase endpoint
+> and publishable key, but the slot's view has not been created and nothing is published, so no live
+> configuration has been served or adopted — see `docs/SUPABASE_SETUP.md` §7/§9 and
+> `docs/PRAYER_CONFIGURATION.md` §11.
