@@ -19,10 +19,16 @@ output.json
 local.properties
 .env
 .env.*
+# Release signing material: keystores and signing credentials are never committed.
+# The Release workflow supplies these via GitHub Secrets and decodes the keystore
+# under $RUNNER_TEMP only; see app/build.gradle.kts and .github/workflows/release-apk.yml.
 keystore.properties
 *.jks
 *.keystore
+*.key
 *.p12
+*.p8
+*.pem
 *.pepk
 google-services.json
 

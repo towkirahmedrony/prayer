@@ -11,7 +11,7 @@ configuration.
 | Kotlin | `2.4.21` | `build.gradle.kts` (buildscript classpath) and `gradle/libs.versions.toml` (`kotlin`) |
 | Android Gradle Plugin | `9.3.3` | `gradle/libs.versions.toml` (`agp`) |
 | Gradle wrapper | `9.8.1` | `gradle/wrapper/gradle-wrapper.properties` |
-| JDK | `17` | `app/build.gradle.kts` (`compileOptions`), `.github/workflows/android-apk.yml` (Temurin 17) |
+| JDK | `17` | `app/build.gradle.kts` (`compileOptions`), `.github/workflows/release-apk.yml` (Temurin 17) |
 | Compose compiler plugin | `2.4.21` (`org.jetbrains.kotlin.plugin.compose`) | `gradle/libs.versions.toml` (`compose-compiler`) |
 | Jetpack Compose BOM | `2026.09.00` | `gradle/libs.versions.toml` (`composeBom`) |
 | compileSdk | `37` with minor version `0` (`android-37.0`) — baseline was `36`; both changes come from real remote build output, see §5.1 and §5.2 | `gradle/libs.versions.toml`, `app/build.gradle.kts` (`compileSdkMinor`) |
@@ -178,11 +178,23 @@ to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
 
 ### 3.11 Build and release configuration
 
-- Debug APK only; release signing and shrinking are not configured and no keystore material
-  exists in the repository.
+- Release APK is production-signed in CI: `.github/workflows/release-apk.yml` (`assembleRelease`)
+  decodes `KEYSTORE_BASE64` into a `$RUNNER_TEMP` keystore and supplies `KEYSTORE_FILE`,
+  `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` as environment variables. `app/build.gradle.kts`
+  creates a `release` signing configuration only when all four are present; debug keeps the default
+  debug signing and is unaffected. An `assembleRelease`/`bundleRelease` without credentials fails
+  fast — there is no debug-key fallback for release builds; `testReleaseUnitTest` and lint are
+  exempt so CI can run them before decoding.
+- Release shrinking is enabled (`isMinifyEnabled = true`, `isShrinkResources = true`,
+  `proguard-android-optimize.txt` + `app/proguard-rules.pro`). No extra keep rules are needed:
+  the app has no reflection-based or annotation-generated entry points beyond each library's
+  consumer rules (Koin DSL modules, Compose, DataStore, coroutines, Adhan). CI verifies the
+  shrunk APK assembles, passes `apksigner verify` and carries the expected package.
 - `buildFeatures.buildConfig = true` so the Settings screen can show the version.
 - Lint: `abortOnError = true`, `warningsAsErrors = false`, `checkReleaseBuilds = false`.
 - Gradle caching and configuration parallelism are enabled in `gradle.properties`.
+- Version is `versionCode = 1` / `versionName = "0.1.0"` in `app/build.gradle.kts` — the single
+  source of truth; tag releases as `v<versionName>` so Release, filename and `versionName` agree.
 
 ### 3.12 No map SDK — the map picker was removed
 
@@ -206,7 +218,7 @@ Consequences, all deliberate rather than leftovers:
 
 ## 4. GitHub Actions toolchain
 
-Workflow: `.github/workflows/android-apk.yml`
+Workflow: `.github/workflows/release-apk.yml`
 
 | Step | Action / command |
 |---|---|
@@ -215,15 +227,21 @@ Workflow: `.github/workflows/android-apk.yml`
 | Gradle + cache | `gradle/actions/setup-gradle` pinned to `3f5f9adaf7d9fecd50b5935e54106014257a94e6` (v6.4.0) |
 | Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-37.0`, `build-tools;36.0.0`, `build-tools;37.0.0` (retried with `--channel=3` if the image's package index is stale) |
 | Wrapper validation | `./gradlew --version` must report `Gradle 9.8.1` |
-| Tests | `./gradlew testDebugUnitTest` |
+| Version | `versionName` read from `app/build.gradle.kts`; `v*` tag for tag pushes, `v<versionName>` otherwise |
+| Tests | `./gradlew testReleaseUnitTest` |
 | Lint | `./gradlew lintDebug` |
-| Build | `./gradlew assembleDebug` |
-| APK check | file exists and size > 0 |
-| Artifact | `actions/upload-artifact` pinned to `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (v7.0.2), name `salah-debug-apk`, retention 14 days |
+| Keystore | `KEYSTORE_BASE64` secret decoded to `$RUNNER_TEMP/salah-release.jks` (0600), `KEYSTORE_FILE` exported |
+| Build | `./gradlew assembleRelease` with `KEYSTORE_FILE` + `KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` |
+| APK check | file exists and size > 0, `apksigner verify --verbose --print-certs`, `aapt2 dump badging` package check, rename to `Salah-<version>-release.apk` + SHA-256 |
+| Artifact | `actions/upload-artifact` pinned to `cf430e030ddbb5b0abf93d22962f4752f3646cd9` (v7.0.2), name `Salah-<version>-release`, retention 90 days |
+| GitHub Release | `gh release create` (or `upload --clobber` if present) for `v*` refs, `Salah <version>` title, APK + SHA-256 attached |
 
 Third-party actions are pinned to immutable commit SHAs with the corresponding release tag
-recorded in a trailing comment. Job permissions are `contents: read` only. No secrets are used
-by the workflow, and the debug build requires no signing credentials.
+recorded in a trailing comment. Workflow permissions are `contents: write` (read + create
+Releases); no other permissions are granted. Secrets are referenced only via `env:` (never
+interpolated into `run:`), are masked by the runner, and the temporary keystore is removed in an
+`if: always()` step. The four required repository secrets are `KEYSTORE_BASE64`,
+`KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 
 ## 5. Adjustments made from real build output
 

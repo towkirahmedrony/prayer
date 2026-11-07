@@ -40,6 +40,59 @@ val salahSupabaseAnonKey: String =
         ?: providers.environmentVariable("SALAH_SUPABASE_ANON_KEY").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
         ?: salahSupabaseDefaultAnonKey
 
+// Release signing credentials — production Release builds only.
+//
+// These four environment variables are supplied by the GitHub Actions Release
+// workflow (.github/workflows/release-apk.yml), which decodes the
+// KEYSTORE_BASE64 GitHub secret into a temporary keystore file and exports the
+// result as KEYSTORE_FILE alongside the three password/alias secrets. No
+// credential value ever appears in this file, in generated files, or in
+// version control: the workflow masks secret values in logs, and the
+// keystore file itself lives only under $RUNNER_TEMP and is deleted after
+// the build.
+//
+// Debug builds never read these variables and keep the default AGP debug
+// signing configuration, so `./gradlew assembleDebug` (locally or in CI)
+// works with nothing configured. An `assemble`/`bundle` Release task
+// requested without all four variables (i.e. `assembleRelease`) fails fast
+// with an explicit message instead of silently falling back to the debug
+// key — a debug-signed "release" APK would previously have been
+// indistinguishable from a production-signed one until signature inspection.
+// Tasks such as `testReleaseUnitTest` and `lintRelease` do not require signing
+// and are deliberately exempt so CI can run them before the keystore is
+// decoded. See docs/TECH_STACK.md §3.11.
+val releaseKeyStoreFile: String? =
+    providers.environmentVariable("KEYSTORE_FILE").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+val releaseKeyStorePassword: String? =
+    providers.environmentVariable("KEYSTORE_PASSWORD").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+val releaseKeyAlias: String? =
+    providers.environmentVariable("KEY_ALIAS").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+val releaseKeyPassword: String? =
+    providers.environmentVariable("KEY_PASSWORD").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+
+val hasReleaseSigning: Boolean =
+    releaseKeyStoreFile != null &&
+        releaseKeyStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null
+
+// Only APK/AAB-producing Release tasks require signing. Unit tests
+// (`testReleaseUnitTest`) and lint (`lintRelease`) run before the keystore is
+// decoded in CI and must not fail here.
+if (
+    gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true) &&
+            (it.startsWith("assemble", ignoreCase = true) || it.startsWith("bundle", ignoreCase = true))
+    } && !hasReleaseSigning
+) {
+    error(
+        "Release signing credentials are not set. The Release workflow provides " +
+            "KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD as " +
+            "environment variables; locally, use a debug build instead " +
+            "(./gradlew assembleDebug).",
+    )
+}
+
 android {
     namespace = "io.github.towkirahmedrony.salah"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -51,6 +104,9 @@ android {
         applicationId = "io.github.towkirahmedrony.salah"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
+        // Single source of truth for the app version. Bump versionCode (monotonic)
+        // and versionName (semver) here, then tag the release as "v<versionName>"
+        // (e.g. v0.1.0) so the GitHub Release and APK filename match this value.
         versionCode = 1
         versionName = "0.1.0"
 
@@ -71,19 +127,43 @@ android {
         )
     }
 
+    signingConfigs {
+        // The release signing configuration exists only when the workflow has
+        // supplied all four credentials (see hasReleaseSigning above). There
+        // is deliberately no debug-key fallback: a release build without
+        // credentials fails fast in the check above, and a release build with
+        // credentials is signed with the production key. The default `debug`
+        // signing configuration is left untouched.
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = project.file(releaseKeyStoreFile!!)
+                storePassword = releaseKeyStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
         }
         release {
+            // Shrinking stays enabled: the app uses no reflection-based or
+            // annotation-generated entry points that would need keep rules
+            // (Koin DSL modules, Compose, DataStore, coroutines and the Adhan
+            // engine all ship their own consumer rules or are reached by
+            // direct calls), and CI verifies the release APK signs and
+            // assembles correctly. See app/proguard-rules.pro.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Local testing only: signed with the debug key so the APK installs.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

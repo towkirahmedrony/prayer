@@ -1,6 +1,9 @@
 # Salah — ProGuard/R8 rules.
 #
-# Shrinking is disabled for both build types in this phase (see docs/TECH_STACK.md),
-# so these rules are only a placeholder for the eventual release configuration.
-# Keep the Koin DSL metadata readable by reflection-free consumers is not required:
-# Salah uses Koin's DSL module declarations, not annotations.
+# The release build enables R8 code shrinking and resource shrinking (see
+# app/build.gradle.kts and docs/TECH_STACK.md §3.11). No additional keep rules
+# are needed: the app uses no reflection-based or annotation-generated entry
+# points beyond what each library's consumer rules already cover — Koin DSL
+# modules (not annotations), Compose, DataStore, coroutines and the Adhan
+# engine are all reached by direct calls. Keep this file as the explicit
+# placeholder for any future keep rule the app genuinely requires.

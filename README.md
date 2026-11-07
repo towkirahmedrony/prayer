@@ -58,7 +58,7 @@ without an account.
 | Navigation: Home, Calendar, Tools and Settings in the bottom bar, with the Prayer timetable, Qibla, Ramadan and the Tasbih counter reached from Tools (the first two also from Home), and Notifications, Location and Calendar settings reached from Settings | Implemented (every destination is a real screen, and every screen is one of the destinations `SalahDestination` declares; nothing renders `PlannedFeatureScreen`) |
 | Loading, empty, error and offline states | Implemented |
 | Unit tests for engine, domain, data, location, calendar, Ramadan, the Tasbih counter, the Zakat calculator (engine, reference cases and screen state), the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the dataset publication path, the prayer-configuration path, the bottom navigation, the Settings structure, and the offline-sync reliability hardening (backoff, offline gating, freshness, state-file migration) | Implemented (over 1 200 `@Test` methods in `app/src/test`) |
-| GitHub Actions debug APK build (tests + lint + artifact) | Implemented |
+| GitHub Actions release APK build (tests + lint + signed artifact + GitHub Release on version tags) | Implemented |
 | **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
 | A moon-sighting or authority-confirmed Hijri date, and an integrated authority Sehri/Iftar timetable | **Not implemented** — so no date or time is ever labelled as confirmed |
@@ -188,7 +188,7 @@ The calculation engine and its pinned version are explained in
 
 ```text
 .
-├── .github/workflows/android-apk.yml   CI build (tests, lint, debug APK, artifact)
+├── .github/workflows/release-apk.yml    CI build (tests, lint, signed release APK, artifact, GitHub Release on tags)
 ├── app/
 │   └── src/main/java/io/github/towkirahmedrony/salah/
 │       ├── core/{model,domain,designsystem}   pure logic, ports, calculator, theme
@@ -242,20 +242,33 @@ bundled — see [`docs/PRAYER_NOTIFICATIONS.md`](docs/PRAYER_NOTIFICATIONS.md) �
 
 ## Building the APK (GitHub Actions)
 
-The APK is **not** built locally. `.github/workflows/android-apk.yml` runs on:
+The APK is **not** built locally. `.github/workflows/release-apk.yml` runs on:
 
-- every push to `main`
 - manual runs (`workflow_dispatch`)
+- version tags (`v*` push) — e.g. `v0.1.0`
 
 Each run: checkout → Temurin JDK 17 → Gradle setup with caching → Android SDK packages
-(`platforms;android-37.0`, `build-tools;37.0.0`) → wrapper validation → `testDebugUnitTest` →
-`lintDebug` → `assembleDebug` → non-empty APK check → artifact upload.
+(`platforms;android-37.0`, `build-tools;37.0.0`) → wrapper validation → version detection →
+`testReleaseUnitTest` → `lintDebug` → keystore decode → `assembleRelease` → `apksigner verify`
++ package check + rename to `Salah-<version>-release.apk` → artifact upload → GitHub Release on
+version tags.
 
 **Where to find the APK:** open the repository on GitHub → *Actions* → the
-*“Salah Android APK”* run for your commit → the run summary shows the commit and the artifact
-**`salah-debug-apk`** (retained for 14 days, downloadable from the run's *Artifacts* section).
-The workflow only reads repository contents (`permissions: contents: read`), needs no secrets
-and no signing credentials.
+*“Salah Release APK”* run → the run summary shows the version and the artifact
+**`Salah-<version>-release`** (retained for 90 days). On a `v*` tag push the same APK (+ its
+`.sha256`) is also attached to the GitHub Release named `Salah v<version>` (e.g. `Salah v0.1.0`
+for tag `v0.1.0`). A manual run from a branch produces only the artifact; a manual run from a
+tag also creates/updates the Release.
+
+**Release signing:** the workflow needs four repository secrets — `KEYSTORE_BASE64` (base64 of the
+release `.jks`), `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` — and decodes the keystore
+only under `$RUNNER_TEMP`, deleting it afterwards. No keystore or credential value is committed
+(`.gitignore` covers `*.jks`, `*.keystore`, `*.key`, `*.p12`, `*.p8`, `*.pem`, `*.pepk` and
+`keystore.properties`). `app/build.gradle.kts` reads the same four values as environment
+variables (`KEYSTORE_FILE` + the three secrets) and signs `assembleRelease` with them; there is
+no debug-key fallback for release builds. The app version (`versionCode`/`versionName` in
+`app/build.gradle.kts`) is preserved at `1` / `0.1.0` — bump it there, then tag `v<versionName>`
+so the Release, filename and `versionName` agree. See `docs/TECH_STACK.md` §3.11 and §4.
 
 ## Current limitations
 
