@@ -40,6 +40,28 @@ val salahSupabaseAnonKey: String =
         ?: providers.environmentVariable("SALAH_SUPABASE_ANON_KEY").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
         ?: salahSupabaseDefaultAnonKey
 
+// Geoapify reverse-geocoding API key — optional and secret. Resolved at build time and
+// never hardcoded in Kotlin source or committed to version control: supplied via the
+// uncommitted root `local.properties` (`GEOAPIFY_API_KEY=...`, which is git-ignored), a
+// Gradle property (`-PGEOAPIFY_API_KEY=...` or `~/.gradle/gradle.properties`), or the
+// `GEOAPIFY_API_KEY` environment variable. A missing or blank key falls back to `""` so the
+// build never fails on configuration alone; consumers must treat `""` as "not configured"
+// and skip network use instead of crashing.
+val geoapifyApiKey: String =
+    (findProperty("GEOAPIFY_API_KEY") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: providers.environmentVariable("GEOAPIFY_API_KEY").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: run {
+            val localProperties = rootProject.file("local.properties")
+            if (localProperties.exists()) {
+                val props = java.util.Properties()
+                localProperties.inputStream().use { props.load(it) }
+                props.getProperty("GEOAPIFY_API_KEY")?.trim()?.takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
+        }
+        ?: ""
+
 // Release signing credentials — production Release builds only.
 //
 // These four environment variables are supplied by the GitHub Actions Release
@@ -124,6 +146,13 @@ android {
             "String",
             "SALAH_SUPABASE_ANON_KEY",
             "\"${salahSupabaseAnonKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        // Optional Geoapify key (see `geoapifyApiKey` above). `""` means not configured: the
+        // app must no-op instead of crashing when the feature needs a network call.
+        buildConfigField(
+            "String",
+            "GEOAPIFY_API_KEY",
+            "\"${geoapifyApiKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
     }
 
