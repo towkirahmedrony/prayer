@@ -38,8 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -857,8 +857,8 @@ private val FORMATTING = CalendarFormatting()
 
 @Composable
 private fun currentLocale(): Locale {
-    val locales = LocalResources.current.configuration.locales
-    return if (locales.size() == 0) Locale.getDefault() else locales[0]
+    val configuration = LocalConfiguration.current
+    return if (configuration.locales.size() > 0) configuration.locales[0] else Locale.ROOT
 }
 
 /**
