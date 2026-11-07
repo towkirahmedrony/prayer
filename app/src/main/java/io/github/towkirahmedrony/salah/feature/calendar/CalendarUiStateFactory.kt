@@ -101,8 +101,7 @@ class CalendarUiStateFactory(
             // padded with blank cells here, so the block the screen draws never changes size when the
             // mode or the displayed month changes.
             weeks = month.weeks
-                .map { week -> week.map { cell -> cellOf(cell, selectedDay.date, month, system, gridLocale) } }
-                .reservedToWeekRows(),
+                .map { week -> week.map { cell -> cellOf(cell, selectedDay.date, month, system, gridLocale) } },
             selected = selectedDay.toSelectedDay(locale),
             today = todayDay.toSelectedDay(locale),
             selectedIsToday = selectedDay.date == today,

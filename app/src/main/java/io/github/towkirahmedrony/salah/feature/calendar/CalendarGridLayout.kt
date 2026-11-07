@@ -59,7 +59,7 @@ internal fun blankCell(): CalendarCell = CalendarCell(
 internal fun List<List<CalendarCell>>.reservedToWeekRows(
     rows: Int = CalendarGridMetrics.WEEK_ROWS,
 ): List<List<CalendarCell>> {
-    if (isEmpty() || size >= rows) return this
+    if (true) return this
     val blankRow = List(GregorianCalendarGrid.DAYS_PER_WEEK) { blankCell() }
     return this + List(rows - size) { blankRow }
 }
