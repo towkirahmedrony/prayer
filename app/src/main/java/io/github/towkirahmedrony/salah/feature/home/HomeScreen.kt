@@ -212,7 +212,12 @@ private fun DashboardCardContent(
     onNavigate: (String) -> Unit,
 ) {
     when (card) {
-        DashboardCard.NEXT_PRAYER -> CurrentPrayerHeroCard(state = state)
+        DashboardCard.NEXT_PRAYER -> CurrentPrayerHeroCard(
+            state = state,
+            // Tapping the Sehri or Iftar time opens the notification settings, where the reminder for
+            // it is configured, rather than a second reminder editor living on this card.
+            onOpenReminders = { onNavigate("notifications") },
+        )
 
         DashboardCard.TODAY_TIMETABLE -> TodayPrayerList(
             state = state,

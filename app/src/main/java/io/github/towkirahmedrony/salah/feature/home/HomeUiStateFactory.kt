@@ -145,7 +145,7 @@ class HomeUiStateFactory(
             prayer = nextPrayer?.prayer,
             time = nextPrayer?.let { timeFormatter.format(it.time) },
             countdown = nextPrayer?.let { CountdownFormatter.format(it.remaining) },
-            countdownCompact = nextPrayer?.let { CountdownFormatter.formatCompact(it.remaining) },
+            countdownCompact = nextPrayer?.let { CountdownFormatter.formatCompactRemaining(it.remaining) },
         )
 
         // The open period is resolved exactly once. The hero card and the current-prayer marker on the
@@ -212,6 +212,7 @@ class HomeUiStateFactory(
                 next = nextPrayerSection,
                 scheduleState = scheduleState,
                 timeFormatter = timeFormatter,
+                now = now,
             ),
             nextPrayer = nextPrayerSection,
             prayerRows = PrayerName.entries.map { prayer ->
@@ -257,33 +258,101 @@ class HomeUiStateFactory(
             dashboard = dashboardState(dashboard),
             ramadan = ramadanSection(window = ramadanWindow, schedule = schedule, timeFormatter = timeFormatter),
             qibla = qiblaSection(location),
-            fasting = fastingTimes(schedule = schedule, now = now, timeFormatter = timeFormatter),
+            fasting = fastingTimes(
+                schedule = schedule,
+                nextDaySchedule = nextDaySchedule,
+                now = now,
+                timeFormatter = timeFormatter,
+            ),
         )
     }
 
     /**
-     * Today's Sehri end and Iftar for the hero card.
+     * The Sehri end and Iftar the hero card shows: the **next** fasting pair.
      *
      * Read through [RamadanCalendar] — Sehri ends at the calculated Fajr and Iftar is the calculated
      * Maghrib — so this card, the Ramadan screen and the fasting reminders can never disagree. Nothing
-     * is recalculated here. A missing schedule, or a schedule without Fajr or Maghrib, gives a `null`
-     * label rather than an invented time.
+     * is calculated here and no offset or buffer is added; this only chooses *which* day's two times
+     * are the useful ones at [now]:
+     *
+     *  - before today's Iftar: today's pair;
+     *  - at or after today's Iftar: tomorrow's pair, read from [nextDaySchedule] — accepted only when it
+     *    is for exactly the next date, the same place and the same calculation profile, which is the
+     *    rule [NextPrayerResolver] applies to the same schedule, so the two can never disagree about
+     *    what "tomorrow" is;
+     *  - at or after today's Iftar with no usable tomorrow: today's pair again, both dimmed, with no
+     *    next event and no countdown. The card never counts down to a time it does not have.
+     *
+     * A missing schedule, or a schedule without Fajr or Maghrib, gives a `null` label rather than an
+     * invented time. Every comparison is half-open at the boundary: a time that is exactly [now] has
+     * already happened.
      */
     private fun fastingTimes(
         schedule: PrayerSchedule?,
+        nextDaySchedule: PrayerSchedule?,
         now: ZonedDateTime,
         timeFormatter: DateTimeFormatter,
     ): FastingTimesSection {
         if (schedule == null) return FastingTimesSection.Unavailable
-        val sehriEnd = RamadanCalendar.sehriEndOf(schedule)
-        val iftar = RamadanCalendar.iftarOf(schedule)
+
+        val today = FastingPair(
+            sehriEnd = RamadanCalendar.sehriEndOf(schedule),
+            iftar = RamadanCalendar.iftarOf(schedule),
+        )
+        val todaysIftar = today.iftar
+        val todayIsOver = todaysIftar != null && !todaysIftar.isAfter(now)
+        val tomorrow = if (todayIsOver) tomorrowsFastingPair(schedule, nextDaySchedule) else null
+        val shown = tomorrow ?: today
+
+        val sehriEnd = shown.sehriEnd
+        val iftar = shown.iftar
+        val nextEvent = when {
+            sehriEnd != null && sehriEnd.isAfter(now) -> FastingEvent.SEHRI_END
+            iftar != null && iftar.isAfter(now) -> FastingEvent.IFTAR
+            else -> null
+        }
+        val nextTime = when (nextEvent) {
+            FastingEvent.SEHRI_END -> sehriEnd
+            FastingEvent.IFTAR -> iftar
+            null -> null
+        }
+
         return FastingTimesSection(
             sehriEndLabel = sehriEnd?.let(timeFormatter::format),
             iftarLabel = iftar?.let(timeFormatter::format),
             sehriPassed = sehriEnd != null && !sehriEnd.isAfter(now),
             iftarPassed = iftar != null && !iftar.isAfter(now),
+            isTomorrow = tomorrow != null,
+            nextEvent = nextEvent,
+            countdown = nextTime?.let { time ->
+                CountdownFormatter.formatCompactRemaining(Duration.between(now, time))
+            },
         )
     }
+
+    /**
+     * Tomorrow's Sehri end and Iftar, or `null` when [nextDaySchedule] cannot honestly stand for
+     * tomorrow: it is absent, for another date, for another place, calculated under another profile,
+     * or lacks Fajr or Maghrib.
+     */
+    private fun tomorrowsFastingPair(
+        today: PrayerSchedule,
+        nextDaySchedule: PrayerSchedule?,
+    ): FastingPair? {
+        if (nextDaySchedule == null) return null
+        if (nextDaySchedule.date != today.date.plusDays(1)) return null
+        if (nextDaySchedule.location != today.location) return null
+        if (nextDaySchedule.profile != today.profile) return null
+        val sehriEnd = RamadanCalendar.sehriEndOf(nextDaySchedule) ?: return null
+        val iftar = RamadanCalendar.iftarOf(nextDaySchedule) ?: return null
+        return FastingPair(sehriEnd = sehriEnd, iftar = iftar)
+    }
+
+    /** One day's two fasting instants, as read from that day's schedule. */
+    private data class FastingPair(
+        val sehriEnd: ZonedDateTime?,
+        val iftar: ZonedDateTime?,
+    )
 
     /**
      * The arranged cards, resolved from the persisted layout.
@@ -379,6 +448,7 @@ class HomeUiStateFactory(
         next: NextPrayerSection,
         scheduleState: PrayerScheduleState,
         timeFormatter: DateTimeFormatter,
+        now: ZonedDateTime,
     ): CurrentPrayerSection = when (status) {
         is CurrentPrayerStatus.Active -> {
             val period = status.period
@@ -394,9 +464,10 @@ class HomeUiStateFactory(
                 endsNextDay = (boundary as? PeriodBoundary.Prayer)?.isNextDay == true,
                 endsWithSolarEvent = (boundary as? PeriodBoundary.Solar)?.event,
                 countdown = CountdownFormatter.format(period.remaining),
-                countdownCompact = CountdownFormatter.formatCompact(period.remaining),
+                countdownCompact = CountdownFormatter.formatCompactRemaining(period.remaining),
                 next = next,
                 unavailable = null,
+                periodProgress = periodProgress(start = period.startsAt, end = period.endsAt, now = now),
             )
         }
 
@@ -409,7 +480,7 @@ class HomeUiStateFactory(
             endsNextDay = false,
             endsWithSolarEvent = null,
             countdown = CountdownFormatter.format(status.remaining),
-            countdownCompact = CountdownFormatter.formatCompact(status.remaining),
+            countdownCompact = CountdownFormatter.formatCompactRemaining(status.remaining),
             next = next,
             unavailable = null,
         )
@@ -427,6 +498,27 @@ class HomeUiStateFactory(
             next = next,
             unavailable = scheduleState.asTimetableNote() ?: status.reason,
         )
+    }
+
+    /**
+     * How far through the open period [now] is, `0f` at [start] to `1f` at [end].
+     *
+     * `null` when there is no honest answer: [start] is unknown (the Isha period that began before the
+     * schedule in hand — its length is not on today's timetable, and one is never borrowed from another
+     * day), or the period does not span a positive interval. A moment outside the period clamps to the
+     * nearer end rather than leaving the `0f..1f` range. Computed from the period's own instants, so it
+     * cannot disagree with the countdown beside it.
+     */
+    private fun periodProgress(
+        start: ZonedDateTime?,
+        end: ZonedDateTime,
+        now: ZonedDateTime,
+    ): Float? {
+        if (start == null) return null
+        val totalMillis = Duration.between(start, end).toMillis()
+        if (totalMillis <= 0L) return null
+        val elapsedMillis = Duration.between(start, now).toMillis()
+        return (elapsedMillis.toDouble() / totalMillis.toDouble()).coerceIn(0.0, 1.0).toFloat()
     }
 
     /**

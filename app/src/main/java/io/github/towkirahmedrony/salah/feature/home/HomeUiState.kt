@@ -100,7 +100,7 @@ sealed interface HomeUiState {
         val ramadan: RamadanSection = RamadanSection.Hidden,
         /** The Qibla bearing from the saved location, or the reason it cannot be shown. */
         val qibla: QiblaSection = QiblaSection.Unavailable,
-        /** Today's Sehri end and Iftar for the hero card, or the placeholder when there is no schedule. */
+        /** The next Sehri end and Iftar for the hero card (tomorrow's once today's Iftar has passed), or the placeholder when there is no schedule. */
         val fasting: FastingTimesSection = FastingTimesSection.Unavailable,
     ) : HomeUiState
 }
@@ -189,21 +189,49 @@ data class QiblaSection(
     }
 }
 
+/** The fasting event the hero card is counting down to. */
+enum class FastingEvent {
+    /** The end of Sehri, i.e. the calculated Fajr. */
+    SEHRI_END,
+
+    /** Iftar, i.e. the calculated Maghrib. */
+    IFTAR,
+}
+
 /**
- * Today's Sehri end and Iftar, for the Home hero card.
+ * The Sehri end and Iftar shown on the Home hero card: the **next** fasting pair, not only today's.
  *
- * Both are read from today's schedule, the same way the Ramadan screen reads them: Sehri ends at the
- * calculated Fajr and Iftar is the calculated Maghrib. They are shown on every day, not only in
+ * Both are read from a schedule through [io.github.towkirahmedrony.salah.core.domain.calendar.RamadanCalendar]
+ * — Sehri ends at the calculated Fajr and Iftar is the calculated Maghrib — so this card, the Ramadan
+ * screen and the fasting reminders can never disagree. They are shown on every day, not only in
  * Ramadan, so the card claims nothing about the month; it only states two times from the timetable.
  * A `null` label means the schedule has no such time, and the card shows a dash rather than a guess.
+ *
+ * Which pair is shown depends on the displayed moment, and the factory resolves it:
+ *  - before today's Sehri end: today's pair, Sehri highlighted ([nextEvent] = [FastingEvent.SEHRI_END]);
+ *  - after Sehri, before Iftar: today's pair, Sehri dimmed, Iftar highlighted;
+ *  - at or after today's Iftar: **tomorrow's** pair ([isTomorrow]), when tomorrow's schedule is
+ *    available, with Sehri highlighted;
+ *  - at or after today's Iftar with no usable tomorrow: today's pair again, both dimmed, with no
+ *    [nextEvent] and no [countdown] — the card never counts down to a time it does not have.
  */
 data class FastingTimesSection(
     val sehriEndLabel: String?,
     val iftarLabel: String?,
-    /** True when today's Sehri end is at or before the displayed moment. */
+    /** True when the displayed Sehri end is at or before the displayed moment (so it is dimmed). */
     val sehriPassed: Boolean = false,
-    /** True when today's Iftar is at or before the displayed moment. */
+    /** True when the displayed Iftar is at or before the displayed moment (so it is dimmed). */
     val iftarPassed: Boolean = false,
+    /** True when the displayed pair belongs to the following local date. */
+    val isTomorrow: Boolean = false,
+    /** The event that is next to happen and is highlighted, or `null` when there is none to name. */
+    val nextEvent: FastingEvent? = null,
+    /**
+     * Compact time until [nextEvent], e.g. `10h 2m`, or `null` when there is no [nextEvent].
+     *
+     * Rendered by the factory, so the card formats nothing.
+     */
+    val countdown: String? = null,
 ) {
     companion object {
         /** No schedule, so no times. */
@@ -326,6 +354,13 @@ data class CurrentPrayerSection(
     val next: NextPrayerSection,
     /** Non-null when no period can be resolved, so the card explains the gap. */
     val unavailable: UnavailabilityReason?,
+    /**
+     * How far through the open period the displayed moment is, `0f` at its start to `1f` at its end,
+     * or `null` when there is nothing honest to draw: no period is open, or the period began before
+     * the schedule in hand ([startTime] is `null`) so its length is not known. Resolved by the
+     * factory from the period's own start and end instants, so the card draws it and measures nothing.
+     */
+    val periodProgress: Float? = null,
 )
 
 data class PrayerRow(

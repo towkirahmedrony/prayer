@@ -1065,4 +1065,9 @@
     <string name="zakat_breakdown_hide">Hide breakdown</string>
     <string name="home_hero_sehri_ends">SEHRI ENDS</string>
     <string name="home_hero_iftar_begins">IFTAR BEGINS</string>
+    <string name="home_hero_tomorrow_sehri_ends">TOMORROW\'S SEHRI ENDS</string>
+    <string name="home_hero_tomorrow_iftar">TOMORROW\'S IFTAR</string>
+    <string name="home_hero_fasting_in">in %1$s</string>
+    <string name="home_hero_set_sehri_reminder">Set Sehri reminder</string>
+    <string name="home_hero_set_iftar_reminder">Set Iftar reminder</string>
 </resources>

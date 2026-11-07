@@ -50,6 +50,7 @@ import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import io.github.towkirahmedrony.salah.feature.common.messageRes
+import io.github.towkirahmedrony.salah.feature.home.FastingEvent
 import io.github.towkirahmedrony.salah.feature.home.FastingTimesSection
 import io.github.towkirahmedrony.salah.feature.home.HeroArcSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
@@ -214,14 +215,25 @@ fun HomeDateLine(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
  *  - **Between sunrise and Dhuhr** no period is open, so the card says "up next" and names the prayer
  *    that opens next, instead of showing a prayer as current when it is not.
  *
- * The lower row is today's Sehri end and Iftar. Sehri ends at the calculated Fajr and Iftar is the
- * calculated Maghrib, exactly as the Ramadan screen reads them; a time that has already passed today is
- * dimmed rather than hidden.
+ * A thin line under the prayer name and countdown shows how far through the open period the moment is.
+ * It is drawn from [io.github.towkirahmedrony.salah.feature.home.CurrentPrayerSection.periodProgress],
+ * which the state factory measured, and is omitted when the factory had nothing honest to report.
+ *
+ * The lower row is the **next** Sehri end and Iftar: today's pair until Iftar, then tomorrow's. Sehri
+ * ends at the calculated Fajr and Iftar is the calculated Maghrib, exactly as the Ramadan screen reads
+ * them. The event that is next is highlighted and carries a small "in 10h 2m" line; a time that has
+ * already passed is dimmed rather than hidden. Which pair, which event and what the countdown says were
+ * all resolved in the state factory — this composable only draws them.
+ *
+ * @param onOpenReminders opens the notification settings so the reader can set a Sehri or Iftar
+ *   reminder. When `null` the two columns are plain text and carry no bell, which is how the Prayer
+ *   screen shows this card.
  */
 @Composable
 fun CurrentPrayerHeroCard(
     state: HomeUiState.Ready,
     modifier: Modifier = Modifier,
+    onOpenReminders: (() -> Unit)? = null,
 ) {
     val accents = LocalSalahAccents.current
     val onBrand = accents.onBrandSurface
@@ -331,6 +343,11 @@ fun CurrentPrayerHeroCard(
                         }
                     }
                 }
+                val progress = hero.periodProgress
+                if (open && progress != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PeriodProgressLine(progress = progress, onBrand = onBrand)
+                }
             } else {
                 Text(
                     text = stringResource(hero.unavailable?.messageRes() ?: R.string.home_next_prayer_none),
@@ -342,34 +359,86 @@ fun CurrentPrayerHeroCard(
             Spacer(modifier = Modifier.height(18.dp))
             HorizontalDivider(color = onBrand.copy(alpha = 0.18f))
             Spacer(modifier = Modifier.height(14.dp))
-            FastingTimesRow(section = state.fasting, onBrand = onBrand)
+            FastingTimesRow(section = state.fasting, onBrand = onBrand, onOpenReminders = onOpenReminders)
         }
     }
 }
 
-/** Today's Sehri end on the left and Iftar on the right, each under its own gold label. */
+/**
+ * A thin track with a fill showing how far through the open prayer period the moment is.
+ *
+ * [progress] is already a `0f..1f` fraction measured by the state factory; it is clamped again here
+ * only so a stray value can never draw outside the track.
+ */
+@Composable
+private fun PeriodProgressLine(
+    progress: Float,
+    onBrand: Color,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(shape)
+            .background(onBrand.copy(alpha = 0.18f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .clip(shape)
+                .background(GoldAccent),
+        )
+    }
+}
+
+/**
+ * The Sehri end on the left and Iftar on the right, each under its own gold label.
+ *
+ * The next event is highlighted and counts down; a time that has passed is dimmed; the other is shown
+ * at a reduced emphasis. When [section] describes tomorrow, the labels say so.
+ */
 @Composable
 private fun FastingTimesRow(
     section: FastingTimesSection,
     onBrand: Color,
+    onOpenReminders: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    // Each column takes half the row so the longer "tomorrow" labels wrap instead of running into the
+    // other column on a narrow phone.
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
         FastingTimeColumn(
-            label = stringResource(R.string.home_hero_sehri_ends),
+            modifier = Modifier.weight(1f),
+            label = stringResource(
+                if (section.isTomorrow) R.string.home_hero_tomorrow_sehri_ends else R.string.home_hero_sehri_ends,
+            ),
             value = section.sehriEndLabel,
             passed = section.sehriPassed,
+            highlighted = section.nextEvent == FastingEvent.SEHRI_END,
+            countdown = section.countdown.takeIf { section.nextEvent == FastingEvent.SEHRI_END },
+            reminderLabel = stringResource(R.string.home_hero_set_sehri_reminder),
+            onClick = onOpenReminders,
             onBrand = onBrand,
             horizontalAlignment = Alignment.Start,
         )
         FastingTimeColumn(
-            label = stringResource(R.string.home_hero_iftar_begins),
+            modifier = Modifier.weight(1f),
+            label = stringResource(
+                if (section.isTomorrow) R.string.home_hero_tomorrow_iftar else R.string.home_hero_iftar_begins,
+            ),
             value = section.iftarLabel,
             passed = section.iftarPassed,
+            highlighted = section.nextEvent == FastingEvent.IFTAR,
+            countdown = section.countdown.takeIf { section.nextEvent == FastingEvent.IFTAR },
+            reminderLabel = stringResource(R.string.home_hero_set_iftar_reminder),
+            onClick = onOpenReminders,
             onBrand = onBrand,
             horizontalAlignment = Alignment.End,
         )
@@ -378,26 +447,65 @@ private fun FastingTimesRow(
 
 @Composable
 private fun FastingTimeColumn(
+    modifier: Modifier,
     label: String,
     value: String?,
     passed: Boolean,
+    highlighted: Boolean,
+    countdown: String?,
+    reminderLabel: String,
+    onClick: (() -> Unit)?,
     onBrand: Color,
     horizontalAlignment: Alignment.Horizontal,
 ) {
-    Column(horizontalAlignment = horizontalAlignment) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-            fontWeight = FontWeight.SemiBold,
-            color = GoldAccent,
-        )
+    // Emphasis is decided from the flags the factory resolved: the next event at full strength, a time
+    // that has passed dimmed, anything else in between.
+    val timeColor = when {
+        highlighted -> onBrand
+        passed -> onBrand.copy(alpha = 0.55f)
+        else -> onBrand.copy(alpha = 0.78f)
+    }
+    val clickable = if (onClick != null) {
+        Modifier.clickable(onClickLabel = reminderLabel, onClick = onClick)
+    } else {
+        Modifier
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .then(clickable)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalAlignment = horizontalAlignment,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                fontWeight = FontWeight.SemiBold,
+                color = GoldAccent,
+                textAlign = if (horizontalAlignment == Alignment.End) TextAlign.End else TextAlign.Start,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (onClick != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                BellGlyph(tint = GoldAccent, modifier = Modifier.size(14.dp))
+            }
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value ?: stringResource(R.string.home_time_unavailable),
             style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif),
             fontWeight = FontWeight.Bold,
-            color = if (passed) onBrand.copy(alpha = 0.6f) else onBrand,
+            color = timeColor,
         )
+        if (highlighted && countdown != null) {
+            Text(
+                text = stringResource(R.string.home_hero_fasting_in, countdown),
+                style = MaterialTheme.typography.bodySmall,
+                color = onBrand.copy(alpha = 0.82f),
+            )
+        }
     }
 }
 

@@ -1068,4 +1068,9 @@
     <string name="zakat_breakdown_hide">বিস্তারিত লুকান</string>
     <string name="home_hero_sehri_ends">সেহরি শেষ</string>
     <string name="home_hero_iftar_begins">ইফতার শুরু</string>
+    <string name="home_hero_tomorrow_sehri_ends">আগামীকালের সেহরি শেষ</string>
+    <string name="home_hero_tomorrow_iftar">আগামীকালের ইফতার</string>
+    <string name="home_hero_fasting_in">%1$s পরে</string>
+    <string name="home_hero_set_sehri_reminder">সেহরির রিমাইন্ডার সেট করুন</string>
+    <string name="home_hero_set_iftar_reminder">ইফতারের রিমাইন্ডার সেট করুন</string>
 </resources>

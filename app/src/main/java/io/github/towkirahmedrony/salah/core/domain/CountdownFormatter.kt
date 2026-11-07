@@ -10,6 +10,8 @@ import java.util.Locale
  */
 object CountdownFormatter {
 
+    private val ONE_MINUTE: Duration = Duration.ofMinutes(1)
+
     /**
      * Formats [remaining] as `H:MM:SS`, or as `MM:SS` when it is shorter than an hour.
      *
@@ -47,5 +49,23 @@ object CountdownFormatter {
         } else {
             String.format(Locale.ROOT, "%dm", minutes)
         }
+    }
+
+    /**
+     * Like [formatCompact], but never claims a running countdown has already reached zero.
+     *
+     * [formatCompact] drops seconds, so a period with 30 seconds left reads `0m` even though it has
+     * not ended, which on the Home hero card looks like the prayer is already over. Here a remaining
+     * time that is positive but shorter than a minute reads `<1m`; an exhausted or negative duration
+     * still reads `0m`, and every other value is rendered exactly as [formatCompact] renders it.
+     *
+     * It is a separate function rather than a change to [formatCompact] on purpose: the day and night
+     * lengths are measurements, not countdowns, and a daylight span shorter than a minute is not a
+     * thing `<1m` should ever describe. Only the countdown fields of the hero, current and next prayer
+     * use this one.
+     */
+    fun formatCompactRemaining(remaining: Duration): String {
+        val underAMinute = !remaining.isNegative && !remaining.isZero && remaining < ONE_MINUTE
+        return if (underAMinute) "<1m" else formatCompact(remaining)
     }
 }
