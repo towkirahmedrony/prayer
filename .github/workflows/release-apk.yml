@@ -4,11 +4,14 @@ name: Salah Release APK
 # The APK is never built locally: this workflow is the authoritative build
 # environment. It replaces the former debug-APK workflow so only one APK
 # build workflow exists in the repository.
-# Triggered by a manual run or by pushing a version tag (v*). A tag push
-# additionally creates a GitHub Release with the APK attached.
+# Triggered by a manual run, by pushing to main, or by pushing a version
+# tag (v*). A tag push additionally creates a GitHub Release with the APK
+# attached; a push to main only builds and uploads the APK artifact.
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
