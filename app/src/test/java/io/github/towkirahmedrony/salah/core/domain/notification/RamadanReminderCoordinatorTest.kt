@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.core.domain.notification
 
 import io.github.towkirahmedrony.salah.core.domain.calendar.HijriCalendar
+import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
 import io.github.towkirahmedrony.salah.testing.FakeLocationRepository
@@ -70,7 +71,10 @@ class RamadanReminderCoordinatorTest {
         .associateWith { date -> testSchedule(date, zone) }
 
     private val notificationSettings = FakePrayerNotificationPreferencesRepository(ramadanOnly())
-    private val userPreferences = FakeUserPreferencesRepository()
+    // Raw Umm al-Qura, so the scenario dates below are the table's own Ramadan window; the offset
+    // scenarios then move it explicitly.
+    private val userPreferences =
+        FakeUserPreferencesRepository(initialCalendarSettings = CalendarSettings.UMM_AL_QURA)
 
     private val coordinator = PrayerNotificationCoordinator(
         planner = PrayerNotificationPlanner(),

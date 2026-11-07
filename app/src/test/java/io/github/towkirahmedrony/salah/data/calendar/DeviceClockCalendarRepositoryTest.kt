@@ -108,7 +108,9 @@ class DeviceClockCalendarRepositoryTest {
      */
     private fun TestScope.observe(
         clock: Clock,
-        settings: MutableStateFlow<CalendarSettings> = MutableStateFlow(CalendarSettings.DEFAULT),
+        // Raw Umm al-Qura by default: the tests that assert a Hijri label pin the table itself, and
+        // the app's `-1` Bangladesh alignment is asserted separately below.
+        settings: MutableStateFlow<CalendarSettings> = MutableStateFlow(CalendarSettings.UMM_AL_QURA),
         interfaceLanguage: MutableStateFlow<AppLanguage> = MutableStateFlow(AppLanguage.SYSTEM),
         /**
          * The stored location as the app publishes it, or `null` for a repository with no location zone
@@ -167,7 +169,7 @@ class DeviceClockCalendarRepositoryTest {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Dhaka"))
         try {
             val settings = MutableStateFlow(
-                CalendarSettings(dateLanguage = DateLanguagePreference.BANGLA),
+                CalendarSettings.UMM_AL_QURA.copy(dateLanguage = DateLanguagePreference.BANGLA),
             )
             val clock = MutableClock(Instant.parse("2024-04-14T06:00:00Z"), ZoneId.of("Asia/Dhaka"))
             val snapshots = observe(clock, settings)
@@ -323,7 +325,9 @@ class DeviceClockCalendarRepositoryTest {
         // The two settings answer different questions: the interface language is how the screen is
         // written, the date language is which script the dates themselves are in. A reader who chose
         // English words but Bengali dates must get Bengali dates.
-        val settings = MutableStateFlow(CalendarSettings(dateLanguage = DateLanguagePreference.BANGLA))
+        val settings = MutableStateFlow(
+            CalendarSettings.UMM_AL_QURA.copy(dateLanguage = DateLanguagePreference.BANGLA),
+        )
         val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
         val snapshots = observe(
             clock,
@@ -369,7 +373,7 @@ class DeviceClockCalendarRepositoryTest {
 
     @Test
     fun `moving the Hijri adjustment re-emits rather than waiting for a restart`() = runTest {
-        val settings = MutableStateFlow(CalendarSettings.DEFAULT)
+        val settings = MutableStateFlow(CalendarSettings.UMM_AL_QURA)
         val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
         val snapshots = observe(clock, settings)
         runCurrent()
@@ -384,6 +388,23 @@ class DeviceClockCalendarRepositoryTest {
         // The Hijri date is still reported as an estimate rather than as a confirmed one, because the
         // user's offset changes which estimate is shown, not how reliable it is.
         assertFalse((snapshots.last().hijri as CalendarDateState.Available).isVerifiedSource)
+    }
+
+    @Test
+    fun `the default settings show the Bangladesh-aligned estimate, not the raw table`() = runTest {
+        // No settings supplied, which is what a fresh install uses: one day behind the raw Umm al-Qura
+        // table, so 11 March 2024 is 29 Sha'ban and Ramadan starts on 12 March instead of 11 March.
+        val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
+        val repository = DeviceClockCalendarRepository(clock = clock)
+
+        val snapshot = repository.observeToday().first()
+        assertEquals("29 Sha'ban 1445 AH", (snapshot.hijri as CalendarDateState.Available).formattedDate)
+        // Still an estimate: the default alignment is not an authority-confirmed date.
+        assertFalse((snapshot.hijri as CalendarDateState.Available).isVerifiedSource)
+
+        val window = repository.observeRamadanWindow().first()
+        assertEquals(LocalDate.of(2024, 3, 12), window!!.start)
+        assertEquals(LocalDate.of(2024, 4, 10), window.end)
     }
 
     @Test
@@ -430,9 +451,10 @@ class DeviceClockCalendarRepositoryTest {
     @Test
     fun `lays out a month with every day converted, including leap day`() = runTest {
         val clock = MutableClock(Instant.parse("2024-03-11T09:00:00Z"), ZoneId.of("UTC"))
-        val month = DeviceClockCalendarRepository(clock = clock)
-            .observeMonth(CalendarSystem.GREGORIAN, LocalDate.of(2024, 3, 1))
-            .first()
+        val month = DeviceClockCalendarRepository(
+            clock = clock,
+            settings = MutableStateFlow(CalendarSettings.UMM_AL_QURA),
+        ).observeMonth(CalendarSystem.GREGORIAN, LocalDate.of(2024, 3, 1)).first()
 
         assertEquals(YearMonth.of(2024, 3), month.yearMonth)
         assertEquals(31, month.days.size)
@@ -469,7 +491,10 @@ class DeviceClockCalendarRepositoryTest {
     @Test
     fun `the repository reports the Ramadan window containing today`() = runTest {
         val inRamadan = MutableClock(Instant.parse("2024-03-20T09:00:00Z"), ZoneId.of("UTC"))
-        val window = DeviceClockCalendarRepository(clock = inRamadan).observeRamadanWindow().first()
+        val window = DeviceClockCalendarRepository(
+            clock = inRamadan,
+            settings = MutableStateFlow(CalendarSettings.UMM_AL_QURA),
+        ).observeRamadanWindow().first()
 
         assertEquals(1445, window!!.hijriYear)
         assertEquals(LocalDate.of(2024, 3, 11), window.start)

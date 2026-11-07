@@ -211,7 +211,14 @@ clock and a published civil definition respectively.
 ### 5.3 The adjustment
 
 The Hijri offset (`CalendarSettings.hijriAdjustmentDays`, clamped to `−2…+2`) exists because local moon
-sighting can move an observance by a day. Its semantics are exact and are tested:
+sighting can move an observance by a day. A fresh install starts at **−1**
+(`CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS`), not `0`. Bangladesh's National Moon Sighting
+Committee has announced Ramadan one day later than the Umm al-Qura table in both 1446 AH (2 March 2025
+against 1 March) and 1447 AH (19 February 2026 against 18 February), so the default shifts the estimate
+to match. `0` remains a real setting — `CalendarSettings.UMM_AL_QURA` is the raw table — and the offset
+is still adjustable within ±2 days. The fixed offset is an approximation: it cannot guarantee that
+every Islamic month, Eid or occasion matches the Committee's announcement. Its semantics are exact and
+are tested:
 
 - it is applied **before** the value is read, so a shifted date is a genuinely different Hijri day and the
   month and year transition with it;
@@ -372,7 +379,7 @@ Persisted (in the existing shared DataStore, keys prefixed `calendar_`):
 | Preference | Key | Default |
 |---|---|---|
 | Default calendar view | `calendar_preferred_system` | `GREGORIAN` |
-| Hijri day offset | `calendar_hijri_adjustment_days` | `0` |
+| Hijri day offset | `calendar_hijri_adjustment_days` | `-1` (Bangladesh-aligned; `0` is the raw Umm al-Qura table, `CalendarSettings.UMM_AL_QURA`) |
 | Date language (script and numerals) | `calendar_date_language` | `SYSTEM` |
 | Precautionary Imsak interval (minutes before Fajr) | `calendar_imsak_minutes_before_fajr` | none — no Imsak time is shown or scheduled |
 
@@ -461,8 +468,10 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 
 ## 12. Limitations and known accuracy constraints
 
-1. **The Hijri date is an estimate.** Umm al-Qura is not the calendar Bangladesh's religious authorities
-   announce Ramadan and the Eids with. Salah labels it as an estimate everywhere and never as confirmed.
+1. **The Hijri date is an estimate.** Umm al-Qura is not the calendar Bangladesh's National Moon Sighting
+   Committee announces Ramadan and the Eids with. The default `-1` day offset is a heuristic that matched
+   the 2025 and 2026 Ramadan starts, not a verification of every date; Salah labels the result as an
+   estimate everywhere and never as confirmed.
 2. **The Ramadan window is an estimate**, may differ by a day from local sighting, and Salah does not know
    the official Bangladeshi start date.
 3. **Sehri and Iftar are calculated references**, not an authority's timetable, and no buffer is applied.
@@ -492,6 +501,7 @@ scheduled by the existing `PrayerNotificationScheduler` and reconciled by the ex
 |---|---|
 | `BanglaCalendarTest` | the published rules and reference dates; every month start; month, year and leap-year boundaries; the 14 April New Year; a whole supported year converted and converted back; refusal before 2019 and after 2399 |
 | `HijriCalendarTest` | the Umm al-Qura reference conversions; month boundaries on both sides; the adjustment and its source label; Hijri month starts and lengths (29 and 30 days); Ramadan window lengths; the window search; `isRamadan` under an offset; observances; the table's bounds |
+| `BangladeshHijriAlignmentTest` | the `-1` default, the raw `UMM_AL_QURA` baseline, the 2025 and 2026 Ramadan starts under both, and clamping from the default |
 | `CalendarMonthResolverTest` | which Gregorian days each system's month covers; the Gregorian leap day; the Bangla month boundaries (Bhadra/Ashwin, Falgun's leap 30 days); the Hijri month length and its movement with the adjustment; refusal outside both supported ranges; every day of every month numbered 1..length |
 | `RamadanCalendarTest` | Sehri = Fajr and Iftar = Maghrib; the manual adjustment moving Sehri with Fajr; a missing Fajr/Maghrib producing no time; day numbering; `IN_RAMADAN`/`UPCOMING`/`FAR_AWAY` on both sides of each boundary |
 | `GregorianCalendarGridTest` | seven cells per row; day order and padding; leading blanks for four different week starts; leap years including the century rules; year transitions; extreme months; `today`, the Ramadan window and the first day of week carried through; a span that is not a Gregorian month |

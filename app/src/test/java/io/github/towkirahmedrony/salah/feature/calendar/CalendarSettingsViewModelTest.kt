@@ -83,7 +83,11 @@ class CalendarSettingsViewModelTest {
         viewModel.shiftHijriAdjustment(1)
         runCurrent()
 
-        assertEquals(1, repository.calendarSettings.first().hijriAdjustmentDays)
+        // The default is -1, so one step forward stores 0 (the raw Umm al-Qura offset).
+        assertEquals(
+            CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS + 1,
+            repository.calendarSettings.first().hijriAdjustmentDays,
+        )
         assertEquals(
             "the offset moves the Ramadan window, so the alarms are rebuilt from it",
             1,
@@ -100,13 +104,13 @@ class CalendarSettingsViewModelTest {
         val repository = FakeUserPreferencesRepository()
         val viewModel = viewModel(repository)
 
-        // Two taps that move the offset, then one past the maximum that stores the same value again.
-        viewModel.shiftHijriAdjustment(1)
-        viewModel.shiftHijriAdjustment(1)
+        // From the default -1, three taps reach the maximum of 2, and each is a real change; a fourth
+        // tap clamps to the same value and must schedule nothing.
+        repeat(3) { viewModel.shiftHijriAdjustment(1) }
         runCurrent()
         assertEquals(
-            "each of the two real changes reconciles once",
-            2,
+            "each of the three real changes reconciles once",
+            3,
             logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
         )
 
@@ -119,7 +123,7 @@ class CalendarSettingsViewModelTest {
         )
         assertEquals(
             "nothing changed, so there is nothing to reschedule",
-            2,
+            3,
             logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
         )
     }
@@ -145,18 +149,43 @@ class CalendarSettingsViewModelTest {
     }
 
     @Test
-    fun `resetting the offset writes zero and reconciles`() = runTest(mainDispatcher) {
+    fun `resetting the offset restores the Bangladesh default and reconciles`() = runTest(mainDispatcher) {
         val repository = FakeUserPreferencesRepository(
-            initialCalendarSettings = CalendarSettings(hijriAdjustmentDays = -1),
+            initialCalendarSettings = CalendarSettings(hijriAdjustmentDays = 1),
         )
         val viewModel = viewModel(repository)
 
-        // Reset returns the estimate to unconverted; the change is a real one, so it reconciles.
+        // Reset restores the fresh-install default (-1), not the raw Umm al-Qura 0; the change is a
+        // real one, so it reconciles.
         viewModel.resetHijriAdjustment()
         runCurrent()
 
-        assertEquals(0, repository.calendarSettings.first().hijriAdjustmentDays)
+        assertEquals(
+            CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS,
+            repository.calendarSettings.first().hijriAdjustmentDays,
+        )
+        assertEquals(-1, repository.calendarSettings.first().hijriAdjustmentDays)
         assertEquals(1, logger.count(SalahDiagnosticEvents.RECONCILE_STARTED))
+    }
+
+    @Test
+    fun `resetting a value that is already the default schedules nothing`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository()
+        val viewModel = viewModel(repository)
+
+        assertEquals(
+            CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS,
+            repository.calendarSettings.first().hijriAdjustmentDays,
+        )
+
+        viewModel.resetHijriAdjustment()
+        runCurrent()
+
+        assertEquals(
+            "the value did not move, so there is nothing to reschedule",
+            0,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
     }
 
     private fun viewModel(repository: FakeUserPreferencesRepository): CalendarSettingsViewModel =

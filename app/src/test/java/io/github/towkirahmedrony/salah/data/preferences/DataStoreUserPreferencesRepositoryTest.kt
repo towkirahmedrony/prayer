@@ -158,8 +158,9 @@ class DataStoreUserPreferencesRepositoryTest {
         assertEquals(CalendarSettings.DEFAULT, settings)
         assertEquals(CalendarSystem.GREGORIAN, settings.preferredSystem)
         assertEquals(DateLanguagePreference.SYSTEM, settings.dateLanguage)
-        // No offset: Salah shows its own unconverted estimate until the user asks otherwise.
-        assertEquals(0, settings.hijriAdjustmentDays)
+        // The key was never written, so the read falls back to the Bangladesh-aligned default.
+        assertEquals(CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS, settings.hijriAdjustmentDays)
+        assertEquals(-1, settings.hijriAdjustmentDays)
     }
 
     @Test
@@ -182,11 +183,25 @@ class DataStoreUserPreferencesRepositoryTest {
 
     @Test
     fun `an update applies to the stored value rather than to a stale copy`() = runTest {
-        // Two taps in quick succession: the second must see the first one's write.
+        // Two taps in quick succession: the second must see the first one's write, so the default -1
+        // becomes 0 and then 1 rather than 0 twice.
         repository.updateCalendarSettings { it.shiftHijriAdjustment(1) }
         repository.updateCalendarSettings { it.shiftHijriAdjustment(1) }
 
-        assertEquals(2, repository.calendarSettings.first().hijriAdjustmentDays)
+        assertEquals(1, repository.calendarSettings.first().hijriAdjustmentDays)
+    }
+
+    @Test
+    fun `an explicitly stored Umm al-Qura zero is preserved`() = runTest {
+        // Zero is a real setting, not "unset": asking for the raw table must store and restore 0
+        // instead of being re-read as the -1 default.
+        repository.updateCalendarSettings { CalendarSettings.UMM_AL_QURA }
+
+        assertEquals(0, repository.calendarSettings.first().hijriAdjustmentDays)
+        assertEquals(
+            0,
+            DataStoreUserPreferencesRepository(dataStore).calendarSettings.first().hijriAdjustmentDays,
+        )
     }
 
     @Test

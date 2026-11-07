@@ -481,9 +481,9 @@
     <string name="calendar_view_hijri">Hijri</string>
     <string name="calendar_view_gregorian_hint">The civil calendar of the device.</string>
     <string name="calendar_view_bangla_hint">Bangladesh civil calendar, under the Bangla Academy rules revised in 2019.</string>
-    <string name="calendar_view_hijri_hint">Estimated from the Umm al-Qura table on this device. Not an announced date.</string>
-    <string name="calendar_hijri_source_calculated">Estimated from the Umm al-Qura calendar on this device \u2014 not an authority-confirmed date.</string>
-    <string name="calendar_hijri_source_adjusted">Estimated from the Umm al-Qura calendar, then moved by your Hijri adjustment \u2014 not an authority-confirmed date.</string>
+    <string name="calendar_view_hijri_hint">Estimated from the Umm al-Qura table on this device, shifted one day earlier by default to approximate Bangladesh. Not an announced date.</string>
+    <string name="calendar_hijri_source_calculated">Estimated from the Umm al-Qura calendar on this device with no day adjustment \u2014 not an authority-confirmed date.</string>
+    <string name="calendar_hijri_source_adjusted">Estimated from the Umm al-Qura calendar, then shifted by the Hijri adjustment (one day earlier by default for Bangladesh) \u2014 not an authority-confirmed date.</string>
     <string name="calendar_today_label">Today</string>
     <string name="calendar_selected_day">Selected day</string>
     <string name="calendar_previous_month">Previous month</string>
@@ -510,7 +510,7 @@
     <string name="calendar_ramadan_in_ramadan">Today is inside the estimated Ramadan range.</string>
     <string name="calendar_ramadan_upcoming">The next Ramadan is expected within about two months, by this device\'s calculation.</string>
     <string name="calendar_ramadan_not_near">Ramadan is more than about two months away, by this device\'s calculation.</string>
-    <string name="calendar_ramadan_estimate_note">The range comes from the Umm al-Qura calculation, not from an announcement by Bangladesh\'s religious authorities, so local moon sighting may move the start and end by a day.</string>
+    <string name="calendar_ramadan_estimate_note">The range comes from the Umm al-Qura calculation shifted by the Hijri adjustment, which is -1 day by default as a Bangladesh approximation. It is not an announcement by the National Moon Sighting Committee, so local moon sighting may still move the start and end by a day.</string>
     <string name="calendar_estimated_badge">Estimated</string>
     <string name="calendar_occasion_note">Observance dates follow the Hijri calendar, so local moon sighting may move them by a day.</string>
     <string name="calendar_sehri_end">Sehri ends</string>
@@ -523,17 +523,17 @@
     <string name="calendar_default_view_title">Default calendar view</string>
     <string name="calendar_default_view_body">Which calendar the Calendar screen opens on. The month grid, its month and weekday names, the day numbers and the year all follow the selected calendar; the other calendars are still shown for the selected day.</string>
     <string name="calendar_hijri_adjustment_title">Hijri date adjustment</string>
-    <string name="calendar_hijri_adjustment_body">Salah\'s Hijri date is an Umm al-Qura estimate. If your community follows a different date, shift it here: every Hijri date, the estimated Ramadan range and the Ramadan reminders move with it. The result is still reported as an estimate, because it is one.</string>
+    <string name="calendar_hijri_adjustment_body">Salah estimates the Hijri date from the Umm al-Qura table and starts one day earlier (-1) to approximate Bangladesh. Every Hijri date, the estimated Ramadan range and the Sehri, Iftar and Imsak reminders move with this offset. It is still an estimate: official dates follow the National Moon Sighting Committee, so adjust within \u00b12 days if your community follows a different date.</string>
     <string name="calendar_hijri_adjustment_value">Adjustment: %1$s day(s)</string>
     <string name="calendar_hijri_adjustment_range">Between \u2212%1$d and +%1$d days</string>
-    <string name="calendar_hijri_adjustment_reset">Reset to 0</string>
+    <string name="calendar_hijri_adjustment_reset">Reset to the Bangladesh default</string>
     <string name="calendar_language_title">Date language</string>
     <string name="calendar_language_body">Which script and numerals calendar dates are written in.</string>
     <string name="calendar_language_system">Follow the device</string>
     <string name="calendar_language_bangla">বাংলা</string>
     <string name="calendar_language_english">English</string>
     <string name="calendar_sources_title">Where these dates come from</string>
-    <string name="calendar_sources_body">The Gregorian date comes from the device clock. The Bangla date is converted with the Bangladesh civil rules revised in 2019, and is only offered for the years those rules are verified for. The Hijri date is estimated from the Umm al-Qura table built into Android and is always labelled as an estimate. None of it needs a network connection.</string>
+    <string name="calendar_sources_body">The Gregorian date comes from the device clock. The Bangla date is converted with the Bangladesh civil rules revised in 2019, and is only offered for the years those rules are verified for. The Hijri date is estimated from the Umm al-Qura table built into Android and shifted one day earlier by default, which is Salah\'s approximation of Bangladesh\'s moon-sighting date; the official dates follow the National Moon Sighting Committee. It is always labelled as an estimate, and none of it needs a network connection.</string>
     <string name="calendar_reminders_note">Sehri and Iftar reminders are configured with the other prayer reminders, so they share one scheduler, one set of permissions and one set of channels.</string>
     <string name="calendar_open_settings">Open calendar settings</string>
     <string name="calendar_open_ramadan">Open the Ramadan calendar</string>
@@ -551,8 +551,8 @@
     <!-- Ramadan screen -->
     <string name="ramadan_window_summary">%1$s • %2$d days</string>
     <string name="ramadan_window_unavailable">This device\'s Hijri table does not cover a Ramadan near today, so Salah shows no Ramadan dates rather than estimated ones.</string>
-    <string name="ramadan_estimate_note">Estimated from the Umm al-Qura calculation; local moon sighting may move the start and end.</string>
-    <string name="ramadan_adjustment_note">Includes your Hijri adjustment of %1$s day(s).</string>
+    <string name="ramadan_estimate_note">Estimated from the Umm al-Qura calculation with the Hijri adjustment (-1 day by default, a Bangladesh approximation); the National Moon Sighting Committee announces the official start and end.</string>
+    <string name="ramadan_adjustment_note">Includes a Hijri adjustment of %1$s day(s); the default -1 day is Salah\'s Bangladesh alignment.</string>
     <string name="ramadan_open_calendar">Open the calendar</string>
     <string name="ramadan_reminders_card_title">Reminders</string>
     <string name="ramadan_reminder_at_time">At time</string>

@@ -177,11 +177,17 @@ class CalendarUiStateFactoryTest {
 
     @Test
     fun `the interface language renders all three calendars but changes none of them`() = runTest {
-        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
+        val month = monthAt(
+            "2024-03-11T09:00:00Z",
+            LocalDate.of(2024, 3, 11),
+            CalendarSettings.UMM_AL_QURA,
+        )
         val selected = LocalDate.of(2024, 3, 11)
 
-        val asEnglish = factory.create(month, CalendarSettings.DEFAULT, selected, english) as CalendarUiState.Ready
-        val asBengali = factory.create(month, CalendarSettings.DEFAULT, selected, bengali) as CalendarUiState.Ready
+        val asEnglish = factory.create(month, CalendarSettings.UMM_AL_QURA, selected, english) as
+            CalendarUiState.Ready
+        val asBengali = factory.create(month, CalendarSettings.UMM_AL_QURA, selected, bengali) as
+            CalendarUiState.Ready
 
         // The same three lines, describing the same date, with the same availability — a translation
         // must never add or remove a representation.
@@ -246,8 +252,14 @@ class CalendarUiStateFactoryTest {
 
     @Test
     fun `every day of the selected day is resolved in all three calendars`() = runTest {
-        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
-        val state = factory.create(month, CalendarSettings.DEFAULT, LocalDate.of(2024, 3, 11), english) as
+        val month = monthAt(
+            "2024-03-11T09:00:00Z",
+            LocalDate.of(2024, 3, 11),
+            CalendarSettings.UMM_AL_QURA,
+        )
+        // Raw Umm al-Qura, so the asserted Hijri label is the table's own value rather than the app's
+        // default Bangladesh alignment.
+        val state = factory.create(month, CalendarSettings.UMM_AL_QURA, LocalDate.of(2024, 3, 11), english) as
             CalendarUiState.Ready
 
         assertEquals(3, state.selected.lines.size)
@@ -353,8 +365,13 @@ class CalendarUiStateFactoryTest {
 
     @Test
     fun `the Ramadan summary is labelled as an estimate and carries the range`() = runTest {
-        val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
-        val state = factory.create(month, CalendarSettings.DEFAULT, month.today, english) as CalendarUiState.Ready
+        val month = monthAt(
+            "2024-03-11T09:00:00Z",
+            LocalDate.of(2024, 3, 11),
+            CalendarSettings.UMM_AL_QURA,
+        )
+        val state = factory.create(month, CalendarSettings.UMM_AL_QURA, month.today, english) as
+            CalendarUiState.Ready
 
         assertEquals(RamadanPhase.IN_RAMADAN, state.ramadan.phase)
         assertEquals(1445, state.ramadan.hijriYear)
@@ -435,7 +452,7 @@ class CalendarUiStateFactoryTest {
     @Test
     fun `selecting the Hijri view follows the interface language instead of always using Arabic`() = runTest {
         // 20 March 2024 is inside Ramadan 1445, which runs 11 March to 9 April 2024.
-        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val settings = CalendarSettings.UMM_AL_QURA.copy(preferredSystem = CalendarSystem.HIJRI)
         val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
         val state = factory.create(month, settings, LocalDate.of(2024, 3, 20), english) as CalendarUiState.Ready
 
@@ -456,7 +473,7 @@ class CalendarUiStateFactoryTest {
 
     @Test
     fun `selecting the Hijri view in a Bengali interface renders Bengali names and numerals`() = runTest {
-        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val settings = CalendarSettings.UMM_AL_QURA.copy(preferredSystem = CalendarSystem.HIJRI)
         val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
         val state = factory.create(month, settings, LocalDate.of(2024, 3, 20), bengali) as CalendarUiState.Ready
 
@@ -476,7 +493,7 @@ class CalendarUiStateFactoryTest {
 
     @Test
     fun `the Hijri dates in the selected-day card follow the interface language`() = runTest {
-        val settings = CalendarSettings(preferredSystem = CalendarSystem.HIJRI)
+        val settings = CalendarSettings.UMM_AL_QURA.copy(preferredSystem = CalendarSystem.HIJRI)
         val month = monthAt("2024-03-20T09:00:00Z", LocalDate.of(2024, 3, 20), settings)
         val englishState = factory.create(month, settings, LocalDate.of(2024, 3, 20), english) as
             CalendarUiState.Ready

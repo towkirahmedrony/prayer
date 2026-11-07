@@ -27,8 +27,10 @@ import kotlinx.coroutines.launch
  * **Only the Hijri offset reschedules anything.** Which Gregorian dates are in Ramadan is decided by
  * that offset, and the Sehri and Iftar reminders are planned from the calendar's Ramadan window — so
  * moving the offset is followed by [PrayerNotificationCoordinator.reconcile], and the reminders move
- * with the dates the screen is now showing instead of waiting for the next app start. The default
- * view and the date language change no time, so they reconcile nothing.
+ * with the dates the screen is now showing instead of waiting for the next app start. The offset starts
+ * at the Bangladesh-aligned [CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS] (`-1`), and reset restores
+ * that value rather than the raw Umm al-Qura `0`. The default view and the date language change no
+ * time, so they reconcile nothing.
  */
 class CalendarSettingsViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
@@ -50,8 +52,15 @@ class CalendarSettingsViewModel(
     /** Moves the Hijri offset by [days], clamped to the supported range by the model. */
     fun shiftHijriAdjustment(days: Int) = update { it.shiftHijriAdjustment(days) }
 
-    /** Returns the Hijri offset to `0`, so Salah shows its own unconverted estimate again. */
-    fun resetHijriAdjustment() = update { it.copy(hijriAdjustmentDays = 0) }
+    /**
+     * Restores the Bangladesh-aligned default offset, [CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS].
+     *
+     * Reset means "back to what a fresh install shows", which is `-1`, not the raw Umm al-Qura `0`. The
+     * write goes through the same transaction as a shift, so resetting a value that is already the
+     * default changes nothing and schedules nothing.
+     */
+    fun resetHijriAdjustment() =
+        update { it.copy(hijriAdjustmentDays = CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS) }
 
     private fun update(transform: (CalendarSettings) -> CalendarSettings) {
         viewModelScope.launch {

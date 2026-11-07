@@ -73,7 +73,9 @@ class CalendarViewModelTest {
         originalLocale = Locale.getDefault()
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         Locale.setDefault(Locale.ENGLISH)
-        preferences = FakePreferences(CalendarSettings.DEFAULT)
+        // Raw Umm al-Qura for the stored settings: the month assertions below pin the table's own
+        // boundaries, and the default Bangladesh alignment has its own tests.
+        preferences = FakePreferences(CalendarSettings.UMM_AL_QURA)
     }
 
     @After

@@ -137,7 +137,11 @@ fun CalendarSettingsScreen(
                         signedDayCount(settings.hijriAdjustmentDays),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (settings.hijriAdjustmentDays == 0) {
+                    // The default is the Bangladesh-aligned offset, not zero, so "at the default" is
+                    // compared against the model's constant rather than against a hard-coded 0.
+                    color = if (settings.hijriAdjustmentDays ==
+                        CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS
+                    ) {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     } else {
                         MaterialTheme.colorScheme.primary
@@ -162,7 +166,7 @@ fun CalendarSettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (settings.hijriAdjustmentDays != 0) {
+            if (settings.hijriAdjustmentDays != CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS) {
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(onClick = viewModel::resetHijriAdjustment) {
                     Text(text = stringResource(R.string.calendar_hijri_adjustment_reset))

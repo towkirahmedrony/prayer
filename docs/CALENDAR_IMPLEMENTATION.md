@@ -153,7 +153,7 @@ under the existing key:
 | Preference | Key | Default |
 |---|---|---|
 | Calendar system shown | `calendar_preferred_system` | `GREGORIAN` |
-| Hijri day offset | `calendar_hijri_adjustment_days` | `0` |
+| Hijri day offset | `calendar_hijri_adjustment_days` | `-1` (Bangladesh-aligned; `0` is the raw Umm al-Qura table, `CalendarSettings.UMM_AL_QURA`) |
 | Date language (the side-by-side list) | `calendar_date_language` | `SYSTEM` |
 
 Unknown or out-of-range stored values fall back to the documented default on read, and the offset is
@@ -161,8 +161,11 @@ clamped on write and on read, so the screen can always represent what is stored.
 
 ## 10. Known limitations
 
-1. **The Hijri date is an estimate.** Umm al-Qura is not what Bangladesh's religious authorities
-   announce; Salah labels it as an estimate everywhere and never as confirmed.
+1. **The Hijri date is an estimate.** The underlying calendar is Umm al-Qura, and the default `-1` day
+   adjustment is Salah's approximation of Bangladesh's usual one-day-later moon-sighting date (it matched
+   the 2025 and 2026 Ramadan starts). Official dates follow the National Moon Sighting Committee; the
+   result is labelled as an estimate everywhere and never as confirmed, and the heuristic cannot guarantee
+   every month or Eid. The manual ±2-day adjustment remains available.
 2. **Bangla conversion is offered only for 14 April 2019 onwards** and only for Bangladesh's rules.
 3. **Hijri conversion is limited to the platform's table** (roughly AH 1300–1600).
 4. **Out-of-range modes fall back to the Gregorian month.** When the Bangla or Hijri month cannot be

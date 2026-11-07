@@ -158,12 +158,13 @@ data class CalendarSettings(
     /**
      * Days added to the calculated Hijri date.
      *
-     * Salah's Hijri date is an estimate from the Umm al-Qura table, and local moon sighting can move
-     * an observance by a day. This offset lets the user align Salah with whatever their community
-     * follows, without Salah pretending to know the announcement. Clamped to
+     * Salah's Hijri date is estimated from the Umm al-Qura table. A fresh install starts from
+     * [DEFAULT_HIJRI_ADJUSTMENT_DAYS] (`-1`), the Bangladesh-aligned estimate, and [UMM_AL_QURA] is the
+     * same calendar with no alignment. The offset stays adjustable so the user can match whichever
+     * date their community follows, without Salah pretending to know the announcement. Clamped to
      * `-[MAX_HIJRI_ADJUSTMENT_DAYS]..[MAX_HIJRI_ADJUSTMENT_DAYS]`.
      */
-    val hijriAdjustmentDays: Int = 0,
+    val hijriAdjustmentDays: Int = DEFAULT_HIJRI_ADJUSTMENT_DAYS,
 
     /** Which language and numeral system calendar dates are rendered in. */
     val dateLanguage: DateLanguagePreference = DateLanguagePreference.SYSTEM,
@@ -195,6 +196,16 @@ data class CalendarSettings(
     fun withoutImsak(): CalendarSettings = copy(imsakMinutesBeforeFajr = null)
 
     companion object {
+        /**
+         * The Hijri offset a fresh install starts from: one day behind the raw Umm al-Qura estimate.
+         *
+         * Bangladesh's National Moon Sighting Committee has announced a Hijri date one day later than
+         * the Umm al-Qura table, which is why `-1` is Salah's default estimate. It is a heuristic, not a
+         * verified announcement: it cannot guarantee every month matches, and the user can still move it
+         * within ±[MAX_HIJRI_ADJUSTMENT_DAYS].
+         */
+        const val DEFAULT_HIJRI_ADJUSTMENT_DAYS: Int = -1
+
         /** Largest Hijri day offset Salah accepts, in either direction. */
         const val MAX_HIJRI_ADJUSTMENT_DAYS: Int = 2
 
@@ -210,8 +221,18 @@ data class CalendarSettings(
         /** The interval a user starts from when they first enable the precautionary Imsak time. */
         const val DEFAULT_IMSAK_MINUTES: Int = 10
 
-        /** The preferences a fresh install starts from: estimated dates, no offset, no Imsak rule. */
+        /** The preferences a fresh install starts from: the Bangladesh-aligned estimate, no Imsak rule. */
         val DEFAULT: CalendarSettings = CalendarSettings()
+
+        /**
+         * The raw, unshifted Umm al-Qura calendar.
+         *
+         * Zero remains a meaningful offset — it is what the platform's own table says — so a caller that
+         * needs the unconverted date asks for it explicitly instead of relying on a default.
+         */
+        val UMM_AL_QURA: CalendarSettings = CalendarSettings(
+            hijriAdjustmentDays = 0,
+        )
 
         /** Fixes an out-of-range stored offset so the UI can always represent it. */
         fun clampHijriAdjustment(days: Int): Int =

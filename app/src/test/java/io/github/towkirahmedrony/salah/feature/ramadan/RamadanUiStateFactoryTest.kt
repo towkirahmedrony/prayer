@@ -64,7 +64,9 @@ class RamadanUiStateFactoryTest {
         today: LocalDate = LocalDate.parse("2024-03-13"),
         locationConfigured: Boolean = true,
         notifications: PrayerNotificationSettings = PrayerNotificationSettings.DEFAULT,
-        calendar: CalendarSettings = CalendarSettings.DEFAULT,
+        // Raw Umm al-Qura: the rows below assert the table's own Hijri labels, so the app's default
+        // Bangladesh alignment is applied only by the test that asks for it.
+        calendar: CalendarSettings = CalendarSettings.UMM_AL_QURA,
     ) = RamadanUiStateInputs(
         today = today,
         calendarSettings = calendar,
