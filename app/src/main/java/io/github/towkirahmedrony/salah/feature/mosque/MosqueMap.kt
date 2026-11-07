@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -290,8 +291,10 @@ private fun MapControls(
     val shape = MaterialTheme.shapes.small
     val glyphTint = MaterialTheme.colorScheme.onSurface
 
+    // A fixed 48dp width: the divider below fills whatever width it is offered, and without this the
+    // whole control stretched across the map.
     Column(
-        modifier = modifier,
+        modifier = modifier.width(48.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(
