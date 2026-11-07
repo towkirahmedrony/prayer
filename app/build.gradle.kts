@@ -50,12 +50,15 @@ val salahSupabaseAnonKey: String =
 val geoapifyApiKey: String =
     (findProperty("GEOAPIFY_API_KEY") as String?)?.trim()?.takeIf { it.isNotEmpty() }
         ?: providers.environmentVariable("GEOAPIFY_API_KEY").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-        ?: run {
+        ?: run<String?> {
             val localProperties = rootProject.file("local.properties")
             if (localProperties.exists()) {
-                val props = java.util.Properties()
-                localProperties.inputStream().use { props.load(it) }
-                props.getProperty("GEOAPIFY_API_KEY")?.trim()?.takeIf { it.isNotEmpty() }
+                localProperties.readLines()
+                    .map { it.trim() }
+                    .firstOrNull { it.substringBefore("=").trim() == "GEOAPIFY_API_KEY" }
+                    ?.substringAfter("=")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
             } else {
                 null
             }
