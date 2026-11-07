@@ -603,6 +603,7 @@ class LocalizationResourcesTest {
             "tools_",
             "tasbih_",
             "zakat_",
+            "mosque_",
             "settings_",
             "method_",
             "asr_",
@@ -629,6 +630,8 @@ class LocalizationResourcesTest {
             "qibla_coordinates",
             "qibla_location_line",
             "qibla_bearing_value_degrees",
+            "mosque_map_attribution",
+            "mosque_marker_description",
         )
 
         /**
@@ -642,6 +645,7 @@ class LocalizationResourcesTest {
             "tools",
             "tasbih",
             "zakat",
+            "mosque",
             "settings",
             "notifications",
             "location",
@@ -680,6 +684,8 @@ class LocalizationResourcesTest {
             "ZakatUiState.kt",
             "ZakatUiStateFactory.kt",
             "ZakatViewModel.kt",
+            "MosqueFinderUiState.kt",
+            "MosqueFinderViewModel.kt",
         )
 
         /** The `feature` directory, relative to the repository root or the module directory. */

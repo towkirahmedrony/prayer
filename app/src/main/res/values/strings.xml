@@ -191,6 +191,71 @@
     <string name="tools_unavailable_note">Quran and Dua are not part of Salah yet, so they are not listed here. Every tool above opens a real screen.</string>
     <string name="tools_tasbih_description">Count with a target, and keep a history of finished sessions</string>
     <string name="tools_zakat_description">Work out zakat on cash, gold, silver, stock and debts, with the rule behind every figure shown</string>
+    <string name="tools_mosques_title">Mosque finder</string>
+    <string name="tools_mosques_description">Find mosques near your location on a map or in a list</string>
+
+    <!--
+      Mosque finder.
+
+      Every failure is its own sentence because the user's next action differs: a rate limit means
+      wait, a missing key means the build is not configured, and a refused key means the key is wrong.
+      Distances are formatted in the composable, in the interface language's numerals, so they read
+      "১.২ কিমি" on a Bengali screen and "1.2 km" on an English one.
+    -->
+    <string name="mosque_title">Mosque finder</string>
+    <string name="mosque_subtitle">Nearby mosques, nearest first. Results come from Geoapify and are saved for offline viewing.</string>
+    <string name="mosque_back">Back</string>
+    <string name="mosque_view_list">List</string>
+    <string name="mosque_view_map">Map</string>
+    <string name="mosque_view_mode_description">Choose list or map</string>
+    <string name="mosque_action_refresh">Refresh</string>
+    <string name="mosque_action_use_current_location">Use current location</string>
+    <string name="mosque_action_directions">Directions</string>
+    <string name="mosque_searching">Looking for mosques nearby…</string>
+    <string name="mosque_refreshing">Refreshing…</string>
+    <string name="mosque_empty_title">No mosques found nearby</string>
+    <string name="mosque_empty_body">No mosques were returned within %1$s km of this location. Try another place or refresh.</string>
+    <string name="mosque_failure_title">Mosques could not be loaded</string>
+    <string name="mosque_failure_not_configured">The mosque search is not configured in this build. The Geoapify API key is missing.</string>
+    <string name="mosque_failure_network_unavailable">There is no connection to the mosque service. Check your connection and try again.</string>
+    <string name="mosque_failure_timeout">The mosque service did not answer in time. Try again.</string>
+    <string name="mosque_failure_connection">Could not reach the mosque service. Check your connection and try again.</string>
+    <string name="mosque_failure_rate_limited">The mosque service is busy. Wait a moment and try again.</string>
+    <string name="mosque_failure_access_denied">The mosque service refused this app\'s API key.</string>
+    <string name="mosque_failure_server">The mosque service returned an error. Try again later.</string>
+    <string name="mosque_failure_malformed">The mosque service returned data that could not be read.</string>
+    <string name="mosque_failure_too_large">The mosque service returned more data than this screen can read.</string>
+    <string name="mosque_failure_unknown">Something went wrong while loading mosques. Try again.</string>
+    <string name="mosque_cached_notice">Showing saved results. The latest refresh did not succeed.</string>
+    <string name="mosque_refresh_failed_notice">The latest refresh did not succeed. Showing the previous results.</string>
+    <string name="mosque_origin_cached">Saved</string>
+    <string name="mosque_origin_live">Live</string>
+    <string name="mosque_distance_metres">%1$s m away</string>
+    <string name="mosque_distance_kilometres">%1$s km away</string>
+    <string name="mosque_selected_title">Selected mosque</string>
+    <string name="mosque_open_directions">Open directions to %1$s</string>
+    <string name="mosque_directions_unavailable">No app on this device can open directions.</string>
+    <string name="mosque_map_loading">Loading map…</string>
+    <string name="mosque_map_unavailable">Map unavailable. The list still works.</string>
+    <string name="mosque_map_failed">The map could not be loaded. The list is still available.</string>
+    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors</string>
+    <string name="mosque_map_description">Map of nearby mosques. %1$s mosques shown.</string>
+    <string name="mosque_map_description_one">Map of nearby mosques. 1 mosque shown.</string>
+    <string name="mosque_marker_description">%1$s, %2$s</string>
+    <string name="mosque_location_permission_denied">Location access is not allowed. Showing mosques around your saved location.</string>
+    <string name="mosque_location_services_disabled">Location is switched off. Turn it on in system settings, or keep using your saved location.</string>
+    <string name="mosque_location_timeout">A current position could not be obtained in time. Try again.</string>
+    <string name="mosque_location_unavailable">A current position could not be obtained. Showing mosques around your saved location.</string>
+    <string name="mosque_location_acquiring">Getting your location…</string>
+    <string name="mosque_location_current">Current location</string>
+    <string name="mosque_location_saved">Saved location: %1$s</string>
+    <string name="mosque_searching_around">Searching around %1$s</string>
+    <string name="mosque_results_count">%1$s mosques nearby</string>
+    <string name="mosque_results_count_one">1 mosque nearby</string>
+    <string name="mosque_no_location">No saved location yet. Use your current location to search.</string>
+    <string name="mosque_address_unknown">Address not provided</string>
+    <string name="mosque_phone">Phone</string>
+    <string name="mosque_website">Website</string>
 
     <!--
       Tasbih: the counting screen and its session history.

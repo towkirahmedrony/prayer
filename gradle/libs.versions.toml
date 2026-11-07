@@ -25,6 +25,17 @@ koin = "4.2.2"
 coroutines = "1.11.0"
 junit = "4.13.2"
 
+# --- Mosque finder -----------------------------------------------------------------------
+# MapLibre Native renders the Geoapify-hosted vector tiles. The SDK ships its own rendering
+# engine; it does not contain map data, so the style is supplied by Geoapify at runtime. See
+# docs/MOSQUE_FINDER.md.
+maplibre = "13.7.1"
+# Room is the persistent cache for previously fetched mosques: the list must survive process
+# death and be usable with no connection. KSP is the annotation processor; the version is
+# KSP's own (not a Kotlin-version prefix) and supports Kotlin 2.x.
+room = "2.8.5"
+ksp = "2.3.13"
+
 # --- Prayer calculation engine ----------------------------------------------------------
 # Adhan Kotlin (batoulapps/adhan-kotlin), published as `com.batoulapps.adhan:adhan2`.
 #
@@ -56,6 +67,14 @@ koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = 
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
+# Map rendering (no map data included; tiles/style come from Geoapify).
+maplibre-android = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
+
+# Persistent mosque cache.
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
 # Local astronomical prayer-time calculation. Works entirely offline; no network is involved.
 adhan-kotlin = { group = "com.batoulapps.adhan", name = "adhan2", version.ref = "adhan" }
 
@@ -65,3 +84,4 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

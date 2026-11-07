@@ -2,6 +2,7 @@ package io.github.towkirahmedrony.salah.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.room.Room
 import io.github.towkirahmedrony.salah.BuildConfig
 import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.DiagnosticsLogger
@@ -46,6 +47,10 @@ import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceFreshnes
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRemoteConfig
 import io.github.towkirahmedrony.salah.core.domain.metalprice.MetalPriceRepository
 import io.github.towkirahmedrony.salah.core.domain.metalprice.RemoteMetalPriceSource
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCache
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueRepository
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchConfig
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchSource
 import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
@@ -74,6 +79,11 @@ import io.github.towkirahmedrony.salah.data.location.AssetBangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.data.metalprice.FileMetalPriceCache
 import io.github.towkirahmedrony.salah.data.metalprice.SupabaseMetalPriceRepository
 import io.github.towkirahmedrony.salah.data.metalprice.SupabaseRemoteMetalPriceSource
+import io.github.towkirahmedrony.salah.data.mosque.DefaultMosqueRepository
+import io.github.towkirahmedrony.salah.data.mosque.GeoapifyMosqueSource
+import io.github.towkirahmedrony.salah.data.mosque.MosqueDao
+import io.github.towkirahmedrony.salah.data.mosque.MosqueDatabase
+import io.github.towkirahmedrony.salah.data.mosque.RoomMosqueCache
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
 import io.github.towkirahmedrony.salah.data.notification.AndroidDiagnosticsLogger
@@ -107,6 +117,7 @@ import io.github.towkirahmedrony.salah.feature.calendar.CalendarViewModel
 import io.github.towkirahmedrony.salah.feature.home.HomeUiStateFactory
 import io.github.towkirahmedrony.salah.feature.home.HomeViewModel
 import io.github.towkirahmedrony.salah.feature.location.LocationViewModel
+import io.github.towkirahmedrony.salah.feature.mosque.MosqueFinderViewModel
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsViewModel
 import kotlin.random.Random
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaViewModel
@@ -391,6 +402,40 @@ val salahModules = module {
         )
     }
     single { LoadPublishedReferencePrices(repository = get()) }
+
+    // Mosque finder -----------------------------------------------------------
+    // The same optional Geoapify key the build already compiles for reverse geocoding. A blank value
+    // is a normal "not configured" state: the config reports it, the source makes no request, and the
+    // screen explains it rather than crashing. Nothing here logs or stores the key.
+    single { MosqueSearchConfig(apiKey = BuildConfig.GEOAPIFY_API_KEY) }
+    single<MosqueSearchSource> { GeoapifyMosqueSource(transport = get(), config = get()) }
+
+    // The persistent cache of previously fetched mosques. Room is scoped to this one table and this
+    // one file; it is not a second preference store and contains no user data, only public places.
+    // A downgrade cannot be migrated by an older build and must not leave a database this build cannot
+    // read, so it is discarded explicitly rather than producing an opaque schema exception.
+    single {
+        Room.databaseBuilder(
+            androidContext(),
+            MosqueDatabase::class.java,
+            MosqueDatabase.NAME,
+        )
+            .addMigrations(*MosqueDatabase.MIGRATIONS)
+            .fallbackToDestructiveMigrationOnDowngrade()
+            .build()
+    }
+    single<MosqueDao> { get<MosqueDatabase>().mosqueDao() }
+    single<MosqueCache> { RoomMosqueCache(dao = get()) }
+    single<MosqueRepository> {
+        DefaultMosqueRepository(
+            config = get(),
+            source = get(),
+            cache = get(),
+            // The one UTC clock the rest of the app reads. It decides the cache timestamp written on a
+            // successful fetch and the age cutoff used to prune, so a test can pin both.
+            clock = get(),
+        )
+    }
 
     // Zakat -------------------------------------------------------------------
     // The calculator itself has no repository and no stored state on purpose. The values a user enters are
@@ -696,6 +741,20 @@ val salahModules = module {
             uiStateFactory = get(),
             loadReferencePrices = get(),
             clock = get(),
+        )
+    }
+
+    // Mosque finder. It reads the saved location and the selected language, asks the shared location
+    // port for a one-shot fix only when the user requests one, and delegates all data work to the
+    // repository. The screen has no logic beyond rendering this state.
+    viewModel {
+        MosqueFinderViewModel(
+            repository = get(),
+            locations = get(),
+            userPreferences = get(),
+            locationProvider = get(),
+            permissionChecker = get(),
+            config = get(),
         )
     }
 }

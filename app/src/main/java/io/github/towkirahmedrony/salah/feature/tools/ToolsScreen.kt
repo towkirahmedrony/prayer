@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronRightGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LanternGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.MosqueGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.QiblaGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihBeadsGlyph
@@ -155,5 +156,6 @@ private fun ToolsEntryGlyph(entry: ToolsEntry, tint: Color) {
         // The counter's own mark, not the Tools tab's: see TasbihBeadsGlyph for why the two differ.
         ToolsEntry.TASBIH -> TasbihBeadsGlyph(tint = tint)
         ToolsEntry.ZAKAT -> ZakatScaleGlyph(tint = tint)
+        ToolsEntry.MOSQUES -> MosqueGlyph(tint = tint)
     }
 }

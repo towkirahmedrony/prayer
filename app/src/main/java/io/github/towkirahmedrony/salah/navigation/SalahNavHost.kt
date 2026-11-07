@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.feature.home.HomeScreen
 import io.github.towkirahmedrony.salah.feature.home.PrayerScreen
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionContext
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionScreen
+import io.github.towkirahmedrony.salah.feature.mosque.MosqueFinderScreen
 import io.github.towkirahmedrony.salah.feature.notifications.PrayerNotificationSettingsScreen
 import io.github.towkirahmedrony.salah.feature.qibla.QiblaScreen
 import io.github.towkirahmedrony.salah.feature.ramadan.RamadanScreen
@@ -105,6 +106,13 @@ fun SalahNavHost(
         // saved state to restore, so nothing depends on how it is entered.
         composable(SalahDestination.ZAKAT.route) {
             ZakatScreen(onBack = { navController.popBackStack() })
+        }
+
+        // The mosque finder. Opened from Tools; back returns to the list that opened it. Its search
+        // centre is the saved location unless the user explicitly asks for a current fix, and that
+        // fix is not written back to the app's location.
+        composable(SalahDestination.MOSQUES.route) {
+            MosqueFinderScreen(onBack = { navController.popBackStack() })
         }
 
         // Settings: the overview, then one destination per category. Each category screen is declared

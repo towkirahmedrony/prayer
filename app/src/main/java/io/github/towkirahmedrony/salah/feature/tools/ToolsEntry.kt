@@ -78,5 +78,17 @@ enum class ToolsEntry(
         titleRes = R.string.zakat_title,
         descriptionRes = R.string.tools_zakat_description,
     ),
+
+    /**
+     * The mosque finder: nearby places of worship on a map or in a list.
+     *
+     * Its own name and description, because no other screen opens it. The row is the finder's only
+     * way in, which is what the Tools screen is for.
+     */
+    MOSQUES(
+        destination = SalahDestination.MOSQUES,
+        titleRes = R.string.tools_mosques_title,
+        descriptionRes = R.string.tools_mosques_description,
+    ),
     ;
 }

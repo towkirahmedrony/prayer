@@ -408,6 +408,70 @@
     <string name="tools_unavailable_note">কুরআন ও দুআ এখনও সালাহর অংশ নয়, তাই এগুলো এখানে তালিকাভুক্ত করা হয়নি। উপরের প্রতিটি টুল একটি প্রকৃত স্ক্রিন খোলে।</string>
     <string name="tools_tasbih_description">লক্ষ্য ঠিক করে গণনা করুন, আর শেষ হওয়া সেশনগুলোর হিসাব রাখুন</string>
     <string name="tools_zakat_description">নগদ, স্বর্ণ, রূপা, ব্যবসার মাল ও ঋণের যাকাত হিসাব করুন, প্রতিটি অঙ্কের নিয়মসহ</string>
+    <string name="tools_mosques_title">মসজিদ খুঁজুন</string>
+    <string name="tools_mosques_description">আপনার আশপাশের মসজিদ মানচিত্রে বা তালিকায় দেখুন</string>
+
+    <!--
+      মসজিদ ফাইন্ডার।
+
+      প্রতিটি ব্যর্থতার আলাদা বাক্য, কারণ ব্যবহারকারীর পরবর্তী কাজ আলাদা: রেট লিমিটে অপেক্ষা করতে হয়,
+      কী না থাকলে বিল্ডটি কনফিগার করা নেই বোঝায়, আর কী প্রত্যাখ্যাত হলে কী-টি ভুল বোঝায়। দূরত্ব
+      স্ক্রিনেই ইন্টারফেসের অঙ্কে লেখা হয়।
+    -->
+    <string name="mosque_title">মসজিদ খুঁজুন</string>
+    <string name="mosque_subtitle">কাছাকাছি মসজিদ, নিকটতম আগে। ফলাফল জিওঅ্যাপিফাই থেকে আসে এবং অফলাইনে দেখার জন্য সংরক্ষিত থাকে।</string>
+    <string name="mosque_back">ফিরে যান</string>
+    <string name="mosque_view_list">তালিকা</string>
+    <string name="mosque_view_map">মানচিত্র</string>
+    <string name="mosque_view_mode_description">তালিকা বা মানচিত্র বেছে নিন</string>
+    <string name="mosque_action_refresh">রিফ্রেশ</string>
+    <string name="mosque_action_use_current_location">বর্তমান অবস্থান ব্যবহার করুন</string>
+    <string name="mosque_action_directions">দিকনির্দেশনা</string>
+    <string name="mosque_searching">আশপাশে মসজিদ খোঁজা হচ্ছে…</string>
+    <string name="mosque_refreshing">রিফ্রেশ হচ্ছে…</string>
+    <string name="mosque_empty_title">আশপাশে কোনো মসজিদ পাওয়া যায়নি</string>
+    <string name="mosque_empty_body">এই অবস্থানের %1$s কিমি এলাকায় কোনো মসজিদ পাওয়া যায়নি। অন্য জায়গা থেকে চেষ্টা করুন বা রিফ্রেশ করুন।</string>
+    <string name="mosque_failure_title">মসজিদ লোড করা যায়নি</string>
+    <string name="mosque_failure_not_configured">এই বিল্ডে মসজিদ অনুসন্ধান কনফিগার করা নেই। জিওঅ্যাপিফাই API কী অনুপস্থিত।</string>
+    <string name="mosque_failure_network_unavailable">মসজিদ পরিষেবায় সংযোগ নেই। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।</string>
+    <string name="mosque_failure_timeout">মসজিদ পরিষেবা সময়মতো উত্তর দেয়নি। আবার চেষ্টা করুন।</string>
+    <string name="mosque_failure_connection">মসজিদ পরিষেবায় পৌঁছানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।</string>
+    <string name="mosque_failure_rate_limited">মসজিদ পরিষেবা এখন ব্যস্ত। কিছুক্ষণ পরে আবার চেষ্টা করুন।</string>
+    <string name="mosque_failure_access_denied">মসজিদ পরিষেবা এই অ্যাপের API কী গ্রহণ করেনি।</string>
+    <string name="mosque_failure_server">মসজিদ পরিষেবা একটি ত্রুটি ফিরিয়েছে। পরে আবার চেষ্টা করুন।</string>
+    <string name="mosque_failure_malformed">মসজিদ পরিষেবা এমন তথ্য ফিরিয়েছে যা পড়া যায়নি।</string>
+    <string name="mosque_failure_too_large">মসজিদ পরিষেবা এই স্ক্রিনের পড়ার সীমার চেয়ে বেশি তথ্য ফিরিয়েছে।</string>
+    <string name="mosque_failure_unknown">মসজিদ লোড করার সময় অজানা সমস্যা হয়েছে। আবার চেষ্টা করুন।</string>
+    <string name="mosque_cached_notice">সংরক্ষিত ফলাফল দেখানো হচ্ছে। সর্বশেষ রিফ্রেশ সফল হয়নি।</string>
+    <string name="mosque_refresh_failed_notice">সর্বশেষ রিফ্রেশ সফল হয়নি। আগের ফলাফল দেখানো হচ্ছে।</string>
+    <string name="mosque_origin_cached">সংরক্ষিত</string>
+    <string name="mosque_origin_live">লাইভ</string>
+    <string name="mosque_distance_metres">%1$s মিটার দূরে</string>
+    <string name="mosque_distance_kilometres">%1$s কিমি দূরে</string>
+    <string name="mosque_selected_title">নির্বাচিত মসজিদ</string>
+    <string name="mosque_open_directions">%1$s-এর দিকনির্দেশনা খুলুন</string>
+    <string name="mosque_directions_unavailable">এই ডিভাইসে কোনো অ্যাপ দিকনির্দেশনা খুলতে পারে না।</string>
+    <string name="mosque_map_loading">মানচিত্র লোড হচ্ছে…</string>
+    <string name="mosque_map_unavailable">মানচিত্র পাওয়া যায়নি। তালিকা এখনও ব্যবহার করা যাবে।</string>
+    <string name="mosque_map_failed">মানচিত্র লোড করা যায়নি। তালিকা এখনও পাওয়া যাচ্ছে।</string>
+    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors</string>
+    <string name="mosque_map_description">আশপাশের মসজিদের মানচিত্র। %1$sটি মসজিদ দেখানো হচ্ছে।</string>
+    <string name="mosque_map_description_one">আশপাশের মসজিদের মানচিত্র। ১টি মসজিদ দেখানো হচ্ছে।</string>
+    <string name="mosque_marker_description">%1$s, %2$s</string>
+    <string name="mosque_location_permission_denied">অবস্থানের অনুমতি নেই। আপনার সংরক্ষিত অবস্থানের আশপাশের মসজিদ দেখানো হচ্ছে।</string>
+    <string name="mosque_location_services_disabled">লোকেশন বন্ধ আছে। সিস্টেম সেটিংসে চালু করুন, অথবা সংরক্ষিত অবস্থান ব্যবহার করুন।</string>
+    <string name="mosque_location_timeout">সময়মতো বর্তমান অবস্থান পাওয়া যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="mosque_location_unavailable">বর্তমান অবস্থান পাওয়া যায়নি। আপনার সংরক্ষিত অবস্থানের আশপাশের মসজিদ দেখানো হচ্ছে।</string>
+    <string name="mosque_location_acquiring">আপনার অবস্থান পাওয়া হচ্ছে…</string>
+    <string name="mosque_location_current">বর্তমান অবস্থান</string>
+    <string name="mosque_location_saved">সংরক্ষিত অবস্থান: %1$s</string>
+    <string name="mosque_searching_around">%1$s-এর আশপাশে খোঁজা হচ্ছে</string>
+    <string name="mosque_results_count">আশপাশে %1$sটি মসজিদ</string>
+    <string name="mosque_results_count_one">আশপাশে ১টি মসজিদ</string>
+    <string name="mosque_no_location">এখনও কোনো সংরক্ষিত অবস্থান নেই। অনুসন্ধান করতে বর্তমান অবস্থান ব্যবহার করুন।</string>
+    <string name="mosque_address_unknown">ঠিকানা দেওয়া হয়নি</string>
+    <string name="mosque_phone">ফোন</string>
+    <string name="mosque_website">ওয়েবসাইট</string>
 
     <!--
       তাসবিহ: গণনার স্ক্রিন ও সেশনের হিসাব।

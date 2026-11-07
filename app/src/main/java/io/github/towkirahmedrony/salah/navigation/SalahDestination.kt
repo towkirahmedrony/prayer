@@ -116,6 +116,15 @@ enum class SalahDestination(
      * keeps nothing, so there is no state a tab would be preserving. See `docs/ZAKAT_METHODOLOGY.md`.
      */
     ZAKAT("zakat", R.string.zakat_title, inBottomBar = false),
+
+    /**
+     * The mosque finder: nearby mosques on a map or in a list.
+     *
+     * A tool rather than a tab, reached from the Tools screen alone. It depends on a saved location
+     * for its first search and on an optional Geoapify key for live results, so it is not a place the
+     * app should open on its own — but it is also not configuration, so it sits with the other tools.
+     */
+    MOSQUES("mosques", R.string.tools_mosques_title, inBottomBar = false),
     ;
 
     companion object {

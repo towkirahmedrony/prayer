@@ -462,3 +462,107 @@ fun SignalGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifi
 
 /** The angle the ruler is drawn on, so its own length leaves the 24-unit box on the diagonal. */
 private const val DIAGONAL_DEGREES = -40f
+
+/**
+ * The mosque finder's mark: a domed prayer hall between two minarets.
+ *
+ * Drawn in the same canvas language as every other glyph: a 24-unit box scaled to the caller's size
+ * and painted in the caller's tint, so it re-themes and adds no icon dependency. The dome is outlined
+ * rather than filled so the mark stays readable at the 24dp the tab and rows use, and the two
+ * minarets are what distinguish a mosque from the generic dome mark already used elsewhere.
+ */
+@Composable
+fun MosqueGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    // The prayer hall and its dome.
+    val hall = Path().apply {
+        moveTo(6.8f, 20f)
+        lineTo(6.8f, 13.2f)
+        cubicTo(6.8f, 9.6f, 9.1f, 7.2f, 12f, 7.2f)
+        cubicTo(14.9f, 7.2f, 17.2f, 9.6f, 17.2f, 13.2f)
+        lineTo(17.2f, 20f)
+    }
+    drawPath(hall, tint, style = stroke)
+    drawLine(tint, Offset(5.4f, 20f), Offset(18.6f, 20f), strokeWidth = 1.6f)
+    // The two minarets, drawn as slim towers with their own caps.
+    listOf(4.2f, 19.8f).forEach { x ->
+        drawLine(tint, Offset(x, 10.4f), Offset(x, 20f), strokeWidth = 1.5f)
+        drawLine(tint, Offset(x - 1.1f, 10.4f), Offset(x + 1.1f, 10.4f), strokeWidth = 1.5f)
+        drawCircle(tint, radius = 0.8f, center = Offset(x, 8.8f))
+    }
+    // The doorway, so the hall reads as an entrance rather than a blank arch.
+    drawArc(
+        color = tint,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(10.2f, 16f),
+        size = Size(3.6f, 4f),
+        style = Stroke(width = 1.4f),
+    )
+}
+
+/** A folded map: the map view's mark. */
+@Composable
+fun MapGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.7f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val map = Path().apply {
+        moveTo(3.8f, 6.2f)
+        lineTo(8.8f, 4.2f)
+        lineTo(15.2f, 6.6f)
+        lineTo(20.2f, 4.6f)
+        lineTo(20.2f, 17.8f)
+        lineTo(15.2f, 19.8f)
+        lineTo(8.8f, 17.4f)
+        lineTo(3.8f, 19.4f)
+        close()
+    }
+    drawPath(map, tint, style = stroke)
+    drawLine(tint, Offset(8.8f, 4.2f), Offset(8.8f, 17.4f), strokeWidth = 1.4f)
+    drawLine(tint, Offset(15.2f, 6.6f), Offset(15.2f, 19.8f), strokeWidth = 1.4f)
+}
+
+/** Three lines with leading dots: the list view's mark. */
+@Composable
+fun ListGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val rows = listOf(6.5f, 12f, 17.5f)
+    rows.forEach { y ->
+        drawCircle(tint, radius = 1.2f, center = Offset(6f, y))
+        drawLine(tint, Offset(9.6f, y), Offset(19.5f, y), strokeWidth = 1.7f, cap = StrokeCap.Round)
+    }
+}
+
+/** A circular arrow: refresh. */
+@Composable
+fun RefreshGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.8f, cap = StrokeCap.Round)
+    drawArc(
+        color = tint,
+        startAngle = -50f,
+        sweepAngle = 300f,
+        useCenter = false,
+        topLeft = Offset(4.4f, 4.4f),
+        size = Size(15.2f, 15.2f),
+        style = stroke,
+    )
+    val arrow = Path().apply {
+        moveTo(14.6f, 2.6f)
+        lineTo(19.6f, 5.2f)
+        lineTo(14.9f, 8.2f)
+    }
+    drawPath(arrow, tint, style = Stroke(width = 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+}
+
+/** A navigation arrow: external directions. */
+@Composable
+fun DirectionsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val arrow = Path().apply {
+        moveTo(20.4f, 3.6f)
+        lineTo(14.2f, 20.4f)
+        lineTo(11.1f, 12.9f)
+        lineTo(3.6f, 9.8f)
+        close()
+    }
+    drawPath(arrow, tint, style = Stroke(width = 1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    drawLine(tint, Offset(11.1f, 12.9f), Offset(20.4f, 3.6f), strokeWidth = 1.4f)
+}

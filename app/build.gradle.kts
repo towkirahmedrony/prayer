@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     // AGP 9 built-in Kotlin: `org.jetbrains.kotlin.android` is deliberately NOT applied here.
     alias(libs.plugins.compose.compiler)
+    // Annotation processing for the Room mosque cache. KSP is used instead of KAPT because the
+    // latter is not compatible with AGP 9's built-in Kotlin.
+    alias(libs.plugins.ksp)
 }
 
 // Salah's Supabase client configuration.
@@ -239,6 +242,13 @@ android {
     }
 }
 
+// Room's exported schemas make a future migration reviewable instead of guesswork. The directory is
+// checked in; the current schema is version 1. KSP's extension is project-level, not part of the
+// Android extension, so it must sit outside `android {}`.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -257,6 +267,14 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Mosque finder: MapLibre renders Geoapify's vector tiles; Room keeps the last fetched
+    // mosque list for offline use. Both are scoped to this feature and add no second networking
+    // client — Geoapify requests go through the existing HttpTransport.
+    implementation(libs.maplibre.android)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Installs the baseline profiles that Compose and Material3 ship, so first frames are AOT-compiled.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")

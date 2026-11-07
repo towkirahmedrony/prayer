@@ -160,6 +160,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # Optional Geoapify key for the mosque finder. Blank is a supported "not configured" state;
+          # when the secret is present the release APK can draw the Geoapify map and query Places.
+          GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_FILE:-}" ]; then
