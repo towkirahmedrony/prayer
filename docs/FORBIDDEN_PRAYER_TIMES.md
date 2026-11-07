@@ -42,9 +42,9 @@ explicit field of a `ProhibitedRuleSet`, and the rule set the application ships 
 
 | Kind | Anchored to | Opens | Closes |
 |---|---|---|---|
-| `SUNRISE_ASCENT` | sunrise | sunrise | 15 minutes after sunrise |
-| `ZENITH_DECLINE` | solar transit (solar noon) | 5 minutes before the transit | 10 minutes after the transit |
-| `SUNSET_SETTING` | sunset | 15 minutes before sunset | sunset |
+| `SUNRISE_ASCENT` | sunrise | sunrise | 20 minutes after sunrise |
+| `ZENITH_DECLINE` | solar transit (solar noon) | 5 minutes before the transit | 5 minutes after the transit, or when Dhuhr begins if that is earlier |
+| `SUNSET_SETTING` | sunset | 20 minutes before sunset | sunset |
 
 Two of these need stating plainly:
 
@@ -66,8 +66,9 @@ Two of these need stating plainly:
   reviewer.
 - `REVIEWED` — confirmed by a qualified reviewer, with the references recorded on the rule set.
 
-`ConfiguredProhibitedRuleSet.DEFAULT.sources` is **empty**, because no reference for these minute
-values has been verified in this repository. The card says so rather than implying a citation, and
+`ConfiguredProhibitedRuleSet.DEFAULT.sources` is **empty**, because no qualified reviewer has approved
+these minute values. They follow published Hanafi fatwa answers (SeekersGuidance, Qibla.com, Darul Ifta
+Birmingham; listed in the comment on `ConfiguredProhibitedRuleSet`) that the developer read. The card says so rather than implying a citation, and
 `ProhibitedConvention.hasVerifiedSources` carries that fact from the rule set to the screen.
 
 **No religious source text is quoted anywhere in this feature.** The wording describes the
@@ -99,8 +100,10 @@ Concretely, for Dhaka on 11 October 2026:
 | Solar transit (`SOLAR_NOON`) | 11:45 |
 | Dhuhr prayer time (Karachi method) | 11:46 |
 
-They differ, and treat them as if they did not: the interval is `[11:40, 11:55)`, anchored to 11:45.
-Changing the calculation method moves the prayer time and leaves the interval exactly where it was.
+They differ. The interval opens at `11:40`, five minutes before the 11:45 transit, and the rule would close
+it at 11:50. Dhuhr begins at 11:46, and zawal (the sun leaving the meridian) is not itself a forbidden
+time, so the interval closes at Dhuhr: `[11:40, 11:46)`. The calculator closes the zenith interval at the
+displayed Dhuhr whenever Dhuhr falls inside it; the opening never moves, so a method offset cannot move it.
 `ProhibitedPeriodStatusResolverTest` asserts this with a deliberately shifted Dhuhr.
 
 **How solar noon is obtained.** It is the engine's solar transit for the coordinates and local date,
@@ -203,9 +206,9 @@ In this task's environment Gradle is **not** run locally; CI
 
 ## 7. Known limitations and unresolved policy
 
-- **The minute values are not verified against a cited source.** They are the application's
-  configured policy. Rationale for the values is given in §2; no reference supporting them has been
-  checked in this repository, and `sources` is empty to say so.
+- **The minute values are not reviewed.** They follow published Hanafi fatwa answers (sunrise about
+  20 minutes, sunset about 20-30 minutes, zenith 3-5 minutes either side), but no qualified reviewer
+  has approved them, so `sources` is empty to say so.
 - **Scholarly conventions differ**, both in the length of each interval and in which prayer
   categories are affected. Salah applies one documented convention and displays it as its own; it
   does not adjudicate between conventions and must not be read as doing so.

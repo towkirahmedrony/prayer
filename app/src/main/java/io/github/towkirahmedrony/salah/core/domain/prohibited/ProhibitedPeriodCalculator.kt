@@ -1,26 +1,25 @@
 package io.github.towkirahmedrony.salah.core.domain.prohibited
 
-import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriod
+import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
+import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriod
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import java.time.ZonedDateTime
 
 /**
  * Derives prohibited-prayer windows from an already calculated [PrayerSchedule].
  *
- * The calculator is deliberately dumb about religion and exact about arithmetic: every boundary
- * it applies comes from the [ProhibitedRuleSet] it is given, and it refuses to run on a rule set
- * that is not applicable — configured by the application or reviewed by a qualified reviewer.
- * There is therefore no duration, angle or tolerance hardcoded here, and no default rule set is
- * baked in — a wrong answer is only possible if someone hands it a wrong rule set on purpose.
- *
- * It is kept separate from ordinary prayer-time calculation: it consumes a schedule and never
+ * Every boundary comes from the [ProhibitedRuleSet] it is given, and it refuses to run on a rule
+ * set that is not applicable. No duration is hardcoded here. It consumes a schedule and never
  * influences one, so prohibited windows can never move a prayer time.
  *
  * Anchors are read from the schedule's solar events — sunrise, the solar transit and sunset —
- * which the engine calculates free of every prayer and method offset. That is why a window is
- * anchored to the true astronomical event rather than to Fajr or Maghrib, which may carry
- * offsets of their own.
+ * which the engine calculates free of every prayer and method offset.
+ *
+ * **One deliberate exception.** The zenith window is closed no later than the displayed Dhuhr
+ * time. Dhuhr begins when the sun has passed the meridian (zawal), and zawal itself is not a
+ * forbidden time, so the app must never show Dhuhr as started while also showing the zenith
+ * prohibition still running. The window's opening is never moved.
  */
 class ProhibitedPeriodCalculator {
 
@@ -28,9 +27,7 @@ class ProhibitedPeriodCalculator {
      * Returns the windows [ruleSet] defines, in chronological order.
      *
      * @throws IllegalArgumentException when [ruleSet] is not applicable, or when the schedule is
-     *   missing an anchor the rule set needs. Both are programming errors: the repository checks
-     *   [ProhibitedRuleBook.isConfigured] first and the schedule must be complete. Returning a
-     *   shorter list would silently under-report a prohibition.
+     *   missing an anchor the rule set needs.
      */
     fun calculate(schedule: PrayerSchedule, ruleSet: ProhibitedRuleSet): List<ProhibitedPeriod> {
         require(ruleSet.isApplicable) {
@@ -50,8 +47,16 @@ class ProhibitedPeriodCalculator {
 
                 ProhibitedWindowKind.ZENITH_DECLINE -> {
                     val transit = schedule.requireSolarEvent(SolarEvent.SOLAR_NOON)
-                    transit.minusMinutes(ruleSet.zenithBeforeMinutes.toLong()) to
-                        transit.plusMinutes(ruleSet.zenithAfterMinutes.toLong())
+                    val opens = transit.minusMinutes(ruleSet.zenithBeforeMinutes.toLong())
+                    val closesByRule = transit.plusMinutes(ruleSet.zenithAfterMinutes.toLong())
+                    val dhuhr = schedule.timeOf(PrayerName.DHUHR)
+                    // Close at Dhuhr when it falls inside the window; otherwise keep the rule's end.
+                    val closes = if (dhuhr != null && dhuhr.isAfter(opens) && dhuhr.isBefore(closesByRule)) {
+                        dhuhr.withZoneSameInstant(zone)
+                    } else {
+                        closesByRule
+                    }
+                    opens to closes
                 }
 
                 ProhibitedWindowKind.SUNSET_SETTING -> {
@@ -68,8 +73,6 @@ class ProhibitedPeriodCalculator {
             )
         }.sortedBy { it.startsAt.toInstant() }
             .also { windows ->
-                // Written against the local zone explicitly, so the assertion holds even if the
-                // device zone differs from the prayer location's zone.
                 check(windows.all { it.startsAt.zone == zone && it.endsAt.zone == zone }) {
                     "Prohibited windows must be expressed in the schedule's zone."
                 }
@@ -87,7 +90,7 @@ class ProhibitedPeriodCalculator {
 
         ProhibitedWindowKind.ZENITH_DECLINE ->
             "Around the sun's zenith, from $zenithBeforeMinutes min before the transit until " +
-                "$zenithAfterMinutes min after it."
+                "$zenithAfterMinutes min after it, ending earlier if Dhuhr begins first."
 
         ProhibitedWindowKind.SUNSET_SETTING ->
             "From $sunsetSettingMinutes min before sunset until sunset."

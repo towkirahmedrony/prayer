@@ -26,7 +26,7 @@ import java.time.ZoneId
  * The remote configuration, resolved and then handed to the real engine.
  *
  * This is the test that ties the new configuration system back to the *existing* behaviour it must not
- * change: the bundled default must reproduce the engine's current output exactly, a supported remote value
+ * change: the bundled default must be exactly the engine's Karachi/Hanafi output plus the documented offsets, a supported remote value
  * must move only the inputs it names, and an unsupported value must never become a profile at all. The
  * expected times are the same regression values the engine's own test pins.
  */
@@ -51,24 +51,23 @@ class PrayerConfigEngineMappingTest {
         timeOf(prayer)!!.toLocalTime().toString().substring(0, 5)
 
     @Test
-    fun `the bundled default preserves the existing calculated times`() = runTest {
+    fun `the bundled default is the engine output plus the Dhuhr and Maghrib offsets`() = runTest {
         val effective = resolver.resolve(null, PrayerSettings.DEFAULT, PrayerConfigOverrides.NONE, null)
 
-        assertEquals(PrayerSettings.DEFAULT.toProfile(), effective.profile)
+        assertEquals(BundledPrayerDefaults.PROFILE, effective.profile)
 
         val schedule = schedule(effective.profile)
         assertEquals("04:39", schedule.at(PrayerName.FAJR))
-        assertEquals("11:46", schedule.at(PrayerName.DHUHR))
+        assertEquals("11:49", schedule.at(PrayerName.DHUHR))
         assertEquals("15:58", schedule.at(PrayerName.ASR))
-        assertEquals("17:36", schedule.at(PrayerName.MAGHRIB))
+        assertEquals("17:40", schedule.at(PrayerName.MAGHRIB))
         assertEquals("18:51", schedule.at(PrayerName.ISHA))
     }
 
     @Test
     fun `a published Asr convention changes only Asr`() = runTest {
-        val bundled = schedule(
-            resolver.resolve(null, PrayerSettings.DEFAULT, PrayerConfigOverrides.NONE, null).profile,
-        )
+        // The convention-free baseline: only the Asr / twilight inputs differ from it.
+        val bundled = schedule(PrayerSettings.DEFAULT.toProfile())
         val standard = schedule(
             resolver.resolve(
                 sampleSnapshot(method = PrayerCalculationMethod.KARACHI, asrMethod = AsrCalculationMethod.STANDARD),
@@ -86,9 +85,8 @@ class PrayerConfigEngineMappingTest {
 
     @Test
     fun `a published calculation method changes Fajr and Isha`() = runTest {
-        val bundled = schedule(
-            resolver.resolve(null, PrayerSettings.DEFAULT, PrayerConfigOverrides.NONE, null).profile,
-        )
+        // The convention-free baseline: only the Asr / twilight inputs differ from it.
+        val bundled = schedule(PrayerSettings.DEFAULT.toProfile())
         // The published method has to be one whose *Fajr* angle differs from the bundled default's.
         // The default is KARACHI at 18/18, and MUSLIM_WORLD_LEAGUE is 18/17: it shares Fajr's 18°
         // with the default, so choosing it would leave Fajr provably unchanged and this test would

@@ -319,3 +319,20 @@ religious correctness, and nothing in the app claims it does.
   the Home screen to be visible. Exact prayer-time alarms are out of scope for this phase, and a
   periodic WorkManager job is deliberately *not* used as a substitute.
 - **UI strings are English only.** Bangla/Arabic script relies on platform fonts.
+
+## Bangladesh convention offsets (bundled default)
+
+`BundledPrayerDefaults.PROFILE` is the profile used when no remote configuration applies and the user owns
+nothing: Karachi 18 degrees / 18 degrees, Hanafi Asr, plus a manual **Dhuhr +3** and **Maghrib +4**.
+
+Evidence: the engine's output for Dhaka was compared with two independent republications of the Islamic
+Foundation Bangladesh Dhaka timetable (27 days across March, April, August and October 2026). Dhuhr is about
+4 minutes after the solar transit (range 3.3-4.7); the Karachi method already adds 1, so the manual offset is 3.
+Maghrib is about 4 minutes after astronomical sunset (range 3.7-5.0); the method adds nothing, so the offset is 4.
+Fajr (+1.3 to +1.8), Isha (+1.7 to +3.2) and Asr (about 0) were not consistent enough to justify an offset.
+
+Limits: only Dhaka was compared; the republications were read, not the Foundation's own site; the offsets are a
+configured default and not a reviewed ruling. A published remote configuration replaces the bundled default, so
+the same offsets must be set in the published global profile or the bundled ones stop applying for users who
+have synced it. `PrayerSettings.DEFAULT` is deliberately left without adjustments (see the KDoc on
+`BundledPrayerDefaults`). Iftar equals Maghrib, so it moves with the Maghrib offset.

@@ -23,7 +23,7 @@ import java.time.ZonedDateTime
  * [ProhibitedPeriodStatusResolver.next].
  *
  * The windows are the real ones the shipped rule set produces for the Dhaka reference timetable:
- * sunrise [05:54, 06:09], zenith [11:40, 11:55], sunset [17:21, 17:36].
+ * sunrise [05:54, 06:14], zenith [11:40, 11:46] (closed at Dhuhr), sunset [17:16, 17:36].
  */
 class ProhibitedPeriodSelectionTest {
 
@@ -66,7 +66,7 @@ class ProhibitedPeriodSelectionTest {
         val active = resolver.active(windows, at(5, 56))
 
         assertEquals(ProhibitedWindowKind.SUNRISE_ASCENT, active?.period?.kind)
-        assertEquals(Duration.ofMinutes(13), active?.endsIn)
+        assertEquals(Duration.ofMinutes(18), active?.endsIn)
         assertNull(active?.startsIn)
     }
 
@@ -82,12 +82,12 @@ class ProhibitedPeriodSelectionTest {
             ProhibitedWindowKind.SUNRISE_ASCENT,
             resolver.active(windows, at(5, 54))?.period?.kind,
         )
-        assertNull("the interval is half-open, so 06:09 has closed it", resolver.active(windows, at(6, 9)))
+        assertNull("the interval is half-open, so 06:14 has closed it", resolver.active(windows, at(6, 14)))
         assertEquals(
             ProhibitedWindowKind.ZENITH_DECLINE,
             resolver.active(windows, at(11, 40))?.period?.kind,
         )
-        assertNull(resolver.active(windows, at(11, 55)))
+        assertNull("Dhuhr begins at 11:46, which closes the zenith interval", resolver.active(windows, at(11, 46)))
     }
 
     @Test
@@ -106,7 +106,7 @@ class ProhibitedPeriodSelectionTest {
     fun `the next window's countdown is to its own opening`() {
         val next = resolver.next(windows, at(15, 0))!!
 
-        assertEquals(Duration.ofHours(2).plusMinutes(21), next.startsIn)
+        assertEquals(Duration.ofHours(2).plusMinutes(16), next.startsIn)
         assertNull(next.endsIn)
     }
 
@@ -120,11 +120,11 @@ class ProhibitedPeriodSelectionTest {
     fun `at an exact end the next selection moves to the following window`() {
         assertEquals(
             ProhibitedWindowKind.ZENITH_DECLINE,
-            resolver.next(windows, at(6, 9))?.period?.kind,
+            resolver.next(windows, at(6, 14))?.period?.kind,
         )
         assertEquals(
             ProhibitedWindowKind.SUNSET_SETTING,
-            resolver.next(windows, at(11, 55))?.period?.kind,
+            resolver.next(windows, at(11, 46))?.period?.kind,
         )
     }
 

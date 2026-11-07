@@ -177,7 +177,7 @@ class PrayerConfigApplierTest {
         val applier = applier(preferences, store)
         applier.apply()
 
-        assertEquals(PrayerSettings.DEFAULT.toProfile(), preferences.prayerSettings.first().toProfile())
+        assertEquals(BundledPrayerDefaults.PROFILE, preferences.prayerSettings.first().toProfile())
         assertEquals(PrayerConfigOriginKind.BUNDLED_DEFAULT, applier.origin.first().kind)
     }
 }

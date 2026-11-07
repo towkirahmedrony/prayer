@@ -112,20 +112,21 @@ class ProhibitedPeriodStatusResolverTest {
         val zenithWindow = windows()[1]
         val sunsetWindow = windows()[2]
 
-        // Sunrise ascent: sunrise until sunrise + 15 minutes.
+        // Sunrise ascent: sunrise until sunrise + 20 minutes.
         assertEquals(at(5, 54), sunriseWindow.startsAt)
-        assertEquals(at(6, 9), sunriseWindow.endsAt)
-        assertEquals(Duration.ofMinutes(15), durationOf(sunriseWindow))
+        assertEquals(at(6, 14), sunriseWindow.endsAt)
+        assertEquals(Duration.ofMinutes(20), durationOf(sunriseWindow))
 
-        // Zenith decline: five minutes before the transit until ten minutes after it.
+        // Zenith decline: opens five minutes before the transit. The rule closes it five minutes
+        // after the transit (11:50), but Dhuhr begins at 11:46, so it closes there.
         assertEquals(at(11, 40), zenithWindow.startsAt)
-        assertEquals(at(11, 55), zenithWindow.endsAt)
-        assertEquals(Duration.ofMinutes(15), durationOf(zenithWindow))
+        assertEquals(at(11, 46), zenithWindow.endsAt)
+        assertEquals(Duration.ofMinutes(6), durationOf(zenithWindow))
 
-        // Sunset setting: fifteen minutes before sunset, ending at sunset.
-        assertEquals(at(17, 21), sunsetWindow.startsAt)
+        // Sunset setting: twenty minutes before sunset, ending at sunset.
+        assertEquals(at(17, 16), sunsetWindow.startsAt)
         assertEquals(at(17, 36), sunsetWindow.endsAt)
-        assertEquals(Duration.ofMinutes(15), durationOf(sunsetWindow))
+        assertEquals(Duration.ofMinutes(20), durationOf(sunsetWindow))
     }
 
     @Test
@@ -134,7 +135,7 @@ class ProhibitedPeriodStatusResolverTest {
         val changedWindows = calculator.calculate(prayerSchedule(), changed)
 
         assertEquals(at(5, 57), changedWindows[0].endsAt)
-        assertEquals(at(11, 55), changedWindows[1].endsAt)
+        assertEquals(at(11, 46), changedWindows[1].endsAt)
         assertEquals(at(17, 29), changedWindows[2].startsAt)
     }
 
@@ -155,13 +156,14 @@ class ProhibitedPeriodStatusResolverTest {
         assertNotNull(dhuhr)
         assertFalse("the fixture must keep the two distinct", transit == dhuhr)
 
-        // The zenith interval is anchored to the transit, not to the prayer time: with a Dhuhr the
-        // method has shifted, the interval must not move with it.
+        // The zenith interval opens relative to the transit, not to the prayer time: with a Dhuhr
+        // the method has shifted later than the window, neither end moves with it.
         val shifted = prayerSchedule(dhuhr = at(12, 10))
         val shiftedZenith = windows(shifted)[1]
 
         assertEquals(transit, shiftedZenith.startsAt.plusMinutes(5))
         assertEquals(at(11, 40), shiftedZenith.startsAt)
+        assertEquals(at(11, 50), shiftedZenith.endsAt)
     }
 
     @Test
@@ -171,16 +173,40 @@ class ProhibitedPeriodStatusResolverTest {
         val fajr = checkNotNull(today.timeOf(PrayerName.FAJR))
         val dhuhr = checkNotNull(today.timeOf(PrayerName.DHUHR))
 
-        // The Fajr period runs 04:39 to sunrise; the prohibited interval is the fifteen minutes
+        // The Fajr period runs 04:39 to sunrise; the prohibited interval is the twenty minutes
         // after sunrise. Reporting the whole period as prohibited would be wrong.
         assertTrue(Duration.between(fajr, dhuhr) > durationOf(sunriseWindow))
         assertEquals(at(5, 54), sunriseWindow.startsAt)
         assertTrue(sunriseWindow.startsAt.isAfter(fajr))
 
-        // The same holds around sunset: the interval is the last fifteen minutes before sunset, not
+        // The same holds around sunset: the interval is the last twenty minutes before sunset, not
         // the whole Maghrib to Isha period.
         val sunsetWindow = windows(today)[2]
         assertTrue(durationOf(sunsetWindow) < Duration.between(at(17, 36), at(18, 51)))
+    }
+
+    // ------------------------------------------------------------- the zenith interval and Dhuhr
+
+    @Test
+    fun `the zenith interval is closed by the time Dhuhr begins`() {
+        // Zawal, the sun leaving the meridian, is when Dhuhr begins and is not a forbidden time, so
+        // the app must never show Dhuhr started while the zenith prohibition is still running.
+        listOf(at(11, 44), at(11, 46), at(11, 49)).forEach { dhuhr ->
+            val today = prayerSchedule(dhuhr = dhuhr)
+            val zenith = windows(today)[1]
+
+            assertEquals(ProhibitedWindowKind.ZENITH_DECLINE, zenith.kind)
+            assertFalse("window must close by Dhuhr $dhuhr", zenith.endsAt.isAfter(dhuhr))
+            assertEquals(
+                ProhibitedPeriodPhase.PASSED,
+                statusOf(ProhibitedWindowKind.ZENITH_DECLINE, dhuhr, today).phase,
+            )
+        }
+    }
+
+    @Test
+    fun `no prohibited interval is active at the moment the default Dhuhr begins`() {
+        assertNull(resolver.active(windows(), at(11, 46)))
     }
 
     // ------------------------------------------------------------------------ exact-time semantics
@@ -199,7 +225,7 @@ class ProhibitedPeriodStatusResolverTest {
         val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(5, 54))
 
         assertEquals(ProhibitedPeriodPhase.ACTIVE, status.phase)
-        assertEquals(Duration.ofMinutes(15), status.endsIn)
+        assertEquals(Duration.ofMinutes(20), status.endsIn)
         assertNull("an active interval has no opening countdown", status.startsIn)
     }
 
@@ -208,12 +234,12 @@ class ProhibitedPeriodStatusResolverTest {
         val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(6, 0))
 
         assertEquals(ProhibitedPeriodPhase.ACTIVE, status.phase)
-        assertEquals(Duration.ofMinutes(9), status.endsIn)
+        assertEquals(Duration.ofMinutes(14), status.endsIn)
     }
 
     @Test
     fun `one second before the end it is still active`() {
-        val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(6, 8, 59))
+        val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(6, 13, 59))
 
         assertEquals(ProhibitedPeriodPhase.ACTIVE, status.phase)
         assertEquals(Duration.ofSeconds(1), status.endsIn)
@@ -221,7 +247,7 @@ class ProhibitedPeriodStatusResolverTest {
 
     @Test
     fun `exactly at the end of an interval it has passed`() {
-        val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(6, 9))
+        val status = statusOf(ProhibitedWindowKind.SUNRISE_ASCENT, at(6, 14))
 
         assertEquals(ProhibitedPeriodPhase.PASSED, status.phase)
         assertNull(status.startsIn)
@@ -254,7 +280,7 @@ class ProhibitedPeriodStatusResolverTest {
     }
 
     @Test
-    fun `the zenith interval covers the transit and the decline after it`() {
+    fun `the zenith interval covers the transit and ends when Dhuhr begins`() {
         assertEquals(
             ProhibitedPeriodPhase.ACTIVE,
             statusOf(ProhibitedWindowKind.ZENITH_DECLINE, at(11, 40)).phase,
@@ -265,11 +291,11 @@ class ProhibitedPeriodStatusResolverTest {
         )
         assertEquals(
             ProhibitedPeriodPhase.ACTIVE,
-            statusOf(ProhibitedWindowKind.ZENITH_DECLINE, at(11, 54, 59)).phase,
+            statusOf(ProhibitedWindowKind.ZENITH_DECLINE, at(11, 45, 59)).phase,
         )
         assertEquals(
             ProhibitedPeriodPhase.PASSED,
-            statusOf(ProhibitedWindowKind.ZENITH_DECLINE, at(11, 55)).phase,
+            statusOf(ProhibitedWindowKind.ZENITH_DECLINE, at(11, 46)).phase,
         )
     }
 
@@ -277,7 +303,7 @@ class ProhibitedPeriodStatusResolverTest {
     fun `the sunset interval ends at sunset, not after it`() {
         assertEquals(
             ProhibitedPeriodPhase.UPCOMING,
-            statusOf(ProhibitedWindowKind.SUNSET_SETTING, at(17, 20)).phase,
+            statusOf(ProhibitedWindowKind.SUNSET_SETTING, at(17, 15)).phase,
         )
         assertEquals(
             ProhibitedPeriodPhase.ACTIVE,
@@ -382,8 +408,8 @@ class ProhibitedPeriodStatusResolverTest {
         val chattogramWindows = calculator.calculate(chattogramSchedule, ruleSet)
 
         assertEquals(at(5, 48), chattogramWindows[0].startsAt)
-        assertEquals(at(6, 3), chattogramWindows[0].endsAt)
-        assertEquals(at(17, 15), chattogramWindows[2].startsAt)
+        assertEquals(at(6, 8), chattogramWindows[0].endsAt)
+        assertEquals(at(17, 10), chattogramWindows[2].startsAt)
         assertFalse(dhaka.latitude == chattogram.latitude)
 
         // The status is read against the same absolute instants, so a place with different times

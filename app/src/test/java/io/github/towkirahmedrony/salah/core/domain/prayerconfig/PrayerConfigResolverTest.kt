@@ -25,7 +25,7 @@ class PrayerConfigResolverTest {
     fun `with nothing remote the bundled default applies`() {
         val effective = resolver.resolve(null, PrayerSettings.DEFAULT, PrayerConfigOverrides.NONE, area)
 
-        assertEquals(PrayerSettings.DEFAULT.toProfile(), effective.profile)
+        assertEquals(BundledPrayerDefaults.PROFILE, effective.profile)
         assertEquals(PrayerConfigOriginKind.BUNDLED_DEFAULT, effective.origin.kind)
     }
 

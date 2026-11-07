@@ -65,6 +65,9 @@ import java.util.Locale
  * "follow the interface", not "follow the phone". [interfaceLanguage] is what makes that true, and
  * leaving it at its default keeps the pre-selector behaviour — the device locale — so the domain-level
  * tests pin exactly what they pinned before.
+ *
+ * The same language also decides the month grid's first day of the week ([observeMonth]), so the grid
+ * and the labels written above it follow one locale rather than the grid following the phone.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceClockCalendarRepository(
@@ -98,8 +101,8 @@ class DeviceClockCalendarRepository(
         }.distinctUntilChanged()
 
     override fun observeMonth(system: CalendarSystem, anchor: LocalDate): Flow<CalendarMonth> =
-        combine(midnightTicks(), settings) { instant, calendarSettings ->
-            monthAt(system, anchor, instant, calendarSettings)
+        combine(midnightTicks(), settings, interfaceLanguage) { instant, calendarSettings, language ->
+            monthAt(system, anchor, instant, calendarSettings, language)
         }.distinctUntilChanged()
 
     override fun observeTodayDate(): Flow<LocalDate> =
@@ -135,9 +138,13 @@ class DeviceClockCalendarRepository(
         anchor: LocalDate,
         instant: Instant,
         calendarSettings: CalendarSettings,
+        language: AppLanguage,
     ): CalendarMonth {
         val today = todayAt(instant)
-        val locale = formatting.localeFor(calendarSettings.dateLanguage)
+        // The interface language is passed so a `SYSTEM` date-language preference follows the app, not
+        // the phone — the same rule snapshotAt() applies. Without it the first day of the week came
+        // from Locale.getDefault() while every label on the grid used the interface locale.
+        val locale = formatting.localeFor(calendarSettings.dateLanguage, systemLocale(language))
         // One window for the whole month, so a day's Ramadan number can never disagree with the range
         // the screen shows beside the grid.
         val window = ramadanCalendar.windowFor(today, calendarSettings.hijriAdjustmentDays)

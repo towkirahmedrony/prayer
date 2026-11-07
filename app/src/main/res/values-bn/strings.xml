@@ -1066,4 +1066,6 @@
     <string name="zakat_prices_manual_needed">স্বয়ংক্রিয় দাম এখন পাওয়া যাচ্ছে না। প্রতি গ্রামের দাম নিজে লিখুন।</string>
     <string name="zakat_breakdown_show">বিস্তারিত দেখুন</string>
     <string name="zakat_breakdown_hide">বিস্তারিত লুকান</string>
+    <string name="home_hero_sehri_ends">সেহরি শেষ</string>
+    <string name="home_hero_iftar_begins">ইফতার শুরু</string>
 </resources>

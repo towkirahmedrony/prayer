@@ -8,29 +8,35 @@ package io.github.towkirahmedrony.salah.core.domain.prohibited
  * This is the **application's own documented policy**, not a quoted ruling. The descriptive rule
  * the three windows express — prayer is prohibited while the sun is rising, while it stands at its
  * zenith, and while it is setting — is not in dispute here; the *minute boundaries* that turn those
- * descriptions into clock times are the part that differs between scholarly conventions and
- * between the institutions that publish prayer timetables. Salah therefore does not claim that
- * these numbers are universally agreed, and it does not present them as one:
+ * descriptions into clock times are the part that differs between scholarly conventions.
  *
  *  - the rule set is marked [RuleVerificationStatus.CONFIGURED], never
  *    [RuleVerificationStatus.REVIEWED], so nothing in the application describes it as confirmed;
- *  - [ProhibitedRuleSet.sources] is empty, because no reference for these minute values has been
- *    verified in this repository, and the screens say so instead of implying a citation;
- *  - the boundaries are **parameters**, not constants in the calculation path, so replacing them
- *    with reviewed values is a one-line data change that cannot move a prayer time;
+ *  - [ProhibitedRuleSet.sources] stays empty: the references below were read by the developer, not
+ *    approved by a qualified reviewer, so the screens still say the values are unreviewed;
+ *  - the boundaries are **parameters**, not constants in the calculation path;
  *  - every boundary is anchored to a true solar event calculated by the existing engine — sunrise,
- *    the solar transit and sunset — and never to Fajr, Dhuhr or Maghrib, which may carry method
- *    offsets of their own.
+ *    the solar transit and sunset — and never to Fajr, Dhuhr or Maghrib, except that the zenith
+ *    window never extends past the displayed Dhuhr time (see [ProhibitedPeriodCalculator]).
+ *
+ * ## Where the numbers come from (Hanafi fatwa answers, read November 2026)
+ *
+ *  - Sunrise: until the sun is a spear's length high, "about twenty minutes" (SeekersGuidance,
+ *    Sohail Hanif and Sufyan Qufi); another answer gives 15-30 minutes depending on place and season
+ *    (SeekersGuidance, Tabraze Azam). 20 is used.
+ *  - Sunset: from when the sun turns dull until it sets, "about twenty minutes to half an hour"
+ *    (SeekersGuidance, Sohail Hanif); 15-30 per Tabraze Azam. 20 is used, the low end of both.
+ *  - Zenith (istiwa): a momentary period, so jurists add a margin: 5 minutes either side
+ *    (Darul Ifta Birmingham, citing Aapke Masail), 3-5 minutes either side (Qibla.com, Abdurrahman
+ *    Mangera). 5 is used. The same answers state that *zawal* — the sun leaving the meridian — is
+ *    when Dhuhr begins and is not itself a forbidden time, which is why the window is closed at
+ *    Dhuhr by the calculator.
  *
  * It is documented in `docs/FORBIDDEN_PRAYER_TIMES.md`, together with what remains unresolved.
  */
 object ConfiguredProhibitedRuleSet {
 
-    /**
-     * Identifier recorded on every window this set produces.
-     *
-     * Stable, because a window's origin has to stay identifiable after the numbers change.
-     */
+    /** Identifier recorded on every window this set produces. */
     const val ID: String = "salah-configured-default"
 
     /**
@@ -38,29 +44,17 @@ object ConfiguredProhibitedRuleSet {
      *
      * | Window | Opens | Closes |
      * |---|---|---|
-     * | Sunrise ascent | sunrise | 15 minutes after sunrise |
-     * | Zenith decline | 5 minutes before the solar transit | 10 minutes after the transit |
-     * | Sunset setting | 15 minutes before sunset | sunset |
-     *
-     * The sunrise and sunset windows use the same 15-minute magnitude, which is a round
-     * approximation of "until the sun has risen clear of the horizon" and "from the point the sun
-     * begins to set" and is the figure most often used in practice. They are **not** derived from
-     * one another: the two events are different and the rule set keeps them as separate parameters
-     * precisely so one can be changed without moving the other.
-     *
-     * The zenith window is deliberately asymmetric. The prohibition describes the sun standing
-     * still at its meridian and then declining, so the window opens at the transit and closes after
-     * the decline; the five minutes *before* the transit are a precautionary margin around a
-     * calculated instant, not a claim that the time before the meridian is itself prohibited. This
-     * is stated again on the screen the user reads.
+     * | Sunrise ascent | sunrise | 20 minutes after sunrise |
+     * | Zenith decline | 5 minutes before the solar transit | 5 minutes after it, or Dhuhr if earlier |
+     * | Sunset setting | 20 minutes before sunset | sunset |
      */
     val DEFAULT: ProhibitedRuleSet = ProhibitedRuleSet(
         id = ID,
         label = "Salah default policy",
-        sunriseAscentMinutes = 15,
+        sunriseAscentMinutes = 20,
         zenithBeforeMinutes = 5,
-        zenithAfterMinutes = 10,
-        sunsetSettingMinutes = 15,
+        zenithAfterMinutes = 5,
+        sunsetSettingMinutes = 20,
         verification = RuleVerificationStatus.CONFIGURED,
         sources = emptyList(),
     )

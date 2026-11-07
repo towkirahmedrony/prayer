@@ -139,7 +139,7 @@ class PrayerConfigResolver {
     ): EffectivePrayerConfig {
         if (snapshot == null) {
             return EffectivePrayerConfig(
-                profile = PrayerSettings.DEFAULT.toProfile(),
+                profile = BundledPrayerDefaults.PROFILE,
                 origin = PrayerConfigOrigin.BUNDLED,
             )
         }

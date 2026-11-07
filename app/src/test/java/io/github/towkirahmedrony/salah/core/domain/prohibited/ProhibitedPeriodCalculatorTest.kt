@@ -17,8 +17,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /**
- * Tests the *structure* of the prohibited-window calculation: anchors, ordering, zone, and the
- * refusal to run on an unreviewed rule set.
+ * Tests the *structure* of the prohibited-window calculation: anchors, ordering, zone, the rule
+ * that the zenith window never outlasts Dhuhr, and the refusal to run on an unreviewed rule set.
  *
  * The rule set used here is synthetic and exists only to exercise arithmetic. Its durations are
  * **not** a religious source, nothing in this file establishes that any window boundary is
@@ -41,6 +41,7 @@ class ProhibitedPeriodCalculatorTest {
     private fun schedule(
         sunNoon: ZonedDateTime? = at(11, 45),
         complete: Boolean = true,
+        dhuhr: ZonedDateTime = at(11, 46),
     ): PrayerSchedule = PrayerSchedule(
         date = date,
         location = location,
@@ -48,7 +49,7 @@ class ProhibitedPeriodCalculatorTest {
         prayers = if (complete) {
             listOf(
                 PrayerTimeEntry(PrayerName.FAJR, at(4, 39)),
-                PrayerTimeEntry(PrayerName.DHUHR, at(11, 46)),
+                PrayerTimeEntry(PrayerName.DHUHR, dhuhr),
                 PrayerTimeEntry(PrayerName.ASR, at(15, 58)),
                 PrayerTimeEntry(PrayerName.MAGHRIB, at(17, 36)),
                 PrayerTimeEntry(PrayerName.ISHA, at(18, 51)),
@@ -80,6 +81,9 @@ class ProhibitedPeriodCalculatorTest {
         verification = verification,
     )
 
+    private fun zenithOf(windows: List<io.github.towkirahmedrony.salah.core.model.ProhibitedPeriod>) =
+        windows.first { it.kind == ProhibitedWindowKind.ZENITH_DECLINE }
+
     @Test
     fun `refuses to run on an unreviewed rule set`() {
         val unreviewed = ruleSet(verification = RuleVerificationStatus.UNREVIEWED)
@@ -105,12 +109,48 @@ class ProhibitedPeriodCalculatorTest {
         // Sunrise until sunrise + 15.
         assertEquals(at(5, 54), windows[0].startsAt)
         assertEquals(at(6, 9), windows[0].endsAt)
-        // Five minutes either side of the transit.
+        // Opens five minutes before the transit. The rule would close it at 11:50, but Dhuhr
+        // begins at 11:46, so it closes there.
         assertEquals(at(11, 40), windows[1].startsAt)
-        assertEquals(at(11, 50), windows[1].endsAt)
+        assertEquals(at(11, 46), windows[1].endsAt)
         // Fifteen minutes before sunset, ending at sunset.
         assertEquals(at(17, 21), windows[2].startsAt)
         assertEquals(at(17, 36), windows[2].endsAt)
+    }
+
+    @Test
+    fun `closes the zenith window at Dhuhr when Dhuhr begins inside it`() {
+        val zenith = zenithOf(calculator.calculate(schedule(dhuhr = at(11, 48)), ruleSet()))
+
+        assertEquals(at(11, 40), zenith.startsAt)
+        assertEquals(at(11, 48), zenith.endsAt)
+    }
+
+    @Test
+    fun `never moves the opening of the zenith window, whatever Dhuhr is`() {
+        val zenith = zenithOf(calculator.calculate(schedule(dhuhr = at(11, 42)), ruleSet()))
+
+        assertEquals(at(11, 40), zenith.startsAt)
+        assertEquals(at(11, 42), zenith.endsAt)
+    }
+
+    @Test
+    fun `keeps the rule's own end when Dhuhr begins after the window`() {
+        val zenith = zenithOf(calculator.calculate(schedule(dhuhr = at(11, 52)), ruleSet()))
+
+        assertEquals(at(11, 40), zenith.startsAt)
+        assertEquals(at(11, 50), zenith.endsAt)
+    }
+
+    @Test
+    fun `keeps the rule's own end when Dhuhr is before the window opens`() {
+        // A Dhuhr that early is a mis-configuration; the window must stay well-formed rather than
+        // collapse or invert.
+        val zenith = zenithOf(calculator.calculate(schedule(dhuhr = at(11, 30)), ruleSet()))
+
+        assertEquals(at(11, 40), zenith.startsAt)
+        assertEquals(at(11, 50), zenith.endsAt)
+        assertTrue(zenith.startsAt.isBefore(zenith.endsAt))
     }
 
     @Test

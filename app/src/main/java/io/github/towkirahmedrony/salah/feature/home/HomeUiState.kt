@@ -100,6 +100,8 @@ sealed interface HomeUiState {
         val ramadan: RamadanSection = RamadanSection.Hidden,
         /** The Qibla bearing from the saved location, or the reason it cannot be shown. */
         val qibla: QiblaSection = QiblaSection.Unavailable,
+        /** Today's Sehri end and Iftar for the hero card, or the placeholder when there is no schedule. */
+        val fasting: FastingTimesSection = FastingTimesSection.Unavailable,
     ) : HomeUiState
 }
 
@@ -184,6 +186,28 @@ data class QiblaSection(
             distanceKm = null,
             unavailable = UnavailabilityReason.NO_LOCATION_CONFIGURED,
         )
+    }
+}
+
+/**
+ * Today's Sehri end and Iftar, for the Home hero card.
+ *
+ * Both are read from today's schedule, the same way the Ramadan screen reads them: Sehri ends at the
+ * calculated Fajr and Iftar is the calculated Maghrib. They are shown on every day, not only in
+ * Ramadan, so the card claims nothing about the month; it only states two times from the timetable.
+ * A `null` label means the schedule has no such time, and the card shows a dash rather than a guess.
+ */
+data class FastingTimesSection(
+    val sehriEndLabel: String?,
+    val iftarLabel: String?,
+    /** True when today's Sehri end is at or before the displayed moment. */
+    val sehriPassed: Boolean = false,
+    /** True when today's Iftar is at or before the displayed moment. */
+    val iftarPassed: Boolean = false,
+) {
+    companion object {
+        /** No schedule, so no times. */
+        val Unavailable: FastingTimesSection = FastingTimesSection(sehriEndLabel = null, iftarLabel = null)
     }
 }
 

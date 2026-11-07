@@ -50,6 +50,7 @@ import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.feature.common.labelRes
 import io.github.towkirahmedrony.salah.feature.common.messageRes
+import io.github.towkirahmedrony.salah.feature.home.FastingTimesSection
 import io.github.towkirahmedrony.salah.feature.home.HeroArcSection
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
@@ -200,12 +201,22 @@ fun HomeDateLine(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
 }
 
 /**
- * The hero card: the next prayer and how long is left, over the day's arc and its solar span.
+ * The hero card: the prayer whose period is open now and how long is left in it, over today's Sehri end
+ * and Iftar.
  *
  * Its fill and everything drawn on it come from the theme's brand pairing, so the white type can never
- * end up on a fill a later theme change moved out from under it. The prayer named is the one that
- * opens the next period, and the countdown is the time until that boundary — read from the resolved
- * current period, so the hero and the timetable cannot disagree about what time it is.
+ * end up on a fill a later theme change moved out from under it.
+ *
+ * Two readings, both taken from [HomeUiState.Ready] and neither calculated here:
+ *  - **While a period is open** the card names that prayer, shows when it ends and how long is left. The
+ *    countdown is the time to the next boundary in the timetable, not a statement of how long the prayer
+ *    may be performed.
+ *  - **Between sunrise and Dhuhr** no period is open, so the card says "up next" and names the prayer
+ *    that opens next, instead of showing a prayer as current when it is not.
+ *
+ * The lower row is today's Sehri end and Iftar. Sehri ends at the calculated Fajr and Iftar is the
+ * calculated Maghrib, exactly as the Ramadan screen reads them; a time that has already passed today is
+ * dimmed rather than hidden.
  */
 @Composable
 fun CurrentPrayerHeroCard(
@@ -216,14 +227,31 @@ fun CurrentPrayerHeroCard(
     val onBrand = accents.onBrandSurface
     val hero = state.currentPrayer
     val next = state.nextPrayer
-    val prayer = next.prayer ?: hero.prayer
+    val open = hero.isActive && hero.prayer != null
+
+    val prayer = if (open) hero.prayer else (next.prayer ?: hero.next.prayer)
     val prayerName = prayer?.let { stringResource(it.labelRes()) }
-    val subtitleTime = next.time ?: hero.endTime
-    val countdown = hero.countdownCompact ?: next.countdownCompact ?: hero.countdown ?: next.countdown
-    val currentName = hero.prayer?.let { stringResource(it.labelRes()) }
+    val statusLabel = stringResource(
+        if (open) R.string.home_hero_status_current else R.string.home_hero_status_up_next,
+    )
+    val subtitle = if (open) {
+        hero.endTime?.let { end ->
+            stringResource(
+                if (hero.endsNextDay) R.string.home_hero_ends_next_day else R.string.home_hero_ends,
+                end,
+            )
+        }
+    } else {
+        (next.time ?: hero.next.time)?.let { time -> stringResource(R.string.home_next_prayer_at, time) }
+    }
+    val countdown = if (open) {
+        hero.countdownCompact ?: hero.countdown
+    } else {
+        next.countdownCompact ?: next.countdown ?: hero.next.countdownCompact ?: hero.next.countdown
+    }
     val caption = when {
-        hero.isActive && currentName != null -> stringResource(R.string.home_hero_ends_then, currentName)
-        prayerName != null -> stringResource(R.string.home_hero_time_until, prayerName)
+        open -> stringResource(R.string.home_hero_time_remaining)
+        prayerName != null -> stringResource(R.string.home_hero_time_until_begins, prayerName)
         else -> null
     }
 
@@ -242,7 +270,7 @@ fun CurrentPrayerHeroCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(R.string.home_hero_label_next_prayer),
+                    text = statusLabel,
                     style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
                     fontWeight = FontWeight.SemiBold,
                     color = GoldAccent,
@@ -274,9 +302,9 @@ fun CurrentPrayerHeroCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (subtitleTime != null) {
+                        if (subtitle != null) {
                             Text(
-                                text = stringResource(R.string.home_next_prayer_at, subtitleTime),
+                                text = subtitle,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = onBrand.copy(alpha = 0.82f),
                             )
@@ -311,14 +339,65 @@ fun CurrentPrayerHeroCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-            HomeArcChart(section = state.heroArc, onBrand = onBrand)
-            Spacer(modifier = Modifier.height(14.dp))
-
+            Spacer(modifier = Modifier.height(18.dp))
             HorizontalDivider(color = onBrand.copy(alpha = 0.18f))
-            Spacer(modifier = Modifier.height(12.dp))
-            SolarSpanRow(state = state, onBrand = onBrand)
+            Spacer(modifier = Modifier.height(14.dp))
+            FastingTimesRow(section = state.fasting, onBrand = onBrand)
         }
+    }
+}
+
+/** Today's Sehri end on the left and Iftar on the right, each under its own gold label. */
+@Composable
+private fun FastingTimesRow(
+    section: FastingTimesSection,
+    onBrand: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        FastingTimeColumn(
+            label = stringResource(R.string.home_hero_sehri_ends),
+            value = section.sehriEndLabel,
+            passed = section.sehriPassed,
+            onBrand = onBrand,
+            horizontalAlignment = Alignment.Start,
+        )
+        FastingTimeColumn(
+            label = stringResource(R.string.home_hero_iftar_begins),
+            value = section.iftarLabel,
+            passed = section.iftarPassed,
+            onBrand = onBrand,
+            horizontalAlignment = Alignment.End,
+        )
+    }
+}
+
+@Composable
+private fun FastingTimeColumn(
+    label: String,
+    value: String?,
+    passed: Boolean,
+    onBrand: Color,
+    horizontalAlignment: Alignment.Horizontal,
+) {
+    Column(horizontalAlignment = horizontalAlignment) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+            fontWeight = FontWeight.SemiBold,
+            color = GoldAccent,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value ?: stringResource(R.string.home_time_unavailable),
+            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif),
+            fontWeight = FontWeight.Bold,
+            color = if (passed) onBrand.copy(alpha = 0.6f) else onBrand,
+        )
     }
 }
 

@@ -257,6 +257,31 @@ class HomeUiStateFactory(
             dashboard = dashboardState(dashboard),
             ramadan = ramadanSection(window = ramadanWindow, schedule = schedule, timeFormatter = timeFormatter),
             qibla = qiblaSection(location),
+            fasting = fastingTimes(schedule = schedule, now = now, timeFormatter = timeFormatter),
+        )
+    }
+
+    /**
+     * Today's Sehri end and Iftar for the hero card.
+     *
+     * Read through [RamadanCalendar] — Sehri ends at the calculated Fajr and Iftar is the calculated
+     * Maghrib — so this card, the Ramadan screen and the fasting reminders can never disagree. Nothing
+     * is recalculated here. A missing schedule, or a schedule without Fajr or Maghrib, gives a `null`
+     * label rather than an invented time.
+     */
+    private fun fastingTimes(
+        schedule: PrayerSchedule?,
+        now: ZonedDateTime,
+        timeFormatter: DateTimeFormatter,
+    ): FastingTimesSection {
+        if (schedule == null) return FastingTimesSection.Unavailable
+        val sehriEnd = RamadanCalendar.sehriEndOf(schedule)
+        val iftar = RamadanCalendar.iftarOf(schedule)
+        return FastingTimesSection(
+            sehriEndLabel = sehriEnd?.let(timeFormatter::format),
+            iftarLabel = iftar?.let(timeFormatter::format),
+            sehriPassed = sehriEnd != null && !sehriEnd.isAfter(now),
+            iftarPassed = iftar != null && !iftar.isAfter(now),
         )
     }
 
