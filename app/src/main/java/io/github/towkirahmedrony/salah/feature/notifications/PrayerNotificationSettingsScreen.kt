@@ -93,6 +93,19 @@ fun PrayerNotificationSettingsScreen(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { viewModel.refreshPermissionState() }
 
+    // One definition of "ask for notification access", used both by the explicit grant button and
+    // by the moment the user turns reminders on — the point at which the permission becomes the
+    // thing that decides whether anything is ever shown.
+    val requestNotifications: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            // The permission does not exist below API 33; notifications there are turned off at the
+            // app level, so the only useful destination is the app's settings page.
+            systemSettingsLauncher.launch(appNotificationSettingsIntent(context.packageName))
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -108,15 +121,7 @@ fun PrayerNotificationSettingsScreen(
 
         PermissionCard(
             uiState = uiState,
-            onRequestNotificationPermission = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    // The permission does not exist below API 33; notifications there are turned off
-                    // at the app level, so the only useful destination is the app's settings page.
-                    systemSettingsLauncher.launch(appNotificationSettingsIntent(context.packageName))
-                }
-            },
+            onRequestNotificationPermission = requestNotifications,
             onRequestExactAlarms = {
                 systemSettingsLauncher.launch(exactAlarmSettingsIntent(context.packageName))
             },
@@ -127,7 +132,13 @@ fun PrayerNotificationSettingsScreen(
 
         RemindersCard(
             uiState = uiState,
-            onMasterEnabledChange = viewModel::setMasterEnabled,
+            onMasterEnabledChange = { enabled ->
+                viewModel.setMasterEnabled(enabled)
+                // Turning reminders on is the moment the permission starts to matter, so it is asked
+                // for then rather than only from a button further up the screen. A user who has
+                // already granted it is never asked again.
+                if (enabled && !uiState.permissions.notificationsAllowed) requestNotifications()
+            },
             onRecalculate = viewModel::recalculate,
         )
 

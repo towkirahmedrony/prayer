@@ -54,13 +54,21 @@ class MediaPlayerAudioPlaybackEngine(
         // overlap even if a caller misses the single-instance rule in AzanPlaybackManager.
         releasePlayer()
 
-        return try {
-            val created = MediaPlayer().apply {
+        // Prepared first, so a resource that cannot be opened fails before focus is taken.
+        val created = try {
+            MediaPlayer().apply {
                 setAudioAttributes(azanAudioAttributes())
                 setDataSource(context, source.toUri())
                 isLooping = false
                 prepare()
             }
+        } catch (error: Exception) {
+            // Includes IOException for a missing resource and IllegalStateException for a corrupt
+            // one. A failed Azan must never take the notification path down with it.
+            return false
+        }
+
+        return try {
             created.setOnCompletionListener { stop() }
             created.setOnErrorListener { _, _, _ ->
                 // Release and stop; never retry silently.
@@ -72,9 +80,11 @@ class MediaPlayerAudioPlaybackEngine(
             player = created
             true
         } catch (error: Exception) {
-            // Includes IOException for a missing resource and IllegalStateException for a corrupt
-            // one. A failed Azan must never take the notification path down with it.
+            // A failure after focus was requested releases the player *and* the focus, so neither
+            // the audio device nor the platform player is left held by a start that never played.
+            runCatching { created.release() }
             releasePlayer()
+            abandonFocusIfHeld()
             false
         }
     }

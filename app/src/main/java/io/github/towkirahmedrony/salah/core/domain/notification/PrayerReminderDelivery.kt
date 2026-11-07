@@ -59,6 +59,16 @@ enum class SuppressionReason {
     /** This target is disabled for this user. */
     TARGET_DISABLED,
 
+    /**
+     * The reminder's own configuration changed after it was scheduled.
+     *
+     * A lead-in alarm carries the lead time it was planned with. If the user has since changed that
+     * lead — or turned it off — the alarm describes a reminder they no longer want, so it is not
+     * shown even though its target is still enabled. The reconciliation started by the settings
+     * change normally cancels it first; this covers the case where that cancel did not land.
+     */
+    SUPERSEDED,
+
     /** Notification permission is not granted, or notifications are turned off for the app. */
     NOTIFICATIONS_NOT_ALLOWED,
 

@@ -16,10 +16,10 @@
                               silently lost until the user next opened the app.
 
         SCHEDULE_EXACT_ALARM   API 31+ special permission. Without it setExactAndAllowWhileIdle
-                              throws, so Salah falls back to a windowed alarm and tells the user
-                              that reminders may be a few minutes late. Asked for separately from
-                              notification permission, because they are different permissions with
-                              different capabilities.
+                              throws, so Salah falls back to an inexact (but Doze-tolerant)
+                              alarm and tells the user that reminders may be a few minutes late.
+                              Asked for separately from notification permission, because they are
+                              different permissions with different capabilities.
 
         VIBRATE               Required for notification vibration. Salah offers a per-prayer
                               vibration preference, so the permission is used.

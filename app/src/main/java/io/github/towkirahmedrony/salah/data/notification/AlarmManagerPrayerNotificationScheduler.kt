@@ -36,10 +36,20 @@ import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificati
  *
  * **Exactness.** `setExactAndAllowWhileIdle` is used when `SCHEDULE_EXACT_ALARM` is granted, so a
  * reminder survives Doze. When it is not granted — which is the default state for an app targeting
- * API 33+ — Salah falls back to `setWindow` with a ten-minute window rather than throwing or
- * silently doing nothing. The fallback is real scheduling, honestly reported: the platform may run
- * it a few minutes late. Salah asks for the permission once, from the notification settings screen,
- * with an explanation, and never nags.
+ * API 33+ — Salah falls back to `setAndAllowWhileIdle`, not `setWindow`. Both are inexact, but only
+ * the former is guaranteed a wakeup while the device is in Doze: an inexact window alarm is
+ * deferred to the next maintenance window, which on a sleeping phone can be much later than the
+ * window suggests. The fallback is real scheduling, honestly reported: the platform may run it a
+ * few minutes late.
+ *
+ * **A revocation mid-schedule is not a lost reminder.** `canScheduleExactAlarms()` can turn false
+ * between the check and the call — Android may revoke the permission on its own after a restore or
+ * a policy change — and `setExactAndAllowWhileIdle` then throws `SecurityException`. That is caught
+ * and the slot is scheduled on the inexact path instead, so one revoked permission cannot leave the
+ * rest of the plan cancelled.
+ *
+ * Salah asks for the permission once, from the notification settings screen, with an explanation,
+ * and never nags.
  *
  * Request codes and URIs come from [PrayerNotificationIds], so a slot has the same identity here,
  * in the receiver, and in the notification it produces.
@@ -71,19 +81,19 @@ class AlarmManagerPrayerNotificationScheduler(
         }
 
         val pendingIntent = pendingIntentFor(notification.slot, request = notification)
+        val slot = notification.slot
+        val exact = permissions.status().exactAlarmsAllowed &&
+            tryScheduleExact(manager, triggerAtMillis, pendingIntent, slot)
 
-        if (permissions.status().exactAlarmsAllowed) {
-            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        } else {
-            manager.setWindow(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                PrayerNotificationScheduler.EXACT_ALARM_FALLBACK_WINDOW_MILLIS,
-                pendingIntent,
-            )
+        if (!exact) {
+            // Inexact, but still delivered during Doze. Deliberately *not* `setWindow`: an inexact
+            // window alarm is deferred to a maintenance window, so on a sleeping phone it can
+            // arrive far later than the window implies. This one is merely imprecise, which is the
+            // limitation the settings screen states.
+            manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             logger.warn(
                 SalahDiagnosticEvents.EXACT_ALARM_UNAVAILABLE,
-                mapOf("slot" to notification.slot.identity),
+                mapOf("slot" to slot.identity),
             )
         }
 
@@ -94,6 +104,29 @@ class AlarmManagerPrayerNotificationScheduler(
                 "advanceMinutes" to notification.advanceMinutes,
             ),
         )
+    }
+
+    /**
+     * Registers an exact, Doze-surviving alarm.
+     *
+     * @return `true` when the platform accepted it; `false` when the permission was revoked between
+     *   the caller's check and this call, which the caller answers by scheduling the inexact
+     *   fallback instead of dropping the slot.
+     */
+    private fun tryScheduleExact(
+        manager: AlarmManager,
+        triggerAtMillis: Long,
+        pendingIntent: PendingIntent,
+        slot: PrayerAlarmSlot,
+    ): Boolean = try {
+        manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        true
+    } catch (error: SecurityException) {
+        logger.warn(
+            SalahDiagnosticEvents.EXACT_ALARM_UNAVAILABLE,
+            mapOf("slot" to slot.identity, "reason" to "revoked_while_scheduling"),
+        )
+        false
     }
 
     override fun cancel(slot: PrayerAlarmSlot) {

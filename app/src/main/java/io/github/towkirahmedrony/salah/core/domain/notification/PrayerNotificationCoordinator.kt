@@ -12,6 +12,8 @@ import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRep
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSchedule
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
 import java.time.Clock
 import java.time.LocalDate
@@ -73,6 +75,12 @@ sealed interface ReconcileOutcome {
  * offline-first [PrayerScheduleRepository], whose provider is a local astronomical calculation, so
  * reboot recovery works with the radio off.
  *
+ * **One reconciliation at a time.** Every trigger shares this one instance, and several can arrive
+ * close together — two quick settings taps, a delivery landing while a boot reconcile runs, a
+ * foreground reconciliation overlapping the app-start one. A plan is only correct as a whole, so
+ * reconciles are serialised by [reconcileMutex]: the last run sees the last settings, and an
+ * interleaved cancel cannot strip an alarm another run has just registered for the same slot.
+ *
  * Failures are values: [reconcile] returns a [ReconcileOutcome] and never throws for an expected
  * problem.
  */
@@ -97,11 +105,21 @@ class PrayerNotificationCoordinator(
     private val ramadanCalendar: RamadanCalendar = RamadanCalendar(),
 ) {
 
+    /** Serialises [reconcile] calls. See the class documentation for why this is required. */
+    private val reconcileMutex = Mutex()
+
     /**
      * Re-derives the alarm set and applies it. Safe to call repeatedly: repeating a
      * reconciliation is idempotent, so a duplicated broadcast cannot duplicate alarms.
+     *
+     * Calls are serialised: a reconciliation that starts while another is running waits for it,
+     * rather than interleaving cancels and schedules against the same slots.
      */
-    suspend fun reconcile(reason: ReconcileReason): ReconcileOutcome {
+    suspend fun reconcile(reason: ReconcileReason): ReconcileOutcome =
+        reconcileMutex.withLock { reconcileLocked(reason) }
+
+    /** The body of [reconcile]; only ever entered while [reconcileMutex] is held. */
+    private suspend fun reconcileLocked(reason: ReconcileReason): ReconcileOutcome {
         logger.info(SalahDiagnosticEvents.RECONCILE_STARTED, mapOf("reason" to reason.name))
 
         return try {

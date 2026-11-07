@@ -26,9 +26,11 @@ import java.time.ZoneId
  *
  *  1. **Master switch** — off means nothing is shown, whatever the alarm says.
  *  2. **Target enabled** — a disabled prayer, sunrise reminder or Ramadan reminder does not appear.
- *  3. **Notifications permitted** — without `POST_NOTIFICATIONS` (or with app notifications turned
+ *  3. **Lead-in unchanged** — an advance reminder whose lead time the user has since changed is
+ *     superseded, because it would announce a lead the user did not choose.
+ *  4. **Notifications permitted** — without `POST_NOTIFICATIONS` (or with app notifications turned
  *     off) the reminder is suppressed and logged rather than posted into the void.
- *  4. **Not stale** — an alarm that fires more than
+ *  5. **Not stale** — an alarm that fires more than
  *     [DeliveryOutcome.STALE_TOLERANCE_MILLIS] after its trigger instant is suppressed. A reminder
  *     that arrives hours late, because the phone was off or a Doze window landed much later, is not
  *     information the user can act on.
@@ -74,6 +76,20 @@ class PrayerNotificationDeliverer(
                 slot.identity,
                 SuppressionReason.TARGET_DISABLED,
                 "This reminder is disabled in the current settings.",
+            )
+        }
+
+        // A lead-in alarm carries the lead it was planned with. If the user has since changed that
+        // lead — or turned the lead-in off — this alarm is superseded even though the target itself
+        // is still enabled. The reconciliation a settings change starts normally cancels it first;
+        // this is what covers the interval (or the failed platform cancel) where it did not.
+        if (slot.kind == PrayerReminderKind.ADVANCE &&
+            settings.currentAdvanceMinutes(slot.target) != request.advanceMinutes
+        ) {
+            return suppress(
+                slot.identity,
+                SuppressionReason.SUPERSEDED,
+                "This reminder's lead time changed after it was scheduled, so it was not shown.",
             )
         }
 
@@ -163,6 +179,24 @@ class PrayerNotificationDeliverer(
         ReminderTarget.SEHRI -> sehriReminderEnabled
         ReminderTarget.IFTAR -> iftarReminderEnabled
         ReminderTarget.IMSAK -> imsakReminderEnabled
+    }
+
+    /**
+     * The lead-in the **current** settings would use for [target], in minutes; `0` when the target
+     * has no lead-in of its own.
+     *
+     * Sehri and Iftar take their lead from [PrayerNotificationSettings.sehriLeadMinutes] and
+     * [PrayerNotificationSettings.iftarLeadMinutes] respectively, which is exactly what the planner
+     * used to build the slot. Sunrise and Imsak are at-time reminders only.
+     */
+    private fun PrayerNotificationSettings.currentAdvanceMinutes(target: ReminderTarget): Int {
+        val prayer = target.prayer
+        return when (target) {
+            ReminderTarget.SEHRI -> sehriLeadMinutes
+            ReminderTarget.IFTAR -> iftarLeadMinutes
+            ReminderTarget.SUNRISE, ReminderTarget.IMSAK -> 0
+            else -> if (prayer == null) 0 else preferenceFor(prayer).advanceMinutes
+        }
     }
 
     /** Sound and vibration for [target]; Ramadan reminders inherit their prayer's preference. */

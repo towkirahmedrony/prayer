@@ -32,12 +32,13 @@ interface PrayerNotificationScheduler {
 
     companion object {
         /**
-         * How wide the fallback window is when exact alarms are not permitted.
+         * The most lateness the inexact fallback is expected to add, in minutes, and the figure the
+         * settings screen quotes.
          *
-         * Ten minutes is a deliberate compromise between punctuality and the platform's ability to
-         * batch: `setWindow` lets Android fire anywhere inside the window and coalesce it with
-         * other wakeups. Salah says "may be a few minutes late" rather than pretending otherwise.
+         * Not a contract — the platform decides — but the honest order of magnitude for
+         * `setAndAllowWhileIdle`: it guarantees a wakeup, not a precise instant. Salah says "may be
+         * a few minutes late" rather than pretending otherwise.
          */
-        const val EXACT_ALARM_FALLBACK_WINDOW_MILLIS: Long = 10L * 60L * 1000L
+        const val INEXACT_FALLBACK_EXPECTED_LATENESS_MINUTES: Int = 10
     }
 }

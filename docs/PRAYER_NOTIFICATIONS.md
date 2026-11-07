@@ -306,7 +306,7 @@ does not attempt the workarounds that would require.
 | `SCHEDULE_EXACT_ALARM` | What Salah calls | Result |
 |---|---|---|
 | Granted | `AlarmManager.setExactAndAllowWhileIdle(RTC_WAKEUP, …)` | Runs at the prayer time and survives Doze. |
-| Not granted (API 31+) | `AlarmManager.setWindow(RTC_WAKEUP, …, 10 min, …)` | Still scheduled, but Android may fire anywhere in the window and may coalesce it with other wakeups. |
+| Not granted (API 31+) | `AlarmManager.setAndAllowWhileIdle(RTC_WAKEUP, …)` | Still scheduled and still wakes the device, but the instant is the platform's choice, so it may be a few minutes late. |
 | API < 31 | `setExactAndAllowWhileIdle` | Exact alarms are unrestricted; there is nothing to request. |
 
 The fallback is **real scheduling**, not a silent no-op and not an exception. Salah asks for the
@@ -314,9 +314,19 @@ permission once from the notification settings screen, explains what is lost wit
 matters — **does not repeatedly re-request it**. The current state is visible at all times as its
 own row, and the supporting text says reminders may be a few minutes late.
 
-`PrayerNotificationScheduler.EXACT_ALARM_FALLBACK_WINDOW_MILLIS` is the single definition of the
-window: **10 minutes**. Ten minutes is a deliberate compromise — wide enough for Android to batch,
-narrow enough to still be a prayer reminder rather than a late alert.
+The fallback is deliberately `setAndAllowWhileIdle` and **not** `setWindow`. Both are inexact, but
+only the former is guaranteed a wakeup while the device is in Doze; an inexact window alarm is
+deferred to the next maintenance window, which on a sleeping phone can be much later than the window
+suggests.
+
+`PrayerNotificationScheduler.INEXACT_FALLBACK_EXPECTED_LATENESS_MINUTES` (10) is the figure the
+settings screen quotes for how late that path may run. It is an expectation, not a contract: the
+platform owns the instant.
+
+`setExactAndAllowWhileIdle` can also throw `SecurityException` if the permission is revoked between
+the `canScheduleExactAlarms()` check and the call — Android may do that on its own after a restore
+or a policy change. The scheduler catches it and schedules the inexact alarm instead, so a
+mid-flight revocation costs punctuality, not the reminder.
 
 ### 5.2 Why `AlarmManager` and not `WorkManager`
 
@@ -532,7 +542,7 @@ a reminder appears at the exact second on every device, and the settings screen 
 
 | Limitation | Cause | What Salah does |
 |---|---|---|
-| A reminder may be a few minutes late. | Exact alarms not permitted, or the device is in Doze. | Uses `setWindow` with a 10-minute window, reports the state, and explains the delay. |
+| A reminder may be a few minutes late. | Exact alarms not permitted, or the device is in Doze. | Uses `setAndAllowWhileIdle` (inexact but Doze-tolerant), reports the state, and explains the delay. |
 | A reminder may not appear at all. | Notification permission denied, or app notifications turned off. | Reports it, offers the grant action, and never claims otherwise. |
 | A reminder may be silenced or hidden. | A channel the user silenced, or Do Not Disturb. | Does not attempt a bypass. States that channel settings belong to the user. |
 | Delivery may be delayed further. | Device-maker power management, battery optimisation, or an app the user force-stopped. | Uses the supported APIs and documents that Salah cannot override them. |

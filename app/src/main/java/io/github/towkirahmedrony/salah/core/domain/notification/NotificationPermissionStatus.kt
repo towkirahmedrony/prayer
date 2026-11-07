@@ -12,8 +12,8 @@ package io.github.towkirahmedrony.salah.core.domain.notification
  *    `NotificationManagerCompat.areNotificationsEnabled()` instead — which the user can also turn
  *    off per app at any Android version.
  *  - [exactAlarmsAllowed] is `SCHEDULE_EXACT_ALARM` (Android 12 / API 31 and later). Without it,
- *    `setExactAndAllowWhileIdle` throws and Salah falls back to a windowed alarm — see
- *    [exactAlarmFallbackInUse].
+ *    `setExactAndAllowWhileIdle` throws and Salah falls back to an inexact, Doze-tolerant alarm —
+ *    see [exactAlarmFallbackInUse].
  *
  * Conflating them is the classic bug this type exists to prevent: granting notifications does
  * **not** grant exact alarms, and a device can have either, both or neither.
@@ -23,13 +23,13 @@ data class NotificationPermissionStatus(
     val exactAlarmsAllowed: Boolean,
 ) {
     /**
-     * True when Salah is scheduling windowed alarms because exact alarms are not permitted.
+     * True when Salah is scheduling inexact alarms because exact alarms are not permitted.
      *
      * The user is told what this means in the notification settings screen: reminders still
-     * arrive, but the platform may deliver them up to
-     * [PrayerNotificationScheduler.EXACT_ALARM_FALLBACK_WINDOW_MILLIS] late, and a device in Doze
-     * may delay them further. That is a genuine limitation and Salah states it rather than
-     * implying second-accurate delivery.
+     * arrive — and still wake the device — but the platform decides the instant, so they may run
+     * roughly [PrayerNotificationScheduler.INEXACT_FALLBACK_EXPECTED_LATENESS_MINUTES] minutes
+     * late. That is a genuine limitation and Salah states it rather than implying second-accurate
+     * delivery.
      */
     val exactAlarmFallbackInUse: Boolean get() = !exactAlarmsAllowed
 

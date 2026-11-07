@@ -155,6 +155,64 @@ class PrayerNotificationDelivererTest {
     }
 
     @Test
+    fun `a lead-in reminder is delivered when its lead still matches the settings`() = runTest {
+        val preferences = PrayerNotificationSettings.DEFAULT.withPreference(
+            PrayerName.FAJR,
+            PrayerNotificationPreference(advanceMinutes = 10),
+        )
+        val advanceSlot = PrayerAlarmSlot(date, ReminderTarget.FAJR, PrayerReminderKind.ADVANCE)
+        val request = PrayerNotificationRequest(advanceSlot, now.toEpochMilli(), now.toEpochMilli(), 10)
+
+        val outcome = deliverer(preferences).deliver(request)
+
+        assertTrue(outcome is DeliveryOutcome.Posted)
+        assertEquals(10, presenter.delivered.single().advanceMinutes)
+    }
+
+    @Test
+    fun `a lead-in reminder whose lead changed is superseded`() = runTest {
+        // Scheduled when Fajr had a 10-minute lead; the user has since set it to 20.
+        val preferences = PrayerNotificationSettings.DEFAULT.withPreference(
+            PrayerName.FAJR,
+            PrayerNotificationPreference(advanceMinutes = 20),
+        )
+        val advanceSlot = PrayerAlarmSlot(date, ReminderTarget.FAJR, PrayerReminderKind.ADVANCE)
+        val request = PrayerNotificationRequest(advanceSlot, now.toEpochMilli(), now.toEpochMilli(), 10)
+
+        val outcome = deliverer(preferences).deliver(request)
+
+        assertEquals(SuppressionReason.SUPERSEDED, (outcome as DeliveryOutcome.Suppressed).reason)
+        assertTrue(presenter.delivered.isEmpty())
+    }
+
+    @Test
+    fun `a lead-in reminder that was turned off is superseded`() = runTest {
+        // The user set the lead back to 0 (off) after this alarm was scheduled.
+        val advanceSlot = PrayerAlarmSlot(date, ReminderTarget.FAJR, PrayerReminderKind.ADVANCE)
+        val request = PrayerNotificationRequest(advanceSlot, now.toEpochMilli(), now.toEpochMilli(), 10)
+
+        val outcome = deliverer().deliver(request)
+
+        assertEquals(SuppressionReason.SUPERSEDED, (outcome as DeliveryOutcome.Suppressed).reason)
+        assertTrue(presenter.delivered.isEmpty())
+    }
+
+    @Test
+    fun `a Sehri lead-in follows the Ramadan lead, not the Fajr prayer lead`() = runTest {
+        val preferences = PrayerNotificationSettings.DEFAULT.withSehriReminder(
+            enabled = true,
+            leadMinutes = 15,
+        )
+        val sehriSlot = PrayerAlarmSlot(date, ReminderTarget.SEHRI, PrayerReminderKind.ADVANCE)
+        val request = PrayerNotificationRequest(sehriSlot, now.toEpochMilli(), now.toEpochMilli(), 15)
+
+        val outcome = deliverer(preferences).deliver(request)
+
+        assertTrue(outcome is DeliveryOutcome.Posted)
+        assertEquals(15, presenter.delivered.single().advanceMinutes)
+    }
+
+    @Test
     fun `a disabled prayer is not delivered`() = runTest {
         val preferences = PrayerNotificationSettings.DEFAULT.withPreference(
             PrayerName.FAJR,
@@ -240,7 +298,15 @@ class PrayerNotificationDelivererTest {
         val advanceSlot = PrayerAlarmSlot(date, ReminderTarget.FAJR, PrayerReminderKind.ADVANCE)
         val request = PrayerNotificationRequest(advanceSlot, now.toEpochMilli(), now.toEpochMilli(), 10)
 
-        val outcome = deliverer(azanSource = "file://azan.mp3").deliver(request)
+        val outcome = deliverer(
+            // The lead must still match the settings, or the reminder is superseded before the
+            // Azan question is reached.
+            preferences = PrayerNotificationSettings.DEFAULT.withPreference(
+                PrayerName.FAJR,
+                PrayerNotificationPreference(advanceMinutes = 10),
+            ),
+            azanSource = "file://azan.mp3",
+        ).deliver(request)
 
         outcome as DeliveryOutcome.Posted
         assertNull("a lead-in reminder is a notification, not a call to prayer", outcome.azan)
