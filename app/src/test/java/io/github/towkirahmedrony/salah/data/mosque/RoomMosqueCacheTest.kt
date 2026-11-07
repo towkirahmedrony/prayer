@@ -139,7 +139,7 @@ class RoomMosqueCacheTest {
             fetchedAtEpochMillis = NOW,
         )
 
-        assertEquals(listOf("good"), dao.rows.map { it.placeId })
+        assertEquals(listOf("good"), dao.rows.values.map { it.placeId })
     }
 
     @Test
@@ -172,7 +172,7 @@ class RoomMosqueCacheTest {
 
         cache.pruneBefore(NOW - 5_000)
 
-        assertEquals(listOf("new"), dao.rows.map { it.placeId })
+        assertEquals(listOf("new"), dao.rows.values.map { it.placeId })
     }
 
     @Test
