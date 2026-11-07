@@ -183,8 +183,8 @@ to JDK 21 first. See `docs/PRAYER_CALCULATION.md` §1 for the full reasoning.
   `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` as environment variables. `app/build.gradle.kts`
   creates a `release` signing configuration only when all four are present; debug keeps the default
   debug signing and is unaffected. An `assembleRelease`/`bundleRelease` without credentials fails
-  fast — there is no debug-key fallback for release builds; `testReleaseUnitTest` and lint are
-  exempt so CI can run them before decoding.
+  fast — there is no debug-key fallback for release builds; unit tests (`testDebugUnitTest`) and
+  lint run before decoding and do not require signing.
 - Release shrinking is enabled (`isMinifyEnabled = true`, `isShrinkResources = true`,
   `proguard-android-optimize.txt` + `app/proguard-rules.pro`). No extra keep rules are needed:
   the app has no reflection-based or annotation-generated entry points beyond each library's
@@ -228,7 +228,7 @@ Workflow: `.github/workflows/release-apk.yml`
 | Android SDK | `sdkmanager` from the runner image: `platform-tools`, `platforms;android-37.0`, `build-tools;36.0.0`, `build-tools;37.0.0` (retried with `--channel=3` if the image's package index is stale) |
 | Wrapper validation | `./gradlew --version` must report `Gradle 9.8.1` |
 | Version | `versionName` read from `app/build.gradle.kts`; `v*` tag for tag pushes, `v<versionName>` otherwise |
-| Tests | `./gradlew testReleaseUnitTest` |
+| Tests | `./gradlew testDebugUnitTest` |
 | Lint | `./gradlew lintDebug` |
 | Keystore | `KEYSTORE_BASE64` secret decoded to `$RUNNER_TEMP/salah-release.jks` (0600), `KEYSTORE_FILE` exported |
 | Build | `./gradlew assembleRelease` with `KEYSTORE_FILE` + `KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` |

@@ -122,7 +122,7 @@ jobs:
           echo "Release version: $VERSION (versionName $GRADLE_VERSION)"
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon testReleaseUnitTest --stacktrace --info --console=plain
+        run: ./gradlew --no-daemon testDebugUnitTest --stacktrace --info --console=plain
 
       - name: Run Android lint
         run: ./gradlew --no-daemon lintDebug --stacktrace --console=plain

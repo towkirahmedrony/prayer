@@ -58,9 +58,9 @@ val salahSupabaseAnonKey: String =
 // with an explicit message instead of silently falling back to the debug
 // key — a debug-signed "release" APK would previously have been
 // indistinguishable from a production-signed one until signature inspection.
-// Tasks such as `testReleaseUnitTest` and `lintRelease` do not require signing
-// and are deliberately exempt so CI can run them before the keystore is
-// decoded. See docs/TECH_STACK.md §3.11.
+// Unit tests (`testDebugUnitTest`) and lint (`lintDebug`) do not require
+// signing and are deliberately exempt so CI can run them before the
+// keystore is decoded. See docs/TECH_STACK.md §3.11.
 val releaseKeyStoreFile: String? =
     providers.environmentVariable("KEYSTORE_FILE").getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
 val releaseKeyStorePassword: String? =
@@ -77,7 +77,7 @@ val hasReleaseSigning: Boolean =
         releaseKeyPassword != null
 
 // Only APK/AAB-producing Release tasks require signing. Unit tests
-// (`testReleaseUnitTest`) and lint (`lintRelease`) run before the keystore is
+// (`testDebugUnitTest`) and lint (`lintDebug`) run before the keystore is
 // decoded in CI and must not fail here.
 if (
     gradle.startParameter.taskNames.any {

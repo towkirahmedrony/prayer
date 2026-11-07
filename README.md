@@ -249,7 +249,7 @@ The APK is **not** built locally. `.github/workflows/release-apk.yml` runs on:
 
 Each run: checkout → Temurin JDK 17 → Gradle setup with caching → Android SDK packages
 (`platforms;android-37.0`, `build-tools;37.0.0`) → wrapper validation → version detection →
-`testReleaseUnitTest` → `lintDebug` → keystore decode → `assembleRelease` → `apksigner verify`
+`testDebugUnitTest` → `lintDebug` → keystore decode → `assembleRelease` → `apksigner verify`
 + package check + rename to `Salah-<version>-release.apk` → artifact upload → GitHub Release on
 version tags.
 
