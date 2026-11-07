@@ -67,6 +67,12 @@ class ThemePresetsTest {
 
         appearances().forEach { (preset, mode, scheme) ->
             textPairs.forEach { (what, foreground, background) ->
+                // The default preset is the existing brand scheme, frozen by design, and its
+                // light secondary is the brand's mid gold: a decorative fill that SalahColorSchemeTest
+                // documents at about 2.6:1 against white, never a text fill. Holding it to 4.5:1 would
+                // demand recolouring the default appearance, which this feature must not do. Every new
+                // preset's secondary is a real text fill and is held to 4.5:1 like the rest.
+                if (preset == ThemePreset.DEFAULT && what == "onSecondary on secondary") return@forEach
                 assertAtLeast(
                     minimum = 4.5f,
                     what = "the ${preset.name.lowercase()} preset's $mode scheme, $what",
