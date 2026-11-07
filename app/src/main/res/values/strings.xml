@@ -1138,5 +1138,4 @@
     <string name="mosque_walk_estimate">about %1$s min walk</string>
     <string name="mosque_zoom_in">Zoom in</string>
     <string name="mosque_zoom_out">Zoom out</string>
-    <string name="mosque_recenter">Show all nearby mosques</string>
 </resources>

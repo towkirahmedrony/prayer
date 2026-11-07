@@ -82,9 +82,9 @@ import kotlin.math.roundToInt
  *
  *  - **List:** the nearest mosque as a highlighted card with its distance, an estimated walking time
  *    and a Directions button, then the rest as compact rows, nearest first.
- *  - **Map:** a full-page map. The header, search context and view switch float over its top edge and
- *    the selected mosque's card floats over its bottom edge; the map's camera is padded by exactly
- *    those overlays, so nothing is framed behind them.
+ *  - **Map:** a full-page map with as little text over it as possible. One thin bar floats at the top
+ *    (back, list/map switch, refresh) and one thin card floats at the bottom (the selected mosque, its
+ *    distance and Directions). The map pads its camera by exactly those two overlays.
  *
  * Switching views never re-queries. The list is the default because it survives every partial
  * failure: a missing key or a failed style leaves distances and directions fully usable.
@@ -145,18 +145,17 @@ fun MosqueFinderScreen(
             MapResults(
                 state = state,
                 viewModel = viewModel,
+                onUseCurrentLocation = requestCurrentLocation,
                 onDirectionsUnavailable = viewModel::onDirectionsUnavailable,
             )
-            FinderChrome(
+            MapTopBar(
                 state = state,
-                floating = true,
                 onBack = onBack,
                 onSelectView = viewModel::setViewMode,
-                onUseCurrentLocation = requestCurrentLocation,
                 onRefresh = viewModel::refresh,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
             )
         } else {
             Column(
@@ -167,7 +166,6 @@ fun MosqueFinderScreen(
             ) {
                 FinderChrome(
                     state = state,
-                    floating = false,
                     onBack = onBack,
                     onSelectView = viewModel::setViewMode,
                     onUseCurrentLocation = requestCurrentLocation,
@@ -213,25 +211,17 @@ private enum class FinderContent {
     LIST,
 }
 
-/**
- * Everything that stays put while the result area changes: header, search context, view switch and
- * notices. [floating] draws each piece on a translucent surface so it stays legible over a map.
- */
+/** The list screen's fixed top: header, search context, view switch and notices. */
 @Composable
 private fun FinderChrome(
     state: MosqueFinderUiState,
-    floating: Boolean,
     onBack: () -> Unit,
     onSelectView: (MosqueViewMode) -> Unit,
     onUseCurrentLocation: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val container = if (floating) {
-        MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
+    val container = MaterialTheme.colorScheme.surface
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -239,7 +229,6 @@ private fun FinderChrome(
     ) {
         FinderHeader(
             state = state,
-            floating = floating,
             container = container,
             onBack = onBack,
             onRefresh = onRefresh,
@@ -254,6 +243,7 @@ private fun FinderChrome(
             selected = state.viewMode,
             container = container,
             onSelect = onSelectView,
+            modifier = Modifier.fillMaxWidth(),
         )
         StatusNotices(state = state)
     }
@@ -263,7 +253,6 @@ private fun FinderChrome(
 @Composable
 private fun FinderHeader(
     state: MosqueFinderUiState,
-    floating: Boolean,
     container: Color,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
@@ -278,16 +267,6 @@ private fun FinderHeader(
         count == 1 -> stringResource(R.string.mosque_results_count_one)
         else -> stringResource(R.string.mosque_results_count, countDigits)
     }
-    val titleShape = MaterialTheme.shapes.small
-    val titleModifier = if (floating) {
-        Modifier
-            .clip(titleShape)
-            .background(container)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, titleShape)
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-    } else {
-        Modifier.padding(horizontal = 2.dp)
-    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -297,26 +276,24 @@ private fun FinderHeader(
         SurfaceIconButton(label = backLabel, container = container, onClick = onBack) {
             ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Column(modifier = titleModifier) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.mosque_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
                 Text(
-                    text = stringResource(R.string.mosque_title),
-                    style = if (floating) {
-                        MaterialTheme.typography.titleMedium
-                    } else {
-                        MaterialTheme.typography.headlineSmall
-                    },
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
         SurfaceIconButton(
@@ -330,7 +307,65 @@ private fun FinderHeader(
     }
 }
 
-/** A 48dp rounded button on a surface, used for the header's two actions. */
+/**
+ * The map's whole top overlay: back, the list/map switch and refresh on one 48dp row. No title, no
+ * count and no location card — the map is the content. A notice, when there is one, sits under it.
+ */
+@Composable
+private fun MapTopBar(
+    state: MosqueFinderUiState,
+    onBack: () -> Unit,
+    onSelectView: (MosqueViewMode) -> Unit,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val container = MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
+    val backLabel = stringResource(R.string.mosque_back)
+    val refreshLabel = stringResource(R.string.mosque_action_refresh)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SurfaceIconButton(label = backLabel, container = container, onClick = onBack) {
+                ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+            }
+            ViewModeSelector(
+                selected = state.viewMode,
+                container = container,
+                onSelect = onSelectView,
+                compact = true,
+                modifier = Modifier.weight(1f),
+            )
+            SurfaceIconButton(
+                label = refreshLabel,
+                container = container,
+                onClick = onRefresh,
+                enabled = state.center != null && !state.isLoading && !state.isRefreshing,
+            ) {
+                if (state.isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    RefreshGlyph(
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+        StatusNotices(state = state)
+    }
+}
+
+/** A 48dp rounded button on a surface. */
 @Composable
 private fun SurfaceIconButton(
     label: String,
@@ -344,7 +379,7 @@ private fun SurfaceIconButton(
     Box(
         modifier = modifier
             .size(48.dp)
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .alpha(if (enabled || label.isEmpty()) 1f else DISABLED_ALPHA)
             .clip(shape)
             .background(container)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
@@ -436,30 +471,34 @@ private fun SearchContextCard(
 }
 
 /**
- * A full-width two-option switch.
+ * A two-option list/map switch.
  *
  * `selectable` with the radio-button role rather than two independent buttons: list and map are
- * mutually exclusive, and a screen reader should announce the current one and its state.
+ * mutually exclusive, and a screen reader should announce the current one and its state. [compact]
+ * removes the inner padding so the whole switch is exactly one 48dp row, to sit beside two 48dp
+ * buttons on the map's top bar.
  */
 @Composable
 private fun ViewModeSelector(
     selected: MosqueViewMode,
     container: Color,
     onSelect: (MosqueViewMode) -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val groupDescription = stringResource(R.string.mosque_view_mode_description)
-    val shape = MaterialTheme.shapes.medium
+    val shape = MaterialTheme.shapes.small
+    val inner = if (compact) 0.dp else 4.dp
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .clip(shape)
             .background(container)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .padding(4.dp)
+            .padding(inner)
             .selectableGroup()
             .semantics { contentDescription = groupDescription },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 4.dp),
     ) {
         ViewModeOption(
             mode = MosqueViewMode.LIST,
@@ -516,6 +555,7 @@ private fun ViewModeOption(
             text = label,
             style = MaterialTheme.typography.labelLarge,
             color = contentColor,
+            maxLines = 1,
         )
     }
 }
@@ -618,11 +658,10 @@ private fun ResultList(
     }
 }
 
-/** A card with the app's gold accent border, used for the nearest and the selected mosque. */
+/** A card with the app's gold accent border, used for the nearest mosque. */
 @Composable
 private fun HighlightCard(
     modifier: Modifier = Modifier,
-    containerAlpha: Float = 1f,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = MaterialTheme.shapes.large
@@ -630,7 +669,7 @@ private fun HighlightCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = containerAlpha))
+            .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f), shape)
             .padding(16.dp),
         content = content,
@@ -781,12 +820,7 @@ private fun MosqueRow(
                     )
                     if (!selected && mosque.address != null) {
                         Text(
-                            text = " · ",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = mosque.address,
+                            text = " · ${mosque.address}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -851,7 +885,7 @@ private fun ContactRow(label: String, value: String?) {
     }
 }
 
-/** The one filled action on the screen: hand the mosque to a maps app. */
+/** The full-width filled action: hand the mosque to a maps app. */
 @Composable
 private fun DirectionsButton(
     mosqueName: String,
@@ -877,15 +911,16 @@ private fun DirectionsButton(
 }
 
 /**
- * The full-page map and the selected mosque's card floating over its bottom edge.
+ * The full-page map and the selected mosque's thin card over its bottom edge.
  *
- * [MAP_TOP_INSET] and [MAP_BOTTOM_INSET] are the heights of the floating header and card. The map pads
- * its camera by them, so the results are framed in the part of the map that is actually visible.
+ * [MAP_TOP_INSET] and [MAP_BOTTOM_INSET] are the heights of the top bar and the card. The map pads its
+ * camera by them, so the results are framed in the part of the map that is actually visible.
  */
 @Composable
 private fun MapResults(
     state: MosqueFinderUiState,
     viewModel: MosqueFinderViewModel,
+    onUseCurrentLocation: () -> Unit,
     onDirectionsUnavailable: () -> Unit,
 ) {
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -902,10 +937,12 @@ private fun MapResults(
             fullBleed = true,
             topInset = MAP_TOP_INSET,
             bottomInset = if (selected != null) MAP_BOTTOM_INSET else 0.dp,
+            isAcquiringLocation = state.isAcquiringLocation,
+            onUseCurrentLocation = onUseCurrentLocation,
             modifier = Modifier.fillMaxSize(),
         )
         if (selected != null) {
-            SelectedMosqueCard(
+            SelectedMosqueBar(
                 item = selected,
                 onDirections = {
                     openDirections(
@@ -922,50 +959,73 @@ private fun MapResults(
     }
 }
 
-/** The compact detail card over the map's bottom edge. */
+/**
+ * The selected mosque as one thin row over the map: name, distance and address on the left, a
+ * Directions button on the right. It is the only text at the bottom of the map.
+ */
 @Composable
-private fun SelectedMosqueCard(
+private fun SelectedMosqueBar(
     item: MosqueWithDistance,
     onDirections: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mosque = item.mosque
     val accents = LocalSalahAccents.current
+    val shape = MaterialTheme.shapes.large
+    val description = stringResource(R.string.mosque_open_directions, mosque.name)
 
-    HighlightCard(modifier = modifier, containerAlpha = FLOATING_ALPHA) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SalahStatusPill(
-                text = stringResource(R.string.mosque_selected_title),
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = accents.goldText,
-            )
-            Spacer(modifier = Modifier.weight(1f))
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA))
+            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f), shape)
+            .padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = distanceLabel(item.distanceMetres, short = true),
-                style = MaterialTheme.typography.titleLarge,
-                color = accents.goldText,
+                text = mosque.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            Row {
+                Text(
+                    text = distanceLabel(item.distanceMetres, short = true),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accents.goldText,
+                )
+                if (mosque.address != null) {
+                    Text(
+                        text = " · ${mosque.address}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = mosque.name,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = mosque.address ?: stringResource(R.string.mosque_address_unknown),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        DirectionsButton(mosqueName = mosque.name, onClick = onDirections)
+        Spacer(modifier = Modifier.size(10.dp))
+        Button(
+            onClick = onDirections,
+            shape = MaterialTheme.shapes.small,
+            contentPadding = PaddingValues(horizontal = 14.dp),
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = description },
+        ) {
+            DirectionsGlyph(
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.size(6.dp))
+            Text(text = stringResource(R.string.mosque_action_directions))
+        }
     }
 }
 
@@ -1130,7 +1190,7 @@ private fun noticeText(notice: MosqueNotice): String = when (notice) {
 
 /**
  * A distance in the interface language's numerals: metres under a kilometre, then one decimal.
- * [short] drops the "away" ("11 m" rather than "11 m away") for places where the label already
+ * [short] drops the "away" ("11 m" rather than "11 m away") for places where the layout already
  * says what the number is.
  */
 @Composable
@@ -1205,6 +1265,6 @@ private const val FLOATING_ALPHA = 0.94f
 
 private const val DISABLED_ALPHA = 0.5f
 
-/** Heights of the floating header block and the selected-mosque card; the map pads its camera by them. */
-private val MAP_TOP_INSET = 216.dp
-private val MAP_BOTTOM_INSET = 196.dp
+/** Heights of the floating top bar and the selected-mosque bar; the map pads its camera by them. */
+private val MAP_TOP_INSET = 72.dp
+private val MAP_BOTTOM_INSET = 100.dp

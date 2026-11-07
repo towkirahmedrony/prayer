@@ -6,10 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,14 +72,18 @@ import org.maplibre.geojson.Point
  * empty canvas. The Places cache in Room makes the *list* usable offline; tiles are not pre-downloaded.
  *
  * **Full-page mode.** With [fullBleed] the map has no frame and fills whatever it is given; the screen
- * floats its header at the top and a detail card at the bottom. [topInset] and [bottomInset] are the
- * heights of those overlays: they become the map's logical padding, so the camera frames the results in
- * the part of the map the user can actually see, and the zoom controls sit in the free space between.
+ * floats a thin bar at the top and a thin card at the bottom. [topInset] and [bottomInset] are those
+ * overlays' heights: they become the map's logical padding, so the camera frames the results in the
+ * part of the map the user can see, and the controls sit in the free space between.
+ *
+ * **"You are here" is the most prominent mark.** The search centre is drawn above every mosque marker,
+ * larger than they are, with a pale ring and a soft halo, so it can be found at the zoom that frames
+ * all results. The selected mosque is drawn above it.
  *
  * **One selection state.** Tapping a marker selects the mosque through the same callback the list uses.
  *
- * **Failure.** A style that cannot load is reported over the map after the style callback or a bounded
- * timeout. The list is not affected.
+ * **Attribution.** MapLibre's own logo and info button are turned off because this composable always
+ * draws the Geoapify and OpenStreetMap attribution itself.
  */
 @Composable
 fun MosqueMap(
@@ -91,6 +96,8 @@ fun MosqueMap(
     fullBleed: Boolean = false,
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp,
+    isAcquiringLocation: Boolean = false,
+    onUseCurrentLocation: (() -> Unit)? = null,
 ) {
     if (styleUrl == null) {
         MapFallback(
@@ -108,6 +115,7 @@ fun MosqueMap(
     val markerColor = coloring.primary.toArgb()
     val selectedColor = coloring.primary.toArgb()
     val centerColor = coloring.secondary.toArgb()
+    val centerRingColor = coloring.onSurface.toArgb()
     val outlineColor = coloring.surface.toArgb()
 
     val density = LocalDensity.current
@@ -125,6 +133,7 @@ fun MosqueMap(
             markerColor = markerColor,
             selectedColor = selectedColor,
             centerColor = centerColor,
+            centerRingColor = centerRingColor,
             outlineColor = outlineColor,
         )
     }
@@ -234,7 +243,8 @@ fun MosqueMap(
             MapControls(
                 onZoomIn = renderer::zoomIn,
                 onZoomOut = renderer::zoomOut,
-                onShowAll = renderer::showAll,
+                onUseCurrentLocation = onUseCurrentLocation,
+                isAcquiringLocation = isAcquiringLocation,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(top = topInset, bottom = bottomInset, end = 12.dp),
@@ -247,7 +257,7 @@ fun MosqueMap(
             color = coloring.onSurfaceVariant,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + bottomInset)
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 6.dp + bottomInset)
                 .clip(MaterialTheme.shapes.small)
                 .background(coloring.surface.copy(alpha = ATTRIBUTION_ALPHA))
                 .padding(horizontal = 6.dp, vertical = 3.dp),
@@ -255,31 +265,67 @@ fun MosqueMap(
     }
 }
 
-/** Zoom in, zoom out and "frame every mosque again". Drawn over a full-page map. */
+/** Zoom in and out as one joined control, and the button that asks for a current location fix. */
 @Composable
 private fun MapControls(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
-    onShowAll: () -> Unit,
+    onUseCurrentLocation: (() -> Unit)?,
+    isAcquiringLocation: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val zoomInLabel = stringResource(R.string.mosque_zoom_in)
     val zoomOutLabel = stringResource(R.string.mosque_zoom_out)
-    val showAllLabel = stringResource(R.string.mosque_recenter)
+    val locationLabel = stringResource(R.string.mosque_action_use_current_location)
+    val shape = MaterialTheme.shapes.small
     val glyphTint = MaterialTheme.colorScheme.onSurface
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        MapControlButton(label = zoomInLabel, onClick = onZoomIn) {
-            PlusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
+        Column(
+            modifier = Modifier
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = CONTROL_ALPHA))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+        ) {
+            MapControlButton(label = zoomInLabel, onClick = onZoomIn) {
+                PlusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 10.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            MapControlButton(label = zoomOutLabel, onClick = onZoomOut) {
+                MinusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
+            }
         }
-        MapControlButton(label = zoomOutLabel, onClick = onZoomOut) {
-            MinusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
-        }
-        MapControlButton(label = showAllLabel, onClick = onShowAll) {
-            LocateGlyph(tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        if (onUseCurrentLocation != null) {
+            Box(
+                modifier = Modifier
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = CONTROL_ALPHA))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+            ) {
+                MapControlButton(
+                    label = locationLabel,
+                    onClick = onUseCurrentLocation,
+                    enabled = !isAcquiringLocation,
+                ) {
+                    if (isAcquiringLocation) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        LocateGlyph(
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -288,16 +334,13 @@ private fun MapControls(
 private fun MapControlButton(
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.small
     Box(
         modifier = Modifier
             .size(48.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = CONTROL_ALPHA))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
@@ -330,7 +373,7 @@ private fun MapFallback(
 
 /** A small, quiet overlay over the map for its loading and failure states. */
 @Composable
-private fun BoxScope.MapOverlay(text: String) {
+private fun MapOverlay(text: String) {
     Box(
         modifier = Modifier
             .matchParentSize()
@@ -371,6 +414,7 @@ private class MosqueMapRenderer {
     private var markerColor: Int = 0
     private var selectedColor: Int = 0
     private var centerColor: Int = 0
+    private var centerRingColor: Int = 0
     private var outlineColor: Int = 0
 
     private var topInsetPx: Int = 0
@@ -388,7 +432,7 @@ private class MosqueMapRenderer {
 
     /**
      * The heights of the overlays drawn over the map. They become the map's logical padding, so every
-     * camera move centres on the visible part of the map rather than behind the header or the card.
+     * camera move centres on the visible part of the map rather than behind the bar or the card.
      */
     fun setInsets(top: Int, bottom: Int) {
         if (top == topInsetPx && bottom == bottomInsetPx) return
@@ -402,30 +446,38 @@ private class MosqueMapRenderer {
         markerColor: Int,
         selectedColor: Int,
         centerColor: Int,
+        centerRingColor: Int,
         outlineColor: Int,
     ) {
         val changed = this.markerColor != markerColor ||
             this.selectedColor != selectedColor ||
             this.centerColor != centerColor ||
+            this.centerRingColor != centerRingColor ||
             this.outlineColor != outlineColor
         this.markerColor = markerColor
         this.selectedColor = selectedColor
         this.centerColor = centerColor
+        this.centerRingColor = centerRingColor
         this.outlineColor = outlineColor
         if (!changed) return
 
         val loaded = style ?: return
-        loaded.getLayerAs<CircleLayer>(CENTER_LAYER_ID)?.setProperties(
-            circleColor(centerColor),
-            circleRadius(CENTER_RADIUS),
-            circleStrokeColor(outlineColor),
-            circleStrokeWidth(CENTER_STROKE),
-        )
         loaded.getLayerAs<CircleLayer>(MOSQUE_LAYER_ID)?.setProperties(
             circleColor(markerColor),
             circleRadius(MARKER_RADIUS),
             circleStrokeColor(outlineColor),
             circleStrokeWidth(MARKER_STROKE),
+        )
+        loaded.getLayerAs<CircleLayer>(CENTER_HALO_LAYER_ID)?.setProperties(
+            circleColor(centerColor),
+            circleRadius(CENTER_HALO_RADIUS),
+            circleOpacity(CENTER_HALO_OPACITY),
+        )
+        loaded.getLayerAs<CircleLayer>(CENTER_LAYER_ID)?.setProperties(
+            circleColor(centerColor),
+            circleRadius(CENTER_RADIUS),
+            circleStrokeColor(centerRingColor),
+            circleStrokeWidth(CENTER_STROKE),
         )
         loaded.getLayerAs<CircleLayer>(SELECTED_HALO_LAYER_ID)?.setProperties(
             circleColor(selectedColor),
@@ -443,6 +495,10 @@ private class MosqueMapRenderer {
     fun attachMap(readyMap: MapLibreMap) {
         if (map === readyMap) return
         map = readyMap
+        // The attribution is drawn by the composable, so the SDK's own logo and info button, which
+        // would sit under the bottom card, are switched off.
+        readyMap.uiSettings.isLogoEnabled = false
+        readyMap.uiSettings.isAttributionEnabled = false
         readyMap.setPadding(0, topInsetPx, 0, bottomInsetPx)
         readyMap.addOnMapClickListener { latLng ->
             val clicked = clickedPlaceId(readyMap, latLng)
@@ -484,13 +540,6 @@ private class MosqueMapRenderer {
 
     fun zoomOut() {
         map?.animateCamera(CameraUpdateFactory.zoomOut(), ZOOM_ANIMATION_MILLIS)
-    }
-
-    /** Frames the search centre and every returned mosque again. */
-    fun showAll() {
-        val readyMap = map ?: return
-        val searchCenter = center ?: return
-        fitResults(readyMap, searchCenter)
     }
 
     private fun render() {
@@ -577,21 +626,20 @@ private class MosqueMapRenderer {
             ?.getStringProperty(PROPERTY_PLACE_ID)
     }
 
+    /**
+     * Adds the sources, then the layers in draw order, bottom to top: mosque markers, the search
+     * centre's halo and dot, then the selected mosque's halo and marker. The centre is above the
+     * markers so it is never hidden by a crowd of them; the selected mosque is above the centre so a
+     * mosque a few metres away stays tappable and visible.
+     */
     private fun ensureLayers(style: Style) {
-        if (style.getSource(CENTER_SOURCE_ID) == null) {
-            style.addSource(GeoJsonSource(CENTER_SOURCE_ID, FeatureCollection.fromFeatures(emptyList())))
-            style.addLayer(
-                CircleLayer(CENTER_LAYER_ID, CENTER_SOURCE_ID).withProperties(
-                    circleColor(centerColor),
-                    circleRadius(CENTER_RADIUS),
-                    circleStrokeColor(outlineColor),
-                    circleStrokeWidth(CENTER_STROKE),
-                ),
-            )
+        listOf(MOSQUE_SOURCE_ID, CENTER_SOURCE_ID, SELECTED_SOURCE_ID).forEach { sourceId ->
+            if (style.getSource(sourceId) == null) {
+                style.addSource(GeoJsonSource(sourceId, FeatureCollection.fromFeatures(emptyList())))
+            }
         }
 
-        if (style.getSource(MOSQUE_SOURCE_ID) == null) {
-            style.addSource(GeoJsonSource(MOSQUE_SOURCE_ID, FeatureCollection.fromFeatures(emptyList())))
+        if (style.getLayer(MOSQUE_LAYER_ID) == null) {
             style.addLayer(
                 CircleLayer(MOSQUE_LAYER_ID, MOSQUE_SOURCE_ID).withProperties(
                     circleColor(markerColor),
@@ -601,10 +649,26 @@ private class MosqueMapRenderer {
                 ),
             )
         }
-
-        if (style.getSource(SELECTED_SOURCE_ID) == null) {
-            style.addSource(GeoJsonSource(SELECTED_SOURCE_ID, FeatureCollection.fromFeatures(emptyList())))
-            // The halo is added first so the solid marker is drawn on top of it.
+        if (style.getLayer(CENTER_HALO_LAYER_ID) == null) {
+            style.addLayer(
+                CircleLayer(CENTER_HALO_LAYER_ID, CENTER_SOURCE_ID).withProperties(
+                    circleColor(centerColor),
+                    circleRadius(CENTER_HALO_RADIUS),
+                    circleOpacity(CENTER_HALO_OPACITY),
+                ),
+            )
+        }
+        if (style.getLayer(CENTER_LAYER_ID) == null) {
+            style.addLayer(
+                CircleLayer(CENTER_LAYER_ID, CENTER_SOURCE_ID).withProperties(
+                    circleColor(centerColor),
+                    circleRadius(CENTER_RADIUS),
+                    circleStrokeColor(centerRingColor),
+                    circleStrokeWidth(CENTER_STROKE),
+                ),
+            )
+        }
+        if (style.getLayer(SELECTED_HALO_LAYER_ID) == null) {
             style.addLayer(
                 CircleLayer(SELECTED_HALO_LAYER_ID, SELECTED_SOURCE_ID).withProperties(
                     circleColor(selectedColor),
@@ -612,6 +676,8 @@ private class MosqueMapRenderer {
                     circleOpacity(HALO_OPACITY),
                 ),
             )
+        }
+        if (style.getLayer(SELECTED_LAYER_ID) == null) {
             style.addLayer(
                 CircleLayer(SELECTED_LAYER_ID, SELECTED_SOURCE_ID).withProperties(
                     circleColor(selectedColor),
@@ -634,6 +700,7 @@ private class MosqueMapRenderer {
     private companion object {
         const val CENTER_SOURCE_ID = "mosque-search-center"
         const val CENTER_LAYER_ID = "mosque-search-center-layer"
+        const val CENTER_HALO_LAYER_ID = "mosque-search-center-halo-layer"
         const val MOSQUE_SOURCE_ID = "nearby-mosques"
         const val MOSQUE_LAYER_ID = "nearby-mosques-layer"
         const val SELECTED_SOURCE_ID = "selected-mosque"
@@ -642,14 +709,18 @@ private class MosqueMapRenderer {
         const val PROPERTY_PLACE_ID = "placeId"
         const val CENTER_FEATURE_ID = "search-center"
 
-        const val MARKER_RADIUS = 7f
-        const val MARKER_STROKE = 2.5f
+        const val MARKER_RADIUS = 6f
+        const val MARKER_STROKE = 2f
         const val SELECTED_RADIUS = 12f
         const val SELECTED_STROKE = 3.5f
         const val HALO_RADIUS = 22f
         const val HALO_OPACITY = 0.25f
-        const val CENTER_RADIUS = 8f
-        const val CENTER_STROKE = 3f
+
+        // The "you are here" dot: clearly larger than a marker, with a pale ring and a wide soft halo.
+        const val CENTER_RADIUS = 10f
+        const val CENTER_STROKE = 4f
+        const val CENTER_HALO_RADIUS = 30f
+        const val CENTER_HALO_OPACITY = 0.3f
 
         const val INITIAL_ZOOM = 14.0
         const val SELECTED_ZOOM = 15.5

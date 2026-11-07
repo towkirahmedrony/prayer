@@ -1140,5 +1140,4 @@
     <string name="mosque_walk_estimate">হেঁটে প্রায় %1$s মিনিট</string>
     <string name="mosque_zoom_in">জুম ইন</string>
     <string name="mosque_zoom_out">জুম আউট</string>
-    <string name="mosque_recenter">আশপাশের সব মসজিদ দেখান</string>
 </resources>
