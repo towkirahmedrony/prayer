@@ -1132,4 +1132,13 @@
     <string name="home_hero_fasting_in">%1$s পরে</string>
     <string name="home_hero_set_sehri_reminder">সেহরির রিমাইন্ডার সেট করুন</string>
     <string name="home_hero_set_iftar_reminder">ইফতারের রিমাইন্ডার সেট করুন</string>
+    <string name="mosque_distance_metres_short">%1$s মিটার</string>
+    <string name="mosque_distance_km_short">%1$s কিমি</string>
+    <string name="mosque_nearest_label">সবচেয়ে কাছে</string>
+    <string name="mosque_more_nearby">আরও কাছাকাছি</string>
+    <string name="mosque_sorted_nearest">নিকটতম আগে</string>
+    <string name="mosque_walk_estimate">হেঁটে প্রায় %1$s মিনিট</string>
+    <string name="mosque_zoom_in">জুম ইন</string>
+    <string name="mosque_zoom_out">জুম আউট</string>
+    <string name="mosque_recenter">আশপাশের সব মসজিদ দেখান</string>
 </resources>

@@ -3,9 +3,12 @@ package io.github.towkirahmedrony.salah.feature.mosque
 import android.graphics.PointF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,15 +25,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.LocateGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.MinusGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.PlusGlyph
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
@@ -44,6 +53,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
+import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
@@ -56,23 +66,18 @@ import org.maplibre.geojson.Point
  * The map half of the mosque finder.
  *
  * **MapLibre renders, Geoapify supplies.** The SDK contains no map data. [styleUrl] is a Geoapify
- * style document that names its own vector tile sources, fonts and sprites; without a key there is no
- * URL to load, and the screen says so rather than showing an empty canvas. This is also why the map
- * has no full-offline claim: the Places cache in Room makes the *list* usable offline, while tiles
- * follow their own service terms and are not pre-downloaded by this app.
+ * style document; without a key there is no URL to load and the screen says so rather than showing an
+ * empty canvas. The Places cache in Room makes the *list* usable offline; tiles are not pre-downloaded.
  *
- * **The camera follows the user's attention.** On first results it frames the search centre and the
- * returned mosques together; choosing a mosque animates to it and a highlighted ring marks the
- * selection. Tapping a marker selects the mosque through the same callback the list uses, so there is
- * one selection state and one detail card in both views.
+ * **Full-page mode.** With [fullBleed] the map has no frame and fills whatever it is given; the screen
+ * floats its header at the top and a detail card at the bottom. [topInset] and [bottomInset] are the
+ * heights of those overlays: they become the map's logical padding, so the camera frames the results in
+ * the part of the map the user can actually see, and the zoom controls sit in the free space between.
  *
- * **Lifecycle.** The `MapView` is created and destroyed with the composition, and its render loop is
- * forwarded from the screen's lifecycle. Leaving the screen therefore stops it rather than leaving a
- * renderer running behind another destination.
+ * **One selection state.** Tapping a marker selects the mosque through the same callback the list uses.
  *
- * **Failure.** A style that cannot load is reported as a message over the map after the style callback
- * or a bounded timeout, whichever happens first. The list is not affected: it is drawn from the same
- * state and remains the accessible, offline-capable view.
+ * **Failure.** A style that cannot load is reported over the map after the style callback or a bounded
+ * timeout. The list is not affected.
  */
 @Composable
 fun MosqueMap(
@@ -82,6 +87,9 @@ fun MosqueMap(
     selectedPlaceId: String?,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
+    fullBleed: Boolean = false,
+    topInset: Dp = 0.dp,
+    bottomInset: Dp = 0.dp,
 ) {
     if (styleUrl == null) {
         MapFallback(
@@ -97,9 +105,13 @@ fun MosqueMap(
     val locale = androidx.compose.ui.platform.LocalResources.current.configuration.locales[0]
 
     val markerColor = coloring.primary.toArgb()
-    val selectedColor = coloring.secondary.toArgb()
-    val centerColor = coloring.tertiary.toArgb()
+    val selectedColor = coloring.primary.toArgb()
+    val centerColor = coloring.secondary.toArgb()
     val outlineColor = coloring.surface.toArgb()
+
+    val density = LocalDensity.current
+    val topInsetPx = with(density) { topInset.roundToPx() }
+    val bottomInsetPx = with(density) { bottomInset.roundToPx() }
 
     // One renderer for the life of the map. It is not keyed on the palette, because recreating it on a
     // theme change would orphan the map and its tap listener; the palette is handed to it instead.
@@ -107,6 +119,7 @@ fun MosqueMap(
     val latestSelect = rememberUpdatedState(onSelect)
     SideEffect {
         renderer.onSelect = { placeId -> latestSelect.value(placeId) }
+        renderer.setInsets(top = topInsetPx, bottom = bottomInsetPx)
         renderer.updatePalette(
             markerColor = markerColor,
             selectedColor = selectedColor,
@@ -158,7 +171,6 @@ fun MosqueMap(
             hasFailed = false
         }
         // A style request that never answers is treated as a failure rather than an endless overlay.
-        // The style callback above clears the flag when it does arrive.
         delay(MAP_LOAD_TIMEOUT_MILLIS)
         if (isLoading) {
             isLoading = false
@@ -182,11 +194,16 @@ fun MosqueMap(
         stringResource(R.string.mosque_map_description, localizedCount)
     }
     val shape = MaterialTheme.shapes.large
-
-    Box(
-        modifier = modifier
+    val frame = if (fullBleed) {
+        modifier
+    } else {
+        modifier
             .clip(shape)
             .border(1.dp, coloring.outlineVariant, shape)
+    }
+
+    Box(
+        modifier = frame
             .background(coloring.surfaceVariant)
             .semantics { contentDescription = mapDescription },
     ) {
@@ -203,7 +220,7 @@ fun MosqueMap(
                     }
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.matchParentSize(),
         )
 
         if (isLoading) {
@@ -212,17 +229,78 @@ fun MosqueMap(
             MapOverlay(text = stringResource(R.string.mosque_map_failed))
         }
 
+        if (fullBleed) {
+            MapControls(
+                onZoomIn = renderer::zoomIn,
+                onZoomOut = renderer::zoomOut,
+                onShowAll = renderer::showAll,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(top = topInset, bottom = bottomInset, end = 12.dp),
+            )
+        }
+
         Text(
             text = stringResource(R.string.mosque_map_attribution),
             style = MaterialTheme.typography.labelSmall,
             color = coloring.onSurfaceVariant,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(8.dp)
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp + bottomInset)
                 .clip(MaterialTheme.shapes.small)
                 .background(coloring.surface.copy(alpha = ATTRIBUTION_ALPHA))
                 .padding(horizontal = 6.dp, vertical = 3.dp),
         )
+    }
+}
+
+/** Zoom in, zoom out and "frame every mosque again". Drawn over a full-page map. */
+@Composable
+private fun MapControls(
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    onShowAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val zoomInLabel = stringResource(R.string.mosque_zoom_in)
+    val zoomOutLabel = stringResource(R.string.mosque_zoom_out)
+    val showAllLabel = stringResource(R.string.mosque_recenter)
+    val glyphTint = MaterialTheme.colorScheme.onSurface
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MapControlButton(label = zoomInLabel, onClick = onZoomIn) {
+            PlusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
+        }
+        MapControlButton(label = zoomOutLabel, onClick = onZoomOut) {
+            MinusGlyph(tint = glyphTint, modifier = Modifier.size(22.dp))
+        }
+        MapControlButton(label = showAllLabel, onClick = onShowAll) {
+            LocateGlyph(tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun MapControlButton(
+    label: String,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val shape = MaterialTheme.shapes.small
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = CONTROL_ALPHA))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
@@ -254,7 +332,7 @@ private fun MapFallback(
 private fun MapOverlay(text: String) {
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .matchParentSize()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = OVERLAY_ALPHA)),
         contentAlignment = Alignment.Center,
     ) {
@@ -271,23 +349,20 @@ private fun MapOverlay(text: String) {
     }
 }
 
-// Formatting is stateless; one instance serves every distance and count on this map. CalendarFormatting
-// is a class rather than an object, so this is the shared instance instead of a new one per call.
+// Formatting is stateless; one instance serves every count on this map.
 private val FORMATTING = CalendarFormatting()
 
-// Map feedback timings and overlay opacities. They are used by the composable, not by the renderer,
-// so they live at file scope rather than in the renderer's companion.
 private const val MAP_LOAD_TIMEOUT_MILLIS = 20_000L
 private const val ATTRIBUTION_ALPHA = 0.82f
 private const val OVERLAY_ALPHA = 0.86f
+private const val CONTROL_ALPHA = 0.94f
 
 /**
  * The imperative side of the map: sources, layers, camera and tap handling.
  *
  * Kept out of the composable so the map's own bookkeeping — which style is loaded, which centre was
  * fitted, which mosque was last selected — is one place rather than a set of remembered flags the
- * composition could lose. It is created once per colour palette and receives the latest data through
- * [update].
+ * composition could lose.
  */
 private class MosqueMapRenderer {
     var onSelect: (String) -> Unit = {}
@@ -296,6 +371,9 @@ private class MosqueMapRenderer {
     private var selectedColor: Int = 0
     private var centerColor: Int = 0
     private var outlineColor: Int = 0
+
+    private var topInsetPx: Int = 0
+    private var bottomInsetPx: Int = 0
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
@@ -308,12 +386,17 @@ private class MosqueMapRenderer {
     private var lastSelected: String? = null
 
     /**
-     * Applies the active theme's colours, updating the drawn layers when the style is already loaded.
-     *
-     * A theme change normally reloads the style, which recreates the layers with the new values via
-     * [ensureLayers]. Updating them here as well keeps the map correct in the case where only the
-     * palette changes.
+     * The heights of the overlays drawn over the map. They become the map's logical padding, so every
+     * camera move centres on the visible part of the map rather than behind the header or the card.
      */
+    fun setInsets(top: Int, bottom: Int) {
+        if (top == topInsetPx && bottom == bottomInsetPx) return
+        topInsetPx = top
+        bottomInsetPx = bottom
+        map?.setPadding(0, top, 0, bottom)
+    }
+
+    /** Applies the active theme's colours, updating the drawn layers when the style is already loaded. */
     fun updatePalette(
         markerColor: Int,
         selectedColor: Int,
@@ -343,6 +426,11 @@ private class MosqueMapRenderer {
             circleStrokeColor(outlineColor),
             circleStrokeWidth(MARKER_STROKE),
         )
+        loaded.getLayerAs<CircleLayer>(SELECTED_HALO_LAYER_ID)?.setProperties(
+            circleColor(selectedColor),
+            circleRadius(HALO_RADIUS),
+            circleOpacity(HALO_OPACITY),
+        )
         loaded.getLayerAs<CircleLayer>(SELECTED_LAYER_ID)?.setProperties(
             circleColor(selectedColor),
             circleRadius(SELECTED_RADIUS),
@@ -354,6 +442,7 @@ private class MosqueMapRenderer {
     fun attachMap(readyMap: MapLibreMap) {
         if (map === readyMap) return
         map = readyMap
+        readyMap.setPadding(0, topInsetPx, 0, bottomInsetPx)
         readyMap.addOnMapClickListener { latLng ->
             val clicked = clickedPlaceId(readyMap, latLng)
             if (clicked != null) {
@@ -386,6 +475,21 @@ private class MosqueMapRenderer {
         this.mosques = mosques
         this.selectedPlaceId = selectedPlaceId
         render()
+    }
+
+    fun zoomIn() {
+        map?.animateCamera(CameraUpdateFactory.zoomIn(), ZOOM_ANIMATION_MILLIS)
+    }
+
+    fun zoomOut() {
+        map?.animateCamera(CameraUpdateFactory.zoomOut(), ZOOM_ANIMATION_MILLIS)
+    }
+
+    /** Frames the search centre and every returned mosque again. */
+    fun showAll() {
+        val readyMap = map ?: return
+        val searchCenter = center ?: return
+        fitResults(readyMap, searchCenter)
     }
 
     private fun render() {
@@ -499,6 +603,14 @@ private class MosqueMapRenderer {
 
         if (style.getSource(SELECTED_SOURCE_ID) == null) {
             style.addSource(GeoJsonSource(SELECTED_SOURCE_ID, FeatureCollection.fromFeatures(emptyList())))
+            // The halo is added first so the solid marker is drawn on top of it.
+            style.addLayer(
+                CircleLayer(SELECTED_HALO_LAYER_ID, SELECTED_SOURCE_ID).withProperties(
+                    circleColor(selectedColor),
+                    circleRadius(HALO_RADIUS),
+                    circleOpacity(HALO_OPACITY),
+                ),
+            )
             style.addLayer(
                 CircleLayer(SELECTED_LAYER_ID, SELECTED_SOURCE_ID).withProperties(
                     circleColor(selectedColor),
@@ -525,20 +637,24 @@ private class MosqueMapRenderer {
         const val MOSQUE_LAYER_ID = "nearby-mosques-layer"
         const val SELECTED_SOURCE_ID = "selected-mosque"
         const val SELECTED_LAYER_ID = "selected-mosque-layer"
+        const val SELECTED_HALO_LAYER_ID = "selected-mosque-halo-layer"
         const val PROPERTY_PLACE_ID = "placeId"
         const val CENTER_FEATURE_ID = "search-center"
 
         const val MARKER_RADIUS = 7f
         const val MARKER_STROKE = 2.5f
-        const val SELECTED_RADIUS = 10f
+        const val SELECTED_RADIUS = 12f
         const val SELECTED_STROKE = 3.5f
-        const val CENTER_RADIUS = 7f
+        const val HALO_RADIUS = 22f
+        const val HALO_OPACITY = 0.25f
+        const val CENTER_RADIUS = 8f
         const val CENTER_STROKE = 3f
 
         const val INITIAL_ZOOM = 14.0
         const val SELECTED_ZOOM = 15.5
         const val CAMERA_ANIMATION_MILLIS = 600
-        const val FIT_PADDING_PX = 96
+        const val ZOOM_ANIMATION_MILLIS = 250
+        const val FIT_PADDING_PX = 72
         const val MIN_FIT_SPAN = 0.0001
     }
 }

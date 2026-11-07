@@ -7,9 +7,12 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,18 +26,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -49,17 +51,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.ChevronLeftGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DirectionsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.ListGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.MapGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.MosqueGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RefreshGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
-import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.mosque.Mosque
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueDataOrigin
@@ -68,38 +72,32 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
 import org.koin.androidx.compose.koinViewModel
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
  * The mosque finder.
  *
- * ## What the screen is
+ * One question — "which mosques are around me?" — answered two ways from one state:
  *
- * One search question — "which mosques are around me?" — answered as a nearest-first list or the same
- * results on a map. The header, the search context and the two small controls are fixed; the result
- * area is the rest of the screen. Switching views never re-queries: the list and the map read one
- * list from one state.
+ *  - **List:** the nearest mosque as a highlighted card with its distance, an estimated walking time
+ *    and a Directions button, then the rest as compact rows, nearest first.
+ *  - **Map:** a full-page map. The header, search context and view switch float over its top edge and
+ *    the selected mosque's card floats over its bottom edge; the map's camera is padded by exactly
+ *    those overlays, so nothing is framed behind them.
  *
- * ## Why the list is the default
+ * Switching views never re-queries. The list is the default because it survives every partial
+ * failure: a missing key or a failed style leaves distances and directions fully usable.
  *
- * It is the view that survives every partial failure. A missing Geoapify key, a style that cannot
- * load or a slow connection leaves the list and its directions fully usable, and the map is a second
- * presentation rather than a prerequisite. It is also the accessible view: a screen reader can read
- * the names and distances in order, while a rendered map is a single canvas.
+ * Location is a deliberate action. The first search uses the app's saved location without asking for
+ * permission; the location button asks for a one-shot fix and requests the runtime permission only if
+ * it has not been granted. That fix is used for this screen only and never written back.
  *
- * ## Location is a deliberate action
+ * No Place Details request, no phone or website intent, no fake mosques. External directions go to
+ * whichever installed app accepts a `geo:` URI, with a web maps fallback.
  *
- * The first search uses the app's saved location — the same one prayer times use — without asking for
- * permission. The location control on the right asks the platform for a one-shot fix and requests the
- * runtime permission only if it has not already been granted. A fix obtained this way is used for this
- * screen and is not written back to the saved location; see [MosqueFinderViewModel] for why.
- *
- * ## What it deliberately does not do
- *
- * No Place Details request, no phone-call or website intent, no fake mosques and no second selection
- * state. The map is a view of the list, and the detail card is the same mosque the list would select.
- * External directions are handed to whichever installed app accepts a `geo:` URI, with a web maps
- * fallback, because Salah has no routing engine of its own.
+ * Insets: like the screen it replaces, this does not pad for the status or navigation bar. The host
+ * scaffold already provides that padding for every destination.
  */
 @Composable
 fun MosqueFinderScreen(
@@ -108,7 +106,6 @@ fun MosqueFinderScreen(
     viewModel: MosqueFinderViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     // Both permissions are requested together so Android 12+ can offer the user the choice between
     // approximate and precise. Salah accepts either; nothing here needs a background grant.
@@ -131,110 +128,278 @@ fun MosqueFinderScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        SalahSubpageHeader(
-            title = stringResource(R.string.mosque_title),
-            backContentDescription = stringResource(R.string.mosque_back),
-            onBack = onBack,
-        )
-        Text(
-            text = stringResource(R.string.mosque_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    // Captured outside the `when`: `state` is a delegated property, so `state.failure` cannot be
+    // smart-cast at the use site.
+    val failure = state.failure
+    val content = when {
+        state.isLoading && !state.hasResults -> FinderContent.LOADING
+        failure != null && !state.hasResults -> FinderContent.FAILURE
+        state.center == null && !state.hasResults -> FinderContent.NO_LOCATION
+        state.isEmptyResult && !state.hasResults -> FinderContent.EMPTY
+        state.viewMode == MosqueViewMode.MAP -> FinderContent.MAP
+        else -> FinderContent.LIST
+    }
 
-        SearchContextRow(
-            state = state,
-            centerText = searchCenterText(state),
-        )
-
-        ControlsRow(
-            state = state,
-            onSelectView = viewModel::setViewMode,
-            onUseCurrentLocation = requestCurrentLocation,
-            onRefresh = viewModel::refresh,
-        )
-
-        StatusNotices(state = state)
-
-        if (state.hasResults) {
-            ResultsSummary(state = state)
-        }
-
-        // Captured outside the `when`: `state` is a delegated property, so `state.failure` cannot be
-        // smart-cast at the use site.
-        val failure = state.failure
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) {
-            when {
-                state.isLoading && !state.hasResults -> LoadingResults()
-                failure != null && !state.hasResults -> FailurePanel(
-                    failure = failure,
-                    onRetry = viewModel::refresh,
-                )
-                state.center == null && !state.hasResults -> NoLocationPanel(
+    Box(modifier = modifier.fillMaxSize()) {
+        if (content == FinderContent.MAP) {
+            MapResults(
+                state = state,
+                viewModel = viewModel,
+                onDirectionsUnavailable = viewModel::onDirectionsUnavailable,
+            )
+            FinderChrome(
+                state = state,
+                floating = true,
+                onBack = onBack,
+                onSelectView = viewModel::setViewMode,
+                onUseCurrentLocation = requestCurrentLocation,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                FinderChrome(
+                    state = state,
+                    floating = false,
+                    onBack = onBack,
+                    onSelectView = viewModel::setViewMode,
                     onUseCurrentLocation = requestCurrentLocation,
+                    onRefresh = viewModel::refresh,
                 )
-                state.isEmptyResult && !state.hasResults -> EmptyPanel(
-                    radiusMetres = state.radiusMetres,
-                    onRetry = viewModel::refresh,
-                )
-                state.viewMode == MosqueViewMode.MAP -> MapResults(
-                    state = state,
-                    viewModel = viewModel,
-                    onDirectionsUnavailable = viewModel::onDirectionsUnavailable,
-                )
-                else -> ResultList(
-                    state = state,
-                    onSelect = viewModel::selectMosque,
-                    onDirectionsUnavailable = viewModel::onDirectionsUnavailable,
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    when (content) {
+                        FinderContent.LOADING -> LoadingResults()
+                        FinderContent.FAILURE -> FailurePanel(
+                            failure = failure ?: MosqueFailure.UNKNOWN,
+                            onRetry = viewModel::refresh,
+                        )
+                        FinderContent.NO_LOCATION -> NoLocationPanel(
+                            onUseCurrentLocation = requestCurrentLocation,
+                        )
+                        FinderContent.EMPTY -> EmptyPanel(
+                            radiusMetres = state.radiusMetres,
+                            onRetry = viewModel::refresh,
+                        )
+                        else -> ResultList(
+                            state = state,
+                            onSelect = viewModel::selectMosque,
+                            onDirectionsUnavailable = viewModel::onDirectionsUnavailable,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-/** One line saying which place the results describe. */
+/** Which of the screen's six bodies is showing. Decided once, so the layout and the body agree. */
+private enum class FinderContent {
+    LOADING,
+    FAILURE,
+    NO_LOCATION,
+    EMPTY,
+    MAP,
+    LIST,
+}
+
+/**
+ * Everything that stays put while the result area changes: header, search context, view switch and
+ * notices. [floating] draws each piece on a translucent surface so it stays legible over a map.
+ */
 @Composable
-private fun SearchContextRow(
+private fun FinderChrome(
     state: MosqueFinderUiState,
-    centerText: String,
+    floating: Boolean,
+    onBack: () -> Unit,
+    onSelectView: (MosqueViewMode) -> Unit,
+    onUseCurrentLocation: () -> Unit,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val container = if (floating) {
+        MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        FinderHeader(
+            state = state,
+            floating = floating,
+            container = container,
+            onBack = onBack,
+            onRefresh = onRefresh,
+        )
+        SearchContextCard(
+            state = state,
+            container = container,
+            centerText = searchCenterText(state),
+            onUseCurrentLocation = onUseCurrentLocation,
+        )
+        ViewModeSelector(
+            selected = state.viewMode,
+            container = container,
+            onSelect = onSelectView,
+        )
+        StatusNotices(state = state)
+    }
+}
+
+/** Back, the title with the result count, and refresh. */
+@Composable
+private fun FinderHeader(
+    state: MosqueFinderUiState,
+    floating: Boolean,
+    container: Color,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    val backLabel = stringResource(R.string.mosque_back)
+    val refreshLabel = stringResource(R.string.mosque_action_refresh)
+    val locale = currentLocale()
+    val count = state.mosques.size
+    val countDigits = FORMATTING.localizeDigits(count.toString(), locale)
+    val subtitle = when {
+        count == 0 -> null
+        count == 1 -> stringResource(R.string.mosque_results_count_one)
+        else -> stringResource(R.string.mosque_results_count, countDigits)
+    }
+    val titleShape = MaterialTheme.shapes.small
+    val titleModifier = if (floating) {
+        Modifier
+            .clip(titleShape)
+            .background(container)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, titleShape)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    } else {
+        Modifier.padding(horizontal = 2.dp)
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SurfaceIconButton(label = backLabel, container = container, onClick = onBack) {
+            ChevronLeftGlyph(tint = MaterialTheme.colorScheme.onSurface)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = titleModifier) {
+                Text(
+                    text = stringResource(R.string.mosque_title),
+                    style = if (floating) {
+                        MaterialTheme.typography.titleMedium
+                    } else {
+                        MaterialTheme.typography.headlineSmall
+                    },
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        SurfaceIconButton(
+            label = refreshLabel,
+            container = container,
+            onClick = onRefresh,
+            enabled = state.center != null && !state.isLoading && !state.isRefreshing,
+        ) {
+            RefreshGlyph(tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+/** A 48dp rounded button on a surface, used for the header's two actions. */
+@Composable
+private fun SurfaceIconButton(
+    label: String,
+    container: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val shape = MaterialTheme.shapes.small
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .clip(shape)
+            .background(container)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/** Which place the results describe, and the one-shot "use my current location" action. */
+@Composable
+private fun SearchContextCard(
+    state: MosqueFinderUiState,
+    container: Color,
+    centerText: String,
+    onUseCurrentLocation: () -> Unit,
+) {
+    val shape = MaterialTheme.shapes.medium
+    val locationDescription = stringResource(R.string.mosque_action_use_current_location)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(container)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(40.dp)
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             LocationPinGlyph(
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 10.dp),
+                .padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = centerText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             if (state.isAcquiringLocation) {
                 Text(
@@ -250,29 +415,6 @@ private fun SearchContextRow(
                 )
             }
         }
-    }
-}
-
-/** The view toggle and the two actions that change what is being searched. */
-@Composable
-private fun ControlsRow(
-    state: MosqueFinderUiState,
-    onSelectView: (MosqueViewMode) -> Unit,
-    onUseCurrentLocation: () -> Unit,
-    onRefresh: () -> Unit,
-) {
-    val locationDescription = stringResource(R.string.mosque_action_use_current_location)
-    val refreshDescription = stringResource(R.string.mosque_action_refresh)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ViewModeSelector(
-            selected = state.viewMode,
-            onSelect = onSelectView,
-        )
-        Spacer(modifier = Modifier.weight(1f))
         IconButton(
             onClick = onUseCurrentLocation,
             enabled = !state.isAcquiringLocation,
@@ -285,58 +427,53 @@ private fun ControlsRow(
                 )
             } else {
                 LocationPinFilledGlyph(
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp),
                 )
             }
-        }
-        IconButton(
-            onClick = onRefresh,
-            enabled = state.center != null && !state.isLoading && !state.isRefreshing,
-            modifier = Modifier.semantics { contentDescription = refreshDescription },
-        ) {
-            RefreshGlyph(
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(22.dp),
-            )
         }
     }
 }
 
 /**
- * A compact two-option selector.
+ * A full-width two-option switch.
  *
  * `selectable` with the radio-button role rather than two independent buttons: list and map are
- * mutually exclusive, and a screen reader should announce the current one and its state. The text
- * labels are visible so the icons are never the only way to tell the options apart.
+ * mutually exclusive, and a screen reader should announce the current one and its state.
  */
 @Composable
 private fun ViewModeSelector(
     selected: MosqueViewMode,
+    container: Color,
     onSelect: (MosqueViewMode) -> Unit,
 ) {
     val groupDescription = stringResource(R.string.mosque_view_mode_description)
+    val shape = MaterialTheme.shapes.medium
 
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(100.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(3.dp)
+            .fillMaxWidth()
+            .clip(shape)
+            .background(container)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(4.dp)
             .selectableGroup()
             .semantics { contentDescription = groupDescription },
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ViewModeOption(
             mode = MosqueViewMode.LIST,
             selected = selected == MosqueViewMode.LIST,
             label = stringResource(R.string.mosque_view_list),
             onSelect = onSelect,
+            modifier = Modifier.weight(1f),
         )
         ViewModeOption(
             mode = MosqueViewMode.MAP,
             selected = selected == MosqueViewMode.MAP,
             label = stringResource(R.string.mosque_view_map),
             onSelect = onSelect,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -347,6 +484,7 @@ private fun ViewModeOption(
     selected: Boolean,
     label: String,
     onSelect: (MosqueViewMode) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val contentColor = if (selected) {
         MaterialTheme.colorScheme.onPrimaryContainer
@@ -355,9 +493,9 @@ private fun ViewModeOption(
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(100.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
             )
@@ -365,15 +503,15 @@ private fun ViewModeOption(
                 selected = selected,
                 role = Role.RadioButton,
                 onClick = { onSelect(mode) },
-            )
-            .padding(horizontal = 11.dp),
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.Center,
     ) {
         when (mode) {
-            MosqueViewMode.LIST -> ListGlyph(tint = contentColor, modifier = Modifier.size(17.dp))
-            MosqueViewMode.MAP -> MapGlyph(tint = contentColor, modifier = Modifier.size(17.dp))
+            MosqueViewMode.LIST -> ListGlyph(tint = contentColor, modifier = Modifier.size(18.dp))
+            MosqueViewMode.MAP -> MapGlyph(tint = contentColor, modifier = Modifier.size(18.dp))
         }
+        Spacer(modifier = Modifier.size(8.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
@@ -402,38 +540,7 @@ private fun StatusNotices(state: MosqueFinderUiState) {
     }
 }
 
-/** The result count, and whether the list came from the cache. */
-@Composable
-private fun ResultsSummary(state: MosqueFinderUiState) {
-    val count = state.mosques.size
-    val locale = currentLocale()
-    val digits = FORMATTING.localizeDigits(count.toString(), locale)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = if (count == 1) {
-                stringResource(R.string.mosque_results_count_one)
-            } else {
-                stringResource(R.string.mosque_results_count, digits)
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        if (state.origin == MosqueDataOrigin.CACHE) {
-            SalahStatusPill(
-                text = stringResource(R.string.mosque_origin_cached),
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
-    }
-}
-
-/** The nearest-first list. */
+/** The nearest mosque as a highlight, then the rest as compact rows. */
 @Composable
 private fun ResultList(
     state: MosqueFinderUiState,
@@ -441,107 +548,273 @@ private fun ResultList(
     onDirectionsUnavailable: () -> Unit,
 ) {
     val context = LocalContext.current
+    val nearest = state.mosques.firstOrNull()
+    val rest = state.mosques.drop(1)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(items = state.mosques, key = { item -> item.mosque.placeId }) { item ->
-            val selected = item.mosque.placeId == state.selectedPlaceId
-            MosqueResultCard(
-                item = item,
-                selected = selected,
-                onSelect = { onSelect(item.mosque.placeId) },
-                onDirections = {
-                    openDirections(
-                        context = context,
-                        mosque = item.mosque,
-                        onUnavailable = onDirectionsUnavailable,
+        if (nearest != null) {
+            item(key = "nearest") {
+                NearestMosqueCard(
+                    item = nearest,
+                    cached = state.origin == MosqueDataOrigin.CACHE,
+                    onDirections = {
+                        openDirections(
+                            context = context,
+                            mosque = nearest.mosque,
+                            onUnavailable = onDirectionsUnavailable,
+                        )
+                    },
+                )
+            }
+        }
+        if (rest.isNotEmpty()) {
+            item(key = "more-header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 2.dp, end = 2.dp, top = 12.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.mosque_more_nearby),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
                     )
-                },
+                    Text(
+                        text = stringResource(R.string.mosque_sorted_nearest),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            items(items = rest, key = { entry -> entry.mosque.placeId }) { entry ->
+                MosqueRow(
+                    item = entry,
+                    selected = entry.mosque.placeId == state.selectedPlaceId,
+                    onSelect = { onSelect(entry.mosque.placeId) },
+                    onDirections = {
+                        openDirections(
+                            context = context,
+                            mosque = entry.mosque,
+                            onUnavailable = onDirectionsUnavailable,
+                        )
+                    },
+                )
+            }
+        }
+        item(key = "source-note") {
+            Text(
+                text = stringResource(R.string.mosque_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 2.dp, vertical = 8.dp),
             )
         }
     }
 }
 
+/** A card with the app's gold accent border, used for the nearest and the selected mosque. */
+@Composable
+private fun HighlightCard(
+    modifier: Modifier = Modifier,
+    containerAlpha: Float = 1f,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = MaterialTheme.shapes.large
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = containerAlpha))
+            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f), shape)
+            .padding(16.dp),
+        content = content,
+    )
+}
+
 /**
- * One mosque in the list.
+ * The nearest mosque: its name, address, a large distance with a walking estimate, and Directions.
  *
- * Collapsed it states the name, the distance and, when the service provided one, the address.
- * Selecting it expands the same card with the full address and the contact fields the response
- * carried, plus the one action that leaves the app. Nothing is fetched on selection.
+ * The walking time is an estimate from the straight-line distance at a steady pace, and is left out
+ * beyond [MAX_WALK_ESTIMATE_METRES], where it would stop being a useful number.
  */
 @Composable
-private fun MosqueResultCard(
+private fun NearestMosqueCard(
+    item: MosqueWithDistance,
+    cached: Boolean,
+    onDirections: () -> Unit,
+) {
+    val mosque = item.mosque
+    val accents = LocalSalahAccents.current
+
+    HighlightCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SalahStatusPill(
+                text = stringResource(R.string.mosque_nearest_label),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = accents.goldText,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (cached) {
+                SalahStatusPill(
+                    text = stringResource(R.string.mosque_origin_cached),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = mosque.name,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = mosque.address ?: stringResource(R.string.mosque_address_unknown),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = distanceLabel(item.distanceMetres, short = true),
+                style = MaterialTheme.typography.headlineMedium,
+                color = accents.goldText,
+            )
+            if (item.distanceMetres <= MAX_WALK_ESTIMATE_METRES) {
+                val minutes = ceil(item.distanceMetres / WALKING_METRES_PER_MINUTE)
+                    .toInt()
+                    .coerceAtLeast(1)
+                Text(
+                    text = stringResource(
+                        R.string.mosque_walk_estimate,
+                        FORMATTING.localizeDigits(minutes.toString(), currentLocale()),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 10.dp, bottom = 3.dp),
+                )
+            }
+        }
+        ContactRow(label = stringResource(R.string.mosque_phone), value = mosque.phone)
+        ContactRow(label = stringResource(R.string.mosque_website), value = mosque.website)
+        Spacer(modifier = Modifier.height(14.dp))
+        DirectionsButton(mosqueName = mosque.name, onClick = onDirections)
+    }
+}
+
+/**
+ * One mosque in the list, collapsed to a single line of name and distance.
+ *
+ * Tapping it selects it, which opens the full address and any contact fields the response carried.
+ * Directions are one tap on the trailing button either way. Nothing is fetched on selection.
+ */
+@Composable
+private fun MosqueRow(
     item: MosqueWithDistance,
     selected: Boolean,
     onSelect: () -> Unit,
     onDirections: () -> Unit,
 ) {
     val mosque = item.mosque
+    val shape = MaterialTheme.shapes.medium
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    val directionsDescription = stringResource(R.string.mosque_open_directions, mosque.name)
 
-    SalahSectionCard(onClick = onSelect) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, borderColor, shape)
+            .clickable(onClick = onSelect)
+            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                MosqueGlyph(
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
                 Text(
                     text = mosque.name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
+                    maxLines = if (selected) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                mosque.address?.let { address ->
-                    Spacer(modifier = Modifier.height(2.dp))
+                Row {
                     Text(
-                        text = address,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = if (selected) 3 else 2,
-                        overflow = TextOverflow.Ellipsis,
+                        text = distanceLabel(item.distanceMetres, short = false),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    if (!selected && mosque.address != null) {
+                        Text(
+                            text = " · ${mosque.address}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.size(10.dp))
-            Text(
-                text = distanceLabel(item.distanceMetres),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-
-        if (selected) {
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (mosque.address == null) {
-                Text(
-                    text = stringResource(R.string.mosque_address_unknown),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            ContactRow(label = stringResource(R.string.mosque_phone), value = mosque.phone)
-            ContactRow(label = stringResource(R.string.mosque_website), value = mosque.website)
-
-            val directionsDescription =
-                stringResource(R.string.mosque_open_directions, mosque.name)
-            TextButton(
+            IconButton(
                 onClick = onDirections,
-                modifier = Modifier
-                    .heightIn(min = 48.dp)
-                    .semantics { contentDescription = directionsDescription },
+                modifier = Modifier.semantics { contentDescription = directionsDescription },
             ) {
                 DirectionsGlyph(
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(22.dp),
                 )
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(text = stringResource(R.string.mosque_action_directions))
+            }
+        }
+
+        if (selected) {
+            Column(modifier = Modifier.padding(top = 8.dp, end = 12.dp)) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = mosque.address ?: stringResource(R.string.mosque_address_unknown),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                ContactRow(label = stringResource(R.string.mosque_phone), value = mosque.phone)
+                ContactRow(label = stringResource(R.string.mosque_website), value = mosque.website)
             }
         }
     }
@@ -573,7 +846,37 @@ private fun ContactRow(label: String, value: String?) {
     }
 }
 
-/** The map and the selected mosque's compact card beneath it. */
+/** The one filled action on the screen: hand the mosque to a maps app. */
+@Composable
+private fun DirectionsButton(
+    mosqueName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val description = stringResource(R.string.mosque_open_directions, mosqueName)
+    Button(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.small,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .semantics { contentDescription = description },
+    ) {
+        DirectionsGlyph(
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.size(8.dp))
+        Text(text = stringResource(R.string.mosque_action_directions))
+    }
+}
+
+/**
+ * The full-page map and the selected mosque's card floating over its bottom edge.
+ *
+ * [MAP_TOP_INSET] and [MAP_BOTTOM_INSET] are the heights of the floating header and card. The map pads
+ * its camera by them, so the results are framed in the part of the map that is actually visible.
+ */
 @Composable
 private fun MapResults(
     state: MosqueFinderUiState,
@@ -584,19 +887,19 @@ private fun MapResults(
     val selected = state.selected
     val context = LocalContext.current
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         MosqueMap(
             styleUrl = viewModel.mapStyleUrl(darkTheme = darkTheme),
             center = state.center,
             mosques = state.mosques,
             selectedPlaceId = state.selectedPlaceId,
             onSelect = viewModel::selectMosque,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            fullBleed = true,
+            topInset = MAP_TOP_INSET,
+            bottomInset = if (selected != null) MAP_BOTTOM_INSET else 0.dp,
+            modifier = Modifier.fillMaxSize(),
         )
         if (selected != null) {
-            Spacer(modifier = Modifier.height(8.dp))
             SelectedMosqueCard(
                 item = selected,
                 onDirections = {
@@ -606,68 +909,58 @@ private fun MapResults(
                         onUnavailable = onDirectionsUnavailable,
                     )
                 },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(12.dp),
             )
         }
     }
 }
 
-/** The compact detail card under the map. */
+/** The compact detail card over the map's bottom edge. */
 @Composable
 private fun SelectedMosqueCard(
     item: MosqueWithDistance,
     onDirections: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val mosque = item.mosque
+    val accents = LocalSalahAccents.current
 
-    SalahSectionCard {
+    HighlightCard(modifier = modifier, containerAlpha = FLOATING_ALPHA) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.mosque_selected_title),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = mosque.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = mosque.address ?: stringResource(R.string.mosque_address_unknown),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(modifier = Modifier.size(10.dp))
+            SalahStatusPill(
+                text = stringResource(R.string.mosque_selected_title),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = accents.goldText,
+            )
+            Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = distanceLabel(item.distanceMetres),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                text = distanceLabel(item.distanceMetres, short = true),
+                style = MaterialTheme.typography.titleLarge,
+                color = accents.goldText,
             )
         }
-        val directionsDescription =
-            stringResource(R.string.mosque_open_directions, mosque.name)
-        TextButton(
-            onClick = onDirections,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .semantics { contentDescription = directionsDescription },
-        ) {
-            DirectionsGlyph(
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.size(6.dp))
-            Text(text = stringResource(R.string.mosque_action_directions))
-        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = mosque.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = mosque.address ?: stringResource(R.string.mosque_address_unknown),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        DirectionsButton(mosqueName = mosque.name, onClick = onDirections)
     }
 }
 
@@ -830,14 +1123,18 @@ private fun noticeText(notice: MosqueNotice): String = when (notice) {
     MosqueNotice.DIRECTIONS_UNAVAILABLE -> stringResource(R.string.mosque_directions_unavailable)
 }
 
-/** A distance in the interface language's numerals: metres under a kilometre, then one decimal. */
+/**
+ * A distance in the interface language's numerals: metres under a kilometre, then one decimal.
+ * [short] drops the "away" ("11 m" rather than "11 m away") for places where the label already
+ * says what the number is.
+ */
 @Composable
-private fun distanceLabel(distanceMetres: Double): String {
+private fun distanceLabel(distanceMetres: Double, short: Boolean): String {
     val locale = currentLocale()
     return if (distanceMetres < METRES_PER_KILOMETRE) {
         val metres = distanceMetres.roundToInt().coerceAtLeast(0)
         stringResource(
-            R.string.mosque_distance_metres,
+            if (short) R.string.mosque_distance_metres_short else R.string.mosque_distance_metres,
             FORMATTING.localizeDigits(metres.toString(), locale),
         )
     } else {
@@ -847,7 +1144,7 @@ private fun distanceLabel(distanceMetres: Double): String {
         }
         val kilometres = formatter.format(distanceMetres / METRES_PER_KILOMETRE)
         stringResource(
-            R.string.mosque_distance_kilometres,
+            if (short) R.string.mosque_distance_km_short else R.string.mosque_distance_kilometres,
             FORMATTING.localizeDigits(kilometres, locale),
         )
     }
@@ -865,10 +1162,8 @@ private fun currentLocale(): Locale {
  * Hands a mosque to an installed maps app.
  *
  * A `geo:` URI is the platform-neutral form every maps app can accept; the web maps URL is the
- * fallback for a device with a browser but no maps app. Neither is part of Salah's own routing — the
- * app opens the destination and lets the user's chosen application decide the route. No activity is
- * resolved in advance: package-visibility rules make a pre-flight check unreliable, so the attempt
- * itself is the check.
+ * fallback for a device with a browser but no maps app. No activity is resolved in advance:
+ * package-visibility rules make a pre-flight check unreliable, so the attempt itself is the check.
  */
 private fun openDirections(
     context: Context,
@@ -893,3 +1188,18 @@ private fun openDirections(
 
 /** Metres in a kilometre, used only for choosing the unit the distance is written in. */
 private const val METRES_PER_KILOMETRE = 1_000.0
+
+/** A steady walking pace, about 4.8 km/h, used only for the nearest mosque's walking estimate. */
+private const val WALKING_METRES_PER_MINUTE = 80.0
+
+/** Beyond this the straight-line walking estimate stops being a useful number. */
+private const val MAX_WALK_ESTIMATE_METRES = 3_000.0
+
+/** Surface opacity for pieces floating over the map: legible, but the map still shows through. */
+private const val FLOATING_ALPHA = 0.94f
+
+private const val DISABLED_ALPHA = 0.5f
+
+/** Heights of the floating header block and the selected-mosque card; the map pads its camera by them. */
+private val MAP_TOP_INSET = 216.dp
+private val MAP_BOTTOM_INSET = 196.dp

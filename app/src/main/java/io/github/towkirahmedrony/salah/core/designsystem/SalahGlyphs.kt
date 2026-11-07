@@ -566,3 +566,23 @@ fun DirectionsGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, mo
     drawPath(arrow, tint, style = Stroke(width = 1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     drawLine(tint, Offset(11.1f, 12.9f), Offset(20.4f, 3.6f), strokeWidth = 1.4f)
 }
+
+@Composable
+fun PlusGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawLine(tint, Offset(12f, 5f), Offset(12f, 19f), strokeWidth = 2f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(5f, 12f), Offset(19f, 12f), strokeWidth = 2f, cap = StrokeCap.Round)
+}
+
+@Composable
+fun MinusGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawLine(tint, Offset(5f, 12f), Offset(19f, 12f), strokeWidth = 2f, cap = StrokeCap.Round)
+}
+
+@Composable
+fun LocateGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    drawCircle(color = tint, radius = 4f, center = Offset(12f, 12f), style = Stroke(width = 1.8f))
+    drawLine(tint, Offset(12f, 2.5f), Offset(12f, 6.5f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(12f, 17.5f), Offset(12f, 21.5f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(2.5f, 12f), Offset(6.5f, 12f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(17.5f, 12f), Offset(21.5f, 12f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+}

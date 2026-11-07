@@ -1130,4 +1130,13 @@
     <string name="home_hero_fasting_in">in %1$s</string>
     <string name="home_hero_set_sehri_reminder">Set Sehri reminder</string>
     <string name="home_hero_set_iftar_reminder">Set Iftar reminder</string>
+    <string name="mosque_distance_metres_short">%1$s m</string>
+    <string name="mosque_distance_km_short">%1$s km</string>
+    <string name="mosque_nearest_label">Nearest</string>
+    <string name="mosque_more_nearby">More nearby</string>
+    <string name="mosque_sorted_nearest">Nearest first</string>
+    <string name="mosque_walk_estimate">about %1$s min walk</string>
+    <string name="mosque_zoom_in">Zoom in</string>
+    <string name="mosque_zoom_out">Zoom out</string>
+    <string name="mosque_recenter">Show all nearby mosques</string>
 </resources>
