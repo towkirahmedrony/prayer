@@ -53,7 +53,9 @@ class AppDropdownFieldFilterTest {
         )
 
         assertEquals(listOf(items[0]), dropdownItemsFor(items, "SADAR"))
-        assertEquals(listOf(items[1]), dropdownItemsFor(items, "bAndArBaN").take(1))
+        // Both names contain the word, so both stay: the filter narrows a list, it does not pick a
+        // single best match, and the caller decides what to do with what is left.
+        assertEquals(items, dropdownItemsFor(items, "bAnDaRbAn"))
     }
 
     @Test
