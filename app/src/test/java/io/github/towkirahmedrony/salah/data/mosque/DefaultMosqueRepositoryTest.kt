@@ -48,7 +48,11 @@ class DefaultMosqueRepositoryTest {
             pages = mapOf(
                 0 to success(
                     mosque("far", "Far Mosque", latitude = 23.8303),
-                    mosque("not-a-mosque", "Madrasah"),
+                    mosque(
+                        "not-a-mosque",
+                        "Madrasah",
+                        categories = listOf(Mosque.CATEGORY_ISLAMIC_WORSHIP),
+                    ),
                 ),
                 2 to success(
                     mosque("near", "Near Mosque", latitude = 23.8123),

@@ -53,6 +53,7 @@ object GeoapifyMosqueParser {
 
         val text = runCatching { body.toString(Charsets.UTF_8) }.getOrNull() ?: return null
         val root = JsonReader.parse(text) as? JsonValue.ObjectValue ?: return null
+        if (root.stringOrNull("type") != "FeatureCollection") return null
         val features = root.child("features") as? JsonValue.ArrayValue ?: return null
 
         val mosques = ArrayList<Mosque>(features.elements.size)
