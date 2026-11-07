@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -329,7 +330,7 @@ private fun MapFallback(
 
 /** A small, quiet overlay over the map for its loading and failure states. */
 @Composable
-private fun MapOverlay(text: String) {
+private fun BoxScope.MapOverlay(text: String) {
     Box(
         modifier = Modifier
             .matchParentSize()
