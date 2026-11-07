@@ -54,4 +54,26 @@ class CountdownFormatterRemainingTest {
         assertEquals("0m", CountdownFormatter.formatCompact(Duration.ofSeconds(30)))
         assertEquals("0m", CountdownFormatter.formatCompact(Duration.ofSeconds(59)))
     }
+
+    // ---- formatClock ----------------------------------------------------------------------------
+
+    @Test
+    fun `the clock reading is always HH_MM_SS`() {
+        assertEquals("00:40:12", CountdownFormatter.formatClock(Duration.ofMinutes(40).plusSeconds(12)))
+        assertEquals("11:05:09", CountdownFormatter.formatClock(Duration.ofHours(11).plusMinutes(5).plusSeconds(9)))
+        assertEquals("00:00:30", CountdownFormatter.formatClock(Duration.ofSeconds(30)))
+    }
+
+    @Test
+    fun `an exhausted or negative duration reads 00_00_00 on the clock`() {
+        assertEquals("00:00:00", CountdownFormatter.formatClock(Duration.ZERO))
+        assertEquals("00:00:00", CountdownFormatter.formatClock(Duration.ofMinutes(-3)))
+    }
+
+    @Test
+    fun `the clock keeps its width across an hour boundary where format does not`() {
+        assertEquals("01:00:00", CountdownFormatter.formatClock(Duration.ofHours(1)))
+        assertEquals("59:59", CountdownFormatter.format(Duration.ofMinutes(59).plusSeconds(59)))
+        assertEquals("00:59:59", CountdownFormatter.formatClock(Duration.ofMinutes(59).plusSeconds(59)))
+    }
 }

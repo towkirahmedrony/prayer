@@ -264,6 +264,7 @@ class HomeUiStateFactory(
                 now = now,
                 timeFormatter = timeFormatter,
             ),
+            heroDates = calendar?.headlines.orEmpty(),
         )
     }
 
@@ -465,6 +466,7 @@ class HomeUiStateFactory(
                 endsWithSolarEvent = (boundary as? PeriodBoundary.Solar)?.event,
                 countdown = CountdownFormatter.format(period.remaining),
                 countdownCompact = CountdownFormatter.formatCompactRemaining(period.remaining),
+                countdownClock = CountdownFormatter.formatClock(period.remaining),
                 next = next,
                 unavailable = null,
                 periodProgress = periodProgress(start = period.startsAt, end = period.endsAt, now = now),
@@ -481,6 +483,7 @@ class HomeUiStateFactory(
             endsWithSolarEvent = null,
             countdown = CountdownFormatter.format(status.remaining),
             countdownCompact = CountdownFormatter.formatCompactRemaining(status.remaining),
+            countdownClock = CountdownFormatter.formatClock(status.remaining),
             next = next,
             unavailable = null,
         )

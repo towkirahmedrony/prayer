@@ -4,6 +4,10 @@ import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.prayer.PrayerScheduleState
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodStatusResolver
+import io.github.towkirahmedrony.salah.core.model.CalendarDateState
+import io.github.towkirahmedrony.salah.core.model.CalendarHeadline
+import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DataSourceInfo
 import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -118,9 +122,10 @@ class HomeHeroCardStateTest {
         now: ZonedDateTime,
         nextDay: PrayerSchedule? = null,
         schedule: PrayerSchedule = today,
+        calendar: CalendarSnapshot? = null,
     ): HomeUiState.Ready {
         val state = factory.create(
-            calendar = null,
+            calendar = calendar,
             location = location,
             settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
             scheduleState = PrayerScheduleState.Available(schedule, origin),
@@ -367,5 +372,86 @@ class HomeHeroCardStateTest {
 
         // Sunrise 05:54 to sunset 17:36 is 11h 42m, a measurement rather than a countdown.
         assertEquals("11h 42m", state.daylight)
+    }
+
+    // ---- ring clock -----------------------------------------------------------------------------
+
+    @Test
+    fun `the open period carries a fixed-width clock countdown`() {
+        // Dhuhr runs 11:46 to 15:58, so at 15:00 there are 58 minutes left.
+        val hero = ready(at(15, 0)).currentPrayer
+
+        assertEquals("00:58:00", hero.countdownClock)
+    }
+
+    @Test
+    fun `the clock countdown ticks with the seconds`() {
+        assertEquals("00:00:30", ready(at(15, 57, 30)).currentPrayer.countdownClock)
+    }
+
+    @Test
+    fun `between sunrise and Dhuhr the clock counts down to the next prayer`() {
+        // Sunrise 05:54 to Dhuhr 11:46: nothing is open, and Dhuhr opens in 3h 46m at 08:00.
+        val hero = ready(at(8, 0)).currentPrayer
+
+        assertFalse(hero.isActive)
+        assertEquals("03:46:00", hero.countdownClock)
+    }
+
+    @Test
+    fun `there is no clock countdown without a schedule`() {
+        val state = factory.create(
+            calendar = null,
+            location = location,
+            settings = PrayerSettings.DEFAULT,
+            scheduleState = PrayerScheduleState.Unavailable(
+                reason = UnavailabilityReason.NO_LOCATION_CONFIGURED,
+                origin = origin,
+            ),
+            prohibitedState = ProhibitedPeriodsState.NotAvailable(reason = UnavailabilityReason.RULES_NOT_VERIFIED),
+            now = at(15, 0),
+        ) as HomeUiState.Ready
+
+        assertNull(state.currentPrayer.countdownClock)
+    }
+
+    // ---- hero dates -----------------------------------------------------------------------------
+
+    private fun snapshot(headlines: List<CalendarHeadline>) = CalendarSnapshot(
+        gregorian = CalendarDateState.NotAvailable(CalendarSystem.GREGORIAN, UnavailabilityReason.UNKNOWN),
+        bangla = CalendarDateState.NotAvailable(CalendarSystem.BANGLA, UnavailabilityReason.UNKNOWN),
+        hijri = CalendarDateState.NotAvailable(CalendarSystem.HIJRI, UnavailabilityReason.UNKNOWN),
+        weekdayLabel = null,
+        headlines = headlines,
+    )
+
+    @Test
+    fun `the hero dates are the snapshot's headlines, in order`() {
+        val headlines = listOf(
+            CalendarHeadline(CalendarSystem.GREGORIAN, primary = "8 Nov", year = "2026", weekday = "Sunday"),
+            CalendarHeadline(CalendarSystem.BANGLA, primary = "24 Kartik", year = "1433"),
+            CalendarHeadline(CalendarSystem.HIJRI, primary = "26 Jumada al-Awwal", year = "1448"),
+        )
+
+        val state = ready(at(15, 0), calendar = snapshot(headlines))
+
+        assertEquals(headlines, state.heroDates)
+    }
+
+    @Test
+    fun `there are no hero dates until the calendar snapshot exists`() {
+        assertTrue(ready(at(15, 0), calendar = null).heroDates.isEmpty())
+    }
+
+    @Test
+    fun `a calendar that did not resolve leaves its column out`() {
+        val onlyGregorian = listOf(
+            CalendarHeadline(CalendarSystem.GREGORIAN, primary = "8 Nov", year = "2026", weekday = "Sunday"),
+        )
+
+        val state = ready(at(15, 0), calendar = snapshot(onlyGregorian))
+
+        assertEquals(1, state.heroDates.size)
+        assertEquals(CalendarSystem.GREGORIAN, state.heroDates.single().system)
     }
 }

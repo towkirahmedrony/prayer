@@ -68,4 +68,22 @@ object CountdownFormatter {
         val underAMinute = !remaining.isNegative && !remaining.isZero && remaining < ONE_MINUTE
         return if (underAMinute) "<1m" else formatCompact(remaining)
     }
+
+    /**
+     * A fixed-width clock reading, `HH:MM:SS`, for example `00:40:12` or `11:05:09`.
+     *
+     * [format] drops the hour when there is none, so its width changes as a countdown crosses an hour
+     * and a card that centres it jumps. The hero ring uses this one instead: the same digits every
+     * second, always eight characters wide. An exhausted or negative duration reads `00:00:00`.
+     */
+    fun formatClock(remaining: Duration): String {
+        val totalSeconds = remaining.seconds.coerceAtLeast(0L)
+        return String.format(
+            Locale.ROOT,
+            "%02d:%02d:%02d",
+            totalSeconds / 3_600,
+            (totalSeconds % 3_600) / 60,
+            totalSeconds % 60,
+        )
+    }
 }

@@ -35,6 +35,28 @@ sealed interface CalendarDateState {
     ) : CalendarDateState
 }
 
+/**
+ * One calendar's date for the Home hero card, split into the parts the card sets in different sizes.
+ *
+ * The same date [CalendarSnapshot.gregorian], [CalendarSnapshot.bangla] and [CalendarSnapshot.hijri]
+ * state as one string; this is that date taken apart so the card can show `8 Nov` large and
+ * `Sunday · 2026` small without parsing a formatted string. Every part is already written in the
+ * script and numerals the date language chose, so the card formats nothing.
+ *
+ * The card's secondary line is built from these parts and a localised label, which is why they are
+ * carried separately instead of as two ready-made lines: the label (`Bangla`, `বাংলা`) is a string
+ * resource, and this model stays free of Android.
+ */
+data class CalendarHeadline(
+    val system: CalendarSystem,
+    /** The large part: day and month, for example `8 Nov`, `২৪ কার্তিক` or `২৬ جُمادى الأولى`. */
+    val primary: String,
+    /** The year, in the same numerals as [primary]. */
+    val year: String,
+    /** The weekday name, for the Gregorian headline only; `null` for the other two. */
+    val weekday: String? = null,
+)
+
 /** Snapshot of the calendar information shown on the Home screen. */
 data class CalendarSnapshot(
     val gregorian: CalendarDateState,
@@ -42,4 +64,12 @@ data class CalendarSnapshot(
     val hijri: CalendarDateState,
     /** Localised weekday name for today, if available. */
     val weekdayLabel: String?,
+    /**
+     * The hero card's date columns, in Gregorian, Bangla, Hijri order.
+     *
+     * Only the calendars that actually resolved are present: a date outside a converter's supported
+     * range is left out, never approximated. Empty by default so a snapshot built without it (as the
+     * domain-level tests do) still reads as "no headline dates".
+     */
+    val headlines: List<CalendarHeadline> = emptyList(),
 )

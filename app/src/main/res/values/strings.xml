@@ -1151,6 +1151,9 @@
     <string name="home_hero_fasting_in">in %1$s</string>
     <string name="home_hero_set_sehri_reminder">Set Sehri reminder</string>
     <string name="home_hero_set_iftar_reminder">Set Iftar reminder</string>
+    <string name="home_hero_date_weekday_year">%1$s · %2$s</string>
+    <string name="home_hero_date_bangla_year">Bangla · %1$s</string>
+    <string name="home_hero_date_hijri_year">Hijri · %1$s</string>
     <string name="mosque_distance_metres_short">%1$s m</string>
     <string name="mosque_distance_km_short">%1$s km</string>
     <string name="mosque_nearest_label">Nearest</string>

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -23,7 +24,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +46,8 @@ import io.github.towkirahmedrony.salah.core.designsystem.SunsetGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldAccent
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.model.CalendarHeadline
+import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.feature.common.labelRes
@@ -201,33 +203,31 @@ fun HomeDateLine(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     )
 }
 
+/** The fill of the hero ring's progress arc: a light mint that reads on the brand surface in both themes. */
+private val HeroRingMint = Color(0xFF7FDDB6)
+
 /**
- * The hero card: the prayer whose period is open now and how long is left in it, over today's Sehri end
+ * The hero card: today's three dates over the open prayer, drawn as a ring, beside the next Sehri end
  * and Iftar.
  *
- * Its fill and everything drawn on it come from the theme's brand pairing, so the white type can never
- * end up on a fill a later theme change moved out from under it.
+ * Three rows of content, all read from [HomeUiState.Ready] and none calculated here:
+ *  - **The dates**: the Gregorian, Bangla and Hijri dates as three columns, each a large day-and-month
+ *    over a small gold line. A calendar that has not resolved is simply absent, and with none resolved
+ *    the row and its divider are left out.
+ *  - **The ring**: the prayer whose period is open, the time left in it as a fixed-width clock and when
+ *    it ends. The arc is how far through the period the moment is, measured by the state factory, and
+ *    is left empty when the factory had nothing honest to report. Between sunrise and Dhuhr no period
+ *    is open, so the ring names the prayer that opens next, says so ("up next") and counts down to it.
+ *  - **Sehri and Iftar**: the next fasting pair, with the next event highlighted and counting down. See
+ *    [FastingPanel].
  *
- * Two readings, both taken from [HomeUiState.Ready] and neither calculated here:
- *  - **While a period is open** the card names that prayer, shows when it ends and how long is left. The
- *    countdown is the time to the next boundary in the timetable, not a statement of how long the prayer
- *    may be performed.
- *  - **Between sunrise and Dhuhr** no period is open, so the card says "up next" and names the prayer
- *    that opens next, instead of showing a prayer as current when it is not.
- *
- * A thin line under the prayer name and countdown shows how far through the open period the moment is.
- * It is drawn from [io.github.towkirahmedrony.salah.feature.home.CurrentPrayerSection.periodProgress],
- * which the state factory measured, and is omitted when the factory had nothing honest to report.
- *
- * The lower row is the **next** Sehri end and Iftar: today's pair until Iftar, then tomorrow's. Sehri
- * ends at the calculated Fajr and Iftar is the calculated Maghrib, exactly as the Ramadan screen reads
- * them. The event that is next is highlighted and carries a small "in 10h 2m" line; a time that has
- * already passed is dimmed rather than hidden. Which pair, which event and what the countdown says were
- * all resolved in the state factory — this composable only draws them.
+ * The countdown is the time to the next boundary in the timetable, not a statement of how long the
+ * prayer may be performed. Its fill and everything drawn on it come from the theme's brand pairing, so
+ * the white type can never end up on a fill a later theme change moved out from under it.
  *
  * @param onOpenReminders opens the notification settings so the reader can set a Sehri or Iftar
- *   reminder. When `null` the two columns are plain text and carry no bell, which is how the Prayer
- *   screen shows this card.
+ *   reminder. When `null` the two fasting blocks are plain text and carry no bell, which is how the
+ *   Prayer screen shows this card.
  */
 @Composable
 fun CurrentPrayerHeroCard(
@@ -237,15 +237,122 @@ fun CurrentPrayerHeroCard(
 ) {
     val accents = LocalSalahAccents.current
     val onBrand = accents.onBrandSurface
+    val shape = RoundedCornerShape(28.dp)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(accents.brandSurface)
+            .border(1.dp, GoldAccent.copy(alpha = 0.28f), shape),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+            if (state.heroDates.isNotEmpty()) {
+                HeroDateRow(dates = state.heroDates, onBrand = onBrand)
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = onBrand.copy(alpha = 0.18f))
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PrayerRing(state = state, onBrand = onBrand, modifier = Modifier.weight(1f))
+                // A fixed height rather than an intrinsic one: the ring sizes itself from its width, and
+                // an intrinsic measurement would ask it for a height before it has a width to use.
+                VerticalDivider(
+                    modifier = Modifier.padding(horizontal = 12.dp).height(112.dp),
+                    color = onBrand.copy(alpha = 0.18f),
+                )
+                FastingPanel(
+                    section = state.fasting,
+                    onBrand = onBrand,
+                    onOpenReminders = onOpenReminders,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The hero's date columns, one per calendar that resolved, separated by thin vertical rules.
+ *
+ * Each column is the date's large part over a small gold line: the Gregorian line is the weekday and the
+ * year, the Bangla and Hijri lines name their calendar and the year. The labels are string resources;
+ * every date part arrives already written in the script and numerals the date language chose.
+ */
+@Composable
+private fun HeroDateRow(
+    dates: List<CalendarHeadline>,
+    onBrand: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        dates.forEachIndexed { index, date ->
+            if (index > 0) {
+                VerticalDivider(
+                    modifier = Modifier.fillMaxHeight(),
+                    color = onBrand.copy(alpha = 0.18f),
+                )
+            }
+            val detail = when (date.system) {
+                CalendarSystem.GREGORIAN -> date.weekday?.let { weekday ->
+                    stringResource(R.string.home_hero_date_weekday_year, weekday, date.year)
+                } ?: date.year
+                CalendarSystem.BANGLA -> stringResource(R.string.home_hero_date_bangla_year, date.year)
+                CalendarSystem.HIJRI -> stringResource(R.string.home_hero_date_hijri_year, date.year)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = if (index == 0) 4.dp else 12.dp, end = 4.dp),
+            ) {
+                Text(
+                    text = date.primary,
+                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = onBrand,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GoldAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The open prayer as a ring: the name, the clock counting down and when the period ends, inside an arc
+ * that fills as the period elapses.
+ *
+ * With no open period (between sunrise and Dhuhr) the ring is the "up next" reading instead: a small
+ * status line, the prayer that opens next, the clock to it and when it begins — and the arc is empty,
+ * because nothing has started. With no schedule at all the ring explains the gap in words rather than
+ * showing a clock that does not exist.
+ */
+@Composable
+private fun PrayerRing(
+    state: HomeUiState.Ready,
+    onBrand: Color,
+    modifier: Modifier = Modifier,
+) {
     val hero = state.currentPrayer
     val next = state.nextPrayer
     val open = hero.isActive && hero.prayer != null
 
     val prayer = if (open) hero.prayer else (next.prayer ?: hero.next.prayer)
     val prayerName = prayer?.let { stringResource(it.labelRes()) }
-    val statusLabel = stringResource(
-        if (open) R.string.home_hero_status_current else R.string.home_hero_status_up_next,
-    )
     val subtitle = if (open) {
         hero.endTime?.let { end ->
             stringResource(
@@ -256,166 +363,116 @@ fun CurrentPrayerHeroCard(
     } else {
         (next.time ?: hero.next.time)?.let { time -> stringResource(R.string.home_next_prayer_at, time) }
     }
-    val countdown = if (open) {
-        hero.countdownCompact ?: hero.countdown
+    val clock = if (open) {
+        hero.countdownClock ?: hero.countdown
     } else {
-        next.countdownCompact ?: next.countdown ?: hero.next.countdownCompact ?: hero.next.countdown
+        hero.countdownClock ?: next.countdown ?: hero.next.countdown
     }
-    val caption = when {
-        open -> stringResource(R.string.home_hero_time_remaining)
-        prayerName != null -> stringResource(R.string.home_hero_time_until_begins, prayerName)
-        else -> null
-    }
+    val progress = if (open) hero.periodProgress else null
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(accents.brandSurface),
+        modifier = modifier.aspectRatio(1f),
+        contentAlignment = Alignment.Center,
     ) {
-        HeroCornerArt(onBrand = onBrand, modifier = Modifier.matchParentSize())
-
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = GoldAccent,
-                )
-                Text(
-                    text = stringResource(R.string.home_hero_label_time_left),
-                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = GoldAccent,
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val strokeWidth = 8.dp.toPx()
+            val inset = strokeWidth / 2f
+            val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+            val topLeft = Offset(inset, inset)
+            drawArc(
+                color = onBrand.copy(alpha = 0.16f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth),
+            )
+            if (progress != null) {
+                drawArc(
+                    color = HeroRingMint,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress.coerceIn(0f, 1f),
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
+        }
 
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
             if (prayerName != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = prayerName,
-                            style = MaterialTheme.typography.displaySmall.copy(
-                                fontSize = 34.sp,
-                                fontFamily = FontFamily.Serif,
-                            ),
-                            fontWeight = FontWeight.Bold,
-                            color = onBrand,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (subtitle != null) {
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = onBrand.copy(alpha = 0.82f),
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = countdown ?: stringResource(R.string.home_time_unavailable),
-                            style = MaterialTheme.typography.displaySmall.copy(
-                                fontSize = 34.sp,
-                                fontFamily = FontFamily.Serif,
-                            ),
-                            fontWeight = FontWeight.Bold,
-                            color = onBrand,
-                        )
-                        caption?.let { text ->
-                            Text(
-                                text = text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = onBrand.copy(alpha = 0.82f),
-                                textAlign = TextAlign.End,
-                            )
-                        }
-                    }
+                if (!open) {
+                    Text(
+                        text = stringResource(R.string.home_hero_status_up_next),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GoldAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                val progress = hero.periodProgress
-                if (open && progress != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    PeriodProgressLine(progress = progress, onBrand = onBrand)
+                Text(
+                    text = prayerName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = onBrand,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = clock ?: stringResource(R.string.home_time_unavailable),
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = onBrand,
+                    maxLines = 1,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onBrand.copy(alpha = 0.82f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             } else {
                 Text(
                     text = stringResource(hero.unavailable?.messageRes() ?: R.string.home_next_prayer_none),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = onBrand.copy(alpha = 0.9f),
+                    textAlign = TextAlign.Center,
                 )
             }
-
-            Spacer(modifier = Modifier.height(18.dp))
-            HorizontalDivider(color = onBrand.copy(alpha = 0.18f))
-            Spacer(modifier = Modifier.height(14.dp))
-            FastingTimesRow(section = state.fasting, onBrand = onBrand, onOpenReminders = onOpenReminders)
         }
     }
 }
 
 /**
- * A thin track with a fill showing how far through the open prayer period the moment is.
- *
- * [progress] is already a `0f..1f` fraction measured by the state factory; it is clamped again here
- * only so a stray value can never draw outside the track.
- */
-@Composable
-private fun PeriodProgressLine(
-    progress: Float,
-    onBrand: Color,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(percent = 50)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .clip(shape)
-            .background(onBrand.copy(alpha = 0.18f)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .fillMaxHeight()
-                .clip(shape)
-                .background(GoldAccent),
-        )
-    }
-}
-
-/**
- * The Sehri end on the left and Iftar on the right, each under its own gold label.
+ * The Sehri end above Iftar, each under its own gold label, with a thin rule between them.
  *
  * The next event is highlighted and counts down; a time that has passed is dimmed; the other is shown
  * at a reduced emphasis. When [section] describes tomorrow, the labels say so.
  */
 @Composable
-private fun FastingTimesRow(
+private fun FastingPanel(
     section: FastingTimesSection,
     onBrand: Color,
     onOpenReminders: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // Each column takes half the row so the longer "tomorrow" labels wrap instead of running into the
-    // other column on a narrow phone.
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
     ) {
         FastingTimeColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             label = stringResource(
                 if (section.isTomorrow) R.string.home_hero_tomorrow_sehri_ends else R.string.home_hero_sehri_ends,
             ),
@@ -426,10 +483,13 @@ private fun FastingTimesRow(
             reminderLabel = stringResource(R.string.home_hero_set_sehri_reminder),
             onClick = onOpenReminders,
             onBrand = onBrand,
-            horizontalAlignment = Alignment.Start,
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = onBrand.copy(alpha = 0.18f),
         )
         FastingTimeColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             label = stringResource(
                 if (section.isTomorrow) R.string.home_hero_tomorrow_iftar else R.string.home_hero_iftar_begins,
             ),
@@ -440,7 +500,6 @@ private fun FastingTimesRow(
             reminderLabel = stringResource(R.string.home_hero_set_iftar_reminder),
             onClick = onOpenReminders,
             onBrand = onBrand,
-            horizontalAlignment = Alignment.End,
         )
     }
 }
@@ -456,7 +515,6 @@ private fun FastingTimeColumn(
     reminderLabel: String,
     onClick: (() -> Unit)?,
     onBrand: Color,
-    horizontalAlignment: Alignment.Horizontal,
 ) {
     // Emphasis is decided from the flags the factory resolved: the next event at full strength, a time
     // that has passed dimmed, anything else in between.
@@ -476,15 +534,13 @@ private fun FastingTimeColumn(
             .clip(RoundedCornerShape(12.dp))
             .then(clickable)
             .padding(horizontal = 4.dp, vertical = 2.dp),
-        horizontalAlignment = horizontalAlignment,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.6.sp),
                 fontWeight = FontWeight.SemiBold,
                 color = GoldAccent,
-                textAlign = if (horizontalAlignment == Alignment.End) TextAlign.End else TextAlign.Start,
                 modifier = Modifier.weight(1f, fill = false),
             )
             if (onClick != null) {
@@ -492,12 +548,12 @@ private fun FastingTimeColumn(
                 BellGlyph(tint = GoldAccent, modifier = Modifier.size(14.dp))
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value ?: stringResource(R.string.home_time_unavailable),
-            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif),
+            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp),
             fontWeight = FontWeight.Bold,
             color = timeColor,
+            maxLines = 1,
         )
         if (highlighted && countdown != null) {
             Text(
@@ -506,26 +562,6 @@ private fun FastingTimeColumn(
                 color = onBrand.copy(alpha = 0.82f),
             )
         }
-    }
-}
-
-/** A faint pair of rings in the hero's top corner, echoing the reference's decorative line art. */
-@Composable
-private fun HeroCornerArt(onBrand: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val center = Offset(size.width * 0.86f, size.height * 0.10f)
-        drawCircle(
-            color = onBrand.copy(alpha = 0.09f),
-            radius = size.width * 0.14f,
-            center = center,
-            style = Stroke(width = 1.5f),
-        )
-        drawCircle(
-            color = onBrand.copy(alpha = 0.06f),
-            radius = size.width * 0.22f,
-            center = center,
-            style = Stroke(width = 1.5f),
-        )
     }
 }
 

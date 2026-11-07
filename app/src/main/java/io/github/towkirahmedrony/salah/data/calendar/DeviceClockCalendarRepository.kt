@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.repository.CalendarRepository
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.CalendarDateState
 import io.github.towkirahmedrony.salah.core.model.CalendarDay
+import io.github.towkirahmedrony.salah.core.model.CalendarHeadline
 import io.github.towkirahmedrony.salah.core.model.CalendarMonth
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSnapshot
@@ -130,7 +131,59 @@ class DeviceClockCalendarRepository(
             bangla = banglaDateState(today, locale),
             hijri = hijriDateState(today, calendarSettings, locale),
             weekdayLabel = formatting.weekday(today, locale),
+            headlines = headlinesFor(today, calendarSettings, locale),
         )
+    }
+
+    /**
+     * The three dates the Home hero card sets as columns, each split into its large and small parts.
+     *
+     * Built from the same converters and the same [locale] as the one-line dates beside it, so the card
+     * and every other reading of today's date come from one source and cannot disagree. A calendar whose
+     * converter has no answer for [today] is left out rather than approximated.
+     *
+     * The Hijri month is the one name chosen differently from the one-line date: under a Bangla
+     * rendering locale it is the Arabic name (`جُمادى الأولى`) with Bangla numerals, because that is the
+     * form the card shows — the day and year stay in the surrounding script while the month keeps the
+     * name the Hijri calendar is known by. Every other locale uses [CalendarFormatting.hijriMonthName]
+     * unchanged.
+     */
+    private fun headlinesFor(
+        today: LocalDate,
+        calendarSettings: CalendarSettings,
+        locale: Locale,
+    ): List<CalendarHeadline> = buildList {
+        add(
+            CalendarHeadline(
+                system = CalendarSystem.GREGORIAN,
+                primary = formatting.gregorianDayMonth(today, locale),
+                year = formatting.numerals(today.year, locale),
+                weekday = formatting.weekday(today, locale),
+            ),
+        )
+        banglaCalendar.convert(today)?.let { date ->
+            add(
+                CalendarHeadline(
+                    system = CalendarSystem.BANGLA,
+                    primary = "${formatting.numerals(date.day, locale)} ${formatting.banglaMonthName(date.month, locale)}",
+                    year = formatting.numerals(date.year, locale),
+                ),
+            )
+        }
+        hijriCalendar.dateOf(today, calendarSettings.hijriAdjustmentDays)?.let { date ->
+            val monthName = if (formatting.isBangla(locale)) {
+                date.month.arabicName
+            } else {
+                formatting.hijriMonthName(date.month, locale)
+            }
+            add(
+                CalendarHeadline(
+                    system = CalendarSystem.HIJRI,
+                    primary = "${formatting.numerals(date.day, locale)} $monthName",
+                    year = formatting.numerals(date.year, locale),
+                ),
+            )
+        }
     }
 
     private fun monthAt(

@@ -543,12 +543,17 @@ private fun TimeRow(
     endTime: String? = null,
     endsNextDay: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column {
+    val showsNextDay = endTime != null && endsNextDay
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
+        // First line: the prayer's name and its time. The time is measured first and is never
+        // wrapped; the name takes whatever width is left. Before, the name and its note shared one
+        // column, and a long note squeezed the time range onto two lines.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = label,
                 style = if (highlighted) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
@@ -557,18 +562,8 @@ private fun TimeRow(
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
+                modifier = Modifier.weight(1f),
             )
-            // Disclosed next to the time it moved, so a corrected time is never presented as a
-            // raw calculation result.
-            if (adjustmentMinutes != 0) {
-                Text(
-                    text = stringResource(R.string.home_adjusted_by, signedMinutes(adjustmentMinutes)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        Column(horizontalAlignment = Alignment.End) {
             Text(
                 // A prayer is a period, not a point: show where it opens and where it closes. The join
                 // is a resource because the separator and the order are part of the language.
@@ -584,13 +579,40 @@ private fun TimeRow(
                     MaterialTheme.colorScheme.onSurface
                 },
                 fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                softWrap = false,
             )
-            if (endTime != null && endsNextDay) {
-                Text(
-                    text = stringResource(R.string.home_ends_next_day),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        }
+
+        // Second line, only when there is something to say: the adjustment disclosed next to the time
+        // it moved (so a corrected time is never presented as a raw calculation result) on the left,
+        // and "ends next day" on the right.
+        if (adjustmentMinutes != 0 || showsNextDay) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (adjustmentMinutes != 0) {
+                    Text(
+                        text = stringResource(R.string.home_adjusted_by, signedMinutes(adjustmentMinutes)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                if (showsNextDay) {
+                    Text(
+                        text = stringResource(R.string.home_ends_next_day),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                    )
+                }
             }
         }
     }

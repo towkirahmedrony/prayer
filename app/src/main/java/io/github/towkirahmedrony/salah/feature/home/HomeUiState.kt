@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.home
 
 import io.github.towkirahmedrony.salah.core.model.AsrCalculationMethod
+import io.github.towkirahmedrony.salah.core.model.CalendarHeadline
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DashboardCard
 import io.github.towkirahmedrony.salah.core.model.HighLatitudeRule
@@ -102,6 +103,13 @@ sealed interface HomeUiState {
         val qibla: QiblaSection = QiblaSection.Unavailable,
         /** The next Sehri end and Iftar for the hero card (tomorrow's once today's Iftar has passed), or the placeholder when there is no schedule. */
         val fasting: FastingTimesSection = FastingTimesSection.Unavailable,
+        /**
+         * The hero card's date columns — Gregorian, Bangla, Hijri — each split into the parts the card
+         * sets large and small. Only the calendars that resolved are present, and the list is empty
+         * while the calendar snapshot has not been produced, so the card shows no date row rather than
+         * a placeholder.
+         */
+        val heroDates: List<CalendarHeadline> = emptyList(),
     ) : HomeUiState
 }
 
@@ -350,6 +358,11 @@ data class CurrentPrayerSection(
     val countdown: String?,
     /** [countdown] rendered compactly for the hero card, e.g. `1h 17m`; `null` with [countdown]. */
     val countdownCompact: String?,
+    /**
+     * [countdown] as a fixed-width `HH:MM:SS` clock, e.g. `00:40:12`, for the hero ring; `null` with
+     * [countdown]. It is the same remaining time, so the ring and every other reading of it agree.
+     */
+    val countdownClock: String? = null,
     /** The next prayer to begin, used when no period is open and shown as secondary detail. */
     val next: NextPrayerSection,
     /** Non-null when no period can be resolved, so the card explains the gap. */
