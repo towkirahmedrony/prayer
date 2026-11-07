@@ -5,9 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -39,8 +42,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -146,10 +151,12 @@ private fun CalendarTitleFallback() {
 /**
  * The month and year, the `Today` action and the two month controls.
  *
- * The title is the largest type on the page and the only flexible element in the row, so a long month
- * name wraps inside its own space instead of squeezing a control out of the row; the controls are
- * fixed-size [androidx.compose.material3.IconButton]s and therefore keep the platform's 48dp touch
- * target.
+ * The title is the heading in all three calendar modes and is the only flexible element in the row, so
+ * it is given a block whose height is *reserved* for two lines ([CalendarTitleMetrics.BLOCK_HEIGHT_SP])
+ * rather than measured from the month on screen: a one-line month is centred inside that block, so the
+ * header, and the grid beneath it, starts at the same Y whichever month or mode is showing. The two
+ * month controls are fixed 48dp targets, so they keep the platform's touch size even beside a two-line
+ * title.
  */
 @Composable
 private fun CalendarHeader(
@@ -161,22 +168,19 @@ private fun CalendarHeader(
     val previousDescription = stringResource(R.string.calendar_previous_month)
     val nextDescription = stringResource(R.string.calendar_next_month)
     val tint = MaterialTheme.colorScheme.onSurface
+    val titleHeight = with(LocalDensity.current) {
+        CalendarTitleMetrics.BLOCK_HEIGHT_SP.sp.toDp()
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = monthLabel,
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontFamily = FontFamily.Serif,
-                fontSize = 32.sp,
-            ),
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+        MonthTitle(
+            monthLabel = monthLabel,
+            modifier = Modifier
+                .weight(1f)
+                .height(titleHeight),
         )
         Text(
             text = stringResource(R.string.calendar_today_label),
@@ -198,6 +202,84 @@ private fun CalendarHeader(
             onClick = onNextMonth,
             glyph = { modifier -> ChevronRightGlyph(tint = tint, modifier = modifier) },
         )
+    }
+}
+
+/**
+ * The month and year, measured against the width the row actually leaves the title.
+ *
+ * The measurement uses the style the text is drawn in, so the decision is made for this device's font,
+ * density and font scale rather than an assumed character width. The whole label stays on one line
+ * when it fits, the year moves under the month name when it does not, and the month name shrinks
+ * towards [CalendarTitleMetrics.MIN_FONT_SIZE_SP] before any part of it is cut. `softWrap = false`
+ * with a single line means a month name can neither wrap onto a second line nor end in an ellipsis,
+ * and the two lines are centred as a group in the reserved block.
+ */
+@Composable
+private fun MonthTitle(monthLabel: String, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val textMeasurer = rememberTextMeasurer()
+    val titleStyle = MaterialTheme.typography.displaySmall.copy(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Bold,
+        lineHeight = CalendarTitleMetrics.PRIMARY_LINE_HEIGHT_SP.sp,
+    )
+    val lineGap = with(density) { CalendarTitleMetrics.LINE_GAP_SP.sp.toDp() }
+    val endGapPx = with(density) { TITLE_END_GAP.roundToPx() }
+
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterStart) {
+        // The width left after the ring of controls, measured rather than assumed, minus the small gap
+        // that keeps the title from touching `Today` when it fills its space.
+        val availableWidthPx = (constraints.maxWidth - endGapPx).coerceAtLeast(0)
+        val layout = remember(monthLabel, availableWidthPx, titleStyle, layoutDirection, density) {
+            CalendarTitlePlanner.plan(
+                monthLabel = monthLabel,
+                availableWidthPx = availableWidthPx,
+                measureWidthPx = { text, fontSizeSp ->
+                    textMeasurer.measure(
+                        text = AnnotatedString(text),
+                        style = titleStyle.copy(fontSize = fontSizeSp.sp),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip,
+                        layoutDirection = layoutDirection,
+                    ).size.width
+                },
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxHeight(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start,
+        ) {
+            Text(
+                text = layout.primaryLine,
+                style = titleStyle.copy(fontSize = layout.fontSizeSp.sp),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+            layout.secondaryLine?.let { year ->
+                Spacer(modifier = Modifier.height(lineGap))
+                Text(
+                    text = year,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = FontFamily.Serif,
+                        fontSize = CalendarTitleMetrics.SECONDARY_FONT_SIZE_SP.sp,
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = CalendarTitleMetrics.SECONDARY_LINE_HEIGHT_SP.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    // Centred beneath the month name, so the pair reads as one heading.
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            }
+        }
     }
 }
 
@@ -224,23 +306,31 @@ private fun MonthControl(
  * The subtitle naming the Hijri and Bangla months the displayed span covers, with the settings action.
  *
  * Only the halves that could be derived are shown, joined by a separator, so a table that does not
- * cover the month leaves no dangling punctuation.
+ * cover the month leaves no dangling punctuation. The line is one line of fixed height: a longer span
+ * is ellipsized rather than wrapped, so this row cannot change height and push the grid down.
  */
 @Composable
 private fun MonthSpanLine(state: CalendarUiState.Ready, onOpenSettings: () -> Unit) {
     val parts = listOfNotNull(state.hijriSpanLabel, state.banglaSpanLabel)
     val settingsDescription = stringResource(R.string.calendar_open_settings)
+    val rowHeight = with(LocalDensity.current) {
+        maxOf(MIN_SUBTITLE_ROW_HEIGHT, CalendarTitleMetrics.SUBTITLE_LINE_HEIGHT_SP.sp.toDp())
+    }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(rowHeight),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (parts.isNotEmpty()) {
             Text(
                 text = parts.joinToString(stringResource(R.string.calendar_month_span_separator)),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    lineHeight = CalendarTitleMetrics.SUBTITLE_LINE_HEIGHT_SP.sp,
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -888,3 +978,9 @@ private val CELL_HEIGHT = 52.dp
 
 /** Width of the date-line label column, so the three values start on one vertical line. */
 private val LABEL_WIDTH = 84.dp
+
+/** Gap between the title and `Today`, so a full-width title never touches the action. */
+private val TITLE_END_GAP = 4.dp
+
+/** The settings control's 48dp touch target, which is also the subtitle row's minimum height. */
+private val MIN_SUBTITLE_ROW_HEIGHT = 48.dp
