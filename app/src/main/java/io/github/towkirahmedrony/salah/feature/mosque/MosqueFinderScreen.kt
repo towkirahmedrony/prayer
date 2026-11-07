@@ -820,7 +820,12 @@ private fun MosqueRow(
                     )
                     if (!selected && mosque.address != null) {
                         Text(
-                            text = " · ${mosque.address}",
+                            text = " · ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = mosque.address,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -1000,7 +1005,12 @@ private fun SelectedMosqueBar(
                 )
                 if (mosque.address != null) {
                     Text(
-                        text = " · ${mosque.address}",
+                        text = " · ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = mosque.address,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
