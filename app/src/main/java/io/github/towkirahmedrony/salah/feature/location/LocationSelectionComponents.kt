@@ -1,8 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.location
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,13 +11,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
@@ -29,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -43,14 +36,15 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.towkirahmedrony.salah.R
-import io.github.towkirahmedrony.salah.core.designsystem.ChevronDownGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SalahBrandLogo
 import io.github.towkirahmedrony.salah.core.designsystem.SignalGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.components.AppDropdownField
+import io.github.towkirahmedrony.salah.core.designsystem.components.DropdownItem
+import io.github.towkirahmedrony.salah.core.designsystem.components.DropdownSearch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
@@ -227,6 +221,11 @@ internal fun ManualAreaSection(
     onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    // One open menu for the three levels, not three independent ones: two lists can never be on screen
+    // at once, and a parent change that disables a child closes whatever that child had open instead
+    // of leaving a menu attached to a control the user can no longer use.
+    var openDropdown by remember { mutableStateOf<AreaLevel?>(null) }
+
     SalahSectionCard(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             LocationPinFilledGlyph(
@@ -268,34 +267,80 @@ internal fun ManualAreaSection(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
-            AreaDropdownField(
+            // Each level's options, in the language the screen is rendering, mapped once per
+            // dataset/language pair rather than on every recomposition of the menu.
+            val divisions = remember(state.divisionOptions, nameLanguage) {
+                state.divisionOptions.asDropdownItems(nameLanguage)
+            }
+            val districts = remember(state.districtOptions, nameLanguage) {
+                state.districtOptions.asDropdownItems(nameLanguage)
+            }
+            val upazilas = remember(state.upazilaOptions, nameLanguage) {
+                state.upazilaOptions.asDropdownItems(nameLanguage)
+            }
+            val dropdownSearch = DropdownSearch(
+                label = stringResource(R.string.location_search_label),
+                emptyMessage = stringResource(R.string.location_search_empty),
+                clearContentDescription = stringResource(R.string.location_search_clear),
+            )
+
+            AppDropdownField(
                 label = stringResource(R.string.location_division_label),
-                selected = state.divisionOptions.firstOrNull { area -> area.id == state.selection.divisionId },
-                options = state.divisionOptions,
+                selectedId = state.selection.divisionId,
+                selectedLabel = state.divisionOptions
+                    .firstOrNull { area -> area.id == state.selection.divisionId }
+                    ?.nameIn(nameLanguage),
+                items = divisions,
+                expanded = openDropdown == AreaLevel.DIVISION,
+                onExpandedChange = { open ->
+                    openDropdown = if (open) AreaLevel.DIVISION else null
+                },
+                onSelect = { id ->
+                    openDropdown = null
+                    onSelectDivision(id)
+                },
                 enabled = state.isDatasetUsable,
-                emptyMessage = null,
-                onSelect = onSelectDivision,
-                nameLanguage = nameLanguage,
+                search = dropdownSearch,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            AreaDropdownField(
+            AppDropdownField(
                 label = stringResource(R.string.location_district_label),
-                selected = state.districtOptions.firstOrNull { area -> area.id == state.selection.districtId },
-                options = state.districtOptions,
+                selectedId = state.selection.districtId,
+                selectedLabel = state.districtOptions
+                    .firstOrNull { area -> area.id == state.selection.districtId }
+                    ?.nameIn(nameLanguage),
+                items = districts,
+                expanded = openDropdown == AreaLevel.DISTRICT,
+                onExpandedChange = { open ->
+                    openDropdown = if (open) AreaLevel.DISTRICT else null
+                },
+                onSelect = { id ->
+                    openDropdown = null
+                    onSelectDistrict(id)
+                },
                 enabled = state.isDatasetUsable && state.selection.divisionId != null,
                 emptyMessage = stringResource(R.string.location_picker_needs_division),
-                onSelect = onSelectDistrict,
-                nameLanguage = nameLanguage,
+                search = dropdownSearch,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            AreaDropdownField(
+            AppDropdownField(
                 label = stringResource(R.string.location_upazila_label),
-                selected = state.upazilaOptions.firstOrNull { area -> area.id == state.selection.upazilaId },
-                options = state.upazilaOptions,
+                selectedId = state.selection.upazilaId,
+                selectedLabel = state.upazilaOptions
+                    .firstOrNull { area -> area.id == state.selection.upazilaId }
+                    ?.nameIn(nameLanguage),
+                items = upazilas,
+                expanded = openDropdown == AreaLevel.UPAZILA,
+                onExpandedChange = { open ->
+                    openDropdown = if (open) AreaLevel.UPAZILA else null
+                },
+                onSelect = { id ->
+                    openDropdown = null
+                    onSelectUpazila(id)
+                },
                 enabled = state.isDatasetUsable && state.selection.districtId != null,
                 emptyMessage = stringResource(R.string.location_picker_needs_district),
-                onSelect = onSelectUpazila,
-                nameLanguage = nameLanguage,
+                search = dropdownSearch,
             )
         }
 
@@ -343,96 +388,19 @@ internal fun ManualAreaSection(
 }
 
 /**
- * One level of the manual hierarchy, as an outlined field that opens a list of the dataset's areas.
+ * One level's options, as the shared dropdown component draws them.
  *
- * The field is read-only: it holds the chosen area and nothing else, and the list it opens is the
- * only way to change it. A read-only `OutlinedTextField` does not open anything by itself, so the
- * click is handled by a transparent layer over it — which is also what keeps the whole field, not
- * just its text, the touch target.
+ * The name is the dataset's own name in the active language — the Bangla one where it has it, the
+ * English one otherwise — so a menu row and the field above it can never disagree.
  */
-@Composable
-internal fun AreaDropdownField(
-    label: String,
-    selected: BangladeshArea?,
-    options: List<BangladeshArea>,
-    enabled: Boolean,
-    emptyMessage: String?,
-    onSelect: (String) -> Unit,
+private fun List<BangladeshArea>.asDropdownItems(
     nameLanguage: LocationNameLanguage,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            // The active language's name: the Bangla one where the dataset has it, the English one
-            // otherwise — the same value the menu below shows for this area.
-            value = selected?.nameIn(nameLanguage).orEmpty(),
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
-            label = { Text(text = label) },
-            trailingIcon = {
-                ChevronDownGlyph(
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            shape = MaterialTheme.shapes.small,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                focusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(MaterialTheme.shapes.small)
-                .clickable(enabled = enabled) { expanded = true },
-        )
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            if (options.isEmpty()) {
-                if (emptyMessage != null) {
-                    DropdownMenuItem(
-                        text = { Text(text = emptyMessage) },
-                        onClick = { expanded = false },
-                        enabled = false,
-                    )
-                }
-            } else {
-                options.forEach { area ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = area.nameIn(nameLanguage),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        onClick = {
-                            expanded = false
-                            onSelect(area.id)
-                        },
-                    )
-                }
-            }
-        }
-    }
+): List<DropdownItem> = map { area ->
+    DropdownItem(id = area.id, label = area.nameIn(nameLanguage))
 }
+
+/** The manual hierarchy's three levels: one of them, at most, has its list open. */
+private enum class AreaLevel { DIVISION, DISTRICT, UPAZILA }
 
 /**
  * True when the message names a failure the user can act on from the screen's own settings link.

@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.location
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -125,6 +126,43 @@ class LocationSelectionWiringTest {
         )
     }
 
+    @Test
+    fun `the three levels share one dropdown component`() {
+        val picker = source("$APP_PACKAGE_PATH/feature/location/$PICKER_FILE").readText()
+
+        assertEquals(
+            "division, district and upazila/thana must each use the one shared dropdown, not a copy each",
+            3,
+            picker.split("AppDropdownField(").size - 1,
+        )
+        assertFalse(
+            "the picker must not keep a dropdown of its own: anchoring and styling belong to the shared component",
+            picker.contains("AreaDropdownField("),
+        )
+        assertFalse(
+            "a bare DropdownMenu is positioned by its parent and is what misplaced the old menus",
+            picker.contains("DropdownMenu("),
+        )
+    }
+
+    @Test
+    fun `the dropdown component is anchored to its field`() {
+        val component = source("$APP_PACKAGE_PATH/$DROPDOWN_PACKAGE_PATH/$DROPDOWN_FILE").readText()
+
+        assertTrue(
+            "the field must be the menu's anchor, which is what places the menu against the field",
+            component.contains("ExposedDropdownMenuBox(") && component.contains("menuAnchor("),
+        )
+        assertTrue(
+            "the menu must be the exposed dropdown, whose width is constrained to the anchor's",
+            component.contains("ExposedDropdownMenu("),
+        )
+        assertFalse(
+            "the menu must never be positioned by hand-computed offsets again",
+            component.contains("DpOffset("),
+        )
+    }
+
     // --- Reading the real files --------------------------------------------------
 
     private fun source(relative: String): File {
@@ -176,5 +214,9 @@ class LocationSelectionWiringTest {
         const val CANONICAL_SCREEN: String = "LocationSelectionScreen.kt"
 
         const val PICKER_FILE: String = "LocationSelectionComponents.kt"
+
+        const val DROPDOWN_PACKAGE_PATH: String = "core/designsystem/components"
+
+        const val DROPDOWN_FILE: String = "AppDropdownField.kt"
     }
 }
