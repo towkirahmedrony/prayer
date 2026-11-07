@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -34,14 +35,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -71,6 +73,10 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueFailure
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
 import org.koin.androidx.compose.koinViewModel
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -153,6 +159,7 @@ fun MosqueFinderScreen(
                 onBack = onBack,
                 onSelectView = viewModel::setViewMode,
                 onRefresh = viewModel::refresh,
+                onDismissNotice = viewModel::dismissNotice,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -170,6 +177,7 @@ fun MosqueFinderScreen(
                     onSelectView = viewModel::setViewMode,
                     onUseCurrentLocation = requestCurrentLocation,
                     onRefresh = viewModel::refresh,
+                    onDismissNotice = viewModel::dismissNotice,
                 )
                 Box(
                     modifier = Modifier
@@ -219,6 +227,7 @@ private fun FinderChrome(
     onSelectView: (MosqueViewMode) -> Unit,
     onUseCurrentLocation: () -> Unit,
     onRefresh: () -> Unit,
+    onDismissNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val container = MaterialTheme.colorScheme.surface
@@ -245,7 +254,7 @@ private fun FinderChrome(
             onSelect = onSelectView,
             modifier = Modifier.fillMaxWidth(),
         )
-        StatusNotices(state = state)
+        StatusNotices(state = state, onDismissNotice = onDismissNotice)
     }
 }
 
@@ -317,6 +326,7 @@ private fun MapTopBar(
     onBack: () -> Unit,
     onSelectView: (MosqueViewMode) -> Unit,
     onRefresh: () -> Unit,
+    onDismissNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val container = MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
@@ -361,7 +371,7 @@ private fun MapTopBar(
                 }
             }
         }
-        StatusNotices(state = state)
+        StatusNotices(state = state, onDismissNotice = onDismissNotice)
     }
 }
 
@@ -560,17 +570,55 @@ private fun ViewModeOption(
     }
 }
 
-/** Notices that qualify the results without replacing them. */
+/**
+ * Notices that qualify the results without replacing them.
+ *
+ * A notice about something this screen cannot fix itself carries the one action that can: the system
+ * settings page. A refused permission that Android will no longer prompt for and a GPS switch that is
+ * off are both only recoverable there, and without the action the location button would look broken.
+ * The transient outcomes carry a dismissal instead, so a notice never outlives the moment it explains.
+ */
 @Composable
-private fun StatusNotices(state: MosqueFinderUiState) {
+private fun StatusNotices(
+    state: MosqueFinderUiState,
+    onDismissNotice: () -> Unit,
+) {
+    val context = LocalContext.current
+
     state.notice?.let { notice ->
-        SalahUnavailableNote(text = noticeText(notice))
+        when (notice) {
+            MosqueNotice.PERMISSION_DENIED -> SalahUnavailableNote(
+                text = noticeText(notice),
+                actionLabel = stringResource(R.string.action_open_settings),
+                onAction = { openAppSettings(context) },
+            )
+
+            MosqueNotice.LOCATION_SERVICES_DISABLED -> SalahUnavailableNote(
+                text = noticeText(notice),
+                actionLabel = stringResource(R.string.action_open_settings),
+                onAction = { openLocationSettings(context) },
+            )
+
+            MosqueNotice.LOCATION_TIMED_OUT,
+            MosqueNotice.LOCATION_UNAVAILABLE,
+            MosqueNotice.DIRECTIONS_UNAVAILABLE -> SalahUnavailableNote(
+                text = noticeText(notice),
+                actionLabel = stringResource(R.string.mosque_action_dismiss),
+                onAction = onDismissNotice,
+            )
+        }
     }
 
     val refreshFailure = state.refreshFailure
     if (refreshFailure != null) {
         val explanation = if (state.origin == MosqueDataOrigin.CACHE) {
-            stringResource(R.string.mosque_cached_notice)
+            // The cache's age is the difference between "these are the mosques here" and "these were
+            // the mosques here a month ago", so a saved list says when it was saved.
+            state.cachedAtEpochMillis
+                ?.let { cachedAt ->
+                    stringResource(R.string.mosque_cached_at_notice, cachedAtText(cachedAt))
+                }
+                ?: stringResource(R.string.mosque_cached_notice)
         } else {
             stringResource(R.string.mosque_refresh_failed_notice)
         }
@@ -578,6 +626,21 @@ private fun StatusNotices(state: MosqueFinderUiState) {
             text = listOf(explanation, failureText(refreshFailure)).joinToString(" "),
         )
     }
+}
+
+/** The cache's write time in the interface language's short date and time. */
+@Composable
+private fun cachedAtText(epochMillis: Long): String {
+    val locale = currentLocale()
+    val formatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)
+            .withLocale(locale)
+            .withZone(ZoneId.systemDefault())
+    }
+    return FORMATTING.localizeDigits(
+        formatter.format(Instant.ofEpochMilli(epochMillis)),
+        locale,
+    )
 }
 
 /** The nearest mosque as a highlight, then the rest as compact rows. */
@@ -1227,10 +1290,43 @@ private fun distanceLabel(distanceMetres: Double, short: Boolean): String {
 
 private val FORMATTING = CalendarFormatting()
 
+/**
+ * The locale the interface is actually being read in.
+ *
+ * `LocalResources`, not `LocalConfiguration`: the app switches language by providing a resources object
+ * for the selected language and leaving the device's configuration alone, so a configuration read here
+ * would report the device's locale. Every number on this screen — distances, counts, walking minutes,
+ * the cache timestamp — would then be written in the device's numerals inside sentences written in the
+ * selected language. The locale list is normally non-empty; guarding it keeps a configuration without
+ * one from throwing.
+ */
 @Composable
 private fun currentLocale(): Locale {
-    val configuration = LocalConfiguration.current
-    return if (configuration.locales.size() > 0) configuration.locales[0] else Locale.ROOT
+    val locales = LocalResources.current.configuration.locales
+    return if (locales.size() > 0) locales[0] else Locale.ROOT
+}
+
+/**
+ * Opens this app's own system settings page, where a refused location permission can be granted.
+ *
+ * Android stops showing the permission dialog after a refusal it considers final, so this is the only
+ * route back for a user who changed their mind. A device with no settings activity simply stays on
+ * this screen; the call is attempted rather than pre-checked, for the same package-visibility reason as
+ * the directions intent below.
+ */
+private fun openAppSettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts(PACKAGE_URI_SCHEME, context.packageName, null),
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+}
+
+/** Opens the system location screen, where a switched-off GPS can be turned back on. */
+private fun openLocationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
 }
 
 /**
@@ -1274,6 +1370,9 @@ private const val MAX_WALK_ESTIMATE_METRES = 3_000.0
 private const val FLOATING_ALPHA = 0.94f
 
 private const val DISABLED_ALPHA = 0.5f
+
+/** The URI scheme that names an Android package, used to open this app's own settings page. */
+private const val PACKAGE_URI_SCHEME = "package"
 
 /** Heights of the floating top bar and the selected-mosque bar; the map pads its camera by them. */
 private val MAP_TOP_INSET = 72.dp

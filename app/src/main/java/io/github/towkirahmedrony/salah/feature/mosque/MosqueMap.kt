@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.feature.mosque
 
 import android.graphics.PointF
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +66,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import java.util.Locale
 
 /**
  * The map half of the mosque finder.
@@ -111,7 +114,11 @@ fun MosqueMap(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val coloring = MaterialTheme.colorScheme
-    val locale = androidx.compose.ui.platform.LocalResources.current.configuration.locales[0]
+    // `LocalResources` rather than `LocalConfiguration`: the app pins `LocalResources` to the selected
+    // interface language, so the count's numerals follow that language rather than the device's. The
+    // locale list is normally non-empty; guarding it keeps a configuration without one from throwing.
+    val locales = LocalResources.current.configuration.locales
+    val locale = if (locales.size() > 0) locales[0] else Locale.ROOT
 
     val markerColor = coloring.primary.toArgb()
     val selectedColor = coloring.primary.toArgb()
@@ -122,6 +129,7 @@ fun MosqueMap(
     val density = LocalDensity.current
     val topInsetPx = with(density) { topInset.roundToPx() }
     val bottomInsetPx = with(density) { bottomInset.roundToPx() }
+    val tapRadiusPx = with(density) { MAP_TAP_RADIUS.roundToPx() }
 
     // One renderer for the life of the map. It is not keyed on the palette, because recreating it on a
     // theme change would orphan the map and its tap listener; the palette is handed to it instead.
@@ -130,6 +138,7 @@ fun MosqueMap(
     SideEffect {
         renderer.onSelect = { placeId -> latestSelect.value(placeId) }
         renderer.setInsets(top = topInsetPx, bottom = bottomInsetPx)
+        renderer.tapRadiusPx = tapRadiusPx
         renderer.updatePalette(
             markerColor = markerColor,
             selectedColor = selectedColor,
@@ -398,6 +407,9 @@ private fun BoxScope.MapOverlay(text: String) {
 private val FORMATTING = CalendarFormatting()
 
 private const val MAP_LOAD_TIMEOUT_MILLIS = 20_000L
+
+/** The half-width of a marker's tap target: a 48 dp square, the smallest comfortable touch target. */
+private val MAP_TAP_RADIUS = 24.dp
 private const val ATTRIBUTION_ALPHA = 0.82f
 private const val OVERLAY_ALPHA = 0.86f
 private const val CONTROL_ALPHA = 0.94f
@@ -420,6 +432,15 @@ private class MosqueMapRenderer {
 
     private var topInsetPx: Int = 0
     private var bottomInsetPx: Int = 0
+
+    /**
+     * The half-width, in pixels, of the square used to hit-test a tap on a marker.
+     *
+     * A circle marker is only a few pixels across at the zoom that frames a result set, so a tap a
+     * finger-width from its centre used to miss and the marker felt unresponsive. Querying a square the
+     * size of a touch target instead makes the whole area around the marker select it.
+     */
+    var tapRadiusPx: Int = 0
 
     private var map: MapLibreMap? = null
     private var style: Style? = null
@@ -620,9 +641,23 @@ private class MosqueMapRenderer {
         )
     }
 
+    /**
+     * The mosque under a tap, or `null` when the tap was not on a marker.
+     *
+     * The tap is expanded to a square of [tapRadiusPx] around the touched point before the layer is
+     * queried, so the marker is as easy to hit as the 48 dp target it is drawn in. Returning `null` for
+     * a tap in open map lets the map pan instead of being swallowed.
+     */
     private fun clickedPlaceId(map: MapLibreMap, latLng: LatLng): String? {
         val screenPoint: PointF = map.projection.toScreenLocation(latLng)
-        return map.queryRenderedFeatures(screenPoint, MOSQUE_LAYER_ID)
+        val radius = tapRadiusPx.coerceAtLeast(1).toFloat()
+        val target = RectF(
+            screenPoint.x - radius,
+            screenPoint.y - radius,
+            screenPoint.x + radius,
+            screenPoint.y + radius,
+        )
+        return map.queryRenderedFeatures(target, MOSQUE_LAYER_ID)
             .firstOrNull()
             ?.getStringProperty(PROPERTY_PLACE_ID)
     }

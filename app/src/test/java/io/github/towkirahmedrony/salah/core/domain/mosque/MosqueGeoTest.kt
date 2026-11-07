@@ -171,6 +171,51 @@ class MosqueGeoTest {
         assertEquals(listOf("inside"), within.map { it.mosque.placeId })
     }
 
+    @Test
+    fun `one mosque published under two identifiers is kept once`() {
+        // The provider can return the same building twice: an OpenStreetMap node and the outline drawn
+        // around it have different place ids, the same name and practically the same point.
+        val node = mosque(
+            placeId = "node",
+            name = "Baitul Mukarram",
+            location = GeoPoint(23.8103, 90.4125),
+        )
+        val way = mosque(
+            placeId = "way",
+            name = "Baitul Mukarram  ",
+            location = GeoPoint(23.81032, 90.41252),
+        )
+
+        val normalized = MosqueGeo.normalize(listOf(node, way))
+
+        assertEquals(listOf("node"), normalized.map { it.placeId })
+    }
+
+    @Test
+    fun `the same name further away is a different mosque`() {
+        // One kilometre apart is two buildings, not one badly surveyed point, so both stay in the list.
+        val here = mosque(placeId = "here", name = "Jame Mosque", location = GeoPoint(23.8103, 90.4125))
+        val elsewhere = mosque(
+            placeId = "elsewhere",
+            name = "Jame Mosque",
+            location = GeoPoint(23.8203, 90.4125),
+        )
+
+        val normalized = MosqueGeo.normalize(listOf(here, elsewhere))
+
+        assertEquals(listOf("here", "elsewhere"), normalized.map { it.placeId })
+    }
+
+    @Test
+    fun `two differently named mosques at one point are both kept`() {
+        val first = mosque(placeId = "first", name = "Baitul Mukarram", location = GeoPoint(23.8103, 90.4125))
+        val second = mosque(placeId = "second", name = "Shahi Masjid", location = GeoPoint(23.8103, 90.4125))
+
+        val normalized = MosqueGeo.normalize(listOf(first, second))
+
+        assertEquals(listOf("first", "second"), normalized.map { it.placeId })
+    }
+
     private fun mosque(
         placeId: String = "place-1",
         name: String = "Baitul Mukarram",

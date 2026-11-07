@@ -113,6 +113,12 @@ The response is a GeoJSON `FeatureCollection`:
 - `properties.place_id` is the cache identity when present. When absent, a stable identity is derived
   from the name and coordinate (`geo:<lat>:<lon>:<normalised-name>`) so pagination and cache updates do
   not duplicate the same feature.
+
+Two different `place_id`s can still describe one building — an OpenStreetMap node and the way drawn
+around it. Results are therefore also deduplicated by normalised name (lower case, whitespace
+collapsed) within 30 m, the `MosqueGeo.NEAR_DUPLICATE_METRES` bound. The bound is deliberately far
+smaller than the search radius: a same-named mosque further away is a different mosque and stays in
+the list, and two differently named mosques at one point are two places.
 - `properties.formatted` is the address, falling back to `address_line1, address_line2`.
 - `properties.categories` is kept so the mosque filter can run again after a cache read.
 - `properties.datasource.raw.phone` / `website` are read when present; there is also a top-level
@@ -218,8 +224,8 @@ rather than dividing by a cosine that approaches zero.
 
 If the request fails and the cache has a result for the current circle, the repository returns that
 result as `Success(origin = CACHE, refreshFailure = <reason>)`. The screen shows the saved list, a
-“Saved” pill and a notice naming the refresh failure. It never replaces a real cached list with a bare
-error panel.
+“Saved” pill and a notice naming the refresh failure **and when the cache was written**, so a saved
+list cannot pass for a live one. It never replaces a real cached list with a bare error panel.
 
 If no request can be made at all (blank key) the same rule applies: cached results are shown with
 “not configured” as the refresh reason; only when there is no cache does the screen show the
@@ -316,6 +322,9 @@ presentation of the same state, not a second source.
 - Distances are written in the interface language's numerals: metres below 1 km, then one decimal of a
   kilometre.
 - Empty, loading, failure and no-location states are separate panels with honest copy.
+- A notice about something only the system can change — a permission refused for good, or GPS switched
+  off — offers the matching settings page, because Android will not show the permission dialog again.
+  Transient notices (timeout, no fix, no maps app) can be dismissed instead of outliving the moment.
 - All touch targets are at least 48 dp; the selector uses `selectable` with the radio-button role; the
   view group, icon actions and directions action carry content descriptions.
 - Light and dark themes follow the app; the map style follows the same theme.

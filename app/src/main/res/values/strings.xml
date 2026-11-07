@@ -227,6 +227,8 @@
     <string name="mosque_failure_too_large">The mosque service returned more data than this screen can read.</string>
     <string name="mosque_failure_unknown">Something went wrong while loading mosques. Try again.</string>
     <string name="mosque_cached_notice">Showing saved results. The latest refresh did not succeed.</string>
+    <string name="mosque_cached_at_notice">Showing saved results from %1$s. The latest refresh did not succeed.</string>
+    <string name="mosque_action_dismiss">Dismiss</string>
     <string name="mosque_refresh_failed_notice">The latest refresh did not succeed. Showing the previous results.</string>
     <string name="mosque_origin_cached">Saved</string>
     <string name="mosque_origin_live">Live</string>

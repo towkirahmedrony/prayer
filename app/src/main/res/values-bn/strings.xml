@@ -443,6 +443,8 @@
     <string name="mosque_failure_too_large">মসজিদ পরিষেবা এই স্ক্রিনের পড়ার সীমার চেয়ে বেশি তথ্য ফিরিয়েছে।</string>
     <string name="mosque_failure_unknown">মসজিদ লোড করার সময় অজানা সমস্যা হয়েছে। আবার চেষ্টা করুন।</string>
     <string name="mosque_cached_notice">সংরক্ষিত ফলাফল দেখানো হচ্ছে। সর্বশেষ রিফ্রেশ সফল হয়নি।</string>
+    <string name="mosque_cached_at_notice">সংরক্ষিত ফলাফল দেখানো হচ্ছে (%1$s)। সর্বশেষ রিফ্রেশ সফল হয়নি।</string>
+    <string name="mosque_action_dismiss">বন্ধ করুন</string>
     <string name="mosque_refresh_failed_notice">সর্বশেষ রিফ্রেশ সফল হয়নি। আগের ফলাফল দেখানো হচ্ছে।</string>
     <string name="mosque_origin_cached">সংরক্ষিত</string>
     <string name="mosque_origin_live">লাইভ</string>

@@ -82,16 +82,53 @@ object MosqueGeo {
      * Identity is [Mosque.placeId], so two pages that repeat the same place collapse to one. The first
      * occurrence wins: it already carries the fields the response provided, and preferring a later one
      * would make the result depend on pagination order for no benefit.
+     *
+     * **A second identity the provider does not give us.** The same physical mosque can be published
+     * twice with two different identifiers — an OpenStreetMap node and the building outline drawn as a
+     * way have separate `place_id`s but the same name and practically the same point. Comparing
+     * identifiers alone cannot collapse those, so a feature is also dropped when an already accepted
+     * feature has the same normalised name and sits within [NEAR_DUPLICATE_METRES] of it. The distance
+     * bound keeps genuinely distinct mosques apart: two buildings with the same name a street apart are
+     * two mosques, not one.
      */
     fun normalize(mosques: List<Mosque>): List<Mosque> {
         val accepted = LinkedHashMap<String, Mosque>()
+        val acceptedPositionsByName = HashMap<String, MutableList<GeoPoint>>()
         for (mosque in mosques) {
             if (!isUsable(mosque)) continue
             if (accepted.containsKey(mosque.placeId)) continue
+
+            val name = normalisedName(mosque.name)
+            val positions = acceptedPositionsByName.getOrPut(name) { mutableListOf() }
+            val alreadyAccepted = positions.any { position ->
+                GeoMath.distanceMetres(position, mosque.location) <= NEAR_DUPLICATE_METRES
+            }
+            if (alreadyAccepted) continue
+
+            positions += mosque.location
             accepted[mosque.placeId] = mosque
         }
         return accepted.values.toList()
     }
+
+    /**
+     * The form two spellings of one mosque's name share: lower case, trimmed, and with every run of
+     * whitespace collapsed to a single space. Punctuation is deliberately left alone, because two
+     * names that differ by a word are two names, not one badly spaced name.
+     */
+    private fun normalisedName(name: String): String =
+        name.lowercase(Locale.ROOT).trim().replace(WHITESPACE, " ")
+
+    private val WHITESPACE = Regex("\\s+")
+
+    /**
+     * How close two identically named features must be to be read as one mosque.
+     *
+     * A provider duplicates a building at the same point (a node and the way around it), so this bound
+     * only has to tolerate survey and rounding noise — tens of metres, not a neighbourhood. It is
+     * deliberately far smaller than the search radius so a list can never lose a real, separate mosque.
+     */
+    internal const val NEAR_DUPLICATE_METRES: Double = 30.0
 
     /** Whether a feature has enough content to be shown. */
     fun isUsable(mosque: Mosque): Boolean =
