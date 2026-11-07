@@ -1,3 +1,8 @@
+// The exposed-dropdown family is still marked experimental in Material 3, and this file is where the
+// app uses it: opting in once here keeps every declaration below (the field, its option row and its
+// search box) under the same acknowledgement instead of repeating the annotation on each.
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package io.github.towkirahmedrony.salah.core.designsystem.components
 
 import androidx.compose.animation.core.animateFloatAsState
