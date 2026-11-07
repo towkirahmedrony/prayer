@@ -68,8 +68,8 @@ object GeoapifyMosqueParser {
         val name = properties.stringOrNull("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
 
         val coordinates = child("geometry")?.child("coordinates") as? JsonValue.ArrayValue ?: return null
-        val longitude = coordinates.elements.getOrNull(0).asNumberOrNull() ?: return null
-        val latitude = coordinates.elements.getOrNull(1).asNumberOrNull() ?: return null
+        val longitude = coordinates.elements.getOrNull(0)?.asNumberOrNull() ?: return null
+        val latitude = coordinates.elements.getOrNull(1)?.asNumberOrNull() ?: return null
         val location = GeoPoint(latitude = latitude, longitude = longitude)
         if (!location.isFinite) return null
 

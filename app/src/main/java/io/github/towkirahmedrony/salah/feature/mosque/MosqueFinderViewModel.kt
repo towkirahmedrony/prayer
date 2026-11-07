@@ -334,7 +334,7 @@ class MosqueFinderViewModel(
             } catch (_: Exception) {
                 null
             }
-            val languageTag = language.languageTag ?: Locale.getDefault().language
+            val languageTag = language?.languageTag ?: Locale.getDefault().language
             val query = MosqueQuery(
                 center = center,
                 radiusMetres = config.radiusMetres,

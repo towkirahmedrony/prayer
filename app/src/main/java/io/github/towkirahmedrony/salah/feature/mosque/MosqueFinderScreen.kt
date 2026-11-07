@@ -166,6 +166,10 @@ fun MosqueFinderScreen(
             ResultsSummary(state = state)
         }
 
+        // Captured outside the `when`: `state` is a delegated property, so `state.failure` cannot be
+        // smart-cast at the use site.
+        val failure = state.failure
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -173,8 +177,8 @@ fun MosqueFinderScreen(
         ) {
             when {
                 state.isLoading && !state.hasResults -> LoadingResults()
-                state.failure != null && !state.hasResults -> FailurePanel(
-                    failure = state.failure,
+                failure != null && !state.hasResults -> FailurePanel(
+                    failure = failure,
                     onRetry = viewModel::refresh,
                 )
                 state.center == null && !state.hasResults -> NoLocationPanel(
@@ -403,7 +407,7 @@ private fun StatusNotices(state: MosqueFinderUiState) {
 private fun ResultsSummary(state: MosqueFinderUiState) {
     val count = state.mosques.size
     val locale = currentLocale()
-    val digits = CalendarFormatting.localizeDigits(count.toString(), locale)
+    val digits = FORMATTING.localizeDigits(count.toString(), locale)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -475,7 +479,6 @@ private fun MosqueResultCard(
     onDirections: () -> Unit,
 ) {
     val mosque = item.mosque
-    val context = LocalContext.current
 
     SalahSectionCard(onClick = onSelect) {
         Row(
@@ -528,13 +531,7 @@ private fun MosqueResultCard(
             val directionsDescription =
                 stringResource(R.string.mosque_open_directions, mosque.name)
             TextButton(
-                onClick = {
-                    openDirections(
-                        context = context,
-                        mosque = mosque,
-                        onUnavailable = onDirectionsUnavailable,
-                    )
-                },
+                onClick = onDirections,
                 modifier = Modifier
                     .heightIn(min = 48.dp)
                     .semantics { contentDescription = directionsDescription },
@@ -621,7 +618,6 @@ private fun SelectedMosqueCard(
     onDirections: () -> Unit,
 ) {
     val mosque = item.mosque
-    val context = LocalContext.current
 
     SalahSectionCard {
         Row(
@@ -660,13 +656,7 @@ private fun SelectedMosqueCard(
         val directionsDescription =
             stringResource(R.string.mosque_open_directions, mosque.name)
         TextButton(
-            onClick = {
-                openDirections(
-                    context = context,
-                    mosque = mosque,
-                    onUnavailable = onDirectionsUnavailable,
-                )
-            },
+            onClick = onDirections,
             modifier = Modifier
                 .heightIn(min = 48.dp)
                 .semantics { contentDescription = directionsDescription },
@@ -748,7 +738,7 @@ private fun EmptyPanel(
 ) {
     val locale = currentLocale()
     val radiusKilometres = ((radiusMetres.coerceAtLeast(0) + 999) / 1000).toString()
-    val radiusDigits = CalendarFormatting.localizeDigits(radiusKilometres, locale)
+    val radiusDigits = FORMATTING.localizeDigits(radiusKilometres, locale)
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -848,7 +838,7 @@ private fun distanceLabel(distanceMetres: Double): String {
         val metres = distanceMetres.roundToInt().coerceAtLeast(0)
         stringResource(
             R.string.mosque_distance_metres,
-            CalendarFormatting.localizeDigits(metres.toString(), locale),
+            FORMATTING.localizeDigits(metres.toString(), locale),
         )
     } else {
         val formatter = NumberFormat.getNumberInstance(locale).apply {
@@ -858,14 +848,18 @@ private fun distanceLabel(distanceMetres: Double): String {
         val kilometres = formatter.format(distanceMetres / METRES_PER_KILOMETRE)
         stringResource(
             R.string.mosque_distance_kilometres,
-            CalendarFormatting.localizeDigits(kilometres, locale),
+            FORMATTING.localizeDigits(kilometres, locale),
         )
     }
 }
 
+private val FORMATTING = CalendarFormatting()
+
 @Composable
-private fun currentLocale(): Locale =
-    LocalResources.current.configuration.locales.getOrNull(0) ?: Locale.getDefault()
+private fun currentLocale(): Locale {
+    val locales = LocalResources.current.configuration.locales
+    return if (locales.size() == 0) Locale.getDefault() else locales[0]
+}
 
 /**
  * Hands a mosque to an installed maps app.

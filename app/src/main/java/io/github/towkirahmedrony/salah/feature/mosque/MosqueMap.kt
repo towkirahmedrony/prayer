@@ -175,7 +175,7 @@ fun MosqueMap(
     }
 
     val count = mosques.size
-    val localizedCount = CalendarFormatting.localizeDigits(count.toString(), locale)
+    val localizedCount = FORMATTING.localizeDigits(count.toString(), locale)
     val mapDescription = if (count == 1) {
         stringResource(R.string.mosque_map_description_one)
     } else {
@@ -270,6 +270,16 @@ private fun MapOverlay(text: String) {
         )
     }
 }
+
+// Formatting is stateless; one instance serves every distance and count on this map. CalendarFormatting
+// is a class rather than an object, so this is the shared instance instead of a new one per call.
+private val FORMATTING = CalendarFormatting()
+
+// Map feedback timings and overlay opacities. They are used by the composable, not by the renderer,
+// so they live at file scope rather than in the renderer's companion.
+private const val MAP_LOAD_TIMEOUT_MILLIS = 20_000L
+private const val ATTRIBUTION_ALPHA = 0.82f
+private const val OVERLAY_ALPHA = 0.86f
 
 /**
  * The imperative side of the map: sources, layers, camera and tap handling.
@@ -530,9 +540,5 @@ private class MosqueMapRenderer {
         const val CAMERA_ANIMATION_MILLIS = 600
         const val FIT_PADDING_PX = 96
         const val MIN_FIT_SPAN = 0.0001
-
-        const val MAP_LOAD_TIMEOUT_MILLIS = 20_000L
-        const val ATTRIBUTION_ALPHA = 0.82f
-        const val OVERLAY_ALPHA = 0.86f
     }
 }
