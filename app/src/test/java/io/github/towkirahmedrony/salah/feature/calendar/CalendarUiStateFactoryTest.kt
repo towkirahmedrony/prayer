@@ -410,6 +410,32 @@ class CalendarUiStateFactoryTest {
     }
 
     @Test
+    fun `all three calendar modes lay out the same six week rows`() = runTest {
+        // February 2024 needs five Gregorian rows; the Bangla and Hijri months anchored here have
+        // their own lengths, so the three modes naturally disagree about row count. The reserved grid
+        // must not: the card can only keep one height if every mode hands the screen six rows.
+        val anchor = LocalDate.of(2024, 2, 10)
+
+        CalendarSystem.entries.forEach { system ->
+            val settings = CalendarSettings(preferredSystem = system)
+            val month = monthAt("2024-02-10T09:00:00Z", anchor, settings)
+            val state = factory.create(month, settings, anchor, english) as CalendarUiState.Ready
+
+            assertEquals(system, state.system)
+            assertEquals("$system rows", CalendarGridMetrics.WEEK_ROWS, state.weeks.size)
+            state.weeks.forEach { week -> assertEquals("$system columns", 7, week.size) }
+
+            // The reservation only adds blank cells: every day of the month is still there, in order,
+            // so no date was dropped or moved to force the equal height.
+            assertEquals(
+                "$system dates",
+                month.days.map { day -> day.date },
+                state.weeks.flatten().mapNotNull { cell -> cell.date },
+            )
+        }
+    }
+
+    @Test
     fun `a month with no days at all fails with a reason instead of an empty grid`() = runTest {
         val month = monthAt("2024-03-11T09:00:00Z", YearMonth.of(2024, 3))
         val empty = month.copy(weeks = emptyList())

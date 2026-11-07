@@ -397,12 +397,25 @@ private fun SystemSwitcher(system: CalendarSystem, onSelectSystem: (CalendarSyst
 }
 
 /**
- * The month as a card: weekday headers, the grid, its legend and — in the Hijri view — the adjustment
- * note.
+ * The month as a card: weekday headers, six week rows, the legend slot and the adjustment slot.
  *
- * Only the grid mirrors for the Hijri view, which is a property of that view rather than of the labels:
- * a Hijri month reads right to left, so its weekday columns and day cells mirror while the page's
- * headings and controls do not.
+ * The card is one size in all three modes, and that comes from reservations rather than from
+ * measuring the month on screen:
+ *
+ *  - the weekday header is one fixed-height row, so its labels cannot change it;
+ *  - the grid always draws [CalendarGridMetrics.WEEK_ROWS] rows of seven cells, with a month that
+ *    needs fewer padded by blank cells, so a short month and a long one share the block and the cell
+ *    size;
+ *  - the legend keeps its height even in a month with nothing to explain, and the adjustment area
+ *    keeps its height in every mode, so neither adds or removes a row when the mode changes.
+ *
+ * The grid is laid out left to right in every mode, the Hijri view included. A Hijri month is the
+ * same seven weekday columns read the same way round as the Gregorian one; only its dates and their
+ * numerals differ, so mirroring the grid put the first column on the right and made the same calendar
+ * read back to front. The direction is provided here, around the calendar presentation only, so this
+ * cannot follow an RTL parent or application locale into the grid while the page's headings, actions
+ * and month navigation keep the page's own direction. The dates and their weekday mapping are
+ * untouched: the grid still draws the month's days in order, on the weekday each one falls on.
  */
 @Composable
 private fun MonthGridCard(
@@ -417,13 +430,7 @@ private fun MonthGridCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            CompositionLocalProvider(
-                LocalLayoutDirection provides if (state.system == CalendarSystem.HIJRI) {
-                    LayoutDirection.Rtl
-                } else {
-                    LayoutDirection.Ltr
-                },
-            ) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 WeekdayHeader(labels = state.weekdayLabels)
                 Spacer(modifier = Modifier.height(6.dp))
                 state.weeks.forEach { week ->
@@ -438,20 +445,27 @@ private fun MonthGridCard(
                     }
                 }
             }
-            GridLegend(weeks = state.weeks)
-            if (state.system == CalendarSystem.HIJRI && state.hijriAdjustmentDays != 0) {
-                HijriAdjustmentNote(
-                    days = state.hijriAdjustmentDays,
-                    onOpenSettings = onOpenSettings,
-                )
-            }
+            GridLegendSlot(weeks = state.weeks)
+            HijriAdjustmentSlot(state = state, onOpenSettings = onOpenSettings)
         }
     }
 }
 
+/**
+ * The weekday labels in one row of reserved height.
+ *
+ * The height is fixed so a label that grows with the font scale cannot push the grid down, and so the
+ * row is the same in every mode: the labels change with the language, never the block they occupy.
+ */
 @Composable
 private fun WeekdayHeader(labels: List<String>) {
-    Row(modifier = Modifier.fillMaxWidth()) {
+    val height = with(LocalDensity.current) {
+        CalendarGridMetrics.WEEKDAY_HEADER_HEIGHT_SP.sp.toDp()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().height(height),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         labels.forEach { label ->
             Text(
                 text = label,
@@ -568,8 +582,27 @@ private fun MonthCell(
 }
 
 /**
+ * The fixed-height area the legend is drawn in.
+ *
+ * Its height is kept whether or not this month carries a mark, because a legend that comes and goes
+ * would change the card's height between months. It is measured in sp, so it grows with the system
+ * font scale rather than clipping a larger setting.
+ */
+@Composable
+private fun GridLegendSlot(weeks: List<List<CalendarCell>>) {
+    val height = with(LocalDensity.current) { CalendarGridMetrics.LEGEND_HEIGHT_SP.sp.toDp() }
+    Spacer(modifier = Modifier.height(GRID_LEGEND_GAP))
+    Box(
+        modifier = Modifier.fillMaxWidth().height(height),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        GridLegend(weeks = weeks)
+    }
+}
+
+/**
  * Names the marks a cell can carry, one per column, and only for a mark that actually appears in the
- * displayed month — so a month with no observance does not explain a dot nobody can see.
+ * displayed month, so a month with no observance does not explain a dot nobody can see.
  */
 @Composable
 private fun GridLegend(weeks: List<List<CalendarCell>>) {
@@ -578,7 +611,6 @@ private fun GridLegend(weeks: List<List<CalendarCell>>) {
     val hasOccasion = weeks.any { week -> week.any { it.occasion != null } }
     if (!hasHijriStart && !hasRamadan && !hasOccasion) return
 
-    Spacer(modifier = Modifier.height(12.dp))
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -642,6 +674,34 @@ private fun LegendItem(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
         )
+    }
+}
+
+/**
+ * The Hijri adjustment's area, under the grid.
+ *
+ * The area exists whenever an adjustment is set, in every mode, and only its text is restricted to
+ * the Hijri view. That is what keeps the card the same height on a mode switch: an area that appeared
+ * with the Hijri text would make the Hijri view taller than the other two, while the adjustment itself
+ * is a stored setting that does not change when the mode does. With no adjustment there is nothing to
+ * say and nothing to reserve.
+ */
+@Composable
+private fun HijriAdjustmentSlot(state: CalendarUiState.Ready, onOpenSettings: () -> Unit) {
+    if (state.hijriAdjustmentDays == 0) return
+    val height = with(LocalDensity.current) {
+        CalendarGridMetrics.ADJUSTMENT_HEIGHT_SP.sp.toDp()
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth().height(height),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (state.system == CalendarSystem.HIJRI) {
+            HijriAdjustmentNote(
+                days = state.hijriAdjustmentDays,
+                onOpenSettings = onOpenSettings,
+            )
+        }
     }
 }
 
@@ -975,6 +1035,9 @@ private fun signedDays(days: Int): String = if (days > 0) "+$days" else days.toS
 
 /** Minimum touch target height for a month cell. */
 private val CELL_HEIGHT = 52.dp
+
+/** Gap between the grid and the legend area, so the marks do not touch the last row. */
+private val GRID_LEGEND_GAP = 12.dp
 
 /** Width of the date-line label column, so the three values start on one vertical line. */
 private val LABEL_WIDTH = 84.dp

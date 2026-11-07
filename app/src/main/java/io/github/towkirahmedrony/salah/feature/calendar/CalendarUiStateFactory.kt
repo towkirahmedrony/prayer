@@ -97,9 +97,12 @@ class CalendarUiStateFactory(
             hijriSpanLabel = spans.first,
             banglaSpanLabel = spans.second,
             weekdayLabels = weekdayLabels(month, gridLocale),
-            weeks = month.weeks.map { week ->
-                week.map { cell -> cellOf(cell, selectedDay.date, month, system, gridLocale) }
-            },
+            // One grid height for every mode: a month that needs fewer than the reserved rows is
+            // padded with blank cells here, so the block the screen draws never changes size when the
+            // mode or the displayed month changes.
+            weeks = month.weeks
+                .map { week -> week.map { cell -> cellOf(cell, selectedDay.date, month, system, gridLocale) } }
+                .reservedToWeekRows(),
             selected = selectedDay.toSelectedDay(locale),
             today = todayDay.toSelectedDay(locale),
             selectedIsToday = selectedDay.date == today,
