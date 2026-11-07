@@ -347,6 +347,7 @@ fun TimetableCard(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
             TimeRow(
                 label = stringResource(row.prayer.labelRes()),
                 time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
+                periodStart = row.periodStartLabel,
                 highlighted = if (hasActivePeriod) row.isCurrent else row.isNext,
                 adjustmentMinutes = row.adjustmentMinutes,
                 endTime = row.endTimeLabel,
@@ -534,6 +535,11 @@ private fun TimeRow(
     time: String,
     highlighted: Boolean,
     adjustmentMinutes: Int,
+    /**
+     * The minute the period is displayed as opening. It differs from [time] only where the previous
+     * period closes in the same minute, keeping the two rows from sharing one.
+     */
+    periodStart: String? = null,
     endTime: String? = null,
     endsNextDay: Boolean = false,
 ) {
@@ -567,7 +573,7 @@ private fun TimeRow(
                 // A prayer is a period, not a point: show where it opens and where it closes. The join
                 // is a resource because the separator and the order are part of the language.
                 text = if (endTime != null) {
-                    stringResource(R.string.home_time_range, time, endTime)
+                    stringResource(R.string.home_time_range, periodStart ?: time, endTime)
                 } else {
                     time
                 },

@@ -72,6 +72,31 @@ Every period is half-open, `[start, end)`. At the exact instant a boundary occur
 
 `CurrentPrayerPeriodResolverTest` asserts each of these instants.
 
+### Displayed period bounds
+
+Because every period is half-open, one period's closing instant is the next prayer's own time. The
+timetable prints each period as a whole-minute `start – end` range, so that shared instant used to be
+printed twice: `11:46 – 15:58` for Dhuhr, then `15:58 – 17:36` for Asr — which reads as an overlap
+even though the periods only touch.
+
+`PrayerPeriodDisplayBounds` (`core/domain/PrayerPeriodDisplayBounds.kt`) derives the **displayed**
+opening minute from the closing one: a period whose opening minute is the minute in which the
+previous period closes is displayed from the next minute (`11:46 – 15:58`, then `15:59 – 17:36`).
+Only that label moves:
+
+- the Adhan times, the schedule, the countdowns and the notifications keep the engine's instants;
+- Fajr opens the timetable at its own time, and Dhuhr keeps its time because the sunrise gap already
+  separates it, so the rule is not a blanket "add a minute" to every prayer;
+- a real gap — sunrise to Dhuhr — is never stretched to close it;
+- Isha's closing boundary is still the next day's Fajr, displayed unchanged and flagged
+  "ends next day";
+- the shift is measured from the previous period's closing minute, never from the previous label, so
+  it cannot accumulate.
+
+`PrayerPeriodDisplayBoundsTest` covers a 15:40 → 15:41 pair, a boundary carrying seconds, a real
+sunrise gap, an incomplete schedule, and the Isha-to-next-day-Fajr case. `HomeUiStateFactoryTest`
+pins the rows' labels in both the 24-hour and 12-hour formats.
+
 ### Midnight and the Isha-to-Fajr transition
 
 Isha's period runs past midnight, so two different situations arise:

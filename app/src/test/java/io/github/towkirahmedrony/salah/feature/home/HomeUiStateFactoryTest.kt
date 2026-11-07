@@ -612,6 +612,74 @@ class HomeUiStateFactoryTest {
         assertEquals(twentyFour.nextPrayer.countdown, twelve.nextPrayer.countdown)
     }
 
+    // --- Displayed period bounds -----------------------------------------------------------------
+    //
+    // A period is half-open: its closing instant is the next prayer's Adhan instant. The timetable
+    // prints ranges at minute precision, so the closing minute used to appear as the next period's
+    // opening minute too ("11:46 – 15:58" then "15:58 – 17:36"). These tests pin the display rule that
+    // removes the overlap without moving the engine's times, and the cases where nothing may move.
+
+    @Test
+    fun `the timetable opens each period after the previous one closes`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+        )
+
+        fun row(prayer: PrayerName) = state.prayerRows.first { it.prayer == prayer }
+
+        // The engine's time is untouched: Asr is still 15:58, and Dhuhr still closes on it.
+        assertEquals("15:58", row(PrayerName.ASR).timeLabel)
+        assertEquals("15:58", row(PrayerName.DHUHR).endTimeLabel)
+        // The labels no longer share that minute — the 15:40 / 15:41 case in the bug report is this
+        // same pair, one minute later.
+        assertEquals("15:59", row(PrayerName.ASR).periodStartLabel)
+        assertEquals("17:37", row(PrayerName.MAGHRIB).periodStartLabel)
+        assertEquals("18:52", row(PrayerName.ISHA).periodStartLabel)
+        // No blind shift: the day's first period and the one after the sunrise gap keep their time.
+        assertEquals("04:39", row(PrayerName.FAJR).periodStartLabel)
+        assertEquals("11:46", row(PrayerName.DHUHR).periodStartLabel)
+        // And the closing boundaries are exactly the timetable's own times.
+        assertEquals("05:54", row(PrayerName.FAJR).endTimeLabel)
+        assertEquals("17:36", row(PrayerName.ASR).endTimeLabel)
+        assertEquals("18:51", row(PrayerName.MAGHRIB).endTimeLabel)
+    }
+
+    @Test
+    fun `the displayed period start follows the user's time format`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWELVE_HOUR),
+        )
+
+        val asr = state.prayerRows.first { it.prayer == PrayerName.ASR }
+
+        // The same minute-resolution rule in either format; only the rendering differs.
+        assertTrue("expected the shifted minute, got ${asr.periodStartLabel}", asr.periodStartLabel!!.contains("59"))
+        assertTrue("expected the Adhan minute, got ${asr.timeLabel}", asr.timeLabel!!.contains("58"))
+        assertNotEquals(asr.timeLabel, asr.periodStartLabel)
+    }
+
+    @Test
+    fun `Isha's displayed end is the next day's Fajr and its start stays on its own minute`() {
+        val state = ready(
+            location = location,
+            scheduleState = PrayerScheduleState.Available(completeSchedule(), origin),
+            settings = PrayerSettings.DEFAULT.copy(timeFormat = TimeFormatPreference.TWENTY_FOUR_HOUR),
+            now = date.atTime(19, 30).atZone(zone),
+            nextDaySchedule = completeSchedule(targetDate = date.plusDays(1)),
+        )
+
+        val isha = state.prayerRows.first { it.prayer == PrayerName.ISHA }
+
+        assertEquals("18:51", isha.timeLabel)
+        assertEquals("18:52", isha.periodStartLabel)
+        assertEquals("04:39", isha.endTimeLabel)
+        assertTrue("the closing Fajr is on the following local date", isha.endsNextDay)
+    }
+
     @Test
     fun `renders times in the prayer location's zone`() {
         // A fixed, locale-independent format is used deliberately: this test is about the zone,

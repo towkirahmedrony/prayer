@@ -308,6 +308,18 @@ data class PrayerRow(
     val prayer: PrayerName,
     /** `null` renders as a placeholder dash in the UI, never as an invented time. */
     val timeLabel: String?,
+    /**
+     * Formatted minute this prayer's period is displayed as opening, or `null` when it cannot be
+     * resolved.
+     *
+     * A period is half-open, `[start, end)`: it closes at the instant the next one opens, so at minute
+     * precision the closing minute of one period and the opening minute of the next would be printed
+     * twice. This label is the first whole minute after the previous period's displayed end, so the
+     * timetable's ranges never share a minute; it equals [timeLabel] whenever the timetable already
+     * separates the two (Fajr, and Dhuhr after the sunrise gap). [timeLabel] itself is never moved: it
+     * stays the engine's Adhan time.
+     */
+    val periodStartLabel: String? = null,
     /** Manual correction already applied to [timeLabel]; `0` when the time is unadjusted. */
     val adjustmentMinutes: Int = 0,
     /** True when this is the next prayer to begin. */

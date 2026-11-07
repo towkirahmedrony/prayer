@@ -5,6 +5,7 @@ import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerPeriodResolver
 import io.github.towkirahmedrony.salah.core.domain.CurrentPrayerStatus
 import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
+import io.github.towkirahmedrony.salah.core.domain.PrayerPeriodDisplayBounds
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.night.NightPeriodCalculator
 import io.github.towkirahmedrony.salah.core.domain.solar.SolarDayResolver
@@ -74,6 +75,16 @@ class HomeUiStateFactory(
      */
     private val qiblaCalculator: QiblaCalculator = QiblaCalculator(),
 ) {
+
+    /**
+     * The whole-minute labels a period is displayed with.
+     *
+     * The resolver in [CurrentPrayerPeriodResolver] reports instants and a half-open `[start, end)`
+     * convention; this derives the labels those instants are rendered with, so the timetable's rows
+     * cannot print one period's closing minute as the next period's opening minute. Stateless, so it
+     * is a field rather than a constructor dependency.
+     */
+    private val displayBounds = PrayerPeriodDisplayBounds()
 
     fun create(
         calendar: CalendarSnapshot?,
@@ -205,10 +216,14 @@ class HomeUiStateFactory(
             nextPrayer = nextPrayerSection,
             prayerRows = PrayerName.entries.map { prayer ->
                 val entry = schedule?.prayers?.firstOrNull { it.prayer == prayer }
-                val end = periodEnd(schedule, prayer, nextDayFajr)
+                val end = displayBounds.endOf(schedule, prayer, nextDayFajr)
+                val displayedStart = displayBounds.displayedStartOf(schedule, prayer, nextDayFajr)
                 PrayerRow(
                     prayer = prayer,
+                    // The engine's own time, unchanged: this is the Adhan minute the next-prayer card,
+                    // the countdown and the notification all describe.
                     timeLabel = entry?.let { timeFormatter.format(it.time) },
+                    periodStartLabel = displayedStart?.let(timeFormatter::format),
                     adjustmentMinutes = entry?.adjustmentMinutes ?: 0,
                     isNext = nextPrayer?.prayer == prayer,
                     isPassed = entry != null && !entry.time.isAfter(now),
@@ -442,40 +457,6 @@ class HomeUiStateFactory(
         val span = Duration.between(sunrise, sunset)
         if (span.isNegative || span.isZero) return null
         return CountdownFormatter.formatCompact(span)
-    }
-
-    /** The moment a prayer's period closes, and whether that moment is on the next local date. */
-    private data class PeriodEnd(val time: ZonedDateTime, val isNextDay: Boolean)
-
-    /**
-     * Resolves where a prayer's period ends, using the same convention as
-     * [CurrentPrayerPeriodResolver]: Fajr closes at sunrise, Dhuhr at Asr, Asr at Maghrib,
-     * Maghrib at Isha and Isha at the next day's Fajr.
-     *
-     * Returns `null` instead of guessing when the schedule is incomplete or the closing boundary
-     * is not available, so a row can only ever show an end time that really exists.
-     */
-    private fun periodEnd(
-        schedule: PrayerSchedule?,
-        prayer: PrayerName,
-        nextDayFajr: ZonedDateTime?,
-    ): PeriodEnd? {
-        if (schedule == null || !schedule.isComplete) return null
-        return when (prayer) {
-            PrayerName.FAJR -> schedule.timeOf(SolarEvent.SUNRISE)?.let { PeriodEnd(it, false) }
-            PrayerName.DHUHR -> schedule.timeOf(PrayerName.ASR)?.let { PeriodEnd(it, false) }
-            PrayerName.ASR -> schedule.timeOf(PrayerName.MAGHRIB)?.let { PeriodEnd(it, false) }
-            PrayerName.MAGHRIB -> schedule.timeOf(PrayerName.ISHA)?.let { PeriodEnd(it, false) }
-            PrayerName.ISHA -> {
-                val isha = schedule.timeOf(PrayerName.ISHA)
-                val closing = nextDayFajr?.withZoneSameInstant(schedule.zoneId)
-                if (isha != null && closing != null && closing.isAfter(isha)) {
-                    PeriodEnd(closing, true)
-                } else {
-                    null
-                }
-            }
-        }
     }
 
     /**
