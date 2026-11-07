@@ -53,11 +53,11 @@ import org.koin.androidx.compose.koinViewModel
  * whether a device fix is stored on arrival or held for confirmation. There is no second onboarding
  * location screen to keep in step.
  *
- * **The appearance preference.** The theme comes from the stored [AppViewModel.themeMode] rather than
- * from a parameter with a default, so the Appearance screen's choice is what actually re-themes the
- * shell: the preference is read here, applied here, and a change reaches the UI on the next emission
- * without a restart. Passing a fixed mode instead would leave the stored value alive in the store and
- * the radio group, and nowhere else.
+ * **The appearance preferences.** All three come from the store rather than from parameters with
+ * defaults, so the Appearance screen's choices are what actually re-theme the shell: the mode, the
+ * colour preset and the layout style are read here, applied here, and a change reaches the UI on the
+ * next emission without a restart. They are three independent flows, so changing the layout style
+ * cannot reset the palette or the mode.
  *
  * **The language preference.** Applied here for the same reason and in the same way: the shell reads
  * [AppViewModel.appLanguage] and wraps everything it draws in [ProvideAppLanguageStrings]. Every
@@ -71,11 +71,13 @@ fun SalahApp(
     appViewModel: AppViewModel = koinViewModel(),
 ) {
     val themeMode by appViewModel.themeMode.collectAsStateWithLifecycle()
+    val themePreset by appViewModel.themePreset.collectAsStateWithLifecycle()
+    val uiStyle by appViewModel.uiStyle.collectAsStateWithLifecycle()
     val appLanguage by appViewModel.appLanguage.collectAsStateWithLifecycle()
     val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
 
     ProvideAppLanguageStrings(language = appLanguage) {
-        SalahTheme(themeMode = themeMode) {
+        SalahTheme(themeMode = themeMode, themePreset = themePreset, uiStyle = uiStyle) {
             when {
                 setupState is LocationSetupState.Complete -> AppShell()
 

@@ -6,6 +6,8 @@ import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import kotlinx.coroutines.flow.Flow
 
 /** User preferences that must survive process death and work offline. */
@@ -14,6 +16,28 @@ interface UserPreferencesRepository {
     val themeMode: Flow<ThemeMode>
 
     suspend fun setThemeMode(mode: ThemeMode)
+
+    /**
+     * The colour palette the app is drawn in.
+     *
+     * Its own key, independent of [themeMode] and [uiStyle], so choosing a palette cannot reset the
+     * light/dark choice or the layout style. The flow always emits a value: a fresh install reads
+     * [ThemePreset.DEFAULT], which is the existing Salah palette, so an upgrade looks unchanged.
+     */
+    val themePreset: Flow<ThemePreset>
+
+    suspend fun setThemePreset(preset: ThemePreset)
+
+    /**
+     * The layout and surface style: spacing, corner radii and card treatment.
+     *
+     * Stored under its own key beside the two colour preferences, so the three appearance choices are
+     * independent. A store written before this preference existed reads [UiStyle.CLASSIC], whose tokens
+     * are exactly the geometry the app already used.
+     */
+    val uiStyle: Flow<UiStyle>
+
+    suspend fun setUiStyle(style: UiStyle)
 
     /**
      * The language the interface is written in.

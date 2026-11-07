@@ -53,6 +53,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeleto
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -119,12 +120,13 @@ fun TasbihScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = layout.screenHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
     ) {
         SalahSubpageHeader(
             title = stringResource(R.string.tasbih_title),

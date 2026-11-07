@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.designsystem.ZakatScaleGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeletonBlock
@@ -135,13 +136,14 @@ fun ZakatScreen(
                     stringResource(R.string.zakat_flow_attention)
                 }
 
+                val layout = LocalSalahStyle.current
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(scroll)
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .padding(horizontal = layout.screenHorizontalPadding, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(layout.listSpacing + 2.dp),
                 ) {
                     when (step) {
                         STEP_ASSETS -> {

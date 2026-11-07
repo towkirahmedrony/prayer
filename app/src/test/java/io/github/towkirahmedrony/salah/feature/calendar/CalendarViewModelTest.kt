@@ -11,6 +11,8 @@ import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import io.github.towkirahmedrony.salah.data.calendar.DeviceClockCalendarRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -394,6 +396,16 @@ class CalendarViewModelTest {
         override val themeMode: Flow<ThemeMode> = MutableStateFlow(ThemeMode.SYSTEM)
 
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
+
+        // The calendar view model does not read the palette or the layout style; the defaults keep the
+        // interface implementation complete without inventing state this test does not inspect.
+        override val themePreset: Flow<ThemePreset> = MutableStateFlow(ThemePreset.DEFAULT)
+
+        override suspend fun setThemePreset(preset: ThemePreset) = Unit
+
+        override val uiStyle: Flow<UiStyle> = MutableStateFlow(UiStyle.CLASSIC)
+
+        override suspend fun setUiStyle(style: UiStyle) = Unit
 
         override val prayerSettings: Flow<PrayerSettings> = MutableStateFlow(PrayerSettings.DEFAULT)
 

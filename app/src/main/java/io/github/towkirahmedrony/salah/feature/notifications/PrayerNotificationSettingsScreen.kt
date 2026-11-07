@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
@@ -106,12 +107,13 @@ fun PrayerNotificationSettingsScreen(
         }
     }
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = layout.screenHorizontalPadding, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
     ) {
         SalahSubpageHeader(
             title = stringResource(R.string.notifications_title),

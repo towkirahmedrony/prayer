@@ -16,7 +16,9 @@ import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -66,6 +68,53 @@ class DataStoreUserPreferencesRepositoryTest {
     fun `defaults to the documented settings before anything is stored`() = runTest {
         assertEquals(PrayerSettings.DEFAULT, repository.prayerSettings.first())
         assertEquals(ThemeMode.SYSTEM, repository.themeMode.first())
+        // The default appearance is the existing brand palette and geometry, so an upgrade changes
+        // nothing until the user makes a choice.
+        assertEquals(ThemePreset.DEFAULT, repository.themePreset.first())
+        assertEquals(UiStyle.CLASSIC, repository.uiStyle.first())
+    }
+
+    @Test
+    fun `the color theme and UI style persist and stay independent of the mode`() = runTest {
+        repository.setThemeMode(ThemeMode.DARK)
+        repository.setThemePreset(ThemePreset.OCEAN)
+        repository.setUiStyle(UiStyle.COMPACT)
+
+        // A fresh repository over the same file stands in for a process restart.
+        val restarted = DataStoreUserPreferencesRepository(dataStore)
+        assertEquals(ThemeMode.DARK, restarted.themeMode.first())
+        assertEquals(ThemePreset.OCEAN, restarted.themePreset.first())
+        assertEquals(UiStyle.COMPACT, restarted.uiStyle.first())
+
+        // Changing the layout style must not reset the palette or the light/dark choice.
+        restarted.setUiStyle(UiStyle.MINIMAL)
+        assertEquals(UiStyle.MINIMAL, restarted.uiStyle.first())
+        assertEquals(ThemePreset.OCEAN, restarted.themePreset.first())
+        assertEquals(ThemeMode.DARK, restarted.themeMode.first())
+    }
+
+    @Test
+    fun `each appearance choice writes exactly one key`() = runTest {
+        repository.setThemeMode(ThemeMode.DARK)
+        val before = dataStore.data.first().asMap().keys
+
+        repository.setThemePreset(ThemePreset.ROSE)
+        assertEquals(before + stringPreferencesKey("theme_preset"), dataStore.data.first().asMap().keys)
+
+        val afterPreset = dataStore.data.first().asMap().keys
+        repository.setUiStyle(UiStyle.MODERN)
+        assertEquals(afterPreset + stringPreferencesKey("ui_style"), dataStore.data.first().asMap().keys)
+    }
+
+    @Test
+    fun `an unknown preset or style falls back to the existing appearance`() = runTest {
+        dataStore.edit { preferences ->
+            preferences[stringPreferencesKey("theme_preset")] = "SEPIA"
+            preferences[stringPreferencesKey("ui_style")] = "GLASS"
+        }
+
+        assertEquals(ThemePreset.DEFAULT, repository.themePreset.first())
+        assertEquals(UiStyle.CLASSIC, repository.uiStyle.first())
     }
 
     @Test

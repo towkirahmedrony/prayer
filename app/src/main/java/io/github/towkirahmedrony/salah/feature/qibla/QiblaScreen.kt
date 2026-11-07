@@ -50,6 +50,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.RulerGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
 import io.github.towkirahmedrony.salah.core.domain.location.LocationFreshness
 import io.github.towkirahmedrony.salah.core.domain.qibla.LocationPermissionState
@@ -172,12 +173,13 @@ private fun QiblaContent(
     // stored state should have to carry.
     var isManualOpen by rememberSaveable { mutableStateOf(false) }
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = layout.contentHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing),
     ) {
         QiblaHeader(state = state)
 

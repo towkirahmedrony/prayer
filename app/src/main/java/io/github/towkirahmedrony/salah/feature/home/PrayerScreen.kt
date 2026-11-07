@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.components.CurrentPrayerHeroCard
 import io.github.towkirahmedrony.salah.feature.home.components.NightPeriodsCard
@@ -33,12 +34,13 @@ fun PrayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = layout.contentHorizontalPadding, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing),
     ) {
         Text(
             text = stringResource(R.string.nav_prayer),

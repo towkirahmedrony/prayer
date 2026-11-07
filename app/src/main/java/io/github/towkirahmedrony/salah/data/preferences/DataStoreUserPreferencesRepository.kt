@@ -19,7 +19,9 @@ import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -49,6 +51,32 @@ class DataStoreUserPreferencesRepository(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { preferences -> preferences[Keys.THEME_MODE] = mode.name }
+    }
+
+    // --- Colour theme and layout style -----------------------------------------
+
+    override val themePreset: Flow<ThemePreset> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences ->
+            ThemePreset.entries.firstOrNull { it.name == preferences[Keys.THEME_PRESET] }
+                ?: ThemePreset.DEFAULT
+        }
+
+    override suspend fun setThemePreset(preset: ThemePreset) {
+        // One key each: selecting a palette cannot rewrite the appearance mode or the layout style
+        // that share this store.
+        dataStore.edit { preferences -> preferences[Keys.THEME_PRESET] = preset.name }
+    }
+
+    override val uiStyle: Flow<UiStyle> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences ->
+            UiStyle.entries.firstOrNull { it.name == preferences[Keys.UI_STYLE] }
+                ?: UiStyle.CLASSIC
+        }
+
+    override suspend fun setUiStyle(style: UiStyle) {
+        dataStore.edit { preferences -> preferences[Keys.UI_STYLE] = style.name }
     }
 
     // --- Interface language -----------------------------------------------------
@@ -249,6 +277,8 @@ class DataStoreUserPreferencesRepository(
 
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val THEME_PRESET = stringPreferencesKey("theme_preset")
+        val UI_STYLE = stringPreferencesKey("ui_style")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         val CALCULATION_METHOD = stringPreferencesKey("prayer_calculation_method")
         val ASR_METHOD = stringPreferencesKey("prayer_asr_method")

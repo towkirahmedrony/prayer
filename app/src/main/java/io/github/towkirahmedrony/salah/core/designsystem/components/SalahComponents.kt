@@ -35,6 +35,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronLeftGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
+import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahCardSurface
+import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahStyle
 import io.github.towkirahmedrony.salah.core.designsystem.theme.salahSwitchPalette
 
 /**
@@ -50,10 +53,18 @@ fun SalahSectionCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.large
-    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    val elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    val style = LocalSalahStyle.current
+    val shape = style.shapes.large
+    val colors = CardDefaults.cardColors(containerColor = salahCardContainer(style))
+    // The style decides the surface treatment: an outlined flat card (Classic, Compact), no chrome at
+    // all (Minimal), or a softly lifted surface (Modern). The border colour stays the divider role, so
+    // it re-tones with the colour preset.
+    val border = if (style.cardBorderWidth > 0.dp) {
+        BorderStroke(style.cardBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+    } else {
+        null
+    }
+    val elevation = CardDefaults.cardElevation(defaultElevation = style.cardElevation)
 
     if (onClick == null) {
         Card(
@@ -63,7 +74,7 @@ fun SalahSectionCard(
             border = border,
             elevation = elevation,
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(style.cardPadding)) {
                 content()
             }
         }
@@ -76,7 +87,7 @@ fun SalahSectionCard(
             border = border,
             elevation = elevation,
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(style.cardPadding)) {
                 content()
             }
         }
@@ -273,14 +284,19 @@ fun SalahShortcutTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val style = LocalSalahStyle.current
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = style.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = salahCardContainer(style)),
+        border = if (style.cardBorderWidth > 0.dp) {
+            BorderStroke(style.cardBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+        } else {
+            null
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = style.cardElevation),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             glyph(MaterialTheme.colorScheme.primary)
@@ -325,6 +341,19 @@ fun SalahSkeletonBlock(
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     )
+}
+
+/**
+ * The card colour the active style asks for.
+ *
+ * A helper rather than an expression at each call site so the two card components cannot disagree
+ * about which surface a borderless style uses. `SURFACE_VARIANT` is what keeps a Minimal or Modern card
+ * visible on AMOLED's true-black canvas, where the card colour and the background are both black.
+ */
+@Composable
+private fun salahCardContainer(style: SalahStyle): Color = when (style.cardSurface) {
+    SalahCardSurface.SURFACE -> MaterialTheme.colorScheme.surface
+    SalahCardSurface.SURFACE_VARIANT -> MaterialTheme.colorScheme.surfaceVariant
 }
 
 /**

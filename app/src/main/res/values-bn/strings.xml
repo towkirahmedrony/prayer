@@ -670,11 +670,28 @@
       The option labels are shared with the theme resources the shell reads.
     -->
     <string name="settings_theme_title">চেহারা ও প্রদর্শন</string>
-    <string name="settings_theme_body">সালাহ দেখতে কেমন হবে। সিস্টেম অনুযায়ী আপনার ডিভাইসের নিজের হালকা বা গাঢ় সেটিং ব্যবহার করে।</string>
+    <string name="settings_theme_body">রঙের থিম, প্রদর্শন মোড ও ইন্টারফেস স্টাইল বেছে নিন। প্রতিটি পরিবর্তন সাথে সাথে প্রয়োগ হয়।</string>
     <string name="settings_theme_mode_title">থিম</string>
     <string name="settings_theme_system">সিস্টেম অনুযায়ী</string>
     <string name="settings_theme_light">হালকা</string>
     <string name="settings_theme_dark">গাঢ়</string>
+    <string name="settings_color_theme_title">রঙের থিম</string>
+    <string name="settings_appearance_mode_title">প্রদর্শন মোড</string>
+    <string name="settings_ui_style_title">ইন্টারফেস স্টাইল</string>
+
+    <string name="theme_default">ডিফল্ট</string>
+    <string name="theme_emerald">পান্না</string>
+    <string name="theme_ocean">মহাসাগর</string>
+    <string name="theme_midnight">মধ্যরাত</string>
+    <string name="theme_rose">গোলাপ</string>
+    <string name="theme_lavender">ল্যাভেন্ডার</string>
+    <string name="theme_amoled">অ্যামোলেড</string>
+    <string name="theme_sand">বালু</string>
+
+    <string name="ui_style_classic">ক্লাসিক</string>
+    <string name="ui_style_minimal">মিনিমাল</string>
+    <string name="ui_style_modern">আধুনিক</string>
+    <string name="ui_style_compact">সংক্ষিপ্ত</string>
 
     <!-- Settings: General and the time format it offers. -->
     <string name="settings_time_format_body">সালাহ যে সময় দেখায়—এর রিমাইন্ডারসহ—সব জায়গায় যে ঘড়ি ব্যবহার করে। এটি সময় কীভাবে লেখা হয় তা বদলায়, কীভাবে হিসাব হয় তা নয়।</string>
@@ -686,7 +703,7 @@
       Settings: the overview's remaining category rows. The names and descriptions of every category
       the overview draws are here, so no row is left in English beside a Bengali heading.
     -->
-    <string name="settings_category_appearance_description">হালকা, গাঢ় বা আপনার ডিভাইস অনুযায়ী।</string>
+    <string name="settings_category_appearance_description">রঙের থিম, প্রদর্শন মোড ও লেআউট স্টাইল।</string>
     <string name="settings_category_prayer_times_title">নামাজের সময়সূচি</string>
     <string name="settings_category_prayer_times_description">হিসাবের পদ্ধতি, আসরের নিয়ম ও নিজে দেওয়া সংশোধন।</string>
     <string name="settings_category_notifications_title">নোটিফিকেশন ও আজান</string>

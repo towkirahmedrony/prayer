@@ -38,6 +38,8 @@ import io.github.towkirahmedrony.salah.core.model.PrayerTimeSource
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.SolarEventEntry
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -316,6 +318,8 @@ class FakePrayerNotificationPreferencesRepository(
 class FakeUserPreferencesRepository(
     initialSettings: PrayerSettings = PrayerSettings.DEFAULT,
     initialTheme: ThemeMode = ThemeMode.SYSTEM,
+    initialThemePreset: ThemePreset = ThemePreset.DEFAULT,
+    initialUiStyle: UiStyle = UiStyle.CLASSIC,
     initialCalendarSettings: CalendarSettings = CalendarSettings.DEFAULT,
     initialAppLanguage: AppLanguage = AppLanguage.DEFAULT,
     initialOverrides: PrayerConfigOverrides = PrayerConfigOverrides.NONE,
@@ -324,6 +328,8 @@ class FakeUserPreferencesRepository(
 
     private val settingsState = MutableStateFlow(initialSettings)
     private val themeState = MutableStateFlow(initialTheme)
+    private val themePresetState = MutableStateFlow(initialThemePreset)
+    private val uiStyleState = MutableStateFlow(initialUiStyle)
     private val calendarState = MutableStateFlow(initialCalendarSettings)
     private val languageState = MutableStateFlow(initialAppLanguage)
     private val overridesState = MutableStateFlow(initialOverrides)
@@ -340,6 +346,18 @@ class FakeUserPreferencesRepository(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeState.value = mode
+    }
+
+    override val themePreset: Flow<ThemePreset> = themePresetState
+
+    override suspend fun setThemePreset(preset: ThemePreset) {
+        themePresetState.value = preset
+    }
+
+    override val uiStyle: Flow<UiStyle> = uiStyleState
+
+    override suspend fun setUiStyle(style: UiStyle) {
+        uiStyleState.value = style
     }
 
     override val prayerSettings: Flow<PrayerSettings> = settingsState

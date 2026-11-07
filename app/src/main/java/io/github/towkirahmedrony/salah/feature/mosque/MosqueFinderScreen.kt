@@ -66,6 +66,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSkeleto
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.domain.calendar.CalendarFormatting
 import io.github.towkirahmedrony.salah.core.domain.mosque.Mosque
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueDataOrigin
@@ -165,11 +166,12 @@ fun MosqueFinderScreen(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
             )
         } else {
+            val layout = LocalSalahStyle.current
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = layout.screenHorizontalPadding, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
             ) {
                 FinderChrome(
                     state = state,

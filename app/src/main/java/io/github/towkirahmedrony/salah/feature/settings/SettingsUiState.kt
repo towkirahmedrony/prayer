@@ -3,6 +3,8 @@ package io.github.towkirahmedrony.salah.feature.settings
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 
 /**
  * Transient feedback shown after a settings action.
@@ -44,6 +46,10 @@ sealed interface SettingsMessage {
  */
 data class SettingsUiState(
     val themeMode: ThemeMode,
+    /** The persisted colour palette; the Appearance screen's swatch grid reads its selection from here. */
+    val themePreset: ThemePreset,
+    /** The persisted layout style, independent of [themeMode] and [themePreset]. */
+    val uiStyle: UiStyle,
     /** The persisted calculation settings; every control reads its selection from here. */
     val prayerSettings: PrayerSettings,
     /**

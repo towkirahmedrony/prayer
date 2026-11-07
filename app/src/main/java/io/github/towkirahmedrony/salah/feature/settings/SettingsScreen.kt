@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 
 /**
  * Settings: the overview of categories.
@@ -38,12 +39,13 @@ fun SettingsScreen(
     onOpenCategory: (SettingsCategory) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = layout.screenHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
     ) {
         Text(
             text = stringResource(R.string.settings_title),

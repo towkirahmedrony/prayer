@@ -15,7 +15,9 @@ import io.github.towkirahmedrony.salah.core.model.PrayerConfigOverrides
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -85,14 +87,28 @@ class SettingsViewModel(
             initialValue = PrayerConfigOrigin.BUNDLED,
         )
 
-    val uiState: StateFlow<SettingsUiState> = combine(
+    /**
+     * The three appearance preferences, combined first so the screen's state can combine four flows.
+     *
+     * They are separate repository flows and are written separately; grouping them here is only about
+     * the typed `combine` overload, never about coupling the values.
+     */
+    private val appearancePreferences = combine(
         userPreferencesRepository.themeMode,
+        userPreferencesRepository.themePreset,
+        userPreferencesRepository.uiStyle,
+    ) { mode, preset, style -> AppearancePreferences(mode, preset, style) }
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        appearancePreferences,
         userPreferencesRepository.prayerSettings,
         userPreferencesRepository.appLanguage,
         message,
-    ) { themeMode, prayerSettings, appLanguage, currentMessage ->
+    ) { appearance, prayerSettings, appLanguage, currentMessage ->
         SettingsUiState(
-            themeMode = themeMode,
+            themeMode = appearance.mode,
+            themePreset = appearance.preset,
+            uiStyle = appearance.style,
             prayerSettings = prayerSettings,
             appLanguage = appLanguage,
             message = currentMessage,
@@ -102,6 +118,8 @@ class SettingsViewModel(
         started = SharingStarted.WhileSubscribed(subscribeTimeoutMillis),
         initialValue = SettingsUiState(
             themeMode = ThemeMode.SYSTEM,
+            themePreset = ThemePreset.DEFAULT,
+            uiStyle = UiStyle.CLASSIC,
             prayerSettings = PrayerSettings.DEFAULT,
             appLanguage = AppLanguage.DEFAULT,
             message = null,
@@ -110,6 +128,22 @@ class SettingsViewModel(
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { userPreferencesRepository.setThemeMode(mode) }
+    }
+
+    /**
+     * Stores the colour palette the Appearance screen chose.
+     *
+     * The preference is the stored value, so the swatch grid follows the change on the next emission;
+     * nothing else is written. No timetable is invalidated and no reminder is rebuilt, because a
+     * palette changes no calculated time.
+     */
+    fun setThemePreset(preset: ThemePreset) {
+        viewModelScope.launch { userPreferencesRepository.setThemePreset(preset) }
+    }
+
+    /** Stores the layout style, independently of the palette and the appearance mode. */
+    fun setUiStyle(style: UiStyle) {
+        viewModelScope.launch { userPreferencesRepository.setUiStyle(style) }
     }
 
     // --- Interface language -----------------------------------------------------
@@ -232,6 +266,12 @@ class SettingsViewModel(
             coordinator.reconcile(ReconcileReason.SETTINGS_CHANGED)
         }
     }
+
+    private data class AppearancePreferences(
+        val mode: ThemeMode,
+        val preset: ThemePreset,
+        val style: UiStyle,
+    )
 
     private companion object {
         const val subscribeTimeoutMillis = 5_000L

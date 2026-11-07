@@ -4,9 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,18 +14,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
-
-private val SalahShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp),
-)
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 
 private val SalahTypography = Typography().let { base ->
     base.copy(
@@ -126,15 +117,24 @@ internal fun resolveDarkTheme(themeMode: ThemeMode, systemInDarkTheme: Boolean):
  * [ThemeMode.SYSTEM] follows the device setting; the explicit modes let the user override it,
  * which is why the system bar icon colours are updated here rather than in the platform theme.
  *
+ * [themePreset] selects the palette and [uiStyle] the geometry. They are separate inputs because they
+ * are separate preferences: a colour theme never changes the spacing, and a layout style never changes
+ * a colour. The scheme comes from the preset's palette, while the shapes, spacing and card treatment
+ * come from the style's tokens through [LocalSalahStyle], so every screen that reads the design system
+ * follows both choices at once.
+ *
  * Bangla and Arabic script are rendered with the platform fonts (Android ships Bengali and
  * Arabic coverage in its system font stack). No font binaries are bundled in this phase.
  */
 @Composable
 fun SalahTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themePreset: ThemePreset = ThemePreset.DEFAULT,
+    uiStyle: UiStyle = UiStyle.CLASSIC,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = resolveDarkTheme(themeMode, systemInDarkTheme = isSystemInDarkTheme())
+    val style = salahStyle(uiStyle)
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -147,11 +147,14 @@ fun SalahTheme(
         }
     }
 
-    CompositionLocalProvider(LocalSalahAccents provides salahAccents(darkTheme)) {
+    CompositionLocalProvider(
+        LocalSalahAccents provides themeAccents(themePreset, darkTheme),
+        LocalSalahStyle provides style,
+    ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) SalahDarkColorScheme else SalahLightColorScheme,
+            colorScheme = themeColorScheme(themePreset, darkTheme),
             typography = SalahTypography,
-            shapes = SalahShapes,
+            shapes = style.shapes,
             content = content,
         )
     }

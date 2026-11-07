@@ -32,6 +32,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.TasbihBeadsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.ZakatScaleGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 
 /**
  * Tools: the entry points to Salah's standalone utilities.
@@ -59,12 +60,13 @@ fun ToolsScreen(
     onOpenTool: (ToolsEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = layout.screenHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
     ) {
         Text(
             text = stringResource(R.string.nav_tools),

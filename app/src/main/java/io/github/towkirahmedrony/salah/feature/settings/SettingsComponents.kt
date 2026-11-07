@@ -46,6 +46,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.MoonGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SlidersGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 
 /**
  * The frame every settings subpage is built in.
@@ -66,12 +67,13 @@ internal fun SettingsSubpage(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val style = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = style.screenHorizontalPadding, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(style.sectionSpacing),
     ) {
         SalahSubpageHeader(
             title = title,
@@ -187,6 +189,7 @@ internal fun <T> SettingsOptionGroup(
     }
     Spacer(modifier = Modifier.height(4.dp))
 
+    val rowSpacing = LocalSalahStyle.current.optionRowSpacing
     Column(modifier = Modifier.selectableGroup()) {
         options.forEach { option ->
             SettingsChoiceRow(
@@ -194,6 +197,7 @@ internal fun <T> SettingsOptionGroup(
                 hint = hint(option)?.let { stringResource(it) },
                 selected = option == selected,
                 onClick = { onSelect(option) },
+                verticalPadding = rowSpacing,
             )
         }
     }
@@ -205,12 +209,13 @@ private fun SettingsChoiceRow(
     hint: String?,
     selected: Boolean,
     onClick: () -> Unit,
+    verticalPadding: androidx.compose.ui.unit.Dp,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(vertical = 3.dp),
+            .padding(vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)

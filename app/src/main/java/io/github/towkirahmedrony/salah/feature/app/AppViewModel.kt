@@ -12,6 +12,8 @@ import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
 import io.github.towkirahmedrony.salah.core.domain.startup.StoredLocationState
 import io.github.towkirahmedrony.salah.core.model.AppLanguage
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +48,26 @@ class AppViewModel(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = ThemeMode.SYSTEM,
+    )
+
+    /**
+     * The colour palette every screen is drawn in.
+     *
+     * Read at the shell for the same reason the appearance mode is: it is one app-wide choice, and a
+     * second read anywhere else would be a second source of truth. The initial value is the default
+     * palette, which is what the first frame must render before the store has been read.
+     */
+    val themePreset: StateFlow<ThemePreset> = userPreferencesRepository.themePreset.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = ThemePreset.DEFAULT,
+    )
+
+    /** The layout and surface style, independent of the palette and the appearance mode. */
+    val uiStyle: StateFlow<UiStyle> = userPreferencesRepository.uiStyle.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = UiStyle.CLASSIC,
     )
 
     /**

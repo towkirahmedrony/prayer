@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.model.DashboardCard
 import io.github.towkirahmedrony.salah.core.model.UnavailabilityReason
 import io.github.towkirahmedrony.salah.feature.common.messageRes
@@ -149,10 +150,16 @@ private fun HomeContent(
         cardState.card == DashboardCard.RAMADAN && !state.ramadan.visible
     }
 
+    val layout = LocalSalahStyle.current
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(
+            start = layout.contentHorizontalPadding,
+            end = layout.contentHorizontalPadding,
+            top = 10.dp,
+            bottom = 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing),
     ) {
         item(key = "home-header") {
             HomeHeader(

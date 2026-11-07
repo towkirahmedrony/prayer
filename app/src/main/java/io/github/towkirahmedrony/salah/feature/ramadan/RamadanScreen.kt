@@ -41,6 +41,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusP
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.domain.CountdownFormatter
 import io.github.towkirahmedrony.salah.core.domain.calendar.FastingCountdown
 import io.github.towkirahmedrony.salah.core.domain.calendar.FastingEventKind
@@ -97,12 +98,13 @@ fun RamadanScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val countdown by viewModel.countdown.collectAsStateWithLifecycle()
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = layout.contentHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing),
     ) {
         when (val state = uiState) {
             RamadanUiState.Loading -> {

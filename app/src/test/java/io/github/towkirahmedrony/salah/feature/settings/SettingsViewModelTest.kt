@@ -11,7 +11,9 @@ import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.ThemeMode
+import io.github.towkirahmedrony.salah.core.model.ThemePreset
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
+import io.github.towkirahmedrony.salah.core.model.UiStyle
 import io.github.towkirahmedrony.salah.testing.FakeLocationRepository
 import io.github.towkirahmedrony.salah.testing.FakePermissionStatusProvider
 import io.github.towkirahmedrony.salah.testing.FakePrayerNotificationPreferencesRepository
@@ -119,6 +121,74 @@ class SettingsViewModelTest {
         assertEquals(ThemeMode.LIGHT, repository.themeMode.first())
         // And the screen follows the store, so the control that was tapped shows the new choice.
         assertEquals(ThemeMode.LIGHT, viewModel.awaitState { it.themeMode == ThemeMode.LIGHT }.themeMode)
+    }
+
+    @Test
+    fun `the stored color theme and UI style are what the Appearance screen opens on`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository(
+            initialTheme = ThemeMode.DARK,
+            initialThemePreset = ThemePreset.SAND,
+            initialUiStyle = UiStyle.COMPACT,
+        )
+        val viewModel = settingsViewModel(repository)
+
+        val state = viewModel.awaitState { it.themePreset == ThemePreset.SAND && it.uiStyle == UiStyle.COMPACT }
+
+        assertEquals(ThemeMode.DARK, state.themeMode)
+        assertEquals(ThemePreset.SAND, state.themePreset)
+        assertEquals(UiStyle.COMPACT, state.uiStyle)
+    }
+
+    @Test
+    fun `the three appearance choices are stored independently`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository(
+            initialTheme = ThemeMode.DARK,
+            initialThemePreset = ThemePreset.EMERALD,
+            initialUiStyle = UiStyle.MINIMAL,
+        )
+        val viewModel = settingsViewModel(repository)
+        viewModel.awaitState { it.uiStyle == UiStyle.MINIMAL }
+
+        viewModel.setThemePreset(ThemePreset.LAVENDER)
+        runCurrent()
+
+        // The palette changed; the mode and the layout style did not.
+        assertEquals(ThemePreset.LAVENDER, repository.themePreset.first())
+        assertEquals(ThemeMode.DARK, repository.themeMode.first())
+        assertEquals(UiStyle.MINIMAL, repository.uiStyle.first())
+
+        viewModel.setUiStyle(UiStyle.MODERN)
+        runCurrent()
+
+        // And the layout style changed without resetting the palette or the mode.
+        assertEquals(UiStyle.MODERN, repository.uiStyle.first())
+        assertEquals(ThemePreset.LAVENDER, repository.themePreset.first())
+        assertEquals(ThemeMode.DARK, repository.themeMode.first())
+
+        assertEquals(
+            "nothing in the appearance sheet recalculates a time or reschedules a reminder",
+            0,
+            logger.count(SalahDiagnosticEvents.RECONCILE_STARTED),
+        )
+    }
+
+    @Test
+    fun `the appearance choices survive reopening the screen`() = runTest(mainDispatcher) {
+        val repository = FakeUserPreferencesRepository()
+        settingsViewModel(repository).apply {
+            setThemePreset(ThemePreset.ROSE)
+            setUiStyle(UiStyle.COMPACT)
+            setThemeMode(ThemeMode.LIGHT)
+        }
+        runCurrent()
+
+        // A second view model over the same store: leaving Settings and returning, or restarting.
+        val reopened = settingsViewModel(repository)
+        val state = reopened.awaitState { it.themePreset == ThemePreset.ROSE && it.uiStyle == UiStyle.COMPACT }
+
+        assertEquals(ThemeMode.LIGHT, state.themeMode)
+        assertEquals(ThemePreset.ROSE, state.themePreset)
+        assertEquals(UiStyle.COMPACT, state.uiStyle)
     }
 
     @Test

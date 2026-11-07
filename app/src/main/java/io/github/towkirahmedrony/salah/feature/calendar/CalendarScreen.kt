@@ -60,6 +60,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.RamadanPhase
@@ -95,12 +96,13 @@ fun CalendarScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val layout = LocalSalahStyle.current
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = layout.contentHorizontalPadding, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(layout.listSpacing + 2.dp),
     ) {
         when (val state = uiState) {
             CalendarUiState.Loading -> {
