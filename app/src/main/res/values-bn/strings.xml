@@ -178,8 +178,8 @@
     <!-- Calendar settings -->
     <string name="calendar_settings_title">ক্যালেন্ডার সেটিংস</string>
     <string name="calendar_default_view_title">ডিফল্ট ক্যালেন্ডার</string>
-    <string name="calendar_hijri_adjustment_title">হিজরি তারিখ সমন্বয়</string>
-    <string name="calendar_hijri_adjustment_reset">বাংলাদেশের ডিফল্টে ফেরান</string>
+    <string name="calendar_hijri_adjustment_title">হিজরি সমন্বয়</string>
+    <string name="calendar_hijri_adjustment_reset">ডিফল্টে ফেরান</string>
     <string name="calendar_language_title">তারিখের ভাষা</string>
     <string name="calendar_language_system">ডিভাইস অনুযায়ী</string>
     <string name="calendar_language_bangla">বাংলা</string>
@@ -350,8 +350,8 @@
       that leave it. Nothing on that screen is left in English.
     -->
     <string name="calendar_view_gregorian_hint">ডিভাইসের সরকারি ক্যালেন্ডার।</string>
-    <string name="calendar_view_bangla_hint">বাংলাদেশের সরকারি বঙ্গাব্দ, যা ২০১৯ সালে সংশোধিত বাংলা একাডেমির নিয়ম অনুসারে।</string>
-    <string name="calendar_view_hijri_hint">এই ডিভাইসের উম্মুল কুরা সারণি থেকে অনুমান করা, ডিফল্টে এক দিন পিছিয়ে বাংলাদেশের সাথে মেলানো। ঘোষিত তারিখ নয়।</string>
+    <string name="calendar_view_bangla_hint">বাংলাদেশের বঙ্গাব্দ, ২০১৯ সালের নিয়ম।</string>
+    <string name="calendar_view_hijri_hint">উম্মুল কুরা থেকে অনুমান করা, ঘোষিত তারিখ নয়।</string>
     <string name="calendar_hijri_source_calculated">এই ডিভাইসের উম্মুল কুরা ক্যালেন্ডার থেকে কোনো দিন সমন্বয় ছাড়া অনুমান করা — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
     <string name="calendar_hijri_source_adjusted">উম্মুল কুরা ক্যালেন্ডার থেকে অনুমান করে হিজরি সমন্বয় অনুযায়ী সরানো (ডিফল্টে বাংলাদেশের জন্য এক দিন পিছিয়ে) — কোনো কর্তৃপক্ষের নিশ্চিত করা তারিখ নয়।</string>
     <string name="calendar_cell_description">তারিখ %1$s</string>
@@ -374,19 +374,19 @@
     <string name="calendar_occasion_note">পালনীয় দিনগুলো হিজরি ক্যালেন্ডার অনুসরণ করে, তাই স্থানীয় চাঁদ দেখার ভিত্তিতে সেগুলো এক দিন সরে যেতে পারে।</string>
 
     <string name="calendar_settings_body">এই ডিভাইসে সংরক্ষিত। এই পছন্দগুলো প্রতিটি ক্যালেন্ডার স্ক্রিনে যা দেখানো হয় তা পরিবর্তন করে।</string>
-    <string name="calendar_default_view_body">ক্যালেন্ডার স্ক্রিন কোন ক্যালেন্ডারে খুলবে। মাসের গ্রিড, তার মাস ও বারগুলোর নাম, দিনের সংখ্যা এবং বছর—সবই নির্বাচিত ক্যালেন্ডার অনুসরণ করে; নির্বাচিত দিনের জন্য অন্য ক্যালেন্ডারগুলোও দেখানো হয়।</string>
-    <string name="calendar_hijri_adjustment_body">সালাহ উম্মুল কুরা সারণি থেকে হিজরি তারিখ অনুমান করে এবং বাংলাদেশের সাথে মেলাতে ডিফল্টে এক দিন পিছিয়ে (-1) শুরু করে। প্রতিটি হিজরি তারিখ, আনুমানিক রমজান সময়কাল এবং সেহরি, ইফতার ও ইমসাকের রিমাইন্ডার এই সমন্বয়ের সাথে সরে যায়। এটি এখনও একটি অনুমান: সরকারি তারিখ জাতীয় চাঁদ দেখা কমিটি অনুসরণ করে, তাই আপনার সমাজ ভিন্ন তারিখ অনুসরণ করলে ±২ দিনের মধ্যে সমন্বয় করুন।</string>
-    <string name="calendar_hijri_adjustment_value">সমন্বয়: %1$s দিন</string>
+    <string name="calendar_default_view_body">মাসের গ্রিড নির্বাচিত ক্যালেন্ডার অনুসরণ করে।</string>
+    <string name="calendar_hijri_adjustment_body">সালাহ উম্মুল কুরা থেকে হিজরি তারিখ অনুমান করে। আপনার সমাজ ভিন্ন তারিখ মানলে সমন্বয় করুন।</string>
+    <string name="calendar_hijri_adjustment_value">%1$s দিন</string>
     <string name="calendar_hijri_adjustment_range">−%1$d থেকে +%1$d দিনের মধ্যে</string>
-    <string name="calendar_language_body">ক্যালেন্ডারের তারিখ কোন লিপি ও সংখ্যায় লেখা হবে। এটি ইন্টারফেসের ভাষা থেকে আলাদা।</string>
-    <string name="calendar_sources_title">এই তারিখগুলো কোথা থেকে আসে</string>
-    <string name="calendar_sources_body">গ্রেগরিয়ান তারিখ আসে ডিভাইসের ঘড়ি থেকে। বঙ্গাব্দ ২০১৯ সালে সংশোধিত বাংলাদেশের সরকারি নিয়মে রূপান্তর করা হয়, এবং যে বছরগুলোর জন্য নিয়মগুলো যাচাই করা হয়েছে শুধু সেগুলোর জন্যই তা দেখানো হয়। হিজরি তারিখ অ্যান্ড্রয়েডে অন্তর্ভুক্ত উম্মুল কুরা সারণি থেকে অনুমান করা হয় এবং ডিফল্টে এক দিন পিছিয়ে দেখানো হয়, যা বাংলাদেশের চাঁদ দেখার তারিখের প্রতি সালাহর একটি আনুমানিক সমন্বয়; সরকারি তারিখ জাতীয় চাঁদ দেখা কমিটি অনুসরণ করে। এটি সর্বদা অনুমান হিসেবেই চিহ্নিত থাকে, এবং এর কোনোটির জন্যই ইন্টারনেট সংযোগ লাগে না।</string>
-    <string name="calendar_reminders_note">সেহরি ও ইফতারের রিমাইন্ডার অন্য নামাজের রিমাইন্ডারগুলোর সাথেই কনফিগার করা হয়, তাই তারা একই শিডিউলার, একই অনুমতি এবং একই চ্যানেল ভাগ করে নেয়।</string>
+    <string name="calendar_language_body">তারিখের লিপি ও সংখ্যা। অ্যাপের ভাষা থেকে আলাদা।</string>
+    <string name="calendar_sources_title">উৎস</string>
+    <string name="calendar_sources_body">গ্রেগরিয়ান আসে ডিভাইসের ঘড়ি থেকে। বঙ্গাব্দ ২০১৯ সালের বাংলাদেশের নিয়মে চলে এবং শুধু যাচাই করা বছরগুলোর জন্যই দেখানো হয়। হিজরি অনুমান, তাই চাঁদ দেখায় এক দিন সরে যেতে পারে। সবকিছু অফলাইনে হিসাব হয়।</string>
+    <string name="calendar_reminders_note">সেহরি ও ইফতারের রিমাইন্ডার বিজ্ঞপ্তিতে সেট করা হয়।</string>
     <string name="calendar_source_computed">এই ডিভাইসে হিসাব করা</string>
 
     <string name="calendar_open_settings">ক্যালেন্ডার সেটিংস খুলুন</string>
     <string name="calendar_open_ramadan">রমজান ক্যালেন্ডার খুলুন</string>
-    <string name="calendar_open_notifications">নামাজের রিমাইন্ডার সেটিংস খুলুন</string>
+    <string name="calendar_open_notifications">নামাজের রিমাইন্ডার সেটিংস</string>
 
     <!-- The Calendar screen's states, so its loading, failure and out-of-range text is Bengali too. -->
     <string name="reason_calendar_out_of_range">এই তারিখটি নির্বাচিত ক্যালেন্ডারের জন্য সালাহ যে পরিসরে রূপান্তর করতে পারে তার বাইরে, তাই একটি আনুমানিক তারিখ দেখানোর বদলে কোনো তারিখ দেখানো হচ্ছে না।</string>
@@ -714,51 +714,46 @@
       full, including the sentences that state what Android decides and what Salah does not claim.
     -->
     <string name="notifications_title">নামাজের বিজ্ঞপ্তি</string>
-    <string name="notifications_intro">সালাহ এই ডিভাইসে হিসাব করা নামাজের সময় থেকে রিমাইন্ডার নির্ধারণ করে। এখানকার সবকিছু অফলাইনে কাজ করে এবং শুধু ডিভাইসে সংরক্ষিত হয়।</string>
-    <string name="notifications_permission_title">অ্যান্ড্রয়েড অনুমতি</string>
-    <string name="notifications_permission_notifications">বিজ্ঞপ্তির অনুমতি</string>
+    <string name="notifications_permission_title">অনুমতি</string>
+    <string name="notifications_permission_notifications">বিজ্ঞপ্তি</string>
     <string name="notifications_permission_exact_alarms">সঠিক অ্যালার্ম</string>
     <string name="notifications_permission_granted">অনুমোদিত</string>
     <string name="notifications_permission_denied">অননুমোদিত</string>
-    <string name="notifications_permission_body">এগুলো দুটি আলাদা অনুমতি এবং সালাহ প্রতিটির জন্য কেবল আপনি বোতাম চাপলে অনুরোধ করে। বিজ্ঞপ্তির অনুমতি একটি রিমাইন্ডারকে নোটিফিকেশন শেডে দেখাতে দেয়। সঠিক অ্যালার্ম ফোন ঘুমন্ত থাকলেও নামাজের সময়ে রিমাইন্ডার চালাতে দেয়; এটি ছাড়া সালাহ রিমাইন্ডার তবুও নির্ধারণ করে, তবে অ্যান্ড্রয়েড সেটি দশ মিনিট পর্যন্ত দেরিতে চালাতে পারে।</string>
+    <string name="notifications_permission_body">আপনি বোতাম চাপলে তবেই সালাহ অনুমতি চায়। সঠিক অ্যালার্ম ছাড়া রিমাইন্ডার দশ মিনিট পর্যন্ত দেরিতে আসতে পারে।</string>
     <string name="notifications_permission_grant">বিজ্ঞপ্তির অনুমতি দিন</string>
     <string name="notifications_permission_manage">বিজ্ঞপ্তি সেটিংস</string>
     <string name="notifications_exact_alarm_grant">সঠিক অ্যালার্মের অনুমতি দিন</string>
-    <string name="notifications_exact_alarm_fallback">সঠিক অ্যালার্মের অনুমতি নেই, তাই রিমাইন্ডার একটি সময়সীমা দিয়ে নির্ধারিত হয়। এগুলো তবুও আসবে, তবে অ্যান্ড্রয়েড কয়েক মিনিট দেরি করতে পারে এবং গভীর পাওয়ার সেভিং-এ থাকা ফোন আরও দেরি করতে পারে।</string>
+    <string name="notifications_exact_alarm_fallback">সঠিক অ্যালার্ম নেই, তাই রিমাইন্ডার একটি সময়সীমার মধ্যে নির্ধারিত হয় এবং কয়েক মিনিট দেরিতে আসতে পারে।</string>
     <string name="notifications_master_title">সব নামাজের বিজ্ঞপ্তি</string>
-    <string name="notifications_master_body_on">সালাহ আজ ও আগামীকালের রিমাইন্ডার হালনাগাদ রাখে, এবং পুনরায় চালু হওয়ার পর সেগুলো আবার তৈরি করে।</string>
-    <string name="notifications_master_body_off">কোনো রিমাইন্ডার নির্ধারিত নেই এবং সালাহ আগের নির্ধারিতগুলো বাতিল করেছে। এটি আবার চালু করলে নিচে আপনি যেসব নামাজ সক্রিয় করেছেন সেগুলো নির্ধারিত হবে।</string>
-    <string name="notifications_schedule_title">নির্ধারিত রিমাইন্ডার</string>
-    <string name="notifications_schedule_count">নির্ধারিত রিমাইন্ডার: %1$d, আগামী %2$d দিনের জন্য (আজ ও আগামীকাল)।</string>
-    <string name="notifications_schedule_missing_dates">ওই দিনগুলোর %1$d দিনের জন্য কোনো সময়সূচি হিসাব করা যায়নি, তাই সেগুলোর জন্য আগেই সংরক্ষিত রিমাইন্ডার মুছে ফেলার বদলে অপরিবর্তিত রাখা হয়েছে।</string>
-    <string name="notifications_schedule_unknown">এই সেশনে এখনও কোনো পুনর্মিলন চালানো হয়নি।</string>
-    <string name="notifications_schedule_body">আপনি এখানে কোনো সেটিং বদলালে, আপনার অবস্থান বা হিসাবের পদ্ধতি বদলালে, ডিভাইসের সময় বা সময় অঞ্চল বদলালে, বা ফোন পুনরায় চালু করলে সালাহ সময়সূচি পুনরায় হিসাব করে।</string>
-    <string name="notifications_schedule_recalculate">এখনই পুনরায় হিসাব করুন</string>
-    <string name="notifications_schedule_no_location">বিজ্ঞপ্তির জন্য একটি অবস্থান দরকার, কারণ নামাজের সময় তা থেকেই হিসাব করা হয়। সেটিংসে একটি যোগ করে আবার এই স্ক্রিন খুলুন।</string>
+    <string name="notifications_master_body_on">আজ ও আগামীকালের জন্য হালনাগাদ থাকে।</string>
+    <string name="notifications_master_body_off">কোনো রিমাইন্ডার নির্ধারিত নেই।</string>
+    <string name="notifications_schedule_title">সময়সূচি</string>
+    <string name="notifications_schedule_count">%1$dটি রিমাইন্ডার, আগামী %2$d দিনের জন্য।</string>
+    <string name="notifications_schedule_missing_dates">ওই দিনগুলোর %1$d দিনের সময়সূচি পাওয়া যায়নি, তাই সেগুলোর সংরক্ষিত রিমাইন্ডার অপরিবর্তিত রাখা হয়েছে।</string>
+    <string name="notifications_schedule_unknown">এই সেশনে এখনও হিসাব হয়নি।</string>
+    <string name="notifications_schedule_body">সেটিংস, অবস্থান বা সময় অঞ্চল বদলালে, বা ফোন চালু করলে নিজেই আবার হিসাব হয়।</string>
+    <string name="notifications_schedule_recalculate">পুনরায় হিসাব</string>
+    <string name="notifications_schedule_no_location">বিজ্ঞপ্তির জন্য অবস্থান দরকার। সেটিংসে যোগ করে আবার এই স্ক্রিন খুলুন।</string>
     <string name="notifications_prayers_title">নামাজসমূহ</string>
-    <string name="notifications_prayers_body">প্রতিটি নামাজ আলাদাভাবে কনফিগার করা যায়। শব্দ নীরব থাকলেও একটি রিমাইন্ডার সক্রিয় থাকতে পারে।</string>
     <string name="notifications_prayer_master_off">উপরের সুইচ দিয়ে বিরত।</string>
-    <string name="notifications_prayer_disabled">এই নামাজের জন্য কোনো রিমাইন্ডার নির্ধারিত নেই।</string>
     <string name="notifications_prayer_sound">শব্দ</string>
-    <string name="notifications_prayer_test_sound">এই শব্দটি চালান</string>
+    <string name="notifications_prayer_test_sound">চালান</string>
     <string name="notifications_prayer_vibration">কম্পন</string>
-    <string name="notifications_prayer_vibration_body">যেখানে ডিভাইস ও তার সেটিংস অনুমতি দেয়।</string>
     <string name="notifications_prayer_advance">আগে মনে করিয়ে দিন</string>
-    <string name="notifications_prayer_advance_body">নামাজের আগে একটি অতিরিক্ত রিমাইন্ডার। বন্ধ মানে শুধু নামাজের সময়ের রিমাইন্ডার নির্ধারিত হয়।</string>
     <string name="notifications_prayer_advance_off">বন্ধ</string>
     <string name="notifications_prayer_advance_value">%1$d মিনিট আগে</string>
     <string name="notifications_solar_title">সূর্যোদয়ের রিমাইন্ডার</string>
-    <string name="notifications_solar_body">সূর্যোদয় একটি সৌর ঘটনা, পাঁচ ওয়াক্ত ফরজ নামাজের একটি নয়, তাই এটি আলাদাভাবে কনফিগার করা হয় এবং ডিফল্টভাবে বন্ধ। এর রিমাইন্ডার সূর্যোদয় বলে, কখনও নামাজ বলে না।</string>
+    <string name="notifications_solar_body">পাঁচ ওয়াক্ত নামাজের একটি নয়। ডিফল্টে বন্ধ।</string>
     <string name="notifications_azan_title">আজান বাজানো</string>
     <string name="notifications_azan_available">উপলব্ধ</string>
     <string name="notifications_azan_unavailable">এই বিল্ডে উপলব্ধ নয়</string>
-    <string name="notifications_azan_body_unavailable">সালাহ একটি সম্পূর্ণ আজান রেকর্ডিং বাজাতে পারে, তবে কোনো রেকর্ডিং বান্ডল করা নেই: একটি পুনর্বিতরণ করতে এমন অধিকার দরকার যা এই প্রকল্পের নেই, আর তৈরি করা একটি টোন আজান হবে না। কাজ করে না এমন একটি নিয়ন্ত্রণ দেওয়ার বদলে সালাহ উপরে আপনি যে বিজ্ঞপ্তির শব্দ বেছেছেন তা বাজায়। লাইসেন্সযুক্ত একটি রেকর্ডিং যোগ করা অডিও উৎসে এক লাইনের পরিবর্তন, এবং এর প্লেব্যাক কোড ও পরীক্ষা আগেই আছে।</string>
-    <string name="notifications_azan_body_available">একটি লাইসেন্সযুক্ত রেকর্ডিং বান্ডল করা আছে, তাই সময়মতো নামাজের রিমাইন্ডার প্লেব্যাকও শুরু করে। বিজ্ঞপ্তি ও প্লেব্যাক আলাদা: একটি বন্ধ করলে অন্যটি কখনও বন্ধ হয় না।</string>
+    <string name="notifications_azan_body_unavailable">কোনো আজান রেকর্ডিং বান্ডল করা নেই, তাই উপরের শব্দটিই বাজে। লাইসেন্সযুক্ত রেকর্ডিং যোগ করা অডিও উৎসে এক লাইনের পরিবর্তন।</string>
+    <string name="notifications_azan_body_available">লাইসেন্সযুক্ত রেকর্ডিং নামাজের সময়ে বাজে। বিজ্ঞপ্তি ও প্লেব্যাক আলাদা।</string>
     <string name="notifications_azan_attribution">রেকর্ডিং: %1$s</string>
-    <string name="notifications_limitations_title">যা অ্যান্ড্রয়েড সিদ্ধান্ত নেয়, সালাহ নয়</string>
-    <string name="notifications_limitations_body">ডু নট ডিস্টার্ব, ব্যাটারি অপ্টিমাইজেশন এবং ডিভাইস নির্মাতার পাওয়ার ম্যানেজমেন্ট—সবই সালাহ ও স্ক্রিনের মাঝে থাকে। সালাহ অ্যান্ড্রয়েডের সমর্থিত অ্যালার্ম ও বিজ্ঞপ্তির API দিয়ে রিমাইন্ডার নির্ধারণ করে এবং কোনোটিকে পাশ কাটানোর চেষ্টা করে না, তাই সালাহ যা ওভাররাইড করতে পারে না এমন সেটিংসে একটি রিমাইন্ডার দেরি হতে পারে বা নীরব হয়ে যেতে পারে।</string>
-    <string name="notifications_channel_note">শব্দ ও কম্পন অ্যান্ড্রয়েড নোটিফিকেশন চ্যানেলে থাকে। এখানে একটি নামাজের শব্দ বদলালে তা সংশ্লিষ্ট চ্যানেলে পাঠানো হয়; আপনি যদি সিস্টেম সেটিংসে ওই চ্যানেল আগেই কাস্টমাইজ করে থাকেন, অ্যান্ড্রয়েড আপনার পছন্দই রাখে।</string>
-    <string name="notifications_offline_note">রিমাইন্ডার ইন্টারনেট সংযোগ ছাড়াই হিসাব, নির্ধারণ ও বিতরণ করা হয়। কোনো অ্যাকাউন্ট লাগে না এবং কোথাও কিছু পাঠানো হয় না।</string>
+    <string name="notifications_limitations_title">অ্যান্ড্রয়েডের সীমা</string>
+    <string name="notifications_limitations_body">ডু নট ডিস্টার্ব ও ব্যাটারি সেটিংস রিমাইন্ডার দেরি করতে বা নীরব করতে পারে। সালাহ অ্যান্ড্রয়েডের সমর্থিত API ব্যবহার করে, সেগুলো এড়িয়ে যায় না।</string>
+    <string name="notifications_channel_note">শব্দ ও কম্পন অ্যান্ড্রয়েডের নোটিফিকেশন চ্যানেলের অংশ, তাই সিস্টেম সেটিংসে বদলানো চ্যানেল আপনার পছন্দই ধরে রাখে।</string>
+    <string name="notifications_offline_note">অফলাইনেই হিসাব ও ডেলিভারি হয়। কোনো অ্যাকাউন্ট লাগে না, কোথাও কিছু পাঠানো হয় না।</string>
     <string name="notifications_status_no_permission">বিজ্ঞপ্তির অনুমতি না দেওয়া পর্যন্ত রিমাইন্ডার দেখা যাবে না।</string>
     <string name="notifications_message_preview_started">আপনার নির্বাচিত শব্দ চালানো হচ্ছে।</string>
     <string name="notifications_message_preview_failed">এই ডিভাইসে ওই শব্দটি চালানো যায়নি।</string>
@@ -767,21 +762,21 @@
 
     <!-- Prayer notification settings: the Ramadan reminder card. -->
     <string name="notifications_ramadan_title">রমজানের রিমাইন্ডার</string>
-    <string name="notifications_ramadan_body">সেহরি ও ইফতারের রিমাইন্ডার, বাকি সবকিছুর মতো একই হিসাব করা সময় থেকে এবং শুধু রমজানেই নির্ধারিত।</string>
-    <string name="notifications_ramadan_sehri_body">হিসাব করা ফজরের আগে, যা সেহরির শেষ সময়।</string>
-    <string name="notifications_ramadan_iftar_body">হিসাব করা মাগরিবে, যা ইফতার।</string>
+    <string name="notifications_ramadan_body">শুধু রমজানে।</string>
+    <string name="notifications_ramadan_sehri_body">ফজরের আগে।</string>
+    <string name="notifications_ramadan_iftar_body">মাগরিবে।</string>
     <string name="notifications_ramadan_imsak">ইমসাক রিমাইন্ডার</string>
-    <string name="notifications_ramadan_imsak_body">আপনি অন্তর্বর্তীকাল নির্ধারণ করলে, সতর্কতামূলক ইমসাক সময়ে।</string>
+    <string name="notifications_ramadan_imsak_body">আপনার নির্ধারিত ইমসাক সময়ে।</string>
     <string name="notifications_ramadan_iftar_lead">ইফতারের আগেও মনে করিয়ে দিন</string>
-    <string name="notifications_ramadan_source_note">দুটোই হিসাব করা ফজর ও মাগরিবের সময় থেকে আসে, তাই এগুলো স্বয়ংক্রিয়ভাবে আপনার হিসাবের পদ্ধতি ও নিজে দেওয়া সংশোধন অনুসরণ করে। সালাহ কোনোটিতেই বাড়তি সময় যোগ করে না, এবং কোনো কর্তৃপক্ষের সময়সূচি নকল করার দাবি করে না।</string>
+    <string name="notifications_ramadan_source_note">আপনার ফজর ও মাগরিবের সময় অনুসরণ করে, বাড়তি সময় ছাড়া।</string>
 
     <!-- Reminder sound names and what will actually be heard. -->
     <string name="notification_sound_system_default">ডিফল্ট শব্দ</string>
-    <string name="notification_sound_system_default_hint">ডিভাইসের নিজের বিজ্ঞপ্তির শব্দ।</string>
+    <string name="notification_sound_system_default_hint">ডিভাইসের নিজের শব্দ।</string>
     <string name="notification_sound_salah_chime">সালাহ চাইম</string>
-    <string name="notification_sound_salah_chime_hint">সালাহর সাথে বান্ডল করা একটি ছোট টোন। অফলাইনে কাজ করে।</string>
+    <string name="notification_sound_salah_chime_hint">সালাহর সাথে বান্ডল করা ছোট টোন।</string>
     <string name="notification_sound_silent">নীরব</string>
-    <string name="notification_sound_silent_hint">কোনো শব্দ নেই। রিমাইন্ডার তবুও বিজ্ঞপ্তি শেডে দেখা যাবে।</string>
+    <string name="notification_sound_silent_hint">শব্দ নেই, তবুও রিমাইন্ডার দেখা যাবে।</string>
 
     <!-- Notification channels and the reminder content Android draws from them. -->
     <string name="notification_channel_prayer_name">নামাজের রিমাইন্ডার — %1$s, %2$s</string>

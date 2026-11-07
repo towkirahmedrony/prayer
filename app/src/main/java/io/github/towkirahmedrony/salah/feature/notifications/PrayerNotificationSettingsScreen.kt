@@ -8,25 +8,18 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,16 +29,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahStatusPill
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
-import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSwitch
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsChoiceRow
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsDivider
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsGroupTitle
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsStepper
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsStepperRow
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsSupportingText
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsSwitchRow
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationPlanner
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -58,26 +55,22 @@ import org.koin.androidx.compose.koinViewModel
 /**
  * Prayer notification settings.
  *
- * Uses Salah's existing design system — the same `SalahSectionCard`, status pill and unavailable
- * note the Home and Settings screens use — and is a destination of its own rather than a section
- * bolted onto Settings, because it carries enough state (per-prayer detail, permission state,
- * schedule status) to deserve a screen.
+ * One card per group, one line per setting: the screen is a control panel, not an explanation of one.
+ * Every behaviour behind these controls is unchanged. What changed is presentation: long paragraphs
+ * became a single line where the line is needed, and disappeared where the control already said it.
  *
- * Three honesty rules shape the content:
+ * Three honesty rules still shape what appears:
  *
- *  1. **Only implemented controls appear.** The sound, vibration and advance controls are all
- *     backed by behaviour that exists. There is no "play the Azan" switch, because no licensed
- *     recording ships; instead a card states that plainly and says what happens today.
- *  2. **Permission state is shown, not assumed.** Notification permission and exact-alarm access
- *     are separate permissions and are presented separately, each with its own explanation and its
- *     own action. Salah asks for each only when the user acts, and never nags.
- *  3. **Android's limits are stated.** Do Not Disturb, battery optimisation, delivery timing with
- *     inexact alarms and the fact that channel settings belong to the user are all spelled out, so
- *     nothing implies a guarantee Android does not offer.
+ *  1. **Only implemented controls appear.** Sound, vibration and advance are all backed by behaviour
+ *     that exists. There is no "play the Azan" switch, because no licensed recording ships; the Azan
+ *     card states that in one line.
+ *  2. **Permission state is shown, not assumed.** Notification permission and exact-alarm access are
+ *     separate, so they are separate rows with their own state and their own action.
+ *  3. **Android's limits are stated.** Do Not Disturb, battery management, delivery timing and channel
+ *     ownership are kept, in one short line each, so nothing implies a guarantee Android does not offer.
  *
  * It is the "Notifications & Adhan" category of the Settings overview, and it is also reached from the
- * calendar and Ramadan screens, which point here rather than growing reminder controls of their own.
- * The back action pops, so it returns to whichever of those opened it.
+ * calendar and Ramadan screens. The back action pops, so it returns to whichever of those opened it.
  */
 @Composable
 fun PrayerNotificationSettingsScreen(
@@ -105,17 +98,12 @@ fun PrayerNotificationSettingsScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SalahSubpageHeader(
             title = stringResource(R.string.notifications_title),
             backContentDescription = stringResource(R.string.action_back),
             onBack = onBack,
-        )
-        Text(
-            text = stringResource(R.string.notifications_intro),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         PermissionCard(
@@ -137,39 +125,20 @@ fun PrayerNotificationSettingsScreen(
             },
         )
 
-        MasterSwitchCard(
-            enabled = uiState.settings.masterEnabled,
-            onEnabledChange = viewModel::setMasterEnabled,
-        )
-
-        ScheduleCard(
+        RemindersCard(
             uiState = uiState,
+            onMasterEnabledChange = viewModel::setMasterEnabled,
             onRecalculate = viewModel::recalculate,
         )
 
-        Text(
-            text = stringResource(R.string.notifications_prayers_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+        PrayersCard(
+            settings = uiState.settings,
+            onEnabledChange = viewModel::setPrayerEnabled,
+            onSoundChange = viewModel::setPrayerSound,
+            onVibrationChange = viewModel::setPrayerVibration,
+            onAdvanceShift = viewModel::shiftPrayerAdvance,
+            onPreview = viewModel::previewSound,
         )
-        Text(
-            text = stringResource(R.string.notifications_prayers_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        PrayerName.entries.forEach { prayer ->
-            PrayerCard(
-                prayer = prayer,
-                preference = uiState.settings.preferenceFor(prayer),
-                masterEnabled = uiState.settings.masterEnabled,
-                onEnabledChange = { viewModel.setPrayerEnabled(prayer, it) },
-                onSoundChange = { viewModel.setPrayerSound(prayer, it) },
-                onVibrationChange = { viewModel.setPrayerVibration(prayer, it) },
-                onAdvanceShift = { forward -> viewModel.shiftPrayerAdvance(prayer, forward) },
-                onPreview = viewModel::previewSound,
-            )
-        }
 
         SolarEventCard(
             enabled = uiState.settings.sunriseReminderEnabled,
@@ -201,12 +170,8 @@ private fun PermissionCard(
     onOpenAppNotificationSettings: () -> Unit,
 ) {
     SalahSectionCard {
-        Text(
-            text = stringResource(R.string.notifications_permission_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
+        SettingsGroupTitle(text = stringResource(R.string.notifications_permission_title))
+        Spacer(modifier = Modifier.height(2.dp))
 
         PermissionRow(
             label = stringResource(R.string.notifications_permission_notifications),
@@ -217,34 +182,31 @@ private fun PermissionCard(
             granted = uiState.permissions.exactAlarmsAllowed,
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.notifications_permission_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // The exact-alarm explanation is the only part of the old paragraph worth keeping, and only
+        // while it applies: it says what the missing permission actually costs.
+        if (!uiState.permissions.exactAlarmsAllowed) {
+            Spacer(modifier = Modifier.height(2.dp))
+            SettingsSupportingText(text = stringResource(R.string.notifications_permission_body))
+        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (!uiState.permissions.notificationsAllowed) {
-                Button(onClick = onRequestNotificationPermission) {
-                    Text(text = stringResource(R.string.notifications_permission_grant))
-                }
-            } else {
-                OutlinedButton(onClick = onOpenAppNotificationSettings) {
-                    Text(text = stringResource(R.string.notifications_permission_manage))
-                }
+        Spacer(modifier = Modifier.height(2.dp))
+        if (uiState.permissions.notificationsAllowed) {
+            TextButton(onClick = onOpenAppNotificationSettings) {
+                Text(text = stringResource(R.string.notifications_permission_manage))
             }
-
-            if (!uiState.permissions.exactAlarmsAllowed) {
-                OutlinedButton(onClick = onRequestExactAlarms) {
-                    Text(text = stringResource(R.string.notifications_exact_alarm_grant))
-                }
+        } else {
+            TextButton(onClick = onRequestNotificationPermission) {
+                Text(text = stringResource(R.string.notifications_permission_grant))
+            }
+        }
+        if (!uiState.permissions.exactAlarmsAllowed) {
+            TextButton(onClick = onRequestExactAlarms) {
+                Text(text = stringResource(R.string.notifications_exact_alarm_grant))
             }
         }
 
         if (uiState.permissions.exactAlarmFallbackInUse) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             SalahUnavailableNote(text = stringResource(R.string.notifications_exact_alarm_fallback))
         }
     }
@@ -253,7 +215,9 @@ private fun PermissionCard(
 @Composable
 private fun PermissionRow(label: String, granted: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -285,47 +249,43 @@ private fun PermissionRow(label: String, granted: Boolean) {
 }
 
 @Composable
-private fun MasterSwitchCard(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+private fun RemindersCard(
+    uiState: PrayerNotificationSettingsUiState,
+    onMasterEnabledChange: (Boolean) -> Unit,
+    onRecalculate: () -> Unit,
+) {
     SalahSectionCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.notifications_master_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Switch(checked = enabled, onCheckedChange = onEnabledChange)
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(
-                if (enabled) {
+        SettingsSwitchRow(
+            title = stringResource(R.string.notifications_master_title),
+            checked = uiState.settings.masterEnabled,
+            onCheckedChange = onMasterEnabledChange,
+            supporting = stringResource(
+                if (uiState.settings.masterEnabled) {
                     R.string.notifications_master_body_on
                 } else {
                     R.string.notifications_master_body_off
                 },
             ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
 
-@Composable
-private fun ScheduleCard(
-    uiState: PrayerNotificationSettingsUiState,
-    onRecalculate: () -> Unit,
-) {
-    SalahSectionCard {
-        Text(
-            text = stringResource(R.string.notifications_schedule_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        SettingsDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.notifications_schedule_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onRecalculate) {
+                Text(text = stringResource(R.string.notifications_schedule_recalculate))
+            }
+        }
 
         val summary = uiState.scheduleSummary
         when {
@@ -334,11 +294,7 @@ private fun ScheduleCard(
             }
 
             summary == null -> {
-                Text(
-                    text = stringResource(R.string.notifications_schedule_unknown),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                SettingsSupportingText(text = stringResource(R.string.notifications_schedule_unknown))
             }
 
             else -> {
@@ -352,7 +308,7 @@ private fun ScheduleCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (summary.datesWithoutSchedule > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     SalahUnavailableNote(
                         text = stringResource(
                             R.string.notifications_schedule_missing_dates,
@@ -363,21 +319,48 @@ private fun ScheduleCard(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.notifications_schedule_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        OutlinedButton(onClick = onRecalculate) {
-            Text(text = stringResource(R.string.notifications_schedule_recalculate))
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_schedule_body))
+    }
+}
+
+/**
+ * The five prayers, one row each, expanding into their own controls only when they are on.
+ *
+ * A single card rather than five: a disabled prayer is one switch row (or one muted row when the
+ * master switch is off), so a user who only wants Fajr and Maghrib scans five lines instead of five
+ * cards. Each prayer still owns its sound, vibration and advance reminder exactly as before.
+ */
+@Composable
+private fun PrayersCard(
+    settings: PrayerNotificationSettings,
+    onEnabledChange: (PrayerName, Boolean) -> Unit,
+    onSoundChange: (PrayerName, NotificationSound) -> Unit,
+    onVibrationChange: (PrayerName, Boolean) -> Unit,
+    onAdvanceShift: (PrayerName, Boolean) -> Unit,
+    onPreview: (NotificationSound) -> Unit,
+) {
+    SalahSectionCard {
+        SettingsGroupTitle(text = stringResource(R.string.notifications_prayers_title))
+
+        PrayerName.entries.forEachIndexed { index, prayer ->
+            if (index > 0) SettingsDivider()
+            PrayerRow(
+                prayer = prayer,
+                preference = settings.preferenceFor(prayer),
+                masterEnabled = settings.masterEnabled,
+                onEnabledChange = { onEnabledChange(prayer, it) },
+                onSoundChange = { onSoundChange(prayer, it) },
+                onVibrationChange = { onVibrationChange(prayer, it) },
+                onAdvanceShift = { forward -> onAdvanceShift(prayer, forward) },
+                onPreview = onPreview,
+            )
         }
     }
 }
 
 @Composable
-private fun PrayerCard(
+private fun PrayerRow(
     prayer: PrayerName,
     preference: PrayerNotificationPreference,
     masterEnabled: Boolean,
@@ -387,164 +370,77 @@ private fun PrayerCard(
     onAdvanceShift: (Boolean) -> Unit,
     onPreview: (NotificationSound) -> Unit,
 ) {
-    SalahSectionCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(prayer.labelRes()),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Switch(
-                checked = preference.enabled && masterEnabled,
-                onCheckedChange = onEnabledChange,
-                enabled = masterEnabled,
-            )
-        }
+    SettingsSwitchRow(
+        title = stringResource(prayer.labelRes()),
+        checked = preference.enabled && masterEnabled,
+        onCheckedChange = onEnabledChange,
+        enabled = masterEnabled,
+    )
 
-        if (!masterEnabled) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.notifications_prayer_master_off),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@SalahSectionCard
-        }
+    if (!masterEnabled || !preference.enabled) return
 
-        if (!preference.enabled) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.notifications_prayer_disabled),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@SalahSectionCard
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             text = stringResource(R.string.notifications_prayer_sound),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(modifier = Modifier.height(2.dp))
-
-        NotificationSound.entries.forEach { sound ->
-            ChoiceRow(
-                label = stringResource(sound.labelRes()),
-                hint = stringResource(sound.hintRes()),
-                selected = preference.sound == sound,
-                onClick = { onSoundChange(sound) },
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
         TextButton(onClick = { onPreview(preference.sound) }) {
             Text(text = stringResource(R.string.notifications_prayer_test_sound))
         }
+    }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.notifications_prayer_vibration),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.notifications_prayer_vibration_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = preference.vibration, onCheckedChange = onVibrationChange)
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.notifications_prayer_advance),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.notifications_prayer_advance_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = { onAdvanceShift(false) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(text = "−", style = MaterialTheme.typography.titleMedium)
-                }
-                Text(
-                    text = if (preference.advanceMinutes == 0) {
-                        stringResource(R.string.notifications_prayer_advance_off)
-                    } else {
-                        stringResource(
-                            R.string.notifications_prayer_advance_value,
-                            preference.advanceMinutes,
-                        )
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (preference.advanceMinutes == 0) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(min = 84.dp),
-                )
-                TextButton(
-                    onClick = { onAdvanceShift(true) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(text = "+", style = MaterialTheme.typography.titleMedium)
-                }
-            }
+    Column(modifier = Modifier.selectableGroup()) {
+        NotificationSound.entries.forEach { sound ->
+            val selected = preference.sound == sound
+            SettingsChoiceRow(
+                label = stringResource(sound.labelRes()),
+                selected = selected,
+                onClick = { onSoundChange(sound) },
+                // Only the chosen sound explains itself, so Silent cannot be mistaken for "no
+                // reminder" while the list itself stays three short lines.
+                hint = if (selected) stringResource(sound.hintRes()) else null,
+            )
         }
     }
+
+    SettingsDivider()
+
+    SettingsSwitchRow(
+        title = stringResource(R.string.notifications_prayer_vibration),
+        checked = preference.vibration,
+        onCheckedChange = onVibrationChange,
+    )
+
+    SettingsDivider()
+
+    SettingsStepperRow(
+        label = stringResource(R.string.notifications_prayer_advance),
+        value = if (preference.advanceMinutes == 0) {
+            stringResource(R.string.notifications_prayer_advance_off)
+        } else {
+            stringResource(R.string.notifications_prayer_advance_value, preference.advanceMinutes)
+        },
+        onDecrease = { onAdvanceShift(false) },
+        onIncrease = { onAdvanceShift(true) },
+        emphasized = preference.advanceMinutes != 0,
+    )
 }
 
 @Composable
 private fun SolarEventCard(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
     SalahSectionCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.notifications_solar_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Switch(checked = enabled, onCheckedChange = onEnabledChange)
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.notifications_solar_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        SettingsSwitchRow(
+            title = stringResource(R.string.notifications_solar_title),
+            checked = enabled,
+            onCheckedChange = onEnabledChange,
+            supporting = stringResource(R.string.notifications_solar_body),
         )
     }
 }
@@ -552,10 +448,9 @@ private fun SolarEventCard(enabled: Boolean, onEnabledChange: (Boolean) -> Unit)
 /**
  * Ramadan reminders.
  *
- * Two independent switches rather than one, because Sehri and Iftar are wanted at different times of
- * day and one of them may be redundant for a given user. Both are backed by real scheduling: they use
- * the same planner, the same channels and the same reconciliation as the prayer reminders, and they are
- * only ever scheduled for the dates the calendar places inside Ramadan.
+ * Two independent switches, because Sehri and Iftar are wanted at different times of day and one may
+ * be redundant for a given user. Both use the same planner, channels and reconciliation as the prayer
+ * reminders, and are only scheduled for the dates the calendar places inside Ramadan.
  */
 @Composable
 private fun RamadanReminderCard(
@@ -567,29 +462,14 @@ private fun RamadanReminderCard(
     onImsakEnabledChange: (Boolean) -> Unit,
 ) {
     SalahSectionCard {
-        Text(
-            text = stringResource(R.string.notifications_ramadan_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = stringResource(R.string.notifications_ramadan_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        SettingsGroupTitle(text = stringResource(R.string.notifications_ramadan_title))
+        Spacer(modifier = Modifier.height(2.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_ramadan_body))
 
-        if (!settings.masterEnabled) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.notifications_prayer_master_off),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@SalahSectionCard
-        }
+        if (!settings.masterEnabled) return@SalahSectionCard
 
-        Spacer(modifier = Modifier.height(10.dp))
+        SettingsDivider()
+
         RamadanReminderRow(
             title = stringResource(R.string.notifications_ramadan_sehri),
             body = stringResource(R.string.notifications_ramadan_sehri_body),
@@ -603,7 +483,7 @@ private fun RamadanReminderCard(
             onLeadShift = onSehriLeadShift,
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        SettingsDivider()
 
         RamadanReminderRow(
             title = stringResource(R.string.notifications_ramadan_iftar),
@@ -619,37 +499,20 @@ private fun RamadanReminderCard(
             onLeadShift = onIftarLeadShift,
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        SettingsDivider()
 
-        // The precautionary Imsak reminder. It has no lead stepper of its own: its time is the Imsak
-        // interval relative to Fajr, configured on the Ramadan screen, and the reminder simply fires at
-        // Imsak. Without a configured interval the planner schedules nothing, so the body says so.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.notifications_ramadan_imsak),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.notifications_ramadan_imsak_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            SalahSwitch(checked = settings.imsakReminderEnabled, onCheckedChange = onImsakEnabledChange)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.notifications_ramadan_source_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // The precautionary Imsak reminder has no lead stepper of its own: its time is the Imsak
+        // interval relative to Fajr, configured on the Ramadan screen, and the reminder fires at
+        // Imsak. Without a configured interval the planner schedules nothing, which the body says.
+        SettingsSwitchRow(
+            title = stringResource(R.string.notifications_ramadan_imsak),
+            checked = settings.imsakReminderEnabled,
+            onCheckedChange = onImsakEnabledChange,
+            supporting = stringResource(R.string.notifications_ramadan_imsak_body),
         )
+
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_ramadan_source_note))
     }
 }
 
@@ -663,30 +526,17 @@ private fun RamadanReminderRow(
     leadValue: String,
     onLeadShift: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // The same switch the Ramadan page draws. These are the same two reminders the Ramadan card
-        // switches, and an off state has to be as visible on this screen as it is on that one.
-        SalahSwitch(checked = enabled, onCheckedChange = onEnabledChange)
-    }
+    SettingsSwitchRow(
+        title = title,
+        checked = enabled,
+        onCheckedChange = onEnabledChange,
+        supporting = body,
+    )
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -694,69 +544,58 @@ private fun RamadanReminderRow(
             text = leadLabel,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(end = 8.dp),
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(
-                onClick = { onLeadShift(false) },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                enabled = enabled,
-            ) {
-                Text(text = "−", style = MaterialTheme.typography.titleMedium)
-            }
-            Text(
-                text = leadValue,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(min = 96.dp),
-            )
-            TextButton(
-                onClick = { onLeadShift(true) },
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                enabled = enabled,
-            ) {
-                Text(text = "+", style = MaterialTheme.typography.titleMedium)
-            }
-        }
+        SettingsStepper(
+            value = leadValue,
+            onDecrease = { onLeadShift(false) },
+            onIncrease = { onLeadShift(true) },
+            emphasized = enabled,
+            enabled = enabled,
+            valueMinWidth = 88.dp,
+        )
     }
 }
 
 @Composable
 private fun AzanCard(uiState: PrayerNotificationSettingsUiState) {
     SalahSectionCard {
-        Text(
-            text = stringResource(R.string.notifications_azan_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        SalahStatusPill(
-            text = stringResource(
-                if (uiState.azanAvailable) {
-                    R.string.notifications_azan_available
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SettingsGroupTitle(
+                text = stringResource(R.string.notifications_azan_title),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+            )
+            SalahStatusPill(
+                text = stringResource(
+                    if (uiState.azanAvailable) {
+                        R.string.notifications_azan_available
+                    } else {
+                        R.string.notifications_azan_unavailable
+                    },
+                ),
+                containerColor = if (uiState.azanAvailable) {
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    R.string.notifications_azan_unavailable
+                    MaterialTheme.colorScheme.surfaceVariant
                 },
-            ),
-            containerColor = if (uiState.azanAvailable) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-            contentColor = if (uiState.azanAvailable) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+                contentColor = if (uiState.azanAvailable) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(
             text = stringResource(
                 if (uiState.azanAvailable) {
                     R.string.notifications_azan_body_available
@@ -764,16 +603,12 @@ private fun AzanCard(uiState: PrayerNotificationSettingsUiState) {
                     R.string.notifications_azan_body_unavailable
                 },
             ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         uiState.azanAttribution?.let { attribution ->
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsSupportingText(
                 text = stringResource(R.string.notifications_azan_attribution, attribution),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -782,31 +617,16 @@ private fun AzanCard(uiState: PrayerNotificationSettingsUiState) {
 @Composable
 private fun LimitationsCard(uiState: PrayerNotificationSettingsUiState) {
     SalahSectionCard {
-        Text(
-            text = stringResource(R.string.notifications_limitations_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.notifications_limitations_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.notifications_channel_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.notifications_offline_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        SettingsGroupTitle(text = stringResource(R.string.notifications_limitations_title))
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_limitations_body))
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_channel_note))
+        Spacer(modifier = Modifier.height(4.dp))
+        SettingsSupportingText(text = stringResource(R.string.notifications_offline_note))
+
         if (!uiState.permissions.notificationsAllowed) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             SalahStatusPill(
                 text = stringResource(R.string.notifications_status_no_permission),
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -841,37 +661,6 @@ private fun MessageBlock(message: NotificationSettingsMessage?) {
         style = MaterialTheme.typography.bodySmall,
         color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
     )
-}
-
-@Composable
-private fun ChoiceRow(
-    label: String,
-    hint: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Column(modifier = Modifier.padding(start = 4.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            Text(
-                text = hint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
 }
 
 /** Opens the per-app notification settings page, which exists at every supported API level. */

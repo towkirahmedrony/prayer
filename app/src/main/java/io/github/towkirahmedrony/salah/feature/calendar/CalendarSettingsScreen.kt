@@ -1,35 +1,31 @@
 package io.github.towkirahmedrony.salah.feature.calendar
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSubpageHeader
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsChoiceRow
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsGroupTitle
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsStepper
+import io.github.towkirahmedrony.salah.core.designsystem.components.SettingsSupportingText
 import io.github.towkirahmedrony.salah.core.model.CalendarSettings
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.DateLanguagePreference
@@ -49,13 +45,16 @@ import org.koin.androidx.compose.koinViewModel
  *  - the **date language**, which chooses whether dates are rendered in Bangla or in Latin script and
  *    numerals.
  *
+ * The copy is deliberately short: each option carries at most one line saying what it is, and the
+ * estimate warning that matters is stated once, next to the control that changes it. No calculation,
+ * conversion or offset logic lives on this screen; it only reads and writes the stored preference.
+ *
  * It is the "Calendar" category of Settings, reachable from the Settings overview as well as from the
  * Calendar screen. The back action pops, which returns to whichever of the two opened it.
  *
  * What is deliberately absent: a Ramadan reminder section. Those settings live with the other prayer
  * reminders, on the notifications screen, so that there is one place that owns notification
- * permissions, channels and scheduling, and so the Ramadan reminders cannot drift away from the
- * subsystem they depend on. The screen says where they are and links there.
+ * permissions, channels and scheduling. This screen says where they are and links there.
  */
 @Composable
 fun CalendarSettingsScreen(
@@ -71,186 +70,101 @@ fun CalendarSettingsScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SalahSubpageHeader(
             title = stringResource(R.string.calendar_settings_title),
             backContentDescription = stringResource(R.string.action_back),
             onBack = onBack,
         )
-        Text(
-            text = stringResource(R.string.calendar_settings_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         SalahSectionCard {
-            Text(
-                text = stringResource(R.string.calendar_default_view_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.calendar_default_view_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            CalendarSystem.entries.forEach { system ->
-                ChoiceRow(
-                    label = stringResource(system.displayNameRes()),
-                    hint = stringResource(system.hintRes()),
-                    selected = settings.preferredSystem == system,
-                    onClick = { viewModel.setPreferredSystem(system) },
-                )
+            SettingsGroupTitle(text = stringResource(R.string.calendar_default_view_title))
+            Spacer(modifier = Modifier.height(2.dp))
+            SettingsSupportingText(text = stringResource(R.string.calendar_default_view_body))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Column(modifier = Modifier.selectableGroup()) {
+                CalendarSystem.entries.forEach { system ->
+                    val selected = settings.preferredSystem == system
+                    SettingsChoiceRow(
+                        label = stringResource(system.displayNameRes()),
+                        selected = selected,
+                        onClick = { viewModel.setPreferredSystem(system) },
+                        // Only the chosen view explains itself, so the three options stay one line
+                        // each and the longest hint in the list is never shown three times.
+                        hint = if (selected) stringResource(system.hintRes()) else null,
+                    )
+                }
             }
         }
 
         SalahSectionCard {
-            Text(
-                text = stringResource(R.string.calendar_hijri_adjustment_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.calendar_hijri_adjustment_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+            SettingsGroupTitle(text = stringResource(R.string.calendar_hijri_adjustment_title))
+            Spacer(modifier = Modifier.height(2.dp))
+            SettingsSupportingText(text = stringResource(R.string.calendar_hijri_adjustment_body))
+            Spacer(modifier = Modifier.height(2.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
             ) {
-                TextButton(
-                    onClick = { viewModel.shiftHijriAdjustment(-1) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(text = "−", style = MaterialTheme.typography.titleMedium)
-                }
-                Text(
-                    text = stringResource(
+                SettingsStepper(
+                    value = stringResource(
                         R.string.calendar_hijri_adjustment_value,
                         signedDayCount(settings.hijriAdjustmentDays),
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    onDecrease = { viewModel.shiftHijriAdjustment(-1) },
+                    onIncrease = { viewModel.shiftHijriAdjustment(1) },
                     // The default is the Bangladesh-aligned offset, not zero, so "at the default" is
                     // compared against the model's constant rather than against a hard-coded 0.
-                    color = if (settings.hijriAdjustmentDays ==
-                        CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS
-                    ) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(min = 140.dp),
+                    emphasized = settings.hijriAdjustmentDays !=
+                        CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS,
+                    valueMinWidth = 120.dp,
                 )
-                TextButton(
-                    onClick = { viewModel.shiftHijriAdjustment(1) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(text = "+", style = MaterialTheme.typography.titleMedium)
-                }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
+
+            SettingsSupportingText(
                 text = stringResource(
                     R.string.calendar_hijri_adjustment_range,
                     CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
                     CalendarSettings.MAX_HIJRI_ADJUSTMENT_DAYS,
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
             if (settings.hijriAdjustmentDays != CalendarSettings.DEFAULT_HIJRI_ADJUSTMENT_DAYS) {
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = viewModel::resetHijriAdjustment) {
+                TextButton(onClick = viewModel::resetHijriAdjustment) {
                     Text(text = stringResource(R.string.calendar_hijri_adjustment_reset))
                 }
             }
         }
 
         SalahSectionCard {
-            Text(
-                text = stringResource(R.string.calendar_language_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.calendar_language_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            DateLanguagePreference.entries.forEach { preference ->
-                ChoiceRow(
-                    label = stringResource(preference.labelRes()),
-                    hint = null,
-                    selected = settings.dateLanguage == preference,
-                    onClick = { viewModel.setDateLanguage(preference) },
-                )
+            SettingsGroupTitle(text = stringResource(R.string.calendar_language_title))
+            Spacer(modifier = Modifier.height(2.dp))
+            SettingsSupportingText(text = stringResource(R.string.calendar_language_body))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Column(modifier = Modifier.selectableGroup()) {
+                DateLanguagePreference.entries.forEach { preference ->
+                    SettingsChoiceRow(
+                        label = stringResource(preference.labelRes()),
+                        selected = settings.dateLanguage == preference,
+                        onClick = { viewModel.setDateLanguage(preference) },
+                    )
+                }
             }
         }
 
         SalahSectionCard {
-            Text(
-                text = stringResource(R.string.calendar_sources_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.calendar_sources_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.calendar_reminders_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(onClick = onOpenNotifications) {
+            SettingsGroupTitle(text = stringResource(R.string.calendar_sources_title))
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsSupportingText(text = stringResource(R.string.calendar_sources_body))
+            Spacer(modifier = Modifier.height(4.dp))
+            SettingsSupportingText(text = stringResource(R.string.calendar_reminders_note))
+            Spacer(modifier = Modifier.height(2.dp))
+            TextButton(onClick = onOpenNotifications) {
                 Text(text = stringResource(R.string.calendar_open_notifications))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChoiceRow(
-    label: String,
-    hint: String?,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Column(modifier = Modifier.padding(start = 4.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-            hint?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
