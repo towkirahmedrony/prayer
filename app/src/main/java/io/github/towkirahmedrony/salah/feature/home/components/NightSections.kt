@@ -23,13 +23,15 @@ import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 
 /**
- * The night interval card: Islamic midnight, the start of the last third, Tahajjud, the phase of the
- * moment being shown, and a countdown to the next boundary.
+ * The night interval card shown on the prayer-timetable details page: night duration, Islamic
+ * midnight, the start of the last third, the phase of the moment being shown, and a countdown to the
+ * next boundary. It is off the Home dashboard by default.
  *
  * Every value comes from `HomeUiState.Ready.night`, already resolved; this composable formats nothing
  * and decides nothing, so it cannot disagree with the timetable or recompute any astronomy. When the
- * interval cannot be built the card explains the gap instead of showing an invented boundary, and it
- * states that Tahajjud is voluntary and its start is a convention rather than presenting a ruling.
+ * interval cannot be built the card explains the gap instead of showing an invented boundary.
+ * Tahajjud is not stated here; the Nafl card owns its Isha-to-Fajr window and its last-third
+ * recommended time.
  */
 @Composable
 fun NightPeriodsCard(
@@ -53,7 +55,6 @@ fun NightPeriodsCard(
             StatRow(label = stringResource(R.string.home_night_duration), value = night.durationLabel)
             StatRow(label = stringResource(R.string.home_night_islamic_midnight), value = night.islamicMidnightLabel)
             StatRow(label = stringResource(R.string.home_night_last_third), value = night.lastThirdStartsLabel)
-            StatRow(label = stringResource(R.string.home_night_tahajjud), value = night.tahajjudStartsLabel)
         }
 
         Spacer(modifier = Modifier.height(10.dp))

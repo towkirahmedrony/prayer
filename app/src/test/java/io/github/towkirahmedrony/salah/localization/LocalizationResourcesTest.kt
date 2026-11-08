@@ -268,6 +268,32 @@ class LocalizationResourcesTest {
         )
     }
 
+    @Test
+    fun `the Nafl category is named Nafl in English and Bengali, and the night card states the required labels`() {
+        val english = englishStrings()
+        val bengali = bengaliStrings()
+
+        assertEquals("Nafl prayers", english.getValue("home_card_nafl_title"))
+        assertEquals("Nafl prayers", english.getValue("nafl_page_title"))
+        assertTrue(english.getValue("nafl_home_note").startsWith("Nafl prayers"))
+        assertEquals("Night duration", english.getValue("home_night_duration"))
+        assertEquals("Islamic midnight", english.getValue("home_night_islamic_midnight"))
+        assertEquals("Last third of night", english.getValue("home_night_last_third"))
+        assertTrue(english.getValue("nafl_last_third_begins").contains("Recommended Tahajjud"))
+
+        listOf(
+            "home_card_nafl_title",
+            "nafl_page_title",
+            "nafl_home_note",
+            "home_night_duration",
+            "home_night_last_third",
+            "nafl_last_third_begins",
+        ).forEach { key ->
+            val value = bengali.getValue(key)
+            assertTrue("$key is still written in Latin script: $value", value.any { it.inBengaliBlock() })
+        }
+    }
+
     // --- Tools and Settings: the surfaces completed after Home and the Calendar -----
 
     @Test
@@ -878,6 +904,45 @@ class LocalizationResourcesTest {
             "home_qibla_bearing",
             "home_qibla_distance",
             "home_qibla_open",
+            // The night-period card (prayer-timetable details page): duration, midnight, last third.
+            "home_night_title",
+            "home_night_note",
+            "home_night_duration",
+            "home_night_islamic_midnight",
+            "home_night_last_third",
+            "home_night_phase_early",
+            "home_night_phase_late",
+            "home_night_phase_last_third",
+            "home_night_outside",
+            "home_night_countdown_midnight",
+            "home_night_countdown_last_third",
+            "home_night_countdown_fajr",
+            // The solar-geometry card.
+            "home_solar_geometry_title",
+            "home_solar_midnight",
+            "home_solar_day_length",
+            "home_solar_night_length",
+            "home_solar_geometry_note",
+            "home_prohibited_note",
+            // The Nafl prayers: card, detail page and notes.
+            "home_card_nafl_title",
+            "home_card_nafl_description",
+            "nafl_duha",
+            "nafl_awwabin",
+            "nafl_tahajjud",
+            "nafl_status_open",
+            "nafl_status_next_dawn",
+            "nafl_duha_preferred",
+            "nafl_last_third_begins",
+            "nafl_page_title",
+            "nafl_home_note",
+            "nafl_note_duha",
+            "nafl_note_awwabin",
+            "nafl_note_disliked",
+            "home_hero_status_nafl",
+            "home_hero_status_prohibited",
+            "home_hero_prohibited_left",
+            "home_prayer_status_later",
         )
 
         /**

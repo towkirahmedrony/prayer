@@ -78,7 +78,7 @@ class HomeUiStateFactory(
      * be resolved here rather than by the compass screen.
      */
     private val qiblaCalculator: QiblaCalculator = QiblaCalculator(),
-    /** The voluntary-prayer periods, derived from the prohibited windows and the night periods. */
+    /** The Nafl-prayer periods, derived from the prohibited windows, Isha and the night interval. */
     private val naflCalculator: NaflPrayerCalculator = NaflPrayerCalculator(),
 ) {
 
@@ -185,14 +185,16 @@ class HomeUiStateFactory(
             timeFormatter = timeFormatter,
         )
 
-        // The voluntary prayers read what the screen already calculated: the prohibited windows bound
-        // Duha, the night periods bound Tahajjud. Nothing here is a second calculation.
+        // The Nafl prayers read what the screen already calculated: the prohibited windows bound
+        // Duha, the displayed Isha opens Tahajjud (valid to the following Fajr), and the night
+        // interval supplies the last third as Tahajjud's recommended start. Nothing here is a second
+        // calculation.
         val prohibitedPeriods = (prohibitedState as? ProhibitedPeriodsState.Available)?.periods.orEmpty()
         val nightPeriods = (nightState as? NightPeriodsState.Available)?.periods
         val naflDay = naflCalculator.calculate(
             schedule = schedule,
             prohibited = prohibitedPeriods,
-            tahajjudStartsAt = nightPeriods?.tahajjudStartsAt,
+            ishaStartsAt = schedule?.timeOf(PrayerName.ISHA),
             lastThirdStartsAt = nightPeriods?.lastThirdStartsAt,
             fajrEndsAt = nextDayFajr,
         )
@@ -378,7 +380,7 @@ class HomeUiStateFactory(
     }
 
     /**
-     * The voluntary prayers for the Home card and the Prayer screen.
+     * The Nafl prayers for the Home card and the Prayer screen.
      *
      * A period that cannot be stated is simply absent; the section is only marked unavailable when no
      * period at all could be derived, so a missing prohibited-rule set does not hide Awwabin.
@@ -806,7 +808,6 @@ class HomeUiStateFactory(
                 durationLabel = CountdownFormatter.formatCompact(periods.duration),
                 islamicMidnightLabel = timeFormatter.format(periods.islamicMidnight),
                 lastThirdStartsLabel = timeFormatter.format(periods.lastThirdStartsAt),
-                tahajjudStartsLabel = timeFormatter.format(periods.tahajjudStartsAt),
                 nextBoundary = upcoming?.boundary,
                 countdown = upcoming?.let { CountdownFormatter.format(it.remaining) },
                 convention = state.convention,
@@ -819,7 +820,6 @@ class HomeUiStateFactory(
             durationLabel = null,
             islamicMidnightLabel = null,
             lastThirdStartsLabel = null,
-            tahajjudStartsLabel = null,
             nextBoundary = null,
             countdown = null,
             convention = null,

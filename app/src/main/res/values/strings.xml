@@ -79,16 +79,15 @@
     <string name="prohibited_convention_reviewed">These boundaries were confirmed by a qualified reviewer, together with the references recorded for them.</string>
 
     <!--
-      Home: the night-period card. The interval is Maghrib to the following Fajr; the boundaries are
-      derived from it. Tahajjud is voluntary night prayer and its start is a documented convention,
-      not a ruling, which is why the note says so instead of asserting it.
+      Prayer-timetable details: the night-period card (off the Home dashboard by default). The interval
+      is Maghrib to the following Fajr; the boundaries are derived from it. Tahajjud is Nafl night
+      prayer, valid after Isha and before Fajr; the last third is its recommended time, not its start.
     -->
     <string name="home_night_title">Night periods</string>
-    <string name="home_night_note">The night interval runs from Maghrib to the next Fajr. Islamic midnight and the last third are derived from that interval. Tahajjud is voluntary night prayer; Salah begins it at the last third, which is one convention among several.</string>
-    <string name="home_night_duration">Night interval</string>
+    <string name="home_night_note">The night interval runs from Maghrib to the next Fajr. Islamic midnight and the last third are derived from that interval. Tahajjud may be prayed after Isha and before Fajr; the last third is its recommended time.</string>
+    <string name="home_night_duration">Night duration</string>
     <string name="home_night_islamic_midnight">Islamic midnight</string>
-    <string name="home_night_last_third">Last third begins</string>
-    <string name="home_night_tahajjud">Tahajjud begins</string>
+    <string name="home_night_last_third">Last third of night</string>
     <string name="home_night_phase_early">First half of the night</string>
     <string name="home_night_phase_late">Second half of the night</string>
     <string name="home_night_phase_last_third">Last third of the night</string>
@@ -1122,7 +1121,7 @@
     <string name="home_card_ramadan_title">Ramadan</string>
     <string name="home_card_ramadan_description">Sehri and Iftar while Ramadan is in progress or near.</string>
     <string name="home_card_night_title">Night periods</string>
-    <string name="home_card_night_description">Islamic midnight, the last third and Tahajjud for tonight.</string>
+    <string name="home_card_night_description">Night duration, Islamic midnight and the last third of the night.</string>
     <string name="home_card_daily_tools_title">Daily tools</string>
     <string name="home_card_daily_tools_description">Shortcuts to the Qibla compass, calendar, Ramadan and tools.</string>
     <string name="home_card_solar_geometry_title">Solar geometry</string>
@@ -1163,12 +1162,12 @@
     <string name="mosque_zoom_in">Zoom in</string>
     <string name="mosque_zoom_out">Zoom out</string>
 
-    <!-- Home: the voluntary (nafl) prayers, the hero ring's prohibited-time reading and the timetable's "later today" label. -->
+    <!-- Home: the Nafl prayers, the hero ring's prohibited-time reading and the timetable's "later today" label. -->
     <string name="home_hero_status_nafl">NAFL</string>
     <string name="home_hero_status_prohibited">PROHIBITED TIME</string>
     <string name="home_hero_prohibited_left">Prohibited · %1$s left</string>
     <string name="home_prayer_status_later">Later today</string>
-    <string name="home_card_nafl_title">Voluntary prayers</string>
+    <string name="home_card_nafl_title">Nafl prayers</string>
     <string name="home_card_nafl_description">Duha, Awwabin and Tahajjud, with the time of each.</string>
     <string name="nafl_duha">Duha</string>
     <string name="nafl_awwabin">Awwabin</string>
@@ -1176,10 +1175,10 @@
     <string name="nafl_status_open">Open now</string>
     <string name="nafl_status_next_dawn">Before dawn</string>
     <string name="nafl_duha_preferred">Preferred from %1$s</string>
-    <string name="nafl_last_third_begins">The last third of the night begins at %1$s.</string>
-    <string name="nafl_page_title">Voluntary prayers</string>
-    <string name="nafl_home_note">Voluntary prayers are not part of the five. These times are Salah\'s own documented conventions, not rulings.</string>
+    <string name="nafl_last_third_begins">Recommended Tahajjud time (last third of the night) begins at %1$s.</string>
+    <string name="nafl_page_title">Nafl prayers</string>
+    <string name="nafl_home_note">Nafl prayers are not part of the five. These times are Salah\'s own documented conventions, not rulings.</string>
     <string name="nafl_note_duha">Duha opens when the disliked time after sunrise ends and closes before the zawal interval begins. Some scholars call the early part Ishraq; Salah shows one Duha period. The preferred part begins a quarter of the way through the day.</string>
     <string name="nafl_note_awwabin">Six rak\'at after Maghrib called Awwabin is a tradition among South Asian Hanafis. Some scholars hold that the narrations for it are weak and that the hadith about the Awwabin prayer refers to Duha. Salah shows the tradition and does not rule between the views.</string>
-    <string name="nafl_note_disliked">In the Hanafi school voluntary prayer is also disliked after Fajr until sunrise and after Asr until sunset. That is a different category from the prohibited intervals and is not shown as prohibited time.</string>
+    <string name="nafl_note_disliked">In the Hanafi school Nafl prayer is also disliked after Fajr until sunrise and after Asr until sunset. That is a different category from the prohibited intervals and is not shown as prohibited time.</string>
 </resources>

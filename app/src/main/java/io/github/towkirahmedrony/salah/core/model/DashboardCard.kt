@@ -45,10 +45,10 @@ enum class DashboardCard(
     /** Sehri and Iftar while Ramadan is in progress, or how long until it begins. */
     RAMADAN("ramadan"),
 
-    /** Islamic midnight, the last third and Tahajjud for the coming night. */
-    NIGHT_PERIODS("night_periods"),
+    /** Islamic midnight, the last third and the night duration for the coming night. Shown on the prayer-timetable details page by default; off the Home dashboard by default. */
+    NIGHT_PERIODS("night_periods", defaultEnabled = false),
 
-    /** Duha, Awwabin and Tahajjud: the voluntary prayers whose times Salah states besides the five. */
+    /** Duha, Awwabin and Tahajjud: the Nafl prayers whose times Salah states besides the five. */
     NAFL("nafl"),
 
     /** Shortcuts to the Qibla compass, the calendar, Ramadan and the tools. */

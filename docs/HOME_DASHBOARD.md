@@ -36,7 +36,7 @@ Declaration order is the default order and the order new cards are appended in.
 | `forbidden_times` | on | `ForbiddenTimesCard`: the prohibited intervals around the day's solar events | `HomeUiState.prohibited` |
 | `calendar` | on | `CalendarCard`: today's Gregorian, Bangla and Hijri dates | `HomeUiState.gregorianSection`, `banglaSection`, `hijriSection` |
 | `ramadan` | on | `RamadanHomeCard`: Ramadan day, Sehri and Iftar, or days until it begins | `HomeUiState.ramadan` |
-| `night_periods` | on | `NightPeriodsCard`: Islamic midnight, the last third, Tahajjud | `HomeUiState.night` |
+| `night_periods` | off | `NightPeriodsCard`: night duration, Islamic midnight, the last third (shown on the prayer-timetable details page by default, off Home by default) | `HomeUiState.night` |
 | `daily_tools` | on | `DailyToolsSection`: shortcuts to Qibla, Calendar, Ramadan and Tools | navigation only |
 | `solar_geometry` | off | `SolarGeometryCard`: solar midnight, day and night length | `HomeUiState.solarDay` |
 | `qibla` | off | `QiblaHomeCard`: the Qibla bearing and distance from the saved location | `HomeUiState.qibla` |
@@ -166,12 +166,13 @@ or a single class:
 
 ---
 
-## 8. Voluntary prayers card (`nafl`)
+## 8. Nafl prayers card (`nafl`)
 
 `DashboardCard.NAFL` (id `nafl`, on by default, after `night_periods`) renders `NaflHomeCard`: Duha,
 Awwabin and Tahajjud with the time and standing of each, from `HomeUiState.nafl`. The periods come from
-`core/domain/nafl/NaflPrayerCalculator`, which reads the prohibited windows and the night periods the
-screen already calculated (see `docs/NAFL_PRAYERS.md`). The card's detail action opens the Prayer
+`core/domain/nafl/NaflPrayerCalculator`, which reads the prohibited windows, Isha and the night periods the
+screen already calculated (see `docs/NAFL_PRAYERS.md`). Tahajjud runs after Isha to Fajr; the last third
+is shown separately as its recommended time. The card's detail action opens the Prayer
 screen, where `NaflDetailCard` and `ProhibitedWindowsCard` give every period, the notes and the list of
 prohibited intervals.
 

@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.core.model.ProhibitedPeriod
 import io.github.towkirahmedrony.salah.core.model.SolarEvent
 import io.github.towkirahmedrony.salah.core.model.SolarEventEntry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -90,10 +91,11 @@ class NaflPrayerCalculatorTest {
     private fun dayOf(
         schedule: PrayerSchedule? = schedule(),
         prohibited: List<ProhibitedPeriod> = windows,
+        ishaStartsAt: ZonedDateTime? = at(18, 33),
     ): NaflDay = calculator.calculate(
         schedule = schedule,
         prohibited = prohibited,
-        tahajjudStartsAt = lastThird,
+        ishaStartsAt = ishaStartsAt,
         lastThirdStartsAt = lastThird,
         fajrEndsAt = fajrTomorrow,
     )
@@ -166,28 +168,41 @@ class NaflPrayerCalculatorTest {
     }
 
     @Test
-    fun `Tahajjud starts at the last third of the night and ends at Fajr`() {
+    fun `Tahajjud runs after Isha to Fajr and the last third is kept as the recommended start`() {
         val tahajjud = checkNotNull(day.tahajjud)
 
         assertEquals(NaflKind.TAHAJJUD, tahajjud.kind)
-        assertEquals(lastThird, tahajjud.startsAt)
+        assertEquals(at(18, 33), tahajjud.startsAt)
         assertEquals(fajrTomorrow, tahajjud.endsAt)
         assertEquals(lastThird, day.lastThirdStartsAt)
+        // The recommended window sits inside the valid window, across midnight.
+        assertTrue(day.lastThirdStartsAt!!.isAfter(tahajjud.startsAt))
+        assertTrue(day.lastThirdStartsAt!!.isBefore(tahajjud.endsAt))
+        assertTrue(tahajjud.contains(at(20, 0)))
+        assertTrue(tahajjud.contains(tomorrowAt(1, 30)))
+        assertTrue(tahajjud.contains(tomorrowAt(4, 0)))
+        assertFalse(tahajjud.contains(at(17, 0)))
+        assertFalse(tahajjud.contains(tomorrowAt(4, 52)))
     }
 
     @Test
-    fun `without the night anchors there is no Tahajjud`() {
+    fun `without Isha or Fajr there is no Tahajjud but the recommended start is still kept`() {
         val withoutNight = calculator.calculate(
             schedule = schedule(),
             prohibited = windows,
-            tahajjudStartsAt = null,
-            lastThirdStartsAt = null,
+            ishaStartsAt = null,
+            lastThirdStartsAt = lastThird,
             fajrEndsAt = null,
         )
 
         assertNull(withoutNight.tahajjud)
-        assertNull(withoutNight.lastThirdStartsAt)
+        assertEquals(lastThird, withoutNight.lastThirdStartsAt)
         assertEquals(day.duha, withoutNight.duha)
+    }
+
+    @Test
+    fun `Tahajjud is absent when Fajr is not after Isha`() {
+        assertNull(dayOf(ishaStartsAt = tomorrowAt(5, 0)).tahajjud)
     }
 
     @Test

@@ -36,10 +36,11 @@ data class UpcomingNightBoundary(
  *
  *  - Islamic midnight = `startsAt + N/2` — the exact midpoint of the interval.
  *  - the last third begins at `endsAt - N/3`.
- *  - Tahajjud begins at the point the convention selects (the last third by default).
  *
- * Nothing here is civil midnight and nothing here is the astronomical solar midnight: the midpoint
- * of a Maghrib-to-Fajr interval falls at a different clock time from both.
+ * Tahajjud is not derived here. Its valid window is after Isha to before Fajr, owned by the Nafl
+ * calculator; this interval supplies only the last-third instant that Nafl shows as the recommended
+ * time. Nothing here is civil midnight and nothing here is the astronomical solar midnight: the
+ * midpoint of a Maghrib-to-Fajr interval falls at a different clock time from both.
  *
  * **Boundary convention.** Every boundary is half-open in the same sense as the prayer periods and
  * the prohibited windows: a moment exactly at a boundary belongs to the period that *begins* there.
@@ -116,11 +117,6 @@ class NightPeriodCalculator(
             duration = duration,
             islamicMidnight = maghrib.plus(half),
             lastThirdStartsAt = fajr.minus(third),
-            tahajjudStartsAt = if (convention.tahajjudAnchoredToLastThird) {
-                fajr.minus(third)
-            } else {
-                maghrib.plus(half)
-            },
         )
     }
 

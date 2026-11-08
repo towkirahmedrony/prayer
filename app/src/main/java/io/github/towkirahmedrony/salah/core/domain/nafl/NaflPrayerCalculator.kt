@@ -9,7 +9,7 @@ import java.time.Duration
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-/** The voluntary (nafl) prayers whose time Salah states. None of them is one of the five. */
+/** The Nafl prayers whose time Salah states. None of them is one of the five. */
 enum class NaflKind {
     /** The forenoon prayer, from the end of the sunrise prohibition to the start of the zenith one. */
     DUHA,
@@ -17,7 +17,7 @@ enum class NaflKind {
     /** The prayer after Maghrib, from Maghrib to Isha (a Hanafi tradition; see docs/NAFL_PRAYERS.md). */
     AWWABIN,
 
-    /** The night prayer, from the start of the last third of the night to Fajr. */
+    /** The night prayer, valid after Isha to before Fajr; the last third is its recommended time. */
     TAHAJJUD,
 }
 
@@ -43,7 +43,8 @@ data class NaflPeriod(
  *
  * @param duhaPreferredFrom the start of the preferred part of Duha, a quarter of the day after
  *   sunrise. It is always inside [duha].
- * @param lastThirdStartsAt the start of the last third of the night, as the night calculator gave it.
+ * @param lastThirdStartsAt the start of the last third of the night, as the night calculator gave it:
+ *   the recommended start of [tahajjud], whose valid window is Isha to Fajr.
  */
 data class NaflDay(
     val duha: NaflPeriod?,
@@ -84,7 +85,8 @@ sealed interface NaflMoment {
  *    prohibition opens (or at Dhuhr, if Dhuhr is earlier), so Duha and a prohibited window can never
  *    overlap;
  *  - Awwabin is the displayed Maghrib to the displayed Isha;
- *  - Tahajjud is the night calculator's start to the following Fajr, both handed in by the caller.
+ *  - Tahajjud is the displayed Isha to the following Fajr (its valid window); the last third,
+ *    handed in by the caller, is shown separately as its recommended start.
  *
  * Both entry points are pure functions of their arguments; neither reads a clock.
  */
@@ -93,7 +95,7 @@ class NaflPrayerCalculator {
     fun calculate(
         schedule: PrayerSchedule?,
         prohibited: List<ProhibitedPeriod>,
-        tahajjudStartsAt: ZonedDateTime?,
+        ishaStartsAt: ZonedDateTime?,
         lastThirdStartsAt: ZonedDateTime?,
         fajrEndsAt: ZonedDateTime?,
     ): NaflDay {
@@ -104,8 +106,8 @@ class NaflPrayerCalculator {
             duha = duha,
             duhaPreferredFrom = duha?.let { preferredStartOf(schedule, it, zone) },
             awwabin = awwabinOf(schedule, zone),
-            tahajjud = if (tahajjudStartsAt != null && fajrEndsAt != null) {
-                period(NaflKind.TAHAJJUD, tahajjudStartsAt, fajrEndsAt, zone)
+            tahajjud = if (ishaStartsAt != null && fajrEndsAt != null) {
+                period(NaflKind.TAHAJJUD, ishaStartsAt, fajrEndsAt, zone)
             } else {
                 null
             },

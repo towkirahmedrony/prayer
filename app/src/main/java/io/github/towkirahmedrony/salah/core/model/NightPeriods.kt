@@ -21,7 +21,6 @@ import java.time.ZonedDateTime
  * @param duration the length of the interval.
  * @param islamicMidnight the exact midpoint of the interval.
  * @param lastThirdStartsAt the instant the final third of the interval begins.
- * @param tahajjudStartsAt the instant the Tahajjud period begins, under the applicable convention.
  */
 data class NightPeriods(
     val startsAt: ZonedDateTime,
@@ -29,28 +28,20 @@ data class NightPeriods(
     val duration: Duration,
     val islamicMidnight: ZonedDateTime,
     val lastThirdStartsAt: ZonedDateTime,
-    val tahajjudStartsAt: ZonedDateTime,
 )
 
 /**
  * The convention the boundaries in a [NightPeriods] were produced under.
  *
  * A night period is a derived calculation, not a quoted ruling: the *midpoint* and the *last third*
- * are arithmetic, but which of those a reader calls "Tahajjud" is a convention. It travels with the
- * periods so a screen can state which convention is in force instead of presenting one as universal.
+ * are arithmetic over the Maghrib-to-Fajr interval. Tahajjud is not anchored here — its valid window
+ * (after Isha to before Fajr) and its recommended time (the last third) are owned by the Nafl
+ * calculator, which reads Isha directly.
  */
 data class NightPeriodConvention(
     val id: String,
     /** Human readable name of the convention. */
     val label: String,
-    /**
-     * True when the Tahajjud period is anchored to the start of the last third of the night.
-     *
-     * This is the convention Salah ships (see `ConfiguredNightConvention`). It is carried on the
-     * convention rather than read as a constant so a different anchoring is a data change, and so a
-     * screen can say which one is being applied.
-     */
-    val tahajjudAnchoredToLastThird: Boolean,
 )
 
 /**

@@ -76,7 +76,7 @@ sealed interface HomeUiState {
         val solarRows: List<SolarRow>,
         /** The day's solar geometry: solar midnight and the measured day and night lengths. */
         val solarDay: SolarDaySection,
-        /** The night interval: Islamic midnight, the last third, Tahajjud and the next boundary. */
+        /** The night interval: night duration, Islamic midnight, the last third and the next boundary. */
         val night: NightSection,
         /**
          * The day's sunlight span — sunset minus sunrise — rendered as `11h 38m`, or `null` when the
@@ -111,7 +111,7 @@ sealed interface HomeUiState {
          * a placeholder.
          */
         val heroDates: List<CalendarHeadline> = emptyList(),
-        /** The voluntary prayers (Duha, Awwabin, Tahajjud) for the Home card and the Prayer screen. */
+        /** The Nafl prayers (Duha, Awwabin, Tahajjud) for the Home card and the Prayer screen. */
         val nafl: NaflSection = NaflSection.Unavailable,
         /**
          * What the hero ring says besides the fard period: an open prohibited window, or open Duha.
@@ -457,7 +457,8 @@ data class SolarDaySection(
  * Every label is already formatted: the composable decides nothing. [phase] is `null` when the
  * displayed moment is outside the interval (between one Fajr and the following Maghrib), which is a
  * fact about the timetable rather than a gap. [nextBoundary] and [countdown] are `null` once the
- * interval has ended for the night.
+ * interval has ended for the night. Tahajjud is not part of this section; the Nafl calculator owns
+ * its Isha-to-Fajr window and its last-third recommended time.
  */
 data class NightSection(
     val phase: NightPhase?,
@@ -465,7 +466,6 @@ data class NightSection(
     val durationLabel: String?,
     val islamicMidnightLabel: String?,
     val lastThirdStartsLabel: String?,
-    val tahajjudStartsLabel: String?,
     val nextBoundary: NightBoundary?,
     val countdown: String?,
     /** The convention the boundaries were derived under, so the screen can disclose it. */
@@ -510,7 +510,7 @@ data class ProvenanceSection(
     val offlineReady: Boolean,
 )
 
-/** One voluntary prayer's period, already formatted. */
+/** One Nafl prayer's period, already formatted. */
 data class NaflRow(
     val kind: NaflKind,
     val startLabel: String,
@@ -524,7 +524,7 @@ data class NaflRow(
     val preferredFromLabel: String? = null,
 )
 
-/** The voluntary prayers for today; [unavailable] is set only when no period could be stated. */
+/** The Nafl prayers for today; [unavailable] is set only when no period could be stated. */
 data class NaflSection(
     val rows: List<NaflRow>,
     val lastThirdStartsLabel: String?,

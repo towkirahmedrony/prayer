@@ -30,6 +30,8 @@ class DashboardConfigTest {
         // The occasional readings are off by default, so a fresh install opens on the daily routine.
         assertFalse(default.isEnabled(DashboardCard.SOLAR_GEOMETRY))
         assertFalse(default.isEnabled(DashboardCard.QIBLA))
+        // Night periods live on the prayer-timetable details page, not on Home by default.
+        assertFalse(default.isEnabled(DashboardCard.NIGHT_PERIODS))
         assertTrue(default.isEnabled(DashboardCard.NEXT_PRAYER))
         assertTrue(default.isEnabled(DashboardCard.TODAY_TIMETABLE))
     }
@@ -42,8 +44,8 @@ class DashboardConfigTest {
         assertFalse(hidden.enabledCards().contains(DashboardCard.FORBIDDEN_TIMES))
         // Position is preserved: the order is unchanged, only the hidden set grew.
         assertEquals(default.order, hidden.order)
-        // And nothing else moved.
-        assertTrue(hidden.isEnabled(DashboardCard.NIGHT_PERIODS))
+        // Night periods stay off the Home dashboard by default.
+        assertFalse(hidden.isEnabled(DashboardCard.NIGHT_PERIODS))
     }
 
     @Test

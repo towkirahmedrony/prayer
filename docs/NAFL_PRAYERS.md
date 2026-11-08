@@ -1,6 +1,6 @@
 # Nafl prayers: Duha, Awwabin, Tahajjud
 
-Voluntary prayers whose times Salah states **besides** the five. They are not in the five-prayer list.
+Nafl prayers whose times Salah states **besides** the five. They are not in the five-prayer list.
 Like the prohibited windows, these are Salah's **documented conventions, not rulings** — nothing here
 has been reviewed by a qualified scholar. Calculation: `core/domain/nafl/NaflPrayerCalculator`.
 
@@ -9,7 +9,8 @@ has been reviewed by a qualified scholar. Calculation: `core/domain/nafl/NaflPra
 | Duha | the end of the sunrise prohibition | the start of the zenith prohibition (or Dhuhr, if earlier) | `ProhibitedPeriodCalculator` windows |
 | Duha, preferred part | sunrise + a quarter of the day (sunset − sunrise) | end of Duha | schedule's sunrise and sunset |
 | Awwabin | displayed Maghrib | displayed Isha | the day's schedule |
-| Tahajjud | start of the last third of the night | following Fajr | `NightPeriodCalculator` |
+| Tahajjud (valid window) | displayed Isha | following Fajr | the day's Isha and the following day's Fajr |
+| Tahajjud (recommended) | start of the last third of the night | following Fajr | `NightPeriodCalculator` |
 
 Because Duha is bounded by the prohibited windows themselves, Duha and a prohibited window can never
 overlap or contradict each other, and a change to the prohibited policy moves Duha with it.
@@ -24,7 +25,7 @@ overlap or contradict each other, and a change to the prohibited policy moves Du
 - Awwabin: six rak'at after Maghrib is a subcontinental Hanafi tradition. Some scholars say the
   narrations for it are weak and that the hadith called "Awwabin" refers to Duha. Salah states the
   tradition and says so.
-- After Fajr until sunrise and after Asr until sunset, voluntary prayer is disliked in the Hanafi
+- After Fajr until sunrise and after Asr until sunset, Nafl prayer is disliked in the Hanafi
   school. That is a different category from the three prohibited windows and is **not** shown as
   "prohibited time".
 

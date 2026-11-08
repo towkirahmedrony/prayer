@@ -1065,13 +1065,12 @@
     <string name="prohibited_convention_not_reviewed">এই সীমাগুলো সালাহর নিজের নথিভুক্ত নীতি, এবং সেভাবেই দেখানো হয়েছে। কোনো যোগ্য পর্যালোচক এগুলো নিশ্চিত করেননি, এবং মিনিটের মান পণ্ডিতদের বিভিন্ন নিয়মে আলাদা হয়।</string>
     <string name="prohibited_convention_reviewed">একজন যোগ্য পর্যালোচক এই সীমাগুলো নিশ্চিত করেছেন, সাথে তাদের জন্য নথিভুক্ত রেফারেন্সসহ।</string>
 
-    <!-- রাতের সময়কাল: মাগরিব থেকে পরদিনের ফজর; তাহাজ্জুদ একটি নফল ইবাদত এবং তার সূচনা একটি নথিভুক্ত নিয়ম। -->
+    <!-- রাতের সময়কাল: মাগরিব থেকে পরদিনের ফজর। তাহাজ্জুদ ইশার পর থেকে ফজরের আগে নফল নামাজ; শেষ তৃতীয়াংশ এর উত্তম সময়। -->
     <string name="home_night_title">রাতের সময়গুলো</string>
-    <string name="home_night_note">রাতের বিরতি মাগরিব থেকে পরদিনের ফজর পর্যন্ত হিসাব করা হয়। ইসলামি মধ্যরাত ও শেষ তৃতীয়াংশ সেই বিরতি থেকেই নির্ণীত। তাহাজ্জুদ একটি নফল ইবাদত; সালাহ এটির সূচনা ধরে রাতের শেষ তৃতীয়াংশ থেকে, যা কয়েকটি নিয়মের একটি।</string>
-    <string name="home_night_duration">রাতের বিরতি</string>
+    <string name="home_night_note">রাতের বিরতি মাগরিব থেকে পরদিনের ফজর পর্যন্ত হিসাব করা হয়। ইসলামি মধ্যরাত ও শেষ তৃতীয়াংশ সেই বিরতি থেকেই নির্ণীত। তাহাজ্জুদ ইশার পর ও ফজরের আগে পড়া যায়; শেষ তৃতীয়াংশ এর উত্তম সময়।</string>
+    <string name="home_night_duration">রাতের বিরতির দৈর্ঘ্য</string>
     <string name="home_night_islamic_midnight">ইসলামি মধ্যরাত</string>
-    <string name="home_night_last_third">শেষ তৃতীয়াংশ শুরু</string>
-    <string name="home_night_tahajjud">তাহাজ্জুদ শুরু</string>
+    <string name="home_night_last_third">রাতের শেষ তৃতীয়াংশ</string>
     <string name="home_night_phase_early">রাতের প্রথমার্ধ</string>
     <string name="home_night_phase_late">রাতের দ্বিতীয়ার্ধ</string>
     <string name="home_night_phase_last_third">রাতের শেষ তৃতীয়াংশ</string>
@@ -1122,7 +1121,7 @@
     <string name="home_card_ramadan_title">রমজান</string>
     <string name="home_card_ramadan_description">রমজান চলাকালে বা নিকটে থাকলে সেহরি ও ইফতার।</string>
     <string name="home_card_night_title">রাতের সময়</string>
-    <string name="home_card_night_description">ইসলামিক মধ্যরাত, শেষ তৃতীয়াংশ ও তাহাজ্জুদ।</string>
+    <string name="home_card_night_description">রাতের দৈর্ঘ্য, ইসলামি মধ্যরাত ও রাতের শেষ তৃতীয়াংশ।</string>
     <string name="home_card_daily_tools_title">দৈনন্দিন টুল</string>
     <string name="home_card_daily_tools_description">কিবলা, ক্যালেন্ডার, রমজান ও টুলের শর্টকাট।</string>
     <string name="home_card_solar_geometry_title">সৌর হিসাব</string>
@@ -1176,7 +1175,7 @@
     <string name="nafl_status_open">এখন চলছে</string>
     <string name="nafl_status_next_dawn">পরদিন ভোরে</string>
     <string name="nafl_duha_preferred">উত্তম সময় %1$s থেকে</string>
-    <string name="nafl_last_third_begins">রাতের শেষ তৃতীয়াংশ শুরু হয় %1$s-এ।</string>
+    <string name="nafl_last_third_begins">সুপারিশকৃত তাহাজ্জুদ সময় (রাতের শেষ তৃতীয়াংশ) শুরু হয় %1$s-এ।</string>
     <string name="nafl_page_title">নফল নামাজ</string>
     <string name="nafl_home_note">নফল নামাজ পাঁচ ওয়াক্তের অংশ নয়। এই সময়গুলো সালাহর নিজের নথিভুক্ত নিয়ম, ফতোয়া নয়।</string>
     <string name="nafl_note_duha">সূর্যোদয়ের পরের মাকরূহ সময় শেষ হলে দোহার সময় শুরু হয় এবং জাওয়ালের নিষিদ্ধ সময় শুরুর আগে শেষ হয়। কিছু আলেম শুরুর অংশকে ইশরাক বলেন; সালাহ একটিই দোহার সময় দেখায়। উত্তম সময় দিনের এক-চতুর্থাংশ পার হওয়ার পর শুরু হয়।</string>

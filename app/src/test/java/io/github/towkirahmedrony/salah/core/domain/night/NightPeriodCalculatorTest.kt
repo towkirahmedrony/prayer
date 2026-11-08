@@ -28,8 +28,8 @@ import java.time.ZonedDateTime
  * the day and Fajr 04:39 the following day. The night interval is therefore 17:36 -> 04:39 next day,
  * a duration of 11h03m; Islamic midnight is its exact midpoint (23:07:30) and the last third begins
  * at 00:58. These pin the arithmetic; the definitions themselves are documented in
- * `docs/SOLAR_AND_NIGHT_PERIODS.md`, and the last-third anchoring of Tahajjud is a stated convention,
- * not a ruling.
+ * `docs/SOLAR_AND_NIGHT_PERIODS.md`. Tahajjud's Isha-to-Fajr window and its last-third recommended
+ * time are covered by `NaflPrayerCalculatorTest`, not here.
  */
 class NightPeriodCalculatorTest {
 
@@ -127,23 +127,13 @@ class NightPeriodCalculatorTest {
     }
 
     @Test
-    fun `Tahajjud begins at the last third under the shipped convention`() {
+    fun `the night interval carries the convention but no Tahajjud start`() {
         val state = calculator.calculate(today, tomorrow) as NightPeriodsState.Available
 
         assertEquals(ConfiguredNightConvention.ID, state.convention.id)
-        assertTrue(state.convention.tahajjudAnchoredToLastThird)
-        assertEquals(state.periods.lastThirdStartsAt, state.periods.tahajjudStartsAt)
-    }
-
-    @Test
-    fun `the alternative convention anchors Tahajjud to the midpoint instead`() {
-        val alternative = NightPeriodCalculator(
-            convention = ConfiguredNightConvention.DEFAULT.copy(tahajjudAnchoredToLastThird = false),
-        )
-        val state = alternative.calculate(today, tomorrow) as NightPeriodsState.Available
-
-        assertEquals(state.periods.islamicMidnight, state.periods.tahajjudStartsAt)
-        assertTrue(state.periods.tahajjudStartsAt.isBefore(state.periods.lastThirdStartsAt))
+        // Tahajjud is owned by the Nafl calculator (Isha to Fajr); the night interval only supplies
+        // the last-third boundary it shows as the recommended time.
+        assertEquals(at(date.plusDays(1), 0, 58), state.periods.lastThirdStartsAt)
     }
 
     // ---------------------------------------------------------------------------------- the phases

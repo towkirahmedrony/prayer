@@ -65,6 +65,7 @@ class DataStoreDashboardConfigTest {
         assertEquals(DashboardCard.entries.map { it.id }, config.order)
         assertTrue(config.isEnabled(DashboardCard.NEXT_PRAYER))
         assertFalse(config.isEnabled(DashboardCard.SOLAR_GEOMETRY))
+        assertFalse(config.isEnabled(DashboardCard.NIGHT_PERIODS))
     }
 
     @Test

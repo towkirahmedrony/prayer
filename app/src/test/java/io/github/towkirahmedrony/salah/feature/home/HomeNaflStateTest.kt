@@ -206,10 +206,28 @@ class HomeNaflStateTest {
         assertFalse(awwabin.isPassed)
 
         val tahajjud = nafl.rows.first { it.kind == NaflKind.TAHAJJUD }
-        assertEquals("01:01", tahajjud.startLabel)
+        // Valid window is after Isha (18:33) to Fajr; the last third (01:01) is the recommended time.
+        assertEquals("18:33", tahajjud.startLabel)
         assertEquals("04:52", tahajjud.endLabel)
-        assertTrue(tahajjud.startsNextDay)
+        assertFalse(tahajjud.startsNextDay)
+        assertTrue(tahajjud.endsNextDay)
         assertEquals("01:01", nafl.lastThirdStartsLabel)
+    }
+
+    @Test
+    fun `Tahajjud is open after Isha across midnight and passed after Fajr`() {
+        val evening = ready(at(20, 0)).nafl.rows.first { it.kind == NaflKind.TAHAJJUD }
+        assertTrue(evening.isOpen)
+        assertFalse(evening.isPassed)
+
+        val afterMidnight = ready(date.plusDays(1).atTime(1, 30).atZone(zone)).nafl.rows
+            .first { it.kind == NaflKind.TAHAJJUD }
+        assertTrue(afterMidnight.isOpen)
+
+        val afterFajr = ready(date.plusDays(1).atTime(5, 0).atZone(zone)).nafl.rows
+            .first { it.kind == NaflKind.TAHAJJUD }
+        assertTrue(afterFajr.isPassed)
+        assertFalse(afterFajr.isOpen)
     }
 
     @Test

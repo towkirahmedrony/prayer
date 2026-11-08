@@ -11,7 +11,7 @@ It exists to keep four things distinct, in the code as well as in the prose:
 1. **an astronomical event** — sunrise, the solar transit, sunset — produced by the engine;
 2. **the astronomical night** — the complement of the day length, sunset to sunrise;
 3. **the night interval** — effective Maghrib to the following effective Fajr, a *prayer-derived*
-   span used for Islamic midnight, the last third and Tahajjud;
+   span used for Islamic midnight and the last third (Tahajjud's recommended time);
 4. **a prohibited interval** — a policy around an event, described in its own document.
 
 None of these is interchangeable with civil midnight, and none of them is a ruling.
@@ -28,7 +28,8 @@ read those instants and the **effective** prayer times (Maghrib and Fajr) of the
 | Component | Input | What it does |
 |---|---|---|
 | `core/domain/solar/SolarDayResolver` | today's `PrayerSchedule` | reads solar noon, sunrise, sunset; derives solar midnight and the day/night lengths |
-| `core/domain/night/NightPeriodCalculator` | today's and the following day's `PrayerSchedule` | reads effective Maghrib and the following day's effective Fajr; derives Islamic midnight, the last third, Tahajjud and the phase |
+| `core/domain/night/NightPeriodCalculator` | today's and the following day's `PrayerSchedule` | reads effective Maghrib and the following day's effective Fajr; derives Islamic midnight, the last third and the phase |
+| `core/domain/nafl/NaflPrayerCalculator` | today's schedule, the prohibited windows, Isha and the following Fajr | derives Duha, Awwabin and Tahajjud (Isha to Fajr) with the last third as Tahajjud's recommended start |
 | `core/domain/prohibited/ProhibitedPeriodStatusResolver` | the day's windows | classifies them and selects the active/next one |
 
 Both resolvers are pure functions of their inputs and read **no clock**. The moment is passed in by
@@ -104,7 +105,6 @@ With `N = endsAt − startsAt`:
 |---|---|
 | Islamic midnight | `startsAt + N/2` — the exact midpoint of the interval |
 | Start of the last third | `endsAt − N/3` |
-| Tahajjud begins | the start of the last third under Salah's convention (§4) |
 | Fajr | `endsAt`, which closes the interval |
 
 For the reference Dhaka timetable (Maghrib 17:36, next Fajr 04:39, `N` = 11h03m): Islamic midnight is
@@ -139,27 +139,18 @@ reads no clock and performs no astronomy, so a countdown tick cannot trigger a r
 
 ---
 
-## 4. The convention, stated as a convention
+## 4. Tahajjud: valid window and recommended time
 
-The interval, the midpoint and the last third are arithmetic and need no convention. The only
-conventional choice is **where Tahajjud begins**, and Salah's convention is recorded in
-`ConfiguredNightConvention`:
-
-- **`tahajjudAnchoredToLastThird = true` (shipped):** Tahajjud runs from the start of the last third
-  to Fajr.
-- **`false`:** Tahajjud would run from Islamic midnight (the whole second half). Nothing else in the
-  code changes; it is one flag on the convention the calculator is given.
+The interval, the midpoint and the last third are arithmetic and need no convention. Tahajjud is not
+anchored to this interval. Its **valid window is after Isha to before Fajr**, derived by
+`NaflPrayerCalculator` from the displayed Isha and the following Fajr. The **last third is its
+recommended time**, shown separately from the last-third instant above; it is not the start of its
+valid window.
 
 `NightPeriodConvention.id` is recorded on the result and travels to the screen, so the interface can
-name which convention is in force. Salah does **not** claim the last-third anchoring is the only
-position, does not quote a source for it, and states on the card that:
-
-- Tahajjud is **voluntary** night prayer, not one of the five obligatory prayers;
-- conventions differ;
-- the calculated boundaries are derived times, not an official announcement.
-
-No ruling — what to pray, how many units, whether it may be offered at a different time — is encoded
-anywhere in this feature.
+name which interval is in force. No ruling — what to pray, how many units, whether it may be offered
+at a different time — is encoded anywhere in this feature. The night card is shown on the
+prayer-timetable details page and is off the Home dashboard by default.
 
 ---
 
@@ -186,9 +177,11 @@ Under `app/src/test/java/io/github/towkirahmedrony/salah/`:
   case; a leap day; each field being `null` when its event is absent; the absent-schedule case; the
   schedule's zone; a schedule for another day.
 - `core/domain/night/NightPeriodCalculatorTest` — the Maghrib-to-next-Fajr interval and its crossing
-  of civil midnight; Islamic midnight as the exact midpoint; the last third; both Tahajjud
-  conventions; every phase boundary, half-open; phases by absolute instant across zones; the next
-  boundary and its countdown at each stage; and every missing/invalid-input case.
+  of civil midnight; Islamic midnight as the exact midpoint; the last third; every phase boundary,
+  half-open; phases by absolute instant across zones; the next boundary and its countdown at each
+  stage; and every missing/invalid-input case.
+- `core/domain/nafl/NaflPrayerCalculatorTest` — Tahajjud after Isha to Fajr with the last third as the
+  recommended start, including the midnight crossing.
 - `core/domain/prohibited/ProhibitedPeriodSelectionTest` — the active and next selections across the
   day, at exact boundaries, and with an empty day.
 - `feature/home/HomeNightSectionTest` — the mapping of both new sections into `HomeUiState`, the
@@ -207,12 +200,12 @@ project; they pin the arithmetic, not any authority comparison.
 
 - **Solar midnight is an approximation** of the true lower culmination (§2), documented rather than
   hidden. A precise nadir solve was judged unnecessary for the latitudes the app targets.
-- **The Tahajjud anchoring is a convention**, not a quoted ruling; only the last third is shipped,
-  the alternative is representable, and either is disclosed as a convention (§4).
+- **Tahajjud's valid window is after Isha; the last third is recommended** (§4). The interval
+  boundary is a time calculation, not a quoted ruling.
 - **Neither value is aligned to any authority's published timetable.** That comparison has not been
   made anywhere in the repository, and nothing here claims it.
-- **The night interval spans two schedules**, so Islamic midnight, the last third and Tahajjud need
-  the following day's Fajr; until it is calculated the interval is reported unavailable rather than
+- **The night interval spans two schedules**, so Islamic midnight and the last third need the
+  following day's Fajr; until it is calculated the interval is reported unavailable rather than
   closed at a guessed boundary.
 - **No ruling is encoded.** This feature reports times and intervals; it does not say what may or may
   not be prayed in them.

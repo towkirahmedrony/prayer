@@ -39,7 +39,7 @@ private fun NaflKind.titleRes(): Int = when (this) {
 }
 
 /**
- * The Home card for the voluntary prayers: Duha, Awwabin and Tahajjud with their times and where each
+ * The Home card for the Nafl prayers: Duha, Awwabin and Tahajjud with their times and where each
  * stands. Every value is already resolved in the state; this composable formats and decides nothing.
  * The times are Salah's documented conventions, and the card says so rather than presenting a ruling.
  */
@@ -95,7 +95,7 @@ fun NaflHomeCard(
     }
 }
 
-/** The full voluntary-prayer detail for the Prayer screen: every period, the last third and the notes. */
+/** The full Nafl-prayer detail for the Prayer screen: every period, the recommended last third and the notes. */
 @Composable
 fun NaflDetailCard(
     state: HomeUiState.Ready,
