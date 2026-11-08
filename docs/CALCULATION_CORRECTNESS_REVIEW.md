@@ -384,7 +384,7 @@ code, but §8 does **not** infer offline behaviour from it alone — each item b
 | User settings | DataStore | Local persistent data |
 | Prayer schedules | **Not persisted** — recomputed in memory per request, cache bounded to 4 entries keyed by the full request (`data/prayer/ProviderBackedPrayerScheduleRepository.kt:44`, `:124-129`, `:172`) | Local calculation; no cache to go stale |
 | Reminder scheduling | Android `AlarmManager` — a platform facility, not a network service | Local platform |
-| Azan audio playback | **Not available**: no licensed recording is bundled, so the source resolves to `null` and playback reports unavailable (`di/SalahModules.kt:223`) | Local; deliberately inert |
+| Azan audio playback | **Bundled and offline**: `res/raw/azan.ogg` (CC0) is played by the Adhan notification channel; no network service is involved | Local asset; no remote dependency |
 
 *Remaining uncertainty:* none of this was exercised on a device — there is no `androidTest` source set, so
 permission prompts, Doze, alarm delivery and lifecycle resume are covered by pure-class tests and inference only.

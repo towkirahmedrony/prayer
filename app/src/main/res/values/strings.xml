@@ -835,9 +835,9 @@
     <string name="notifications_solar_body">Not one of the five prayers. Off by default.</string>
     <string name="notifications_azan_title">Azan playback</string>
     <string name="notifications_azan_available">Available</string>
-    <string name="notifications_azan_unavailable">Not available in this build</string>
-    <string name="notifications_azan_body_unavailable">No Azan recording is bundled, so reminders use the sound above. Adding a licensed recording is a one-line change to the audio source.</string>
-    <string name="notifications_azan_body_available">A licensed recording plays at the prayer time. Notifications and playback are separate.</string>
+    <string name="notifications_azan_unavailable">Unavailable</string>
+    <string name="notifications_azan_body_unavailable">No Adhan recording is available in this build, so reminders use the sound above.</string>
+    <string name="notifications_azan_body_available">The Adhan ships with Salah and plays offline. Choose \u201cAdhan\u201d as a prayer\'s sound above to use it.</string>
     <string name="notifications_azan_attribution">Recording: %1$s</string>
     <string name="notifications_limitations_title">Android limits</string>
     <string name="notifications_limitations_body">Do Not Disturb and battery settings can delay or silence a reminder. Salah uses Android\'s supported APIs and does not bypass them.</string>
@@ -854,6 +854,8 @@
     <string name="notification_sound_system_default_hint">The device\'s own sound.</string>
     <string name="notification_sound_salah_chime">Salah chime</string>
     <string name="notification_sound_salah_chime_hint">A short tone bundled with Salah.</string>
+    <string name="notification_sound_azan">Adhan</string>
+    <string name="notification_sound_azan_hint">The call to prayer, bundled with Salah. Plays offline.</string>
     <string name="notification_sound_silent">Silent</string>
     <string name="notification_sound_silent_hint">No sound, but the reminder still appears.</string>
 

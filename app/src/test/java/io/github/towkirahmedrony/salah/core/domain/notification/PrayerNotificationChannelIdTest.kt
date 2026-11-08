@@ -38,6 +38,10 @@ class PrayerNotificationChannelIdTest {
     fun `ids are stable strings with a shared prefix`() {
         assertEquals("salah_prayer_salah_chime_vibrate", PrayerNotificationChannelId.of(NotificationSound.SALAH_CHIME, true))
         assertEquals("salah_prayer_silent_quiet", PrayerNotificationChannelId.of(NotificationSound.SILENT, false))
+        // The Adhan gets its own ids rather than reusing an existing channel: Android pins a
+        // channel's sound at creation, so a new sound needs a new channel id to be heard at all.
+        assertEquals("salah_prayer_azan_vibrate", PrayerNotificationChannelId.of(NotificationSound.AZAN, true))
+        assertEquals("salah_prayer_azan_quiet", PrayerNotificationChannelId.of(NotificationSound.AZAN, false))
         PrayerNotificationChannelId.prayerChannels.forEach { id ->
             assertTrue(id.startsWith(PrayerNotificationChannelId.PREFIX))
         }

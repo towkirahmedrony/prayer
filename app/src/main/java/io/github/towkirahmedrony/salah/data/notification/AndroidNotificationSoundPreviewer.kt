@@ -16,9 +16,11 @@ import io.github.towkirahmedrony.salah.core.model.NotificationSound
  * Plays the actual sounds the user is choosing between.
  *
  * The preview plays the *same* asset the channel will use — the device's own notification sound for
- * [NotificationSound.SYSTEM_DEFAULT], the bundled chime for [NotificationSound.SALAH_CHIME] — rather
- * than a generic beep, so what the user hears is what they will get. Nothing is invented for the
- * preview, and a preview is clearly a preview: it plays once and never becomes a reminder.
+ * [NotificationSound.SYSTEM_DEFAULT], the bundled chime for [NotificationSound.SALAH_CHIME] and the
+ * bundled Adhan for [NotificationSound.AZAN] — rather than a generic beep, so what the user hears is
+ * what they will get. Nothing is invented for the preview, and a preview is clearly a preview: it
+ * plays once and never becomes a reminder. Choosing the Adhan starts the recording itself, which is
+ * long by nature; the next tap, or leaving the screen, stops it.
  *
  * One preview at a time. Starting a new preview stops the previous one, so tapping along the list
  * cannot produce overlapping audio, and the resources are released as soon as playback finishes.
@@ -41,7 +43,9 @@ class AndroidNotificationSoundPreviewer(
 
                 NotificationSound.SYSTEM_DEFAULT -> previewSystemDefault()
 
-                NotificationSound.SALAH_CHIME -> previewChime()
+                NotificationSound.SALAH_CHIME -> previewBundled(R.raw.salah_chime)
+
+                NotificationSound.AZAN -> previewBundled(R.raw.azan)
             }
         } catch (error: Exception) {
             stopPreview()
@@ -74,9 +78,9 @@ class AndroidNotificationSoundPreviewer(
         return true
     }
 
-    /** The bundled chime, played once. */
-    private fun previewChime(): Boolean {
-        val uri: Uri = "android.resource://${context.packageName}/${R.raw.salah_chime}".toUri()
+    /** A bundled `res/raw` recording, played once. */
+    private fun previewBundled(resourceId: Int): Boolean {
+        val uri: Uri = "android.resource://${context.packageName}/$resourceId".toUri()
         val current = MediaPlayer().apply {
             setAudioAttributes(previewAudioAttributes())
             setDataSource(context, uri)

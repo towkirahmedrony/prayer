@@ -31,10 +31,10 @@ import io.github.towkirahmedrony.salah.core.domain.notification.AudioPlaybackEng
  *    subsystem reports as a failure. The prayer notification itself is unaffected — the reminder is
  *    delivered whether or not the audio works.
  *
- * **Not exercised at runtime today.** Because [BundledAzanAudioSource] resolves to `null`, this
- * engine is never asked to play anything in the shipped build, and its device behaviour has not
- * been verified on hardware. That limitation is stated in `docs/PRAYER_NOTIFICATIONS.md` §5
- * rather than being presented as tested.
+ * **Not exercised at runtime today.** The bundled Adhan is played by the notification channel, and
+ * delivery deliberately starts no second player, so this engine is never asked to play anything in
+ * the shipped build and its device behaviour has not been verified on hardware. That limitation is
+ * stated in `docs/PRAYER_NOTIFICATIONS.md` §6 rather than being presented as tested.
  */
 class MediaPlayerAudioPlaybackEngine(
     private val context: Context,

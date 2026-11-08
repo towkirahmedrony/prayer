@@ -22,13 +22,12 @@ Implemented:
 - A documented fallback when exact alarms are not permitted.
 - Reboot, clock, time-zone, date and app-update recovery.
 - Offline operation with no network call anywhere in the scheduling or delivery path.
-- Azan **playback machinery** (lifecycle, single instance, release, failure handling) — implemented
-  and tested, but with no recording bundled. See §5.
+- A **bundled Adhan recording** (`res/raw/azan.ogg`, CC0, offline) selectable per prayer as the
+  reminder sound and played by Android's notification channel. See §6.
 
 Deliberately **not** implemented, and reported as such in the UI rather than hidden:
 
-- Bundled Azan audio (licensing — §5).
-- A long-running foreground playback service (§5.3).
+- Long-form Adhan playback outside the notification channel — no foreground playback service (§6.4).
 - A post-prayer reminder. No product behaviour defines one, so inventing one would be guessing at
   religious guidance rather than scheduling a notification.
 - Any attempt to bypass Do Not Disturb, battery optimisation or a user's channel settings (§7).
@@ -69,10 +68,9 @@ Deliberately **not** implemented, and reported as such in the UI rather than hid
                                     re-checks master switch, target,
                                     permission and staleness
                                                      │
-                                    ┌────────────────┴────────────────┐
-                                    ▼                                 ▼
-                     PrayerNotificationPresenter            AzanPlaybackManager
-                     (post / suppress / fail)               (play / unavailable)
+                                                     ▼
+                                    PrayerNotificationPresenter
+                                    (post to the chosen sound's channel / suppress / fail)
 ```
 
 ### 2.1 Responsibilities
@@ -92,8 +90,8 @@ Deliberately **not** implemented, and reported as such in the UI rather than hid
 | `AndroidPrayerNotificationPresenter` | `data/notification` | Renders and posts the notification. |
 | `DataStorePrayerNotificationPreferencesRepository` | `data/notification` | Persists the settings in the existing DataStore. |
 | `AndroidNotificationPermissionStatusProvider` | `data/notification` | Reads the two platform permissions. |
-| `AzanPlaybackManager` | `core/domain/notification` | Playback lifecycle rules. |
-| `BundledAzanAudioSource` / `MediaPlayerAudioPlaybackEngine` | `data/notification` | The audio asset source and the framework player. |
+| `AzanAudioSource` / `BundledAzanAudioSource` | `core/domain`, `data/notification` | The bundled Adhan recording and its licence credit. |
+| `AzanPlaybackManager` / `MediaPlayerAudioPlaybackEngine` | `core/domain`, `data/notification` | Playback lifecycle machinery retained for future long-form playback; not invoked by delivery (§6.4). |
 | `SalahDiagnosticEvents` / `AndroidDiagnosticsLogger` | `core/domain`, `data/notification` | Structured diagnostics. |
 
 There is exactly **one** scheduler and exactly **one** reconciliation entry point. Nothing else in
@@ -276,7 +274,7 @@ than a channel per prayer:
 | `salah_prayer_silent_quiet` | none | no | `DEFAULT` |
 | `salah_status` | none | no | `LOW` |
 
-`3 sounds × 2 vibration states = 6` prayer channels, **regardless of how many prayers exist**. Two
+`4 sounds × 2 vibration states = 8` prayer channels, **regardless of how many prayers exist**. Two
 prayers that share a preference share a channel. `PrayerNotificationChannelId.of(sound, vibration)`
 is the single source of the mapping, and `PrayerNotificationChannelIdTest` asserts the set is
 unique, bounded and stable.
@@ -345,71 +343,84 @@ path, and adding it would be a regression rather than a shrug.
 
 ---
 
-## 6. Azan playback
+## 6. Azan (Adhan) audio
 
-### 6.1 What is implemented
+### 6.1 What ships
 
-The playback subsystem is complete and unit-tested:
+Salah bundles one Adhan recording, `app/src/main/res/raw/azan.ogg`:
 
-- **`AzanPlaybackManager`** — the lifecycle rules: at most one playback at a time, stop on request,
-  always release, no restart of an interrupted stream, no looping.
-- **`AzanAudioSource`** (port) — where a recording comes from; `attribution()` for its credit.
-- **`AudioPlaybackEngine`** (port) and **`MediaPlayerAudioPlaybackEngine`** — the framework player,
-  with audio focus requested as `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` (so the user's music is ducked
-  rather than silenced) and abandoned on stop and completion.
-- **The delivery path calls it**: `PrayerNotificationDeliverer` attempts playback for an `AT_TIME`
-  prayer reminder — and only for that. A lead-in reminder and the sunrise reminder are
-  notifications, not calls to prayer, and never start audio.
+| Property | Value |
+|---|---|
+| Format | Ogg Vorbis, 44.1 kHz stereo |
+| Duration | 2 min 34 s |
+| File size | 1,229,032 bytes (~1.2 MB), ~64 kbps |
+| Playback | local only — read from the APK, no network, no storage permission |
 
-No new audio library was added. `MediaPlayer` is part of Android, plays a bundled `res/raw` asset or
-a local file without any storage permission, and is the right tool for one local recording.
+It is offered as a **reminder sound**, not as a separate switch: `NotificationSound.AZAN` appears in
+each prayer's sound list beside *Default sound*, *Salah chime* and *Silent*. Choosing it is the
+"Ajan notification" option, and because it is a per-prayer preference, Fajr and Maghrib can use the
+Adhan while the other prayers keep a short tone. The choice is stored exactly like the other three
+sounds, so it survives restart, reboot and update, and an unknown stored value falls back to the
+default sound rather than breaking the screen.
 
-### 6.2 Why no Azan recording is bundled
+Playback is performed by **Android's notification channel**, the only mechanism the platform offers
+for a reminder sound from API 26 onwards. `AndroidNotificationChannels` sets the recording as the
+sound of `salah_prayer_azan_vibrate` / `salah_prayer_azan_quiet`. The per-prayer *Test sound* action
+plays the same recording through `AndroidNotificationSoundPreviewer`.
 
-**No Azan recording ships with Salah, and the reason is licensing, not effort.** A full Azan
-recording is a substantial piece of religious audio; redistributing one requires rights this project
-does not hold (see `README.md`). The two alternatives were both worse than shipping nothing:
+`PrayerNotificationDeliverer` deliberately does **not** start a second player. That would play the
+recording twice — once from the channel, once from `MediaPlayer` — so the channel is the single
+delivery path, and audio can no longer fail independently of the reminder.
 
-- Bundling a recording of unknown provenance would put a licensing problem inside the APK.
-- Synthesising a stand-in and labelling it "Azan" would misrepresent a generated tone as recited
-  scripture — exactly the sort of fabrication the rest of Salah refuses.
+### 6.2 Licence and attribution
 
-So `BundledAzanAudioSource.resolve()` returns `null`, `AzanPlaybackManager.play()` returns
-`AzanPlaybackResult.Unavailable(NO_LICENSED_AUDIO_BUNDLED)`, and the settings screen reports the
-limitation in plain language. **Because the option cannot work, no "play the Azan" switch is
-offered** — offering a control that does nothing would be worse than offering none.
+The recording is **CC0 1.0 Universal** (public-domain dedication): it may be redistributed, even
+commercially, with no permission and no attribution required. It is credited anyway.
 
-The user requirement "disable Azan playback while keeping ordinary notifications enabled" is
-therefore satisfied trivially and by construction: notifications and playback are separate paths,
-and turning off one can never affect the other.
+- **File**: `Beautiful adhan.ogg`
+- **Author**: Adam-synagda
+- **Source**: Wikimedia Commons — <https://commons.wikimedia.org/wiki/File:Beautiful_adhan.ogg>
+- **Licence**: CC0 1.0 Universal — <https://creativecommons.org/publicdomain/zero/1.0/>
+- **Published SHA-1**: `a1fa4fd942401922c5c3301816384aae86956522`
+- **Bundled copy**: `res/raw/azan.ogg`, MD5 `d9ba3de09b6a2b8715f32e765485ed43`
 
-### 6.3 The extension point
+No transformation was applied: the published Ogg Vorbis file is stored as-is, which is already the
+compact format the APK wants. The credit is shown to the user on the **Azan playback** card, from
+`AzanAudioSource.attribution()`, so provenance is visible in the app and not only in this file.
 
-Adding a licensed recording is **one line**: return its location from
-`BundledAzanAudioSource.resolve()`. Nothing else changes — the manager, the engine, the focus
-handling, the single-instance rule and the failure paths already exist and already have tests
-(`AzanPlaybackManagerTest`). `AzanAudioSource.attribution()` exists so a recording's credit can be
-surfaced in the settings screen as soon as one is bundled.
+### 6.3 Channel versioning
 
-### 6.4 Why long-form background playback is not implemented
+A channel's sound is fixed at creation: calling `createNotificationChannel` on an existing id with a
+different sound is silently ignored. Adding the Adhan therefore **added channel ids** rather than
+rewriting an existing one. Because ids are derived from the sound name
+(`salah_prayer_<sound>_<vibrate|quiet>`), the new sound produced two fresh ids; Android created them
+with the Adhan sound, and every channel created earlier keeps the settings — including the user's own
+edits — that it already had. No stored preference needed migrating: a prayer's stored sound name
+still selects the channel that carries that sound.
 
-Playing a multi-minute recording from a broadcast receiver is not safe: `onReceive` runs on the main
-thread with a short budget, and a long-playing component needs a **foreground service** with a
-declared `foregroundServiceType`, a `FOREGROUND_SERVICE_*` permission and a persistent, dismissible
-notification. That is a significant, user-visible behavioural change — a notification Salah cannot
-remove while the Azan is playing — and it would be introduced to serve an asset that does not exist.
+A user who had customised a channel stays in control: the Adhan channel can be silenced or
+re-sounded in system settings, and Salah reports that rather than overriding it.
 
-Implementing it now would mean shipping and testing an invasive service on the strength of an
-assumption. So Salah implements the reliable notification-sound path first and documents the
-limitation. When a licensed recording is added, the foreground-service variant is a deliberate,
-reviewable piece of work rather than a hidden side effect of returning a non-null file path.
+### 6.4 Playback lifecycle limits
+
+The channel's sound is played by the system, not by Salah. Consequently:
+
+- no foreground service is started and no `FOREGROUND_SERVICE_*` permission is requested;
+- Salah cannot pause, resume or stop the recording once Android begins it;
+- a reminder posted during Do Not Disturb follows the user's DND rules, like any other notification;
+- the recording ends when the notification is dismissed or the sound completes.
+
+`AzanPlaybackManager`, `AudioPlaybackEngine` and `MediaPlayerAudioPlaybackEngine` remain in the tree,
+with their unit tests, as the reviewed machinery for a future **long-form playback** feature (for
+example playing the Adhan outside a notification). They are not invoked by the delivery path,
+precisely so the channel's playback is never doubled.
 
 ### 6.5 Honest limitation
 
-`MediaPlayerAudioPlaybackEngine` is **not exercised at runtime in this build**, because nothing is
-ever resolved for it to play. Its logic is written to be reviewable and the manager above it is
-unit-tested, but its **device behaviour has not been verified on hardware** — that is only possible
-once a recording exists. This document says so rather than implying the audio path is proven.
+The Adhan has **not been played on real hardware** as part of this change. What is verified: the file
+itself (container, codec, sample rate, duration, size), the channel-routing unit tests, and the app's
+compilation and unit tests. Device-level playback, Doze behaviour and OEM notification-sound handling
+still belong to the on-device checklist in `PRAYER_NOTIFICATIONS_TESTING.md`.
 
 ---
 
@@ -515,8 +526,8 @@ at all.
   disagree with the device, and therefore no possibility of duplicate reminders after reconnecting.
 - A correction to the device clock or time zone triggers a local rebuild, not a sync.
 
-The one thing that is genuinely external is a licensed Azan recording (§5) — and its absence has a
-working offline fallback: the notification sound.
+The Adhan recording is part of the APK (§6), so even the loudest reminder needs no network. Nothing
+in the notification path has an online fallback, because nothing in it goes online.
 
 ---
 
@@ -528,8 +539,9 @@ sorted so a line is stable and greppable.
 
 Events recorded: reconciliation started/finished/unavailable, master switch off, no location,
 schedule loaded or unavailable, alarm scheduled/cancelled/skipped-past, exact-alarm fallback in use,
-notification permission missing, delivery posted/suppressed/failed, and Azan
-started/stopped/unavailable/failed.
+notification permission missing, and delivery posted/suppressed/failed. The Azan playback events
+still exist for the retained playback machinery, but delivery no longer emits them: the channel
+plays the recording (§6.4).
 
 Levels are used as documented: `info` for normal operation, `warn` for a degraded-but-correct path
 (exact alarms unavailable, notifications not permitted, a date with no schedule), and `error` only
@@ -554,7 +566,7 @@ a reminder appears at the exact second on every device, and the settings screen 
 | A reminder may be silenced or hidden. | A channel the user silenced, or Do Not Disturb. | Does not attempt a bypass. States that channel settings belong to the user. |
 | Delivery may be delayed further. | Device-maker power management, battery optimisation, or an app the user force-stopped. | Uses the supported APIs and documents that Salah cannot override them. |
 | A reminder may be dropped entirely. | The user force-stopped the app; Android then withholds broadcasts until the app is launched again. | The next app launch reconciles and repairs the schedule. |
-| No audible Azan. | No licensed recording is bundled (§5.2). | Plays the notification sound the user chose, and says why. |
+| The Adhan may be cut short or silenced. | Android plays the channel's sound, so DND, a channel the user changed, or a second notification can interrupt it. | States that the channel's sound belongs to Android, and that the recording is played by the notification rather than a background service (§6.4). |
 | A very late reminder is suppressed. | The device was off, or a Doze window landed hours later. | Suppresses anything more than `DeliveryOutcome.STALE_TOLERANCE_MILLIS` (30 minutes) late and logs the reason, rather than showing a notification the user cannot act on. |
 
 Deliberate non-features, for the avoidance of doubt:

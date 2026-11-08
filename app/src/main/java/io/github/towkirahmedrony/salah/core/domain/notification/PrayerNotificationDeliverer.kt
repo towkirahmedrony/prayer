@@ -38,11 +38,12 @@ import java.time.ZoneId
  * Then it renders the reminder through the user's **current** preferences, not the ones that were
  * stored when the alarm was scheduled, so a sound changed yesterday is heard today.
  *
- * Azan playback is attempted only for an at-time prayer reminder, after the notification has been
- * posted, and its outcome can never affect the notification: audio is an extra, the reminder is the
- * point. Today the bundled audio source reports that no licensed recording ships, so this resolves
- * to [AzanPlaybackResult.Unavailable] and the notification carries the alert (see
- * `docs/PRAYER_NOTIFICATIONS.md` §5).
+ * The Adhan is **not** started here. When the user chooses
+ * [io.github.towkirahmedrony.salah.core.model.NotificationSound.AZAN] for a prayer, the reminder is
+ * posted to the Adhan channel and Android plays the bundled recording as that channel's sound. A
+ * second player started from this path would play the same recording twice, so there is exactly one
+ * delivery mechanism: the notification channel Android requires anyway. See
+ * `docs/PRAYER_NOTIFICATIONS.md` §6.
  *
  * Never throws: every path returns a [DeliveryOutcome].
  */
@@ -52,7 +53,6 @@ class PrayerNotificationDeliverer(
     private val locations: LocationRepository,
     private val permissions: NotificationPermissionStatusProvider,
     private val presenter: PrayerNotificationPresenter,
-    private val azanPlayback: AzanPlaybackManager,
     private val logger: DiagnosticsLogger,
     private val clock: Clock,
 ) {
@@ -70,7 +70,6 @@ class PrayerNotificationDeliverer(
             )
         }
 
-        val prayer = slot.target.prayer
         if (!settings.isEnabled(slot.target)) {
             return suppress(
                 slot.identity,
@@ -155,12 +154,9 @@ class PrayerNotificationDeliverer(
             ),
         )
 
-        // Azan playback is attempted only for an at-time *prayer* reminder: a lead-in reminder is a
-        // notification rather than a call to prayer, and the Iftar reminder is not a prayer — playing
-        // the Azan for it would double the call already made at Maghrib.
-        val azan = if (delivery.isAtEventTime && prayer != null) azanPlayback.play() else null
-
-        return DeliveryOutcome.Posted(channelId = delivery.channelId, azan = azan)
+        // The channel carries the sound, including the Adhan when that is what the user chose, so
+        // there is nothing to play here. Audio therefore cannot fail independently of the reminder.
+        return DeliveryOutcome.Posted(channelId = delivery.channelId)
     }
 
     /**

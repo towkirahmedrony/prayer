@@ -1,31 +1,39 @@
 package io.github.towkirahmedrony.salah.data.notification
 
+import android.content.Context
+import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.domain.notification.AzanAudioSource
 
 /**
- * Salah's Azan recording source, which currently has **no recording to offer**.
+ * The Adhan recording bundled with Salah.
  *
- * This is the honest state of the feature, not an unfinished stub. A full Azan recording is a
- * substantial piece of religious audio, and bundling one means redistributing it, which requires
- * rights this project does not have. The alternatives were both worse:
+ * The recording is `res/raw/azan.ogg` (Ogg Vorbis, 44.1 kHz stereo, 2 min 34 s, about 1.2 MB), so it
+ * travels inside the APK: it plays with no network, no storage permission and no download step. It
+ * is what backs [io.github.towkirahmedrony.salah.core.model.NotificationSound.AZAN], which is the
+ * sound the notification channel plays — the channel, not a separate player, is the delivery
+ * mechanism Android provides for a reminder's sound.
  *
- *  - bundling a recording of unknown provenance would ship a licensing problem inside the APK, and
- *    `README.md` states that no licence has been established for this repository;
- *  - synthesising a stand-in and labelling it "Azan" would misrepresent a generated tone as
- *    recited scripture — precisely the kind of fabrication the rest of Salah refuses to do.
+ * **Licence.** The recording is CC0 1.0 Universal (public domain dedication), so redistribution is
+ * expressly permitted and no attribution is legally required. It is credited anyway, both here and
+ * in the settings screen, because the performer deserves it and because provenance should be
+ * checkable:
  *
- * So [resolve] returns `null`, and the notification settings screen tells the user plainly that
- * Azan playback is unavailable in this build and why, instead of showing a control that cannot
- * work. `docs/PRAYER_NOTIFICATIONS.md` §5 records the decision.
+ *  - File: `Beautiful adhan.ogg`
+ *  - Author: Adam-synagda
+ *  - Source: Wikimedia Commons, https://commons.wikimedia.org/wiki/File:Beautiful_adhan.ogg
+ *  - Licence: CC0 1.0 Universal (public domain dedication)
  *
- * **Adding a licensed recording is a one-line change**: return its location here (a bundled
- * `res/raw` resource, or a file the user supplies) and [AzanPlaybackManager] starts playing it.
- * The playback lifecycle, audio focus, single-instance rule and release behaviour are already
- * implemented and unit-tested; only the asset is missing.
+ * See `docs/PRAYER_NOTIFICATIONS.md` §6.2 for the file's checksum and verification details.
  */
-class BundledAzanAudioSource : AzanAudioSource {
+class BundledAzanAudioSource(
+    private val context: Context,
+) : AzanAudioSource {
 
-    override fun resolve(): String? = null
+    /** The bundled recording as an app-resource URI, readable without any storage permission. */
+    override fun resolve(): String =
+        "android.resource://${context.packageName}/${R.raw.azan}"
 
-    override fun attribution(): String? = null
+    /** The credit shown next to the Adhan option. */
+    override fun attribution(): String =
+        "\"Beautiful adhan\" by Adam-synagda (Wikimedia Commons), CC0 1.0 public domain"
 }

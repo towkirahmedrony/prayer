@@ -141,13 +141,14 @@ fun TimeFormatPreference.labelRes(): Int = when (this) {
  * Reminder sound names.
  *
  * A sound choice is never a bare name: [hintRes] states what will actually be heard, so `Silent`
- * cannot be mistaken for "no reminder" and the bundled chime is not presented as something it is
- * not.
+ * cannot be mistaken for "no reminder" and the bundled chime and Adhan are not presented as
+ * something they are not.
  */
 @StringRes
 fun NotificationSound.labelRes(): Int = when (this) {
     NotificationSound.SYSTEM_DEFAULT -> R.string.notification_sound_system_default
     NotificationSound.SALAH_CHIME -> R.string.notification_sound_salah_chime
+    NotificationSound.AZAN -> R.string.notification_sound_azan
     NotificationSound.SILENT -> R.string.notification_sound_silent
 }
 
@@ -155,6 +156,7 @@ fun NotificationSound.labelRes(): Int = when (this) {
 fun NotificationSound.hintRes(): Int = when (this) {
     NotificationSound.SYSTEM_DEFAULT -> R.string.notification_sound_system_default_hint
     NotificationSound.SALAH_CHIME -> R.string.notification_sound_salah_chime_hint
+    NotificationSound.AZAN -> R.string.notification_sound_azan_hint
     NotificationSound.SILENT -> R.string.notification_sound_silent_hint
 }
 

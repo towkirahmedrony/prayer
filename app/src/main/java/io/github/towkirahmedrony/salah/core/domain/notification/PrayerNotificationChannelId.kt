@@ -15,7 +15,7 @@ import io.github.towkirahmedrony.salah.core.model.NotificationSound
  * That is the concrete requirement the plan asked for, and it is why this is a small, bounded,
  * *derived* set rather than a channel per prayer: two prayers that share a sound and a vibration
  * preference share a channel, and the total is
- * `3 sounds × 2 vibration states = 6` regardless of how many prayers exist.
+ * `4 sounds × 2 vibration states = 8` regardless of how many prayers exist.
  *
  * Channel ids are stable strings, because Android remembers a channel's settings by id: renaming
  * one would silently reset the user's customisations. They are built from the enum names so that

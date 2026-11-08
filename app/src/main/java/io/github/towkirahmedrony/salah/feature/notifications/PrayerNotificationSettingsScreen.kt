@@ -77,8 +77,8 @@ import org.koin.androidx.compose.koinViewModel
  * Three honesty rules still shape what appears:
  *
  *  1. **Only implemented controls appear.** Sound, vibration and advance are all backed by behaviour
- *     that exists. There is no "play the Azan" switch, because no licensed recording ships; the Azan
- *     card states that in one line.
+ *     that exists. The Adhan is one of the sound choices rather than a separate switch, so the Azan
+ *     card reports the bundled recording and its credit instead of offering a second control.
  *  2. **Permission state is shown, not assumed.** Notification permission and exact-alarm access are
  *     separate, so they are separate rows with their own state and their own action. The one action
  *     notification permission offers — "Enable Notifications" — exists only while the permission is
@@ -488,7 +488,7 @@ private fun PrayerRow(
                 selected = selected,
                 onClick = { onSoundChange(sound) },
                 // Only the chosen sound explains itself, so Silent cannot be mistaken for "no
-                // reminder" while the list itself stays three short lines.
+                // reminder" while the list itself stays four short lines.
                 hint = if (selected) stringResource(sound.hintRes()) else null,
             )
         }

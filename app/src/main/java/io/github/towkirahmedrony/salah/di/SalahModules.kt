@@ -568,10 +568,10 @@ val salahModules = module {
     single<PrayerNotificationPresenter> { AndroidPrayerNotificationPresenter(androidContext()) }
     single<NotificationSoundPreviewer> { AndroidNotificationSoundPreviewer(androidContext()) }
 
-    // Azan playback. The audio *source* is what is missing, not the machinery: no licensed
-    // recording is bundled, so `resolve()` returns null and playback is reported as unavailable.
-    // See docs/PRAYER_NOTIFICATIONS.md §5.
-    single<AzanAudioSource> { BundledAzanAudioSource() }
+    // Azan audio. The CC0 Adhan recording ships in res/raw/azan.ogg and is played by the Adhan
+    // notification channel; the source reports its location and credit to the settings screen.
+    // See docs/PRAYER_NOTIFICATIONS.md §6.
+    single<AzanAudioSource> { BundledAzanAudioSource(androidContext()) }
     single<AudioPlaybackEngine> { MediaPlayerAudioPlaybackEngine(androidContext()) }
     single { AzanPlaybackManager(audioSource = get(), engine = get(), logger = get()) }
 
@@ -583,7 +583,6 @@ val salahModules = module {
             locations = get(),
             permissions = get(),
             presenter = get(),
-            azanPlayback = get(),
             logger = get(),
             clock = get(),
         )

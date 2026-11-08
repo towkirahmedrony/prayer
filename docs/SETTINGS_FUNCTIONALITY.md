@@ -209,7 +209,7 @@ that matters for "does the setting work".
 | --- | --- |
 | Master switch | planner returns nothing and the coordinator cancels every managed alarm; `PrayerNotificationDeliverer` re-checks at delivery time |
 | Per-prayer enabled | a disabled prayer produces no plan entry and is suppressed at delivery |
-| Per-prayer sound | `SYSTEM_DEFAULT` / `SALAH_CHIME` (bundled `res/raw/salah_chime.wav`) / `SILENT` → the channel the reminder is posted to (`PrayerNotificationChannelId.of(sound, vibration)`) |
+| Per-prayer sound | `SYSTEM_DEFAULT` / `SALAH_CHIME` (bundled `res/raw/salah_chime.wav`) / `AZAN` (bundled `res/raw/azan.ogg`, CC0) / `SILENT` → the channel the reminder is posted to (`PrayerNotificationChannelId.of(sound, vibration)`) |
 | Per-prayer vibration | the same channel's `enableVibration`, i.e. the platform mechanism the API level requires |
 | Per-prayer advance | `0..30` min → an additional reminder planned before the prayer; `0` is off |
 | Sunrise reminder | its own switch, planned at the true sunrise as a solar event, never as a prayer and never with an advance reminder |
@@ -227,9 +227,10 @@ that matters for "does the setting work".
 - **Failure:** a denied `POST_NOTIFICATIONS` produces a suppression with a reason and a banner, not a
   claim that reminders are on; an unavailable schedule produces `ScheduleUnavailable`; a platform
   refusal to register one alarm is counted and logged without aborting the rest.
-- **Azan:** no licensed recording ships, so no control is offered. `AzanPlaybackManager` is implemented
-  and unit-tested and becomes reachable when `BundledAzanAudioSource.resolve()` returns a source. The
-  screen states this rather than offering a switch that cannot work.
+- **Adhan:** the recording ships (`res/raw/azan.ogg`, CC0) and is one of the four sound choices, so
+  "announce this prayer with the Adhan" is a per-prayer sound rather than a second switch. Android
+  plays it as the sound of `salah_prayer_azan_vibrate` / `salah_prayer_azan_quiet`, which exist only
+  because the sound has its own channel ids (`PRAYER_NOTIFICATIONS.md` §6.3).
 
 ### 6.3 Calendar
 
@@ -276,9 +277,9 @@ CI (`.github/workflows/android-apk.yml`) is the authoritative check: it runs
 
 ## 8. Known limitations
 
-- **Azan playback is unavailable.** No recording with a redistributable licence is bundled, so no
-  control is offered and the screen says so. The playback machinery exists and is tested. The setting
-  becomes live by implementing `AzanAudioSource`.
+- **The Adhan is played by the notification, not by a background service.** The recording is CC0 and
+  ships in the APK, but Salah cannot pause or stop it once Android starts it, and DND or a changed
+  channel can silence it. Long-form playback outside the notification is not implemented.
 - **The interface language is a preference, and only the Calendar is fully translated.** Settings >
   General offers English, Bengali and "Follow the device", and the choice is applied to every screen
   without recreating the activity. The *Calendar* screen is translated in full; the rest of the app keeps

@@ -79,11 +79,13 @@ enum class SuppressionReason {
 /** What happened when a fired alarm was delivered. */
 sealed interface DeliveryOutcome {
 
-    /** A reminder was posted. [azan] is the playback result for an at-time reminder, if attempted. */
-    data class Posted(
-        val channelId: String,
-        val azan: AzanPlaybackResult? = null,
-    ) : DeliveryOutcome
+    /**
+     * A reminder was posted to [channelId].
+     *
+     * The channel, not this class, owns the sound — including the bundled Adhan when the user chose
+     * it — so there is no separate playback result to report.
+     */
+    data class Posted(val channelId: String) : DeliveryOutcome
 
     /** Nothing was shown, deliberately, for [reason]. */
     data class Suppressed(

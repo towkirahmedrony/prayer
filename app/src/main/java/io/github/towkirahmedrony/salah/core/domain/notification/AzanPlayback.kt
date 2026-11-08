@@ -6,22 +6,22 @@ import io.github.towkirahmedrony.salah.core.domain.SalahDiagnosticEvents
 /**
  * Where a full-length Azan recording comes from.
  *
- * Separated from the playback machinery so the licensing question and the engineering question
- * stay apart. Salah ships **no** Azan recording: a proper one is a substantial piece of religious
- * audio, and redistributing a recording requires rights that this project does not have. Rather
- * than bundling something unlicensed, or synthesising a stand-in and calling it an Azan, the
- * bundled implementation reports that nothing is available.
- *
- * Adding a licensed recording is then a one-line change to
- * [io.github.towkirahmedrony.salah.data.notification.BundledAzanAudioSource]: return its location
- * and [AzanPlaybackManager] begins playing it, with no other code touched.
+ * Separated from the playback machinery so the asset and the engineering stay apart. Salah now ships
+ * a CC0 Adhan recording, but it is delivered by the **notification channel**
+ * ([io.github.towkirahmedrony.salah.core.model.NotificationSound.AZAN]), not by this port: the
+ * channel is the mechanism Android provides for a reminder's sound, and starting a player here as
+ * well would play the recording twice. This port and [AudioPlaybackEngine] therefore remain the
+ * reviewed machinery for a future long-form playback feature (see `docs/PRAYER_NOTIFICATIONS.md`
+ * §6.4), and the bundled implementation reports the recording's location and credit so the settings
+ * screen can name and acknowledge it.
  */
 interface AzanAudioSource {
 
     /**
-     * The playable location of the Azan recording, or `null` when none is bundled.
+     * The playable location of the Azan recording, or `null` when none is available.
      *
-     * `null` is a normal, expected answer and is what Salah reports today.
+     * `null` remains a normal answer for a build without the asset: playback is then reported as
+     * unavailable rather than inferred.
      */
     fun resolve(): String?
 
@@ -59,7 +59,7 @@ interface AudioPlaybackEngine {
 
 /** Why a request to play the Azan did not produce audio. */
 enum class AzanUnavailableReason {
-    /** No licensed recording is bundled with this build. */
+    /** No recording was resolvable. Salah bundles one, so this is a build/configuration state. */
     NO_LICENSED_AUDIO_BUNDLED,
 
     /** Playback is already running; a second instance is never started. */
@@ -85,8 +85,8 @@ sealed interface AzanPlaybackResult {
 /**
  * Owns Azan playback: at most one instance, stopped on request, always released.
  *
- * The whole subsystem is implemented and tested even though no recording ships, so the extension
- * point is real rather than a comment. Its rules:
+ * The whole subsystem is implemented and tested even though delivery does not use it, so the
+ * extension point is real rather than a comment. Its rules:
  *
  *  - **One playback at a time.** A second [play] while audio is running returns
  *    [AzanUnavailableReason.ALREADY_PLAYING] instead of stacking a second stream. Two Azans
@@ -125,7 +125,7 @@ class AzanPlaybackManager(
     fun play(): AzanPlaybackResult {
         val source = audioSource.resolve()
         if (source == null) {
-            val detail = "No licensed Azan recording is bundled with this build."
+            val detail = "No Azan recording is available to play."
             logger.info(
                 SalahDiagnosticEvents.AZAN_UNAVAILABLE,
                 mapOf("reason" to AzanUnavailableReason.NO_LICENSED_AUDIO_BUNDLED.name),

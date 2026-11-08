@@ -11,9 +11,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Azan playback is implemented and tested even though no recording ships. These tests hold the
- * lifecycle rules that will matter the moment a licensed recording is added: play at most once at a
- * time, stop on request, always release, and never crash when the audio is missing.
+ * The playback manager is retained machinery: delivery plays the bundled Adhan through the
+ * notification channel instead. These tests hold the lifecycle rules any future long-form playback
+ * must keep: play at most once at a time, stop on request, always release, and never crash when the
+ * audio is missing.
  */
 class AzanPlaybackManagerTest {
 
@@ -26,7 +27,7 @@ class AzanPlaybackManagerTest {
         AzanPlaybackManager(FakeAzanAudioSource(source), engine, logger) to engine
 
     @Test
-    fun `playback reports unavailable when no licensed recording is bundled`() {
+    fun `playback reports unavailable when no recording is available`() {
         val (azan, engine) = manager(source = null)
 
         val result = azan.play()

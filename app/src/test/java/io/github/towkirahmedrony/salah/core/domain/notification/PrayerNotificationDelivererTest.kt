@@ -7,8 +7,6 @@ import io.github.towkirahmedrony.salah.core.model.PrayerNotificationPreference
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.core.model.TimeFormatPreference
-import io.github.towkirahmedrony.salah.testing.FakeAudioPlaybackEngine
-import io.github.towkirahmedrony.salah.testing.FakeAzanAudioSource
 import io.github.towkirahmedrony.salah.testing.FakeLocationRepository
 import io.github.towkirahmedrony.salah.testing.FakePermissionStatusProvider
 import io.github.towkirahmedrony.salah.testing.FakePrayerNotificationPreferencesRepository
@@ -19,8 +17,6 @@ import io.github.towkirahmedrony.salah.testing.RecordingLogger
 import io.github.towkirahmedrony.salah.testing.testLocation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -58,7 +54,6 @@ class PrayerNotificationDelivererTest {
 
     private fun deliverer(
         preferences: PrayerNotificationSettings = PrayerNotificationSettings.DEFAULT,
-        azanSource: String? = null,
         prayerSettings: PrayerSettings = PrayerSettings.DEFAULT,
     ): PrayerNotificationDeliverer = PrayerNotificationDeliverer(
         notificationSettings = FakePrayerNotificationPreferencesRepository(preferences),
@@ -66,11 +61,6 @@ class PrayerNotificationDelivererTest {
         locations = FakeLocationRepository(testLocation(zone)),
         permissions = permissions,
         presenter = presenter,
-        azanPlayback = AzanPlaybackManager(
-            audioSource = FakeAzanAudioSource(azanSource),
-            engine = FakeAudioPlaybackEngine(),
-            logger = logger,
-        ),
         logger = logger,
         clock = clock,
     )
@@ -272,58 +262,48 @@ class PrayerNotificationDelivererTest {
         assertTrue(outcome is DeliveryOutcome.Posted)
     }
 
-    // --- Azan -----------------------------------------------------------------
+    // --- Adhan -----------------------------------------------------------------
 
     @Test
-    fun `azan is attempted for an at-time prayer reminder`() = runTest {
-        val outcome = deliverer(azanSource = "file://azan.mp3").deliver(fajrRequest())
+    fun `choosing the Adhan sound routes the reminder to the Adhan channel`() = runTest {
+        // The Adhan is delivered by the channel, so the routing *is* the whole audio feature: a
+        // reminder posted to the Adhan channel is the one Android plays the recording for.
+        val preferences = PrayerNotificationSettings.DEFAULT.withPreference(
+            PrayerName.FAJR,
+            PrayerNotificationPreference(sound = NotificationSound.AZAN, vibration = true),
+        )
 
-        outcome as DeliveryOutcome.Posted
-        assertEquals(AzanPlaybackResult.Started, outcome.azan)
+        val outcome = deliverer(preferences).deliver(fajrRequest())
+
+        assertEquals(
+            "salah_prayer_azan_vibrate",
+            (outcome as DeliveryOutcome.Posted).channelId,
+        )
+        assertEquals(1, presenter.delivered.size)
     }
 
     @Test
-    fun `azan playback being unavailable never prevents the reminder`() = runTest {
-        val outcome = deliverer(azanSource = null).deliver(fajrRequest())
-
-        outcome as DeliveryOutcome.Posted
-        assertNotNull(outcome.azan)
-        assertTrue(outcome.azan is AzanPlaybackResult.Unavailable)
-        assertEquals("the notification is the point, the audio is an extra", 1, presenter.delivered.size)
-        assertTrue(logger.has(SalahDiagnosticEvents.DELIVERY_POSTED))
-    }
-
-    @Test
-    fun `azan is not attempted for a lead-in reminder`() = runTest {
-        val advanceSlot = PrayerAlarmSlot(date, ReminderTarget.FAJR, PrayerReminderKind.ADVANCE)
-        val request = PrayerNotificationRequest(advanceSlot, now.toEpochMilli(), now.toEpochMilli(), 10)
-
-        val outcome = deliverer(
-            // The lead must still match the settings, or the reminder is superseded before the
-            // Azan question is reached.
-            preferences = PrayerNotificationSettings.DEFAULT.withPreference(
+    fun `a prayer left on its normal sound is not routed to the Adhan channel`() = runTest {
+        // Keep the per-prayer preferences independent: Fajr hears the Adhan, Dhuhr keeps the chime.
+        val preferences = PrayerNotificationSettings.DEFAULT
+            .withPreference(
                 PrayerName.FAJR,
-                PrayerNotificationPreference(advanceMinutes = 10),
-            ),
-            azanSource = "file://azan.mp3",
-        ).deliver(request)
+                PrayerNotificationPreference(sound = NotificationSound.AZAN),
+            )
+            .withPreference(
+                PrayerName.DHUHR,
+                PrayerNotificationPreference(sound = NotificationSound.SALAH_CHIME),
+            )
 
-        outcome as DeliveryOutcome.Posted
-        assertNull("a lead-in reminder is a notification, not a call to prayer", outcome.azan)
-    }
+        val dhuhrSlot = PrayerAlarmSlot(date, ReminderTarget.DHUHR, PrayerReminderKind.AT_TIME)
+        val request = PrayerNotificationRequest(dhuhrSlot, now.toEpochMilli(), now.toEpochMilli(), 0)
 
-    @Test
-    fun `azan is not attempted for the solar target`() = runTest {
-        val sunriseSlot = PrayerAlarmSlot(date, ReminderTarget.SUNRISE, PrayerReminderKind.AT_TIME)
-        val request = PrayerNotificationRequest(sunriseSlot, now.toEpochMilli(), now.toEpochMilli(), 0)
+        val outcome = deliverer(preferences).deliver(request)
 
-        val outcome = deliverer(
-            preferences = PrayerNotificationSettings.DEFAULT.copy(sunriseReminderEnabled = true),
-            azanSource = "file://azan.mp3",
-        ).deliver(request)
-
-        outcome as DeliveryOutcome.Posted
-        assertNull(outcome.azan)
+        assertEquals(
+            PrayerNotificationChannelId.of(NotificationSound.SALAH_CHIME, vibration = true),
+            (outcome as DeliveryOutcome.Posted).channelId,
+        )
     }
 
     // --- Failure handling -----------------------------------------------------

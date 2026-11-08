@@ -57,7 +57,7 @@ data class PrayerNotificationSettingsUiState(
     val notificationPermissionRequested: Boolean = false,
     /** Whether the configured location is set, which is what a schedule needs. */
     val locationConfigured: Boolean,
-    /** True when a licensed Azan recording is available to play. `false` in this build. */
+    /** True when the bundled Adhan recording is available to offer as a sound. */
     val azanAvailable: Boolean,
     val azanAttribution: String?,
     /** The result of the most recent reconciliation in this session, or `null` if none has run. */

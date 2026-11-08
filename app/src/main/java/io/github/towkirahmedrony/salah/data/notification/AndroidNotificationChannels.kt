@@ -19,7 +19,7 @@ import io.github.towkirahmedrony.salah.core.model.NotificationSound
  * notification — owns the sound and the vibration. Salah's `minSdk` is 26, so per-prayer sound and
  * vibration preferences can only be honoured by routing each reminder to a channel that already
  * carries that pair. The set is therefore the closed cross-product of
- * `NotificationSound × vibration` — six prayer channels — and *not* one channel per prayer: two
+ * `NotificationSound × vibration` — eight prayer channels — and *not* one channel per prayer: two
  * prayers that share a preference share a channel.
  *
  * **Channel settings are created once and then belong to the user.** After creation Android keeps
@@ -31,6 +31,13 @@ import io.github.towkirahmedrony.salah.core.model.NotificationSound
  * A seventh channel, [PrayerNotificationChannelId.STATUS], is used for non-urgent Salah messages.
  * It is deliberately low importance and unrelated to prayer reminders, so silencing status
  * messages cannot accidentally silence prayer reminders.
+ *
+ * **A new sound gets new channel ids, never a rewritten old one.** Android pins a channel's sound
+ * at creation, so changing the sound behind an existing id would be silently ignored. Because the
+ * ids are derived from the [NotificationSound] name, adding [NotificationSound.AZAN] produced
+ * `salah_prayer_azan_vibrate` / `salah_prayer_azan_quiet`, which the platform creates with the
+ * Adhan sound. Channels created for the other sounds are left exactly as the user has them, and a
+ * stored per-prayer preference keeps pointing at the channel that carries the sound it names.
  */
 class AndroidNotificationChannels(
     private val context: Context,
@@ -86,6 +93,12 @@ class AndroidNotificationChannels(
                     setSound(chimeUri(), reminderAudioAttributes())
                 }
 
+                NotificationSound.AZAN -> {
+                    // The bundled Adhan. An app-resource URI is played by the platform from the
+                    // APK itself, so the recording works offline and needs no storage permission.
+                    setSound(azanUri(), reminderAudioAttributes())
+                }
+
                 NotificationSound.SILENT -> {
                     // Explicitly silent. `enableVibration` above still controls the haptic.
                     setSound(null, null)
@@ -124,6 +137,7 @@ class AndroidNotificationChannels(
             when (sound) {
                 NotificationSound.SYSTEM_DEFAULT -> R.string.notification_sound_system_default
                 NotificationSound.SALAH_CHIME -> R.string.notification_sound_salah_chime
+                NotificationSound.AZAN -> R.string.notification_sound_azan
                 NotificationSound.SILENT -> R.string.notification_sound_silent
             },
         )
@@ -139,6 +153,9 @@ class AndroidNotificationChannels(
 
     /** The bundled chime, addressed as an app resource so it needs no storage permission. */
     private fun chimeUri(): Uri = "android.resource://${context.packageName}/${R.raw.salah_chime}".toUri()
+
+    /** The bundled Adhan, addressed the same way: it is read from the APK, not from the network. */
+    private fun azanUri(): Uri = "android.resource://${context.packageName}/${R.raw.azan}".toUri()
 
     /** Sonification attributes, so the sound respects the notification stream and its volume. */
     private fun reminderAudioAttributes(): AudioAttributes = AudioAttributes.Builder()

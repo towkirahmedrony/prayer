@@ -30,9 +30,9 @@ Implemented:
   with per-prayer sound, vibration and advance-reminder settings, a global master switch, a separate
   sunrise reminder, notification channels, exact-alarm fallback, and recovery after reboot, clock,
   time-zone, date and app-update changes. Fully offline.
-- **Azan playback machinery:** lifecycle, single-instance, audio-focus and release rules,
-  implemented and unit-tested. No recording is bundled because no licence exists to redistribute
-  one, so the settings screen reports the limitation rather than offering a dead control.
+- **Adhan notification sound:** a CC0 Adhan recording ships in `res/raw/azan.ogg` and is selectable
+  per prayer as the reminder sound. Android plays it as the sound of the dedicated
+  `salah_prayer_azan_*` channel, so it works offline with no storage permission. Fully offline.
 - **Qibla compass:** the initial great-circle bearing to the Kaaba computed locally, a
   sensor-driven dial built on the device's real orientation sensors, magnetic-declination
   correction from the platform's geomagnetic model, request-based device location alongside manual
@@ -57,8 +57,8 @@ Implemented:
 - GitHub Actions workflow that runs tests, lint and builds the debug APK.
 
 Deliberately **not** implemented (see §11): an authority-confirmed Hijri date or Sehri/Iftar
- timetable, prohibited-time rules, bundled Azan audio, third-party timetable providers, Room, widgets,
- foreground-service playback.
+ timetable, prohibited-time rules, third-party timetable providers, Room, widgets, foreground-service
+ playback.
 
 Detailed calendar documentation, including the Bangladesh rules and their source, the supported
 ranges and the accuracy limits, lives in [`CALENDAR_SYSTEM.md`](CALENDAR_SYSTEM.md).
@@ -324,10 +324,9 @@ PrayerNotificationPreferences    LocationRepository              UserPreferences
                              PrayerNotificationDeliverer
                      re-reads settings + permission + Clock
                                           │
-                    ┌─────────────────────┴─────────────────────┐
-                    ▼                                           ▼
-        AndroidPrayerNotificationPresenter            AzanPlaybackManager
-              (post / suppress / fail)                (play / unavailable)
+                                          ▼
+                            AndroidPrayerNotificationPresenter
+                    (post to the chosen sound's channel / suppress / fail)
 ```
 
 What the diagram is asserting:
@@ -537,12 +536,12 @@ data source.
 | Notification planning | `PrayerNotificationPlannerTest` | Enabled/disabled, master switch, past events, advance reminders, sunrise separated from prayers, missing schedule, duplicates, deterministic order, cancellation set |
 | Notification identity | `PrayerNotificationIdsTest`, `PrayerNotificationRequestTest`, `PrayerNotificationChannelIdTest` | Request-code uniqueness across 400 days × 6 targets × 2 kinds, URI round trip, malformed-input rejection, bounded and stable channel ids |
 | Notification settings | `PrayerNotificationSettingsTest`, `DataStorePrayerNotificationPreferencesRepositoryTest` | Defaults, clamping, sparseness, real persistence across recreation, safe fallback on bad stored data, coexistence with the other preferences in one store |
-| Scheduling, recovery, delivery | `PrayerNotificationCoordinatorTest`, `PrayerNotificationDelivererTest` | Reboot recovery, duplicate broadcasts, master switch, location/date/time-zone change, exact-alarm fallback, missing permission, one failure not aborting the rest, suppression rules, staleness, Azan attempt boundaries, structured logging with no coordinates |
+| Scheduling, recovery, delivery | `PrayerNotificationCoordinatorTest`, `PrayerNotificationDelivererTest` | Reboot recovery, duplicate broadcasts, master switch, location/date/time-zone change, exact-alarm fallback, missing permission, one failure not aborting the rest, suppression rules, staleness, Adhan channel routing, structured logging with no coordinates |
 | Qibla bearing | `QiblaCalculatorTest` | Two independently implemented formulations (a 3-D tangent-plane projection and the spherical law of cosines) checked against the production formula across a global grid, a frozen 13-city table, human-checkable sanity cases, range and wraparound, invalid and non-finite input, the poles, the Kaaba point, the antipode, and the great-circle distance against a chord derivation |
 | Heading and north reference | `HeadingMathTest`, `HeadingSmootherTest`, `SensorFramesTest`, `CompassAccuracyGateTest` | Normalization and non-finite folding, signed shortest difference and its antisymmetry, declination applied once with the double-correction property asserted at a non-zero declination, measured smoothing lag bounds and jitter reduction, the four screen-rotation frames and their cycle, and the calibration warm-up gate |
 | Qibla state and inputs | `QiblaStateReducerTest`, `LocationProviderSelectionTest`, `LocationFreshnessTest` | Every phase and the precedence between them, every calibration advice, exhaustiveness over the accuracy values, provider ordering per granted precision, and both freshness window boundaries including clock skew |
 | Location provenance | `DataStoreLocationRepositoryTest` | Real DataStore on a temporary file: manual and device round trips, metadata not inherited on a manual save, implausible accuracy discarded, recreation, clearing without touching other preferences, stores written before origins were recorded, and partial writes |
-| Azan playback | `AzanPlaybackManagerTest` | Single instance, stop, release, missing asset, engine failure — against a fake engine; device behaviour is unverified because no recording is bundled |
+| Azan playback (retained machinery) | `AzanPlaybackManagerTest` | Single instance, stop, release, missing asset, engine failure — against a fake engine; not invoked by delivery, and device behaviour is unverified |
 
 Not yet covered (and therefore not claimed): Compose UI tests, instrumentation tests, Android's
 actual alarm and notification delivery on a device, `MediaPlayer` against real audio, real sensor
@@ -592,11 +591,11 @@ read, a location fix — the fake holds its answer on a `CompletableDeferred` ra
   is scheduled, so a new reminder type (a Ramadan reminder, a Qibla alert) is a change to the
   planner plus a `ReminderTarget` constant — the coordinator, receivers, channels and UI need no
   new mechanism.
-- **Azan audio**: implement `AzanAudioSource` to return a licensed recording (or return it from
-  `BundledAzanAudioSource.resolve()`) and playback begins working, because the lifecycle, focus,
-  single-instance and release rules already exist and are tested. A foreground-service variant for
-  unattended long-form playback is a separate, deliberate piece of work — see
-  `PRAYER_NOTIFICATIONS.md` §5.4.
+- **Adhan audio**: the bundled recording is selected as a per-prayer sound and played by the Adhan
+  channel, so a second recording or a different delivery mechanism is a change to
+  `NotificationSound`, `AndroidNotificationChannels` and the licence credit — see
+  `PRAYER_NOTIFICATIONS.md` §6. A foreground-service variant for long-form playback outside the
+  notification is a separate, deliberate piece of work (§6.4).
 - **A different time-critical mechanism**: implement `PrayerNotificationScheduler`. The planner,
   coordinator, delivery path and UI are unaffected.
 - **A different sensor strategy**: implement `CompassSensorSource`. The smoothing, the declination

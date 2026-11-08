@@ -8,11 +8,12 @@ package io.github.towkirahmedrony.salah.core.model
  * [vibration] control how it announces itself, and [advanceMinutes] controls the optional reminder
  * that runs before the prayer.
  *
- * There is deliberately **no** "play the Azan" flag. A long-form Azan recording requires a
- * recording that Salah has the right to redistribute, and none is bundled — so offering the
- * setting would be offering a control that cannot work. The playback subsystem is implemented
- * and unit-tested (`AzanPlaybackManager`) and becomes reachable the moment a licensed recording
- * is added; see `docs/PRAYER_NOTIFICATIONS.md` §5.
+ * There is deliberately **no** separate "play the Azan" flag. The Adhan *is* a sound choice —
+ * [NotificationSound.AZAN] — so "announce this prayer with the Adhan" and "which sound does this
+ * prayer use" are one setting rather than two that could disagree. Because it lives in each
+ * prayer's preference, a user can have the Adhan for Fajr and Maghrib and a plain tone for the
+ * rest. The recording is bundled and played by the notification channel; see
+ * `docs/PRAYER_NOTIFICATIONS.md` §6.
  */
 data class PrayerNotificationPreference(
     /** Whether Salah schedules a reminder for this target at all. */

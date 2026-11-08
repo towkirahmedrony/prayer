@@ -865,9 +865,9 @@
     <string name="notifications_solar_body">পাঁচ ওয়াক্ত নামাজের একটি নয়। ডিফল্টে বন্ধ।</string>
     <string name="notifications_azan_title">আজান বাজানো</string>
     <string name="notifications_azan_available">উপলব্ধ</string>
-    <string name="notifications_azan_unavailable">এই বিল্ডে উপলব্ধ নয়</string>
-    <string name="notifications_azan_body_unavailable">কোনো আজান রেকর্ডিং বান্ডল করা নেই, তাই উপরের শব্দটিই বাজে। লাইসেন্সযুক্ত রেকর্ডিং যোগ করা অডিও উৎসে এক লাইনের পরিবর্তন।</string>
-    <string name="notifications_azan_body_available">লাইসেন্সযুক্ত রেকর্ডিং নামাজের সময়ে বাজে। বিজ্ঞপ্তি ও প্লেব্যাক আলাদা।</string>
+    <string name="notifications_azan_unavailable">উপলব্ধ নয়</string>
+    <string name="notifications_azan_body_unavailable">এই বিল্ডে কোনো আজান রেকর্ডিং নেই, তাই উপরের শব্দটিই বাজে।</string>
+    <string name="notifications_azan_body_available">আজান সালাহর সাথে বান্ডল করা এবং ইন্টারনেট ছাড়াই বাজে। ব্যবহার করতে উপরে নামাজের শব্দ হিসেবে \u201cআজান\u201d বেছে নিন।</string>
     <string name="notifications_azan_attribution">রেকর্ডিং: %1$s</string>
     <string name="notifications_limitations_title">অ্যান্ড্রয়েডের সীমা</string>
     <string name="notifications_limitations_body">ডু নট ডিস্টার্ব ও ব্যাটারি সেটিংস রিমাইন্ডার দেরি করতে বা নীরব করতে পারে। সালাহ অ্যান্ড্রয়েডের সমর্থিত API ব্যবহার করে, সেগুলো এড়িয়ে যায় না।</string>
@@ -894,6 +894,8 @@
     <string name="notification_sound_system_default_hint">ডিভাইসের নিজের শব্দ।</string>
     <string name="notification_sound_salah_chime">সালাহ চাইম</string>
     <string name="notification_sound_salah_chime_hint">সালাহর সাথে বান্ডল করা ছোট টোন।</string>
+    <string name="notification_sound_azan">আজান</string>
+    <string name="notification_sound_azan_hint">আজান, সালাহর সাথে বান্ডল করা। ইন্টারনেট ছাড়াই বাজে।</string>
     <string name="notification_sound_silent">নীরব</string>
     <string name="notification_sound_silent_hint">শব্দ নেই, তবুও রিমাইন্ডার দেখা যাবে।</string>
 

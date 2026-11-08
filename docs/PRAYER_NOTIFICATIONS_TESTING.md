@@ -29,20 +29,20 @@ constraint, not an accident — see §3.
 
 ## 2. What is covered
 
-103 of the 191 unit tests in the repository cover this subsystem.
+110 unit tests cover this subsystem.
 
 | Test class | Tests | Covers |
 |---|---|---|
 | `PrayerNotificationPlannerTest` | 20 | What gets scheduled, and what must not |
 | `PrayerNotificationCoordinatorTest` | 25 | Reconciliation, recovery, change handling, failure paths |
-| `PrayerNotificationDelivererTest` | 16 | Whether a fired alarm becomes a visible reminder |
-| `DataStorePrayerNotificationPreferencesRepositoryTest` | 9 | Real persistence, defaults, bad stored data |
+| `PrayerNotificationDelivererTest` | 18 | Whether a fired alarm becomes a visible reminder, and which channel it is routed to |
+| `DataStorePrayerNotificationPreferencesRepositoryTest` | 14 | Real persistence, defaults, bad stored data |
 | `PrayerNotificationSettingsTest` | 9 | Defaults, clamping, sparseness |
-| `AzanPlaybackManagerTest` | 8 | Playback lifecycle, duplication, failure |
+| `AzanPlaybackManagerTest` | 8 | Retained playback lifecycle, duplication, failure (not on the delivery path) |
 | `PrayerNotificationIdsTest` | 7 | Identity uniqueness, stability, round trip |
 | `PrayerNotificationRequestTest` | 5 | Alarm payload contract |
 | `PrayerNotificationChannelIdTest` | 4 | Channel set is unique, bounded and stable |
-| **Total** | **103** | |
+| **Total** | **110** | |
 
 ### 2.1 Scheduler — `PrayerNotificationPlannerTest`
 
@@ -103,9 +103,8 @@ meaning reminders could still fire after the user had switched notifications off
 | A silent choice still produces a reminder | `a silent choice still produces a reminder` |
 | A sound changed after scheduling is honoured | `a sound changed after scheduling is honoured at delivery time` |
 | The reminder is rendered in the location's zone and format | `the reminder is rendered in the prayer location's zone and time format` |
-| Azan starts only when enabled and available | `azan is attempted for an at-time prayer reminder` |
-| Azan being unavailable never blocks the reminder | `azan playback being unavailable never prevents the reminder` |
-| Azan is not attempted for a lead-in or a solar event | `azan is not attempted for a lead-in reminder`, `azan is not attempted for the solar target` |
+| Choosing the Adhan routes the reminder to the Adhan channel | `choosing the Adhan sound routes the reminder to the Adhan channel` |
+| Per-prayer sounds stay independent | `a prayer left on its normal sound is not routed to the Adhan channel` |
 | Failures are reported, never swallowed | `a presenter that refuses is reported as a failure, not a success`, `a presenter that throws is reported instead of crashing the receiver` |
 
 ### 2.4 Settings persistence — `DataStorePrayerNotificationPreferencesRepositoryTest`
@@ -140,11 +139,12 @@ Real `DataStore`, on a temporary file — not a fake.
 | Duplicate playback is prevented | `a second play request never stacks a second stream` |
 | Playback can be stopped | `stop releases playback and is safe to repeat` |
 | Audio resources are released | `release is forwarded to the engine` |
-| Missing audio resources do not crash the app | `playback reports unavailable when no licensed recording is bundled` |
+| Missing audio resources do not crash the app | `playback reports unavailable when no recording is available` |
 | Playback failures are logged | `an engine that refuses to start is reported as a failure, not a crash`, `an engine that throws is reported as a failure with the cause logged` |
 
-Because no recording ships (`PRAYER_NOTIFICATIONS.md` §5.2), these tests exercise the manager
-against a fake engine. They are real tests of the lifecycle rules, but they say **nothing** about
+The Adhan recording now ships (`PRAYER_NOTIFICATIONS.md` §6), but it is delivered by the notification
+channel, so these tests cover machinery that delivery deliberately does not invoke. They exercise the
+manager against a fake engine: real tests of the lifecycle rules, saying **nothing** about
 `MediaPlayer` on a real device — see §4.
 
 ---
@@ -201,9 +201,9 @@ set a location, and open **Settings → Prayer notifications**.
 | S4 | Silent reminder | Set one prayer to **Silent** | Its reminder appears in the shade with no sound and no vibration; other prayers still sound |
 | S5 | Vibrate off | Turn **Vibrate** off for one prayer | That reminder does not vibrate; a prayer left on still does |
 | S6 | Advance reminder | Set **Remind me before** to 10 min | A reminder arrives ~10 minutes before the prayer, and a second at the prayer time |
-| S7 | Sound preview | Press **Play this sound** for each of the three sounds | Device default plays the device's sound; Salah chime plays the bundled tone; Silent plays nothing and the status message confirms |
+| S7 | Sound preview | Press **Play this sound** for each of the four sounds | Device default plays the device's sound; Salah chime plays the bundled tone; Adhan plays the bundled recording; Silent plays nothing and the status message confirms |
 | S8 | Sunrise reminder | Turn on **Sunrise reminder** and disable every prayer | Exactly one reminder, at sunrise, worded as sunrise — never as a prayer |
-| S9 | Azan availability is stated | Open the **Azan playback** card | Reads "Not available in this build" with the licensing explanation; **no** switch is offered that could be turned on |
+| S9 | Adhan availability and credit are stated | Open the **Azan playback** card | Reads "Available" with the source/licence credit; the Adhan appears in each prayer's sound list, and choosing it changes only that prayer |
 
 ### 4.3 Recovery and change (needs a device; the reboot case needs patience)
 
@@ -227,7 +227,7 @@ set a location, and open **Settings → Prayer notifications**.
 | O3 | Battery optimisation | Put the device in its most aggressive power-saving mode | Reminders may be delayed. Record what actually happened; this is device-specific and cannot be generalised |
 | O4 | Do Not Disturb | Enable DND with notifications blocked | Reminders are silenced or withheld by the system. Salah does not bypass DND and shows no error |
 | O5 | Doze / screen off overnight | Leave the device unplugged and still overnight with an early Fajr | Fajr fires at or near its time, or is visibly late. Record the observed delay and the device model |
-| O6 | Azan playback on device | Not testable in this build — no recording is bundled (`PRAYER_NOTIFICATIONS.md` §5.2) | n/a |
+| O6 | Adhan playback on device | Set one prayer to **Adhan**, wait for (or simulate) its reminder | The bundled recording plays from the notification with the device offline. **Not yet performed on hardware** — `PRAYER_NOTIFICATIONS.md` §6.5 |
 
 ---
 
@@ -235,7 +235,7 @@ set a location, and open **Settings → Prayer notifications**.
 
 **Verified by automated tests, in CI, on this commit:** planning, identity, persistence, delivery
 decisions, permission and stale-alarm handling, the exact-alarm fallback, the cancellation window
-and its bound, and the Azan playback lifecycle.
+and its bound, Adhan channel routing, and the retained Azan playback lifecycle.
 
 **Verified by CI only as a build, not as behaviour:** the debug APK compiles, passes lint and
 uploads its artifact.
@@ -245,4 +245,5 @@ Doze and battery-optimisation behaviour, the system's permission and channel sur
 surviving a real reboot, and `MediaPlayer` playing real audio.
 
 **Assumed, but not verified:** that a `MediaPlayerAudioPlaybackEngine` would behave as written on a
-real device. It is unreachable in this build because no recording is bundled.
+real device. It is unreachable in this build because delivery plays the bundled Adhan through the
+notification channel and starts no second player.

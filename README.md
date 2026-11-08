@@ -59,7 +59,7 @@ without an account.
 | Loading, empty, error and offline states | Implemented |
 | Unit tests for engine, domain, data, location, calendar, Ramadan, the Tasbih counter, the Zakat calculator (engine, reference cases and screen state), the notification subsystem, Home mapping, the first-launch location gate, the Qibla feature, the dataset publication path, the prayer-configuration path, the bottom navigation, the Settings structure, and the offline-sync reliability hardening (backoff, offline gating, freshness, state-file migration) | Implemented (over 1 200 `@Test` methods in `app/src/test`) |
 | GitHub Actions release APK build (tests + lint + signed artifact + GitHub Release on version tags) | Implemented |
-| **Azan playback machinery** (lifecycle, audio focus, single instance, stop, release) | **Implemented and unit-tested, but no recording is bundled** — no licence exists to redistribute one, so the settings screen says so and no dead switch is offered |
+| **Adhan notification sound** (bundled CC0 recording, offline, per prayer) | **Implemented** — `res/raw/azan.ogg` is selectable as a prayer's sound and played by the dedicated `salah_prayer_azan_*` notification channel; device playback is not yet verified on hardware |
 | Prohibited prayer-time intervals | Implemented, with a documented policy: sunrise-ascent, solar-noon (zawal) and sunset-setting intervals, each with start, end, anchor event, status and countdown. The minute boundaries are this app's configured policy, not a reviewed ruling — see `docs/FORBIDDEN_PRAYER_TIMES.md` |
 | A moon-sighting or authority-confirmed Hijri date, and an integrated authority Sehri/Iftar timetable | **Not implemented** — so no date or time is ever labelled as confirmed |
 | Zakat on agricultural produce, livestock, minerals, shares, provident funds or property held for resale; the Maliki and Hanbali zakat treatments | Deliberately out of scope — each has its own rate or trigger, recorded in `docs/ZAKAT_METHODOLOGY.md` §4.6 and §9 |
@@ -235,10 +235,11 @@ The calculation engine and its pinned version are explained in
 The project uses a **single `:app` module with package boundaries** at this stage; the packages
 mirror the intended future modules. The reasoning is documented in `docs/ARCHITECTURE.md`.
 
-**On `res/raw/salah_chime.wav`:** this is the only audio asset in the repository. It is a short
-reminder tone that was **synthesised for this project** and carries no third-party rights, so it can
-be redistributed with the source. It is explicitly *not* an Azan recording, and no Azan recording is
-bundled — see [`docs/PRAYER_NOTIFICATIONS.md`](docs/PRAYER_NOTIFICATIONS.md) §5.
+**On the bundled audio:** `res/raw/salah_chime.wav` is a short reminder tone **synthesised for this
+project** and carries no third-party rights. `res/raw/azan.ogg` is a complete Adhan recording
+released under **CC0 1.0** (public domain), so it may be redistributed with the source; its origin,
+checksum and credit are recorded in
+[`docs/PRAYER_NOTIFICATIONS.md`](docs/PRAYER_NOTIFICATIONS.md) §6.2 and shown in the app.
 
 ## Building the APK (GitHub Actions)
 
@@ -308,9 +309,9 @@ so the Release, filename and `versionName` agree. See `docs/TECH_STACK.md` §3.1
 2. **A verified authority source** — if a published, redistributable Sehri/Iftar timetable or a
    moon-sighting announcement feed is ever integrated, it must be linked to its source, labelled as
    such, and must leave the local calculation working when it cannot be reached.
-3. **Licensed Azan audio** — source a recording whose redistribution rights are established, add it
-   to `res/raw`, and return it from `BundledAzanAudioSource`. Decide deliberately whether
-   unattended long-form playback warrants a foreground service.
+3. **Long-form Adhan playback** — the bundled Adhan is delivered as its notification channel's
+   sound; decide deliberately whether unattended playback beyond the notification warrants a
+   foreground service.
 4. **On-device verification** — work through the notification and Qibla checklists on real hardware
    and record the results, including device-specific Doze, battery and magnetometer behaviour.
 5. **Remote providers and caching** — the optional Supabase publication path (location dataset and
