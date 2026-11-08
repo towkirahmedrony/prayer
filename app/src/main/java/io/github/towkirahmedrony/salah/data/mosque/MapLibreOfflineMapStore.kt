@@ -310,10 +310,10 @@ class MapLibreOfflineMapStore(
     private fun OfflineTilePyramidRegionDefinition.toMapBounds(): MapBounds? {
         val box = bounds ?: return null
         return MapBounds(
-            north = box.latNorth,
-            south = box.latSouth,
-            east = box.lonEast,
-            west = box.lonWest,
+            north = box.getLatNorth(),
+            south = box.getLatSouth(),
+            east = box.getLonEast(),
+            west = box.getLonWest(),
         )
     }
 
