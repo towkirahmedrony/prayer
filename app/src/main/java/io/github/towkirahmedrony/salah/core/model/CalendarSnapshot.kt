@@ -49,7 +49,7 @@ sealed interface CalendarDateState {
  */
 data class CalendarHeadline(
     val system: CalendarSystem,
-    /** The large part: day and month, for example `8 Nov`, `২৪ কার্তিক` or `২৬ جُمادى الأولى`. */
+    /** The large part: day and month, for example `8 Nov`, `২৩ কার্তিক` or `২৬ جُمادى الأولى`. */
     val primary: String,
     /** The year, in the same numerals as [primary]. */
     val year: String,

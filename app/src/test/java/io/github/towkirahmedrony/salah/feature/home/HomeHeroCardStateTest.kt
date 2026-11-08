@@ -418,10 +418,34 @@ class HomeHeroCardStateTest {
     // ---- hero dates -----------------------------------------------------------------------------
 
     private fun snapshot(headlines: List<CalendarHeadline>) = CalendarSnapshot(
-        gregorian = CalendarDateState.NotAvailable(CalendarSystem.GREGORIAN, UnavailabilityReason.UNKNOWN),
-        bangla = CalendarDateState.NotAvailable(CalendarSystem.BANGLA, UnavailabilityReason.UNKNOWN),
-        hijri = CalendarDateState.NotAvailable(CalendarSystem.HIJRI, UnavailabilityReason.UNKNOWN),
-        weekdayLabel = null,
+        // The factory refuses a snapshot whose Gregorian date is not Available, so the Gregorian
+        // date is always resolved here; Bangla/Hijri follow whether their headline is present.
+        gregorian = CalendarDateState.Available(
+            CalendarSystem.GREGORIAN,
+            "8 November 2026",
+            true,
+        ),
+        bangla = if (headlines.any { it.system == CalendarSystem.BANGLA }) {
+            CalendarDateState.Available(CalendarSystem.BANGLA, "23 Kartik 1433", true)
+        } else {
+            CalendarDateState.NotAvailable(
+                CalendarSystem.BANGLA,
+                UnavailabilityReason.OUT_OF_SUPPORTED_RANGE,
+            )
+        },
+        hijri = if (headlines.any { it.system == CalendarSystem.HIJRI }) {
+            CalendarDateState.Available(
+                CalendarSystem.HIJRI,
+                "26 Jumada al-Awwal 1448 AH",
+                false,
+            )
+        } else {
+            CalendarDateState.NotAvailable(
+                CalendarSystem.HIJRI,
+                UnavailabilityReason.OUT_OF_SUPPORTED_RANGE,
+            )
+        },
+        weekdayLabel = "Sunday",
         headlines = headlines,
     )
 
@@ -429,7 +453,7 @@ class HomeHeroCardStateTest {
     fun `the hero dates are the snapshot's headlines, in order`() {
         val headlines = listOf(
             CalendarHeadline(CalendarSystem.GREGORIAN, primary = "8 Nov", year = "2026", weekday = "Sunday"),
-            CalendarHeadline(CalendarSystem.BANGLA, primary = "24 Kartik", year = "1433"),
+            CalendarHeadline(CalendarSystem.BANGLA, primary = "23 Kartik", year = "1433"),
             CalendarHeadline(CalendarSystem.HIJRI, primary = "26 Jumada al-Awwal", year = "1448"),
         )
 

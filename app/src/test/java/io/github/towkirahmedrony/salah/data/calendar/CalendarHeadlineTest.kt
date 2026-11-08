@@ -80,9 +80,9 @@ class CalendarHeadlineTest {
     fun `the Bangla column is the day and month with the year apart, in Bangla script`() {
         val column = headlines(DateLanguagePreference.BANGLA).forSystem(CalendarSystem.BANGLA)
 
-        // 8 November 2026 is 24 Kartik 1433 under the Bangladesh rules.
+        // 8 November 2026 is 23 Kartik 1433 under the Bangladesh rules.
         assertNotNull(column)
-        assertEquals("২৪ কার্তিক", column!!.primary)
+        assertEquals("২৩ কার্তিক", column!!.primary)
         assertEquals("১৪৩৩", column.year)
         assertNull(column.weekday)
     }
