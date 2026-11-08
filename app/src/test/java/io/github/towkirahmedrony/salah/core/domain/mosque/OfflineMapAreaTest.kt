@@ -82,11 +82,22 @@ class OfflineMapAreaTest {
     @Test
     fun `stored bounds report whether they cover a point`() {
         val bounds = MapBounds(north = 24.0, south = 23.0, east = 91.0, west = 90.0)
+        val region = OfflineMapRegion(
+            id = 1L,
+            label = "Dhaka",
+            styleUrl = "https://example.test/style.json",
+            bounds = bounds,
+            minZoom = 10.0,
+            maxZoom = 16.0,
+            downloadedBytes = 0L,
+            isComplete = true,
+            createdAtEpochMillis = 0L,
+        )
 
         assertTrue(bounds.isValid)
-        assertTrue(bounds.covers(dhaka))
-        assertFalse(bounds.covers(GeoPoint(10.0, 10.0)))
-        assertFalse(bounds.covers(null))
+        assertTrue(region.covers(dhaka))
+        assertFalse(region.covers(GeoPoint(10.0, 10.0)))
+        assertFalse(region.covers(null))
         assertFalse(MapBounds(north = 23.0, south = 24.0, east = 91.0, west = 90.0).isValid)
     }
 }
