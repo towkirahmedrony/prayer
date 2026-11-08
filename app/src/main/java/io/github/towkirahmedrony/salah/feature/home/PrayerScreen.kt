@@ -93,7 +93,7 @@ private fun PrayerTimetableContent(
                 top = 20.dp,
                 bottom = 28.dp,
             ),
-        verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing),
+        verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing + 8.dp),
     ) {
         PrayerTimetableHeader(state = state)
 

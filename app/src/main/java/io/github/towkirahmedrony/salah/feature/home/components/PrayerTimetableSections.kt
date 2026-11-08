@@ -1,7 +1,6 @@
 package io.github.towkirahmedrony.salah.feature.home.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -14,24 +13,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.R
+import io.github.towkirahmedrony.salah.core.designsystem.ClockGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.MosqueGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.NightGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.RamadanGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunrisePrayerGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.SunsetGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahUnavailableNote
+import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.domain.nafl.NaflKind
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
@@ -43,6 +53,9 @@ import io.github.towkirahmedrony.salah.feature.home.HomeUiState
 import io.github.towkirahmedrony.salah.feature.home.NaflRow
 import io.github.towkirahmedrony.salah.feature.home.ProhibitedSection
 import io.github.towkirahmedrony.salah.feature.home.PrayerRow
+
+/** The width of the leading glyph column plus the gap before a row's text. */
+private val RowTextInset = 44.dp
 
 /**
  * The Prayer screen's header: the page name over the place and date the times belong to.
@@ -90,35 +103,92 @@ fun PrayerTimetableHeader(state: HomeUiState.Ready, modifier: Modifier = Modifie
 }
 
 /**
- * The five obligatory prayers, directly under the page header.
+ * The five obligatory prayers, in the page's one large surface.
  *
- * A row is a period, so its time is the range the period spans. The open period is tinted and marked
- * "Now" with its remaining time; the next period is marked "Up next". Everything else stays plain, so
- * the eye lands on the two rows that matter without a second summary above them.
+ * The panel is what separates the fard timetable from the readings below it: it has a distinct
+ * header, a tonal surface and row dividers, while every other section stays flat on the page. The
+ * open period is the only row with a filled background and a full-strength accent bar; the next
+ * period gets a soft accent bar and a label, so the eye can find both without either one shouting.
  */
 @Composable
 fun PrayerTimesList(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
+    val layout = LocalSalahStyle.current
+    val scheme = MaterialTheme.colorScheme
+    val rowInset = layout.cardPadding + RowTextInset
+
     Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(layout.shapes.large)
+            .background(scheme.surfaceContainerHigh),
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = layout.cardPadding, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SectionIcon { tint -> MosqueGlyph(tint, Modifier.size(20.dp)) }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = stringResource(R.string.home_prayer_timetable_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = scheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.home_prayer_times_arabic),
+                style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Rtl),
+                color = scheme.primary,
+                textAlign = TextAlign.Start,
+            )
+        }
+        HorizontalDivider(
+            color = scheme.outlineVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = layout.cardPadding),
+        )
         state.timetableNote?.let { note ->
-            SalahUnavailableNote(text = stringResource(note.messageRes()))
-            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier.padding(
+                    start = layout.cardPadding,
+                    end = layout.cardPadding,
+                    top = 10.dp,
+                    bottom = 2.dp,
+                ),
+            ) {
+                SalahUnavailableNote(text = stringResource(note.messageRes()))
+            }
         }
-        state.prayerRows.forEach { row ->
-            PrayerTimeRow(state = state, row = row)
+        state.prayerRows.forEachIndexed { index, row ->
+            PrayerTimeRow(
+                state = state,
+                row = row,
+                horizontalPadding = layout.cardPadding,
+            )
+            if (index != state.prayerRows.lastIndex) {
+                TimetableRowDivider(
+                    startInset = rowInset,
+                    endInset = layout.cardPadding,
+                )
+            }
         }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
 @Composable
-private fun PrayerTimeRow(state: HomeUiState.Ready, row: PrayerRow) {
+private fun PrayerTimeRow(
+    state: HomeUiState.Ready,
+    row: PrayerRow,
+    horizontalPadding: Dp,
+) {
     val scheme = MaterialTheme.colorScheme
     val current = row.isCurrent
     // A next prayer that has already passed belongs to the following day (today's Fajr after Isha),
     // so it is not marked on today's row.
     val next = row.isNext && !row.isPassed && !current
+    val passed = row.isPassed && !current && !next
     val start = row.periodStartLabel ?: row.timeLabel
     val time = if (start != null && row.endTimeLabel != null) {
         stringResource(R.string.home_time_range, start, row.endTimeLabel)
@@ -145,10 +215,27 @@ private fun PrayerTimeRow(state: HomeUiState.Ready, row: PrayerRow) {
         name = stringResource(row.prayer.labelRes()),
         time = time,
         glyph = { tint -> PrayerRowGlyph(row.prayer, tint) },
-        glyphTint = if (current || next) scheme.primary else scheme.onSurfaceVariant,
-        nameColor = if (current) scheme.primary else scheme.onSurface,
-        timeColor = if (current || next) scheme.primary else scheme.onSurface,
-        containerColor = if (current) scheme.primary.copy(alpha = 0.12f) else null,
+        glyphTint = when {
+            current || next -> scheme.primary
+            passed -> scheme.onSurfaceVariant.copy(alpha = 0.7f)
+            else -> scheme.onSurfaceVariant
+        },
+        nameColor = when {
+            current -> scheme.primary
+            passed -> scheme.onSurfaceVariant
+            else -> scheme.onSurface
+        },
+        timeColor = when {
+            current -> scheme.primary
+            passed -> scheme.onSurfaceVariant
+            else -> scheme.onSurface
+        },
+        containerColor = if (current) scheme.primary.copy(alpha = 0.10f) else null,
+        accentColor = when {
+            current -> scheme.primary
+            next -> scheme.primary.copy(alpha = 0.35f)
+            else -> null
+        },
         statusText = when {
             current -> stringResource(R.string.home_prayer_status_now)
             next -> stringResource(R.string.home_prayer_status_up_next)
@@ -159,6 +246,8 @@ private fun PrayerTimeRow(state: HomeUiState.Ready, row: PrayerRow) {
         statusContentColor = scheme.onPrimary,
         detail = detail.takeIf { it.isNotEmpty() },
         detailColor = if (current) scheme.primary else scheme.onSurfaceVariant,
+        horizontalPadding = horizontalPadding,
+        minHeight = 56.dp,
     )
 }
 
@@ -166,13 +255,24 @@ private fun PrayerTimeRow(state: HomeUiState.Ready, row: PrayerRow) {
 @Composable
 fun NaflTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     val nafl = state.nafl
-    TimetableSection(title = stringResource(R.string.nafl_page_title), modifier = modifier) {
+    TimetableSection(
+        title = stringResource(R.string.nafl_page_title),
+        glyph = { tint -> TasbihGlyph(tint, Modifier.size(20.dp)) },
+        modifier = modifier,
+    ) {
         if (nafl.unavailable != null) {
             SalahUnavailableNote(text = stringResource(nafl.unavailable.messageRes()))
         } else {
-            nafl.rows.forEach { row -> NaflTimeRow(row = row) }
+            nafl.rows.forEachIndexed { index, row ->
+                NaflTimeRow(row = row)
+                if (index != nafl.rows.lastIndex) {
+                    TimetableRowDivider(startInset = RowTextInset, endInset = 0.dp)
+                }
+            }
             nafl.lastThirdStartsLabel?.let { label ->
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
+                TimetableRowDivider(startInset = 0.dp, endInset = 0.dp)
+                Spacer(Modifier.height(4.dp))
                 TimetableStatRow(
                     label = stringResource(R.string.home_night_last_third),
                     value = label,
@@ -192,7 +292,8 @@ private fun NaflTimeRow(row: NaflRow) {
         glyphTint = if (row.isOpen) scheme.primary else scheme.onSurfaceVariant,
         nameColor = if (row.isOpen) scheme.primary else scheme.onSurface,
         timeColor = if (row.isOpen) scheme.primary else scheme.onSurface,
-        containerColor = if (row.isOpen) scheme.primary.copy(alpha = 0.12f) else null,
+        containerColor = if (row.isOpen) scheme.primary.copy(alpha = 0.10f) else null,
+        accentColor = if (row.isOpen) scheme.primary else null,
         statusText = if (row.isOpen) stringResource(R.string.nafl_status_open) else null,
         statusIsPill = row.isOpen,
         statusColor = scheme.primary,
@@ -206,7 +307,11 @@ private fun NaflTimeRow(row: NaflRow) {
 @Composable
 fun ProhibitedTimetableSection(section: ProhibitedSection, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    TimetableSection(title = stringResource(R.string.home_prohibited_title), modifier = modifier) {
+    TimetableSection(
+        title = stringResource(R.string.home_prohibited_title),
+        glyph = { tint -> ClockGlyph(tint, Modifier.size(20.dp)) },
+        modifier = modifier,
+    ) {
         if (section.windows.isEmpty()) {
             SalahUnavailableNote(
                 text = stringResource(
@@ -214,7 +319,7 @@ fun ProhibitedTimetableSection(section: ProhibitedSection, modifier: Modifier = 
                 ),
             )
         } else {
-            section.windows.forEach { window ->
+            section.windows.forEachIndexed { index, window ->
                 val active = window.phase == ProhibitedPeriodPhase.ACTIVE
                 val upcoming = window.phase == ProhibitedPeriodPhase.UPCOMING
                 val countdown = window.countdown?.let { remaining ->
@@ -239,6 +344,7 @@ fun ProhibitedTimetableSection(section: ProhibitedSection, modifier: Modifier = 
                     nameColor = if (active) scheme.onErrorContainer else scheme.onSurface,
                     timeColor = if (active) scheme.onErrorContainer else scheme.onSurface,
                     containerColor = if (active) scheme.errorContainer else null,
+                    accentColor = if (active) scheme.error else null,
                     statusText = when {
                         active -> stringResource(R.string.prohibited_phase_active)
                         upcoming -> stringResource(R.string.prohibited_phase_upcoming)
@@ -250,17 +356,24 @@ fun ProhibitedTimetableSection(section: ProhibitedSection, modifier: Modifier = 
                     detail = if (active || upcoming) countdown else null,
                     detailColor = if (active) scheme.onErrorContainer else scheme.onSurfaceVariant,
                 )
+                if (index != section.windows.lastIndex) {
+                    TimetableRowDivider(startInset = RowTextInset, endInset = 0.dp)
+                }
             }
         }
     }
 }
 
-/** Sehri end and Iftar, with the next one highlighted and its countdown. */
+/** Sehri end and Iftar, with the next one marked and its countdown. */
 @Composable
 fun SawmTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val fasting = state.fasting
-    TimetableSection(title = stringResource(R.string.prayer_section_sawm), modifier = modifier) {
+    TimetableSection(
+        title = stringResource(R.string.prayer_section_sawm),
+        glyph = { tint -> RamadanGlyph(tint, Modifier.size(20.dp)) },
+        modifier = modifier,
+    ) {
         val sehriActive = fasting.nextEvent == FastingEvent.SEHRI_END
         val iftarActive = fasting.nextEvent == FastingEvent.IFTAR
         val sehriLabel = if (fasting.isTomorrow) {
@@ -284,10 +397,14 @@ fun SawmTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier
             glyphTint = if (sehriActive) scheme.primary else scheme.onSurfaceVariant,
             nameColor = if (sehriActive) scheme.primary else scheme.onSurface,
             timeColor = if (sehriActive) scheme.primary else scheme.onSurface,
-            containerColor = if (sehriActive) scheme.primary.copy(alpha = 0.12f) else null,
+            containerColor = if (sehriActive) scheme.primary.copy(alpha = 0.10f) else null,
+            accentColor = if (sehriActive) scheme.primary.copy(alpha = 0.35f) else null,
+            statusText = if (sehriActive) stringResource(R.string.home_prayer_status_up_next) else null,
+            statusColor = scheme.primary,
             detail = if (sehriActive) countdown else null,
             detailColor = scheme.primary,
         )
+        TimetableRowDivider(startInset = RowTextInset, endInset = 0.dp)
         TimetableRow(
             name = stringResource(iftarLabel),
             time = fasting.iftarLabel ?: stringResource(R.string.home_time_unavailable),
@@ -295,41 +412,56 @@ fun SawmTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier
             glyphTint = if (iftarActive) scheme.primary else scheme.onSurfaceVariant,
             nameColor = if (iftarActive) scheme.primary else scheme.onSurface,
             timeColor = if (iftarActive) scheme.primary else scheme.onSurface,
-            containerColor = if (iftarActive) scheme.primary.copy(alpha = 0.12f) else null,
+            containerColor = if (iftarActive) scheme.primary.copy(alpha = 0.10f) else null,
+            accentColor = if (iftarActive) scheme.primary.copy(alpha = 0.35f) else null,
+            statusText = if (iftarActive) stringResource(R.string.home_prayer_status_up_next) else null,
+            statusColor = scheme.primary,
             detail = if (iftarActive) countdown else null,
             detailColor = scheme.primary,
         )
     }
 }
 
-/** Sunrise and sunset, then the measured solar geometry that used to sit in its own card. */
+/** Sunrise and sunset, then the measured solar geometry as a quieter block. */
 @Composable
 fun SunTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val solar = state.solarDay
-    TimetableSection(title = stringResource(R.string.prayer_section_sun), modifier = modifier) {
-        state.solarRows
-            .filter { row -> row.event == SolarEvent.SUNRISE || row.event == SolarEvent.SUNSET }
-            .forEach { row ->
-                TimetableRow(
-                    name = stringResource(row.event.labelRes()),
-                    time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
-                    glyph = { tint ->
-                        if (row.event == SolarEvent.SUNRISE) {
-                            SunrisePrayerGlyph(tint, modifier = Modifier.size(22.dp))
-                        } else {
-                            SunsetGlyph(tint, modifier = Modifier.size(22.dp))
-                        }
-                    },
-                    glyphTint = scheme.onSurfaceVariant,
-                )
+    TimetableSection(
+        title = stringResource(R.string.prayer_section_sun),
+        glyph = { tint -> SunGlyph(tint, Modifier.size(20.dp)) },
+        modifier = modifier,
+    ) {
+        val sunRows = state.solarRows.filter { row ->
+            row.event == SolarEvent.SUNRISE || row.event == SolarEvent.SUNSET
+        }
+        sunRows.forEachIndexed { index, row ->
+            TimetableRow(
+                name = stringResource(row.event.labelRes()),
+                time = row.timeLabel ?: stringResource(R.string.home_time_unavailable),
+                glyph = { tint ->
+                    if (row.event == SolarEvent.SUNRISE) {
+                        SunrisePrayerGlyph(tint, modifier = Modifier.size(22.dp))
+                    } else {
+                        SunsetGlyph(tint, modifier = Modifier.size(22.dp))
+                    }
+                },
+                glyphTint = scheme.onSurfaceVariant,
+            )
+            if (index != sunRows.lastIndex) {
+                TimetableRowDivider(startInset = RowTextInset, endInset = 0.dp)
             }
+        }
+
+        if (sunRows.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            TimetableRowDivider(startInset = 0.dp, endInset = 0.dp)
+            Spacer(Modifier.height(4.dp))
+        }
 
         if (solar.unavailable != null) {
-            Spacer(Modifier.height(6.dp))
             SalahUnavailableNote(text = stringResource(solar.unavailable.messageRes()))
         } else {
-            Spacer(Modifier.height(6.dp))
             TimetableStatRow(
                 label = stringResource(R.string.home_solar_midnight),
                 value = solar.solarMidnightLabel,
@@ -350,7 +482,11 @@ fun SunTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier)
 @Composable
 fun NightTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
     val night = state.night
-    TimetableSection(title = stringResource(R.string.home_night_title), modifier = modifier) {
+    TimetableSection(
+        title = stringResource(R.string.home_night_title),
+        glyph = { tint -> NightGlyph(tint, Modifier.size(20.dp)) },
+        modifier = modifier,
+    ) {
         if (night.unavailable != null) {
             SalahUnavailableNote(text = stringResource(night.unavailable.messageRes()))
         } else {
@@ -359,7 +495,9 @@ fun NightTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifie
                 boundary = night.nextBoundary,
                 countdown = night.countdown,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+            TimetableRowDivider(startInset = 0.dp, endInset = 0.dp)
+            Spacer(Modifier.height(4.dp))
             TimetableStatRow(
                 label = stringResource(R.string.home_night_duration),
                 value = night.durationLabel,
@@ -376,33 +514,63 @@ fun NightTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifie
     }
 }
 
+/**
+ * A secondary section: an icon chip and title over a hairline that carries the eye to the edge.
+ *
+ * The rule is the section's identity, not a border around its content. It is the only line above the
+ * rows, so the page reads as a set of titled chapters rather than one uninterrupted block.
+ */
 @Composable
 private fun TimetableSection(
     title: String,
+    glyph: @Composable (Color) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(8.dp))
-        Column(
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            content = content,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionIcon(glyph = glyph)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = scheme.onSurface,
+            )
+            Spacer(Modifier.width(12.dp))
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = scheme.outlineVariant.copy(alpha = 0.6f),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SectionIcon(glyph: @Composable (Color) -> Unit) {
+    val layout = LocalSalahStyle.current
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(layout.shapes.small)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        glyph(MaterialTheme.colorScheme.primary)
     }
 }
 
 /**
- * One timetable line: glyph, name (with an optional status), optional detail and the time at the end.
+ * One timetable line: a leading glyph column, the name with an optional status, optional detail, and
+ * the time at the end.
  *
- * The time is an unweighted child, so it is measured first and can never be squeezed onto two lines;
- * the name column takes what is left and may wrap for Bangla. A tinted [containerColor] is what marks
- * the open or next period, so no row needs a border or a divider.
+ * The glyph column is a fixed 32dp so every name in every section starts on the same vertical line.
+ * The time is measured first and is never wrapped; the name column takes what is left and may wrap
+ * for Bangla. [accentColor] draws a 3dp bar inside the glyph column's left margin, which marks the
+ * open or next period without moving the text or adding a border around the row.
  */
 @Composable
 private fun TimetableRow(
@@ -414,84 +582,110 @@ private fun TimetableRow(
     nameColor: Color = MaterialTheme.colorScheme.onSurface,
     timeColor: Color = MaterialTheme.colorScheme.onSurface,
     containerColor: Color? = null,
+    accentColor: Color? = null,
     statusText: String? = null,
     statusIsPill: Boolean = false,
     statusColor: Color = MaterialTheme.colorScheme.primary,
     statusContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     detail: String? = null,
     detailColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    horizontalPadding: Dp = 0.dp,
+    minHeight: Dp = 48.dp,
 ) {
-    val shape = MaterialTheme.shapes.medium
-    val horizontalPadding = if (containerColor != null) 12.dp else 0.dp
+    val shape = MaterialTheme.shapes.small
+    val accentWidth = 3.dp
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(shape)
-            .then(if (containerColor != null) Modifier.background(containerColor) else Modifier)
-            .heightIn(min = 48.dp)
-            .padding(
-                start = horizontalPadding,
-                end = horizontalPadding,
-                top = 8.dp,
-                bottom = 8.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = horizontalPadding),
     ) {
-        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            glyph(glyphTint)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = nameColor,
-                    maxLines = 2,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (statusText != null) {
-                    Spacer(Modifier.width(8.dp))
-                    if (statusIsPill) {
-                        StatusPill(
-                            text = statusText,
-                            containerColor = statusColor,
-                            contentColor = statusContentColor,
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(containerColor ?: Color.Transparent)
+                .drawBehind {
+                    if (accentColor != null) {
+                        drawRect(
+                            color = accentColor,
+                            topLeft = Offset.Zero,
+                            size = Size(accentWidth.toPx(), size.height),
                         )
-                    } else {
+                    }
+                },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                    glyph(glyphTint)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.labelSmall,
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = statusColor,
-                            maxLines = 1,
+                            color = nameColor,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (statusText != null) {
+                            Spacer(Modifier.width(8.dp))
+                            if (statusIsPill) {
+                                StatusPill(
+                                    text = statusText,
+                                    containerColor = statusColor,
+                                    contentColor = statusContentColor,
+                                )
+                            } else {
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = statusColor,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                    if (detail != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = detailColor,
+                            maxLines = 2,
                         )
                     }
                 }
-            }
-            if (detail != null) {
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.width(12.dp))
                 Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = detailColor,
-                    maxLines = 2,
+                    text = time,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = timeColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    textAlign = TextAlign.End,
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = time,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = timeColor,
-            maxLines = 1,
-            softWrap = false,
-            textAlign = TextAlign.End,
-        )
     }
+}
+
+@Composable
+private fun TimetableRowDivider(startInset: Dp, endInset: Dp) {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = startInset, end = endInset),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+    )
 }
 
 @Composable
@@ -517,8 +711,8 @@ private fun TimetableStatRow(label: String, value: String?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 40.dp)
-            .padding(vertical = 4.dp),
+            .heightIn(min = 36.dp)
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
