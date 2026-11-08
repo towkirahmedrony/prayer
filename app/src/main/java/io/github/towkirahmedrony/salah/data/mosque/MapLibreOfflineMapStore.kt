@@ -86,11 +86,15 @@ class MapLibreOfflineMapStore(
                 try {
                     val status = awaitDownload(region, onProgress)
                     val definition = region.definition as OfflineTilePyramidRegionDefinition
+                    val styleUrl = definition.styleURL
+                        ?: throw OfflineMapException(OfflineMapFailure.STORAGE)
+                    val bounds = definition.toMapBounds()
+                        ?: throw OfflineMapException(OfflineMapFailure.STORAGE)
                     OfflineMapRegion(
                         id = region.id,
                         label = label,
-                        styleUrl = definition.styleURL,
-                        bounds = definition.toMapBounds(),
+                        styleUrl = styleUrl,
+                        bounds = bounds,
                         minZoom = definition.minZoom,
                         maxZoom = definition.maxZoom,
                         downloadedBytes = status.completedResourceSize,
@@ -142,8 +146,10 @@ class MapLibreOfflineMapStore(
     private suspend fun listRegions(manager: OfflineManager): List<OfflineRegion> =
         suspendCancellableCoroutine { continuation ->
             manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
-                override fun onList(offlineRegions: Array<OfflineRegion>) {
-                    if (continuation.isActive) continuation.resume(offlineRegions.toList())
+                override fun onList(offlineRegions: Array<OfflineRegion>?) {
+                    if (continuation.isActive) {
+                        continuation.resume(offlineRegions?.toList().orEmpty())
+                    }
                 }
 
                 override fun onError(error: String) {
@@ -245,11 +251,11 @@ class MapLibreOfflineMapStore(
     private suspend fun statusOf(region: OfflineRegion): OfflineRegionStatus? =
         suspendCancellableCoroutine<OfflineRegionStatus?> { continuation ->
             region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
-                override fun onStatus(status: OfflineRegionStatus) {
+                override fun onStatus(status: OfflineRegionStatus?) {
                     if (continuation.isActive) continuation.resume(status)
                 }
 
-                override fun onError(error: String) {
+                override fun onError(error: String?) {
                     if (continuation.isActive) continuation.resume(null)
                 }
             })
@@ -286,11 +292,13 @@ class MapLibreOfflineMapStore(
         val status = statusOf(this) ?: return null
         val definition = definition as? OfflineTilePyramidRegionDefinition ?: return null
         val metadata = metadataJson()
+        val styleUrl = definition.styleURL ?: return null
+        val bounds = definition.toMapBounds() ?: return null
         return OfflineMapRegion(
             id = id,
             label = metadata.optString(FIELD_LABEL),
-            styleUrl = definition.styleURL,
-            bounds = definition.toMapBounds(),
+            styleUrl = styleUrl,
+            bounds = bounds,
             minZoom = definition.minZoom,
             maxZoom = definition.maxZoom,
             downloadedBytes = status.completedResourceSize,
@@ -299,12 +307,15 @@ class MapLibreOfflineMapStore(
         )
     }
 
-    private fun OfflineTilePyramidRegionDefinition.toMapBounds(): MapBounds = MapBounds(
-        north = bounds.latNorth,
-        south = bounds.latSouth,
-        east = bounds.lonEast,
-        west = bounds.lonWest,
-    )
+    private fun OfflineTilePyramidRegionDefinition.toMapBounds(): MapBounds? {
+        val box = bounds ?: return null
+        return MapBounds(
+            north = box.latNorth,
+            south = box.latSouth,
+            east = box.lonEast,
+            west = box.lonWest,
+        )
+    }
 
     /** Metadata written by this app, or an empty object for a region it did not write. */
     private fun OfflineRegion.metadataJson(): JSONObject =
