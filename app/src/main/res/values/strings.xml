@@ -267,13 +267,16 @@
     <string name="mosque_offline_empty_body">Mosques you load while online are saved here. Connect to the internet and refresh.</string>
     <string name="mosque_cache_unavailable">Saved results could not be read on this device.</string>
     <string name="mosque_offline_map_available">Available offline · %1$s</string>
+    <string name="mosque_map_offline_view">Offline view</string>
+    <string name="mosque_map_saved_results">Saved results</string>
+    <string name="mosque_map_refresh_failed">Refresh failed</string>
     <string name="mosque_offline_map_missing">Map not saved · about %1$s</string>
     <string name="mosque_offline_map_missing_offline">No offline map for this area. Connect to download it.</string>
     <string name="mosque_offline_map_area_too_large">This area is too large to save offline.</string>
     <string name="mosque_offline_map_area_unknown">No map area to save yet.</string>
     <string name="mosque_offline_map_download">Download</string>
     <string name="mosque_offline_map_cancel">Cancel</string>
-    <string name="mosque_offline_map_delete">Delete</string>
+    <string name="mosque_offline_map_delete">Delete offline map</string>
     <string name="mosque_offline_map_downloading">Saving map…</string>
     <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
     <string name="mosque_offline_map_failed_network">The offline map could not be downloaded. Check your connection.</string>

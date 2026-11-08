@@ -482,13 +482,16 @@
     <string name="mosque_offline_empty_body">অনলাইনে থাকলে যে মসজিদগুলো লোড হয় সেগুলো এখানে সংরক্ষিত থাকে। ইন্টারনেট সংযোগ দিয়ে রিফ্রেশ করুন।</string>
     <string name="mosque_cache_unavailable">এই ডিভাইসে সংরক্ষিত ফলাফল পড়া যায়নি।</string>
     <string name="mosque_offline_map_available">অফলাইনে পাওয়া যাবে · %1$s</string>
+    <string name="mosque_map_offline_view">অফলাইন ভিউ</string>
+    <string name="mosque_map_saved_results">সংরক্ষিত ফলাফল</string>
+    <string name="mosque_map_refresh_failed">রিফ্রেশ ব্যর্থ</string>
     <string name="mosque_offline_map_missing">মানচিত্র সংরক্ষিত নয় · প্রায় %1$s</string>
     <string name="mosque_offline_map_missing_offline">এই এলাকার অফলাইন মানচিত্র নেই। ডাউনলোড করতে ইন্টারনেট সংযোগ করুন।</string>
     <string name="mosque_offline_map_area_too_large">এই এলাকা অফলাইনে সংরক্ষণের জন্য খুব বড়।</string>
     <string name="mosque_offline_map_area_unknown">সংরক্ষণ করার মতো কোনো মানচিত্র এলাকা এখনও নেই।</string>
     <string name="mosque_offline_map_download">ডাউনলোড</string>
     <string name="mosque_offline_map_cancel">বাতিল</string>
-    <string name="mosque_offline_map_delete">মুছুন</string>
+    <string name="mosque_offline_map_delete">অফলাইন মানচিত্র মুছুন</string>
     <string name="mosque_offline_map_downloading">মানচিত্র সংরক্ষণ হচ্ছে…</string>
     <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
     <string name="mosque_offline_map_failed_network">অফলাইন মানচিত্র ডাউনলোড করা যায়নি। ইন্টারনেট সংযোগ দেখুন।</string>

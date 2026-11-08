@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.ChevronLeftGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.DeleteGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.DirectionsGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.ListGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
@@ -392,7 +393,11 @@ private fun MapTopBar(
                 }
             }
         }
-        StatusNotices(state = state, onDismissNotice = onDismissNotice)
+        StatusNotices(
+            state = state,
+            onDismissNotice = onDismissNotice,
+            compactForMap = true,
+        )
         OfflineMapBar(
             state = state,
             container = container,
@@ -437,6 +442,15 @@ private fun OfflineMapBar(
         else -> OfflineMapAction.NONE
     }
     val stored = offlineMap.coveringRegion
+    val deleteLabel = stringResource(R.string.mosque_offline_map_delete)
+    val performAction: () -> Unit = {
+        when (action) {
+            OfflineMapAction.DOWNLOAD -> onDownload()
+            OfflineMapAction.CANCEL -> onCancel()
+            OfflineMapAction.DELETE -> stored?.let { region -> onDelete(region.id) }
+            OfflineMapAction.NONE -> Unit
+        }
+    }
 
     Column(
         modifier = modifier
@@ -463,30 +477,31 @@ private fun OfflineMapBar(
                 text = offlineMapStatusText(state),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
+                maxLines = if (stored != null) 1 else 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (action != OfflineMapAction.NONE) {
+            if (action == OfflineMapAction.DELETE) {
+                IconButton(
+                    onClick = performAction,
+                    modifier = Modifier.semantics { contentDescription = deleteLabel },
+                ) {
+                    DeleteGlyph(
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else if (action != OfflineMapAction.NONE) {
                 TextButton(
-                    onClick = {
-                        when (action) {
-                            OfflineMapAction.DOWNLOAD -> onDownload()
-                            OfflineMapAction.CANCEL -> onCancel()
-                            OfflineMapAction.DELETE ->
-                                stored?.let { region -> onDelete(region.id) }
-                            OfflineMapAction.NONE -> Unit
-                        }
-                    },
+                    onClick = performAction,
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
                     Text(
                         text = stringResource(
-                            when (action) {
-                                OfflineMapAction.DOWNLOAD -> R.string.mosque_offline_map_download
-                                OfflineMapAction.CANCEL -> R.string.mosque_offline_map_cancel
-                                OfflineMapAction.DELETE -> R.string.mosque_offline_map_delete
-                                OfflineMapAction.NONE -> R.string.mosque_offline_map_download
+                            if (action == OfflineMapAction.DOWNLOAD) {
+                                R.string.mosque_offline_map_download
+                            } else {
+                                R.string.mosque_offline_map_cancel
                             },
                         ),
                         style = MaterialTheme.typography.labelLarge,
@@ -799,6 +814,7 @@ private fun ViewModeOption(
 private fun StatusNotices(
     state: MosqueFinderUiState,
     onDismissNotice: () -> Unit,
+    compactForMap: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -828,7 +844,18 @@ private fun StatusNotices(
     }
 
     val refreshFailure = state.refreshFailure
-    if (refreshFailure != null) {
+    val compactStatus = when {
+        !compactForMap -> null
+        !state.isOnline && state.offlineMap.isAvailable ->
+            stringResource(R.string.mosque_map_offline_view)
+        refreshFailure != null && state.origin == MosqueDataOrigin.CACHE ->
+            stringResource(R.string.mosque_map_saved_results)
+        refreshFailure != null -> stringResource(R.string.mosque_map_refresh_failed)
+        else -> null
+    }
+    if (compactStatus != null) {
+        MapStatusPill(text = compactStatus)
+    } else if (refreshFailure != null) {
         val explanation = if (state.origin == MosqueDataOrigin.CACHE) {
             // The cache's age is the difference between "these are the mosques here" and "these were
             // the mosques here a month ago", so a saved list says when it was saved.
@@ -842,6 +869,33 @@ private fun StatusNotices(
         }
         SalahUnavailableNote(
             text = listOf(explanation, failureText(refreshFailure)).joinToString(" "),
+        )
+    }
+}
+
+/** A single-line map status, so cached/offline context does not cover the map. */
+@Composable
+private fun MapStatusPill(text: String) {
+    val shape = MaterialTheme.shapes.small
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        MapGlyph(
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

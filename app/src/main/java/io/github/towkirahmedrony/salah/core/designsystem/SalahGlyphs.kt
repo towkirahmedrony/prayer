@@ -522,6 +522,25 @@ fun MapGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier)
     drawLine(tint, Offset(15.2f, 6.6f), Offset(15.2f, 19.8f), strokeWidth = 1.4f)
 }
 
+/** An outlined bin: delete a downloaded offline map. */
+@Composable
+fun DeleteGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    val stroke = Stroke(width = 1.7f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    drawLine(tint, Offset(4.5f, 6.5f), Offset(19.5f, 6.5f), strokeWidth = 1.7f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(9f, 4.5f), Offset(15f, 4.5f), strokeWidth = 1.7f, cap = StrokeCap.Round)
+    drawLine(tint, Offset(9f, 4.5f), Offset(9f, 6.2f), strokeWidth = 1.5f)
+    drawLine(tint, Offset(15f, 4.5f), Offset(15f, 6.2f), strokeWidth = 1.5f)
+    drawRoundRect(
+        color = tint,
+        topLeft = Offset(6.5f, 8f),
+        size = Size(11f, 12.5f),
+        cornerRadius = CornerRadius(1.4f, 1.4f),
+        style = stroke,
+    )
+    drawLine(tint, Offset(10f, 10.5f), Offset(10f, 17f), strokeWidth = 1.4f)
+    drawLine(tint, Offset(14f, 10.5f), Offset(14f, 17f), strokeWidth = 1.4f)
+}
+
 /** Three lines with leading dots: the list view's mark. */
 @Composable
 fun ListGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
