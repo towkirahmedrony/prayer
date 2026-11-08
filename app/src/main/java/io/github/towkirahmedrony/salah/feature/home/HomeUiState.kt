@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.core.model.PrayerCalculationMethod
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.domain.night.NightBoundary
 import io.github.towkirahmedrony.salah.core.domain.night.NightPhase
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflKind
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
 import io.github.towkirahmedrony.salah.core.model.NightPeriodConvention
@@ -110,6 +111,13 @@ sealed interface HomeUiState {
          * a placeholder.
          */
         val heroDates: List<CalendarHeadline> = emptyList(),
+        /** The voluntary prayers (Duha, Awwabin, Tahajjud) for the Home card and the Prayer screen. */
+        val nafl: NaflSection = NaflSection.Unavailable,
+        /**
+         * What the hero ring says besides the fard period: an open prohibited window, or open Duha.
+         * `null` when neither is open.
+         */
+        val heroNafl: HeroNaflSection? = null,
     ) : HomeUiState
 }
 
@@ -500,4 +508,57 @@ data class ProvenanceSection(
     val providerId: String?,
     val observedAtLabel: String?,
     val offlineReady: Boolean,
+)
+
+/** One voluntary prayer's period, already formatted. */
+data class NaflRow(
+    val kind: NaflKind,
+    val startLabel: String,
+    val endLabel: String,
+    /** True when the period begins on the following local date (Tahajjud, from today's view). */
+    val startsNextDay: Boolean,
+    val endsNextDay: Boolean,
+    val isOpen: Boolean,
+    val isPassed: Boolean,
+    /** Duha only: where its preferred part (a quarter of the day after sunrise) begins. */
+    val preferredFromLabel: String? = null,
+)
+
+/** The voluntary prayers for today; [unavailable] is set only when no period could be stated. */
+data class NaflSection(
+    val rows: List<NaflRow>,
+    val lastThirdStartsLabel: String?,
+    val unavailable: UnavailabilityReason?,
+) {
+    companion object {
+        val Unavailable: NaflSection = NaflSection(
+            rows = emptyList(),
+            lastThirdStartsLabel = null,
+            unavailable = UnavailabilityReason.UNKNOWN,
+        )
+    }
+}
+
+/** Which non-fard reading the hero ring is giving. */
+enum class HeroNaflKind {
+    /** A prohibited window is open. */
+    PROHIBITED,
+
+    /** Duha is open. */
+    DUHA,
+}
+
+/**
+ * The hero ring's non-fard reading, resolved against the displayed moment. The clock and the compact
+ * countdown are the same remaining time, so the ring and the red line beside a fard period agree.
+ */
+data class HeroNaflSection(
+    val kind: HeroNaflKind,
+    /** The prohibited window's kind, for [HeroNaflKind.PROHIBITED]; `null` for Duha. */
+    val windowKind: ProhibitedWindowKind?,
+    val endLabel: String,
+    val countdownClock: String,
+    val countdownCompact: String,
+    /** How far through the window or the period the moment is, `0f..1f`, or `null`. */
+    val progress: Float?,
 )

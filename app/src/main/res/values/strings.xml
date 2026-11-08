@@ -1162,4 +1162,24 @@
     <string name="mosque_walk_estimate">about %1$s min walk</string>
     <string name="mosque_zoom_in">Zoom in</string>
     <string name="mosque_zoom_out">Zoom out</string>
+
+    <!-- Home: the voluntary (nafl) prayers, the hero ring's prohibited-time reading and the timetable's "later today" label. -->
+    <string name="home_hero_status_nafl">NAFL</string>
+    <string name="home_hero_status_prohibited">PROHIBITED TIME</string>
+    <string name="home_hero_prohibited_left">Prohibited · %1$s left</string>
+    <string name="home_prayer_status_later">Later today</string>
+    <string name="home_card_nafl_title">Voluntary prayers</string>
+    <string name="home_card_nafl_description">Duha, Awwabin and Tahajjud, with the time of each.</string>
+    <string name="nafl_duha">Duha</string>
+    <string name="nafl_awwabin">Awwabin</string>
+    <string name="nafl_tahajjud">Tahajjud</string>
+    <string name="nafl_status_open">Open now</string>
+    <string name="nafl_status_next_dawn">Before dawn</string>
+    <string name="nafl_duha_preferred">Preferred from %1$s</string>
+    <string name="nafl_last_third_begins">The last third of the night begins at %1$s.</string>
+    <string name="nafl_page_title">Voluntary prayers</string>
+    <string name="nafl_home_note">Voluntary prayers are not part of the five. These times are Salah\'s own documented conventions, not rulings.</string>
+    <string name="nafl_note_duha">Duha opens when the disliked time after sunrise ends and closes before the zawal interval begins. Some scholars call the early part Ishraq; Salah shows one Duha period. The preferred part begins a quarter of the way through the day.</string>
+    <string name="nafl_note_awwabin">Six rak\'at after Maghrib called Awwabin is a tradition among South Asian Hanafis. Some scholars hold that the narrations for it are weak and that the hadith about the Awwabin prayer refers to Duha. Salah shows the tradition and does not rule between the views.</string>
+    <string name="nafl_note_disliked">In the Hanafi school voluntary prayer is also disliked after Fajr until sunrise and after Asr until sunset. That is a different category from the prohibited intervals and is not shown as prohibited time.</string>
 </resources>

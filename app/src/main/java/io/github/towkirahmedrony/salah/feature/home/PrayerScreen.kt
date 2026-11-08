@@ -22,7 +22,9 @@ import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.feature.common.messageRes
 import io.github.towkirahmedrony.salah.feature.home.components.CurrentPrayerHeroCard
+import io.github.towkirahmedrony.salah.feature.home.components.NaflDetailCard
 import io.github.towkirahmedrony.salah.feature.home.components.NightPeriodsCard
+import io.github.towkirahmedrony.salah.feature.home.components.ProhibitedWindowsCard
 import io.github.towkirahmedrony.salah.feature.home.components.SolarGeometryCard
 import io.github.towkirahmedrony.salah.feature.home.components.TimetableCard
 import org.koin.androidx.compose.koinViewModel
@@ -58,6 +60,10 @@ fun PrayerScreen(
                 CurrentPrayerHeroCard(state = state)
                 Spacer(modifier = Modifier.height(4.dp))
                 TimetableCard(state = state)
+                Spacer(modifier = Modifier.height(4.dp))
+                ProhibitedWindowsCard(section = state.prohibited)
+                Spacer(modifier = Modifier.height(4.dp))
+                NaflDetailCard(state = state)
                 Spacer(modifier = Modifier.height(4.dp))
                 NightPeriodsCard(state = state)
                 Spacer(modifier = Modifier.height(4.dp))

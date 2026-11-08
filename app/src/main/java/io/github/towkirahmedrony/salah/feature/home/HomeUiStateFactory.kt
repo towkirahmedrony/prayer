@@ -7,6 +7,10 @@ import io.github.towkirahmedrony.salah.core.domain.NextPrayerResolver
 import io.github.towkirahmedrony.salah.core.domain.PeriodBoundary
 import io.github.towkirahmedrony.salah.core.domain.PrayerPeriodDisplayBounds
 import io.github.towkirahmedrony.salah.core.domain.location.LocationDisplayName
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflDay
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflMoment
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflPeriod
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflPrayerCalculator
 import io.github.towkirahmedrony.salah.core.domain.night.NightPeriodCalculator
 import io.github.towkirahmedrony.salah.core.domain.solar.SolarDayResolver
 import io.github.towkirahmedrony.salah.core.domain.dashboard.DashboardConfig
@@ -74,6 +78,8 @@ class HomeUiStateFactory(
      * be resolved here rather than by the compass screen.
      */
     private val qiblaCalculator: QiblaCalculator = QiblaCalculator(),
+    /** The voluntary-prayer periods, derived from the prohibited windows and the night periods. */
+    private val naflCalculator: NaflPrayerCalculator = NaflPrayerCalculator(),
 ) {
 
     /**
@@ -172,11 +178,25 @@ class HomeUiStateFactory(
         // screen reads. Neither performs astronomy: they only read instants the engine produced, and
         // they are a pure function of those instants and the displayed moment.
         val solarDayUi = solarDaySection(solarDayResolver.resolve(schedule), timeFormatter)
+        val nightState = nightPeriodCalculator.calculate(schedule, nextDaySchedule)
         val nightUi = nightSection(
-            state = nightPeriodCalculator.calculate(schedule, nextDaySchedule),
+            state = nightState,
             now = now,
             timeFormatter = timeFormatter,
         )
+
+        // The voluntary prayers read what the screen already calculated: the prohibited windows bound
+        // Duha, the night periods bound Tahajjud. Nothing here is a second calculation.
+        val prohibitedPeriods = (prohibitedState as? ProhibitedPeriodsState.Available)?.periods.orEmpty()
+        val nightPeriods = (nightState as? NightPeriodsState.Available)?.periods
+        val naflDay = naflCalculator.calculate(
+            schedule = schedule,
+            prohibited = prohibitedPeriods,
+            tahajjudStartsAt = nightPeriods?.tahajjudStartsAt,
+            lastThirdStartsAt = nightPeriods?.lastThirdStartsAt,
+            fajrEndsAt = nextDayFajr,
+        )
+        val naflMoment = naflCalculator.momentAt(naflDay, prohibitedPeriods, now)
 
         return HomeUiState.Ready(
             gregorianDate = gregorian?.formattedDate,
@@ -265,6 +285,14 @@ class HomeUiStateFactory(
                 timeFormatter = timeFormatter,
             ),
             heroDates = calendar?.headlines.orEmpty(),
+            nafl = naflSection(
+                day = naflDay,
+                schedule = schedule,
+                scheduleState = scheduleState,
+                now = now,
+                timeFormatter = timeFormatter,
+            ),
+            heroNafl = naflMoment?.let { moment -> heroNaflSection(moment, now, timeFormatter) },
         )
     }
 
@@ -347,6 +375,78 @@ class HomeUiStateFactory(
         val sehriEnd = RamadanCalendar.sehriEndOf(nextDaySchedule) ?: return null
         val iftar = RamadanCalendar.iftarOf(nextDaySchedule) ?: return null
         return FastingPair(sehriEnd = sehriEnd, iftar = iftar)
+    }
+
+    /**
+     * The voluntary prayers for the Home card and the Prayer screen.
+     *
+     * A period that cannot be stated is simply absent; the section is only marked unavailable when no
+     * period at all could be derived, so a missing prohibited-rule set does not hide Awwabin.
+     */
+    private fun naflSection(
+        day: NaflDay,
+        schedule: PrayerSchedule?,
+        scheduleState: PrayerScheduleState,
+        now: ZonedDateTime,
+        timeFormatter: DateTimeFormatter,
+    ): NaflSection {
+        if (schedule == null) {
+            return NaflSection(
+                rows = emptyList(),
+                lastThirdStartsLabel = null,
+                unavailable = scheduleState.asTimetableNote() ?: UnavailabilityReason.UNKNOWN,
+            )
+        }
+
+        fun rowOf(period: NaflPeriod?, preferredFrom: ZonedDateTime? = null): NaflRow? {
+            if (period == null) return null
+            return NaflRow(
+                kind = period.kind,
+                startLabel = timeFormatter.format(period.startsAt),
+                endLabel = timeFormatter.format(period.endsAt),
+                startsNextDay = period.startsAt.toLocalDate().isAfter(schedule.date),
+                endsNextDay = period.endsAt.toLocalDate().isAfter(schedule.date),
+                isOpen = period.contains(now),
+                isPassed = !period.endsAt.isAfter(now),
+                preferredFromLabel = preferredFrom?.let(timeFormatter::format),
+            )
+        }
+
+        val rows = listOfNotNull(
+            rowOf(day.duha, day.duhaPreferredFrom),
+            rowOf(day.awwabin),
+            rowOf(day.tahajjud),
+        )
+        return NaflSection(
+            rows = rows,
+            lastThirdStartsLabel = day.lastThirdStartsAt?.let(timeFormatter::format),
+            unavailable = if (rows.isEmpty()) UnavailabilityReason.UNKNOWN else null,
+        )
+    }
+
+    /** The hero ring's non-fard reading: all of it derived from the moment's own instants. */
+    private fun heroNaflSection(
+        moment: NaflMoment,
+        now: ZonedDateTime,
+        timeFormatter: DateTimeFormatter,
+    ): HeroNaflSection = when (moment) {
+        is NaflMoment.Prohibited -> HeroNaflSection(
+            kind = HeroNaflKind.PROHIBITED,
+            windowKind = moment.period.kind,
+            endLabel = timeFormatter.format(moment.period.endsAt),
+            countdownClock = CountdownFormatter.formatClock(moment.remaining),
+            countdownCompact = CountdownFormatter.formatCompactRemaining(moment.remaining),
+            progress = periodProgress(start = moment.period.startsAt, end = moment.period.endsAt, now = now),
+        )
+
+        is NaflMoment.DuhaOpen -> HeroNaflSection(
+            kind = HeroNaflKind.DUHA,
+            windowKind = null,
+            endLabel = timeFormatter.format(moment.period.endsAt),
+            countdownClock = CountdownFormatter.formatClock(moment.remaining),
+            countdownCompact = CountdownFormatter.formatCompactRemaining(moment.remaining),
+            progress = periodProgress(start = moment.period.startsAt, end = moment.period.endsAt, now = now),
+        )
     }
 
     /** One day's two fasting instants, as read from that day's schedule. */

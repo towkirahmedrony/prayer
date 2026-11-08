@@ -48,6 +48,9 @@ enum class DashboardCard(
     /** Islamic midnight, the last third and Tahajjud for the coming night. */
     NIGHT_PERIODS("night_periods"),
 
+    /** Duha, Awwabin and Tahajjud: the voluntary prayers whose times Salah states besides the five. */
+    NAFL("nafl"),
+
     /** Shortcuts to the Qibla compass, the calendar, Ramadan and the tools. */
     DAILY_TOOLS("daily_tools"),
 

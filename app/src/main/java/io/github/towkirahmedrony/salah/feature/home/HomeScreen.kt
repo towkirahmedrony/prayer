@@ -36,6 +36,7 @@ import io.github.towkirahmedrony.salah.feature.home.components.FailureBanner
 import io.github.towkirahmedrony.salah.feature.home.components.ForbiddenTimesCard
 import io.github.towkirahmedrony.salah.feature.home.components.HomeHeader
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
+import io.github.towkirahmedrony.salah.feature.home.components.NaflHomeCard
 import io.github.towkirahmedrony.salah.feature.home.components.NightPeriodsCard
 import io.github.towkirahmedrony.salah.feature.home.components.QiblaHomeCard
 import io.github.towkirahmedrony.salah.feature.home.components.RamadanHomeCard
@@ -248,6 +249,12 @@ private fun DashboardCardContent(
         )
 
         DashboardCard.NIGHT_PERIODS -> NightPeriodsCard(state = state)
+
+        DashboardCard.NAFL -> NaflHomeCard(
+            state = state,
+            // Every period, the notes and the prohibited list live on the Prayer screen.
+            onViewDetails = { onNavigate("prayer") },
+        )
 
         DashboardCard.SOLAR_GEOMETRY -> SolarGeometryCard(state = state)
 

@@ -250,6 +250,7 @@ fun DashboardCard.labelRes(): Int = when (this) {
     DashboardCard.CALENDAR -> R.string.home_card_calendar_title
     DashboardCard.RAMADAN -> R.string.home_card_ramadan_title
     DashboardCard.NIGHT_PERIODS -> R.string.home_card_night_title
+    DashboardCard.NAFL -> R.string.home_card_nafl_title
     DashboardCard.DAILY_TOOLS -> R.string.home_card_daily_tools_title
     DashboardCard.SOLAR_GEOMETRY -> R.string.home_card_solar_geometry_title
     DashboardCard.QIBLA -> R.string.home_card_qibla_title
@@ -264,6 +265,7 @@ fun DashboardCard.descriptionRes(): Int = when (this) {
     DashboardCard.CALENDAR -> R.string.home_card_calendar_description
     DashboardCard.RAMADAN -> R.string.home_card_ramadan_description
     DashboardCard.NIGHT_PERIODS -> R.string.home_card_night_description
+    DashboardCard.NAFL -> R.string.home_card_nafl_description
     DashboardCard.DAILY_TOOLS -> R.string.home_card_daily_tools_description
     DashboardCard.SOLAR_GEOMETRY -> R.string.home_card_solar_geometry_description
     DashboardCard.QIBLA -> R.string.home_card_qibla_description

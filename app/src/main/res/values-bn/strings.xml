@@ -1162,4 +1162,24 @@
     <string name="mosque_walk_estimate">হেঁটে প্রায় %1$s মিনিট</string>
     <string name="mosque_zoom_in">জুম ইন</string>
     <string name="mosque_zoom_out">জুম আউট</string>
+
+    <!-- হোম: নফল নামাজ, হিরো রিংয়ের নিষিদ্ধ সময়ের পাঠ এবং সময়সূচির "আজ পরে" লেবেল। -->
+    <string name="home_hero_status_nafl">নফল</string>
+    <string name="home_hero_status_prohibited">নিষিদ্ধ সময়</string>
+    <string name="home_hero_prohibited_left">নিষিদ্ধ · %1$s বাকি</string>
+    <string name="home_prayer_status_later">আজ পরে</string>
+    <string name="home_card_nafl_title">নফল নামাজ</string>
+    <string name="home_card_nafl_description">দোহা, আওয়াবিন ও তাহাজ্জুদ, প্রতিটির সময়সহ।</string>
+    <string name="nafl_duha">দোহা (চাশত)</string>
+    <string name="nafl_awwabin">আওয়াবিন</string>
+    <string name="nafl_tahajjud">তাহাজ্জুদ</string>
+    <string name="nafl_status_open">এখন চলছে</string>
+    <string name="nafl_status_next_dawn">পরদিন ভোরে</string>
+    <string name="nafl_duha_preferred">উত্তম সময় %1$s থেকে</string>
+    <string name="nafl_last_third_begins">রাতের শেষ তৃতীয়াংশ শুরু হয় %1$s-এ।</string>
+    <string name="nafl_page_title">নফল নামাজ</string>
+    <string name="nafl_home_note">নফল নামাজ পাঁচ ওয়াক্তের অংশ নয়। এই সময়গুলো সালাহর নিজের নথিভুক্ত নিয়ম, ফতোয়া নয়।</string>
+    <string name="nafl_note_duha">সূর্যোদয়ের পরের মাকরূহ সময় শেষ হলে দোহার সময় শুরু হয় এবং জাওয়ালের নিষিদ্ধ সময় শুরুর আগে শেষ হয়। কিছু আলেম শুরুর অংশকে ইশরাক বলেন; সালাহ একটিই দোহার সময় দেখায়। উত্তম সময় দিনের এক-চতুর্থাংশ পার হওয়ার পর শুরু হয়।</string>
+    <string name="nafl_note_awwabin">মাগরিবের পর ছয় রাকাতকে আওয়াবিন বলা উপমহাদেশের হানাফি রীতি। কিছু আলেম বলেন, এই রাকাত সংক্রান্ত বর্ণনা দুর্বল, আর আওয়াবিনের নামাজ নিয়ে হাদিসে দোহাকেই বোঝানো হয়েছে। সালাহ রীতিটি দেখায় এবং দুই মতের মধ্যে ফয়সালা করে না।</string>
+    <string name="nafl_note_disliked">হানাফি মাযহাবে ফজরের পর সূর্যোদয় পর্যন্ত এবং আসরের পর সূর্যাস্ত পর্যন্ত নফল নামাজ মাকরূহ। এটি নিষিদ্ধ সময় থেকে ভিন্ন শ্রেণি, তাই নিষিদ্ধ সময় হিসেবে দেখানো হয় না।</string>
 </resources>

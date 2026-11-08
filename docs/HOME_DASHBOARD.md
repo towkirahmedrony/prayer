@@ -163,3 +163,18 @@ or a single class:
 ```
 ./gradlew :app:testDebugUnitTest --tests '*DashboardConfigTest'
 ```
+
+---
+
+## 8. Voluntary prayers card (`nafl`)
+
+`DashboardCard.NAFL` (id `nafl`, on by default, after `night_periods`) renders `NaflHomeCard`: Duha,
+Awwabin and Tahajjud with the time and standing of each, from `HomeUiState.nafl`. The periods come from
+`core/domain/nafl/NaflPrayerCalculator`, which reads the prohibited windows and the night periods the
+screen already calculated (see `docs/NAFL_PRAYERS.md`). The card's detail action opens the Prayer
+screen, where `NaflDetailCard` and `ProhibitedWindowsCard` give every period, the notes and the list of
+prohibited intervals.
+
+The hero ring also reads `HomeUiState.heroNafl`: with no fard period open, an open prohibited window
+(red) or open Duha ("NAFL") takes the ring over; while a fard period is open and a prohibited window
+overlaps it (Asr through the sunset window), the prayer stays and a red line is added beneath it.
