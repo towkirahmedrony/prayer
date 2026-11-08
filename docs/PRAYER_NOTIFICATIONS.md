@@ -201,7 +201,7 @@ requested before the app itself is on screen.
 
 | Permission | Exists from | Why Salah needs it | How it is obtained |
 |---|---|---|---|
-| `POST_NOTIFICATIONS` | API 33 | Without it the platform records a posted notification but never shows it. | Runtime request, once on first launch and from the prayer-notification settings screen. |
+| `POST_NOTIFICATIONS` | API 33 | Without it the platform records a posted notification but never shows it.|  Runtime request, once on first launch; afterwards through the app's notification settings, opened from the prayer-notification settings screen. |
 | `RECEIVE_BOOT_COMPLETED` | API 1 | Alarms do not survive a reboot; without it the schedule would be silently lost. | Install-time. |
 | `SCHEDULE_EXACT_ALARM` | API 31 | Without it `setExactAndAllowWhileIdle` throws. | Special access, requested separately from the notification settings screen. |
 | `VIBRATE` | API 1 | Required for notification vibration, which Salah offers per prayer. | Install-time. |
@@ -237,14 +237,14 @@ not during location setup — and from the prayer-notification settings screen:
 - The first-launch prompt uses the native runtime dialog, once. Whether the dialog has been shown
   is persisted (`UserPreferencesRepository.notificationPermissionRequested`), so a denial is never
   re-prompted on a later launch. Below API 33 there is no runtime permission and nothing is asked.
-- The **"Allow notifications"** button appears while notification permission is missing and the
-  native dialog can still be shown. Pressing it launches the runtime request.
-- If the user has permanently denied the permission (or notifications are turned off at the *app*
-  level), the action becomes **"Enable Notifications"** and opens the app's notification settings
-  page instead — with the App Info page as a fallback if that screen cannot be opened — because
-  that is the only place the setting can be changed. The choice between the two is made by
+- An **"Enable Notifications"** button appears inside the permissions card while notification
+  permission is missing, and is hidden entirely once it is granted. Pressing it opens the app's
+  notification settings page — with the App Info page as a fallback if that screen cannot be
+  opened — because that is the only place the setting can be changed after the first-launch dialog
+  has been answered.
+- Opening reminder settings while the permission is missing still routes through
   `NotificationPermissionPolicy`, which pairs the persisted has-requested flag with
-  `shouldShowRequestPermissionRationale`.
+  `shouldShowRequestPermissionRationale` to decide whether the native dialog can be shown again.
 - The **"Allow exact alarms"** button appears while exact-alarm access is missing. Pressing it opens
   the system grant screen.
 

@@ -810,9 +810,7 @@
     <string name="notifications_permission_granted">Allowed</string>
     <string name="notifications_permission_denied">Not allowed</string>
     <string name="notifications_permission_body">Salah asks once on first launch. Without exact alarms, Android may deliver a reminder up to ten minutes late.</string>
-    <string name="notifications_permission_grant">Allow notifications</string>
     <string name="notifications_permission_enable">Enable Notifications</string>
-    <string name="notifications_permission_manage">Notification settings</string>
     <string name="notifications_exact_alarm_grant">Allow exact alarms</string>
     <string name="notifications_exact_alarm_fallback">Exact alarms are off, so reminders use an inexact alarm and may arrive a few minutes late.</string>
     <string name="notifications_master_title">All prayer notifications</string>

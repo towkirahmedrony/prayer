@@ -840,9 +840,7 @@
     <string name="notifications_permission_granted">অনুমোদিত</string>
     <string name="notifications_permission_denied">অননুমোদিত</string>
     <string name="notifications_permission_body">সালাহ প্রথমবার চালু হলে একবার অনুমতি চায়। সঠিক অ্যালার্ম ছাড়া রিমাইন্ডার দশ মিনিট পর্যন্ত দেরিতে আসতে পারে।</string>
-    <string name="notifications_permission_grant">বিজ্ঞপ্তির অনুমতি দিন</string>
     <string name="notifications_permission_enable">বিজ্ঞপ্তি চালু করুন</string>
-    <string name="notifications_permission_manage">বিজ্ঞপ্তি সেটিংস</string>
     <string name="notifications_exact_alarm_grant">সঠিক অ্যালার্মের অনুমতি দিন</string>
     <string name="notifications_exact_alarm_fallback">সঠিক অ্যালার্ম নেই, তাই রিমাইন্ডার একটি অ-নির্দিষ্ট সময়ে নির্ধারিত হয় এবং কয়েক মিনিট দেরিতে আসতে পারে।</string>
     <string name="notifications_master_title">সব নামাজের বিজ্ঞপ্তি</string>

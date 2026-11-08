@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,7 +80,10 @@ import org.koin.androidx.compose.koinViewModel
  *     that exists. There is no "play the Azan" switch, because no licensed recording ships; the Azan
  *     card states that in one line.
  *  2. **Permission state is shown, not assumed.** Notification permission and exact-alarm access are
- *     separate, so they are separate rows with their own state and their own action.
+ *     separate, so they are separate rows with their own state and their own action. The one action
+ *     notification permission offers — "Enable Notifications" — exists only while the permission is
+ *     missing, and it hands the user to Android's own app notification settings, which is the only
+ *     place the permission can actually be changed once the first-launch dialog has been answered.
  *  3. **Android's limits are stated.** Do Not Disturb, battery management, delivery timing and channel
  *     ownership are kept, in one short line each, so nothing implies a guarantee Android does not offer.
  *
@@ -179,8 +184,6 @@ fun PrayerNotificationSettingsScreen(
 
         PermissionCard(
             uiState = uiState,
-            permissionAction = permissionAction,
-            onRequestNotificationPermission = requestNotifications,
             onRequestExactAlarms = {
                 try {
                     systemSettingsLauncher.launch(exactAlarmSettingsIntent(context.packageName))
@@ -238,8 +241,6 @@ fun PrayerNotificationSettingsScreen(
 @Composable
 private fun PermissionCard(
     uiState: PrayerNotificationSettingsUiState,
-    permissionAction: NotificationPermissionAction,
-    onRequestNotificationPermission: () -> Unit,
     onRequestExactAlarms: () -> Unit,
     onOpenAppNotificationSettings: () -> Unit,
 ) {
@@ -264,26 +265,24 @@ private fun PermissionCard(
         }
 
         Spacer(modifier = Modifier.height(2.dp))
-        if (uiState.permissions.notificationsAllowed) {
-            TextButton(onClick = onOpenAppNotificationSettings) {
-                Text(text = stringResource(R.string.notifications_permission_manage))
+
+        // Only while the permission is missing, because only then is there something to enable. The
+        // button opens Android's own per-app notification settings rather than an in-app prompt: the
+        // first-launch dialog has already been answered by this point, and a manual toggle in system
+        // settings is what actually changes the permission afterwards. When the permission is granted
+        // the button is removed from the hierarchy entirely — the row above already reports it.
+        if (!uiState.permissions.notificationsAllowed) {
+            Button(
+                onClick = onOpenAppNotificationSettings,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(text = stringResource(R.string.notifications_permission_enable))
             }
-        } else {
-            // Denied: the action matches what tapping it will actually do — "Allow
-            // notifications" while the native dialog can still be shown, "Enable
-            // Notifications" when only system settings can change it.
-            TextButton(onClick = onRequestNotificationPermission) {
-                Text(
-                    text = stringResource(
-                        if (permissionAction == NotificationPermissionAction.OPEN_APP_SETTINGS) {
-                            R.string.notifications_permission_enable
-                        } else {
-                            R.string.notifications_permission_grant
-                        },
-                    ),
-                )
-            }
+            Spacer(modifier = Modifier.height(4.dp))
         }
+
         if (!uiState.permissions.exactAlarmsAllowed) {
             TextButton(onClick = onRequestExactAlarms) {
                 Text(text = stringResource(R.string.notifications_exact_alarm_grant))
