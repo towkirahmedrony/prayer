@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +34,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -72,6 +74,7 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.Mosque
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueDataOrigin
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueFailure
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
+import io.github.towkirahmedrony.salah.core.domain.mosque.OfflineMapFailure
 import org.koin.androidx.compose.koinViewModel
 import java.text.NumberFormat
 import java.time.Instant
@@ -138,8 +141,13 @@ fun MosqueFinderScreen(
     // Captured outside the `when`: `state` is a delegated property, so `state.failure` cannot be
     // smart-cast at the use site.
     val failure = state.failure
+    val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val content = when {
         state.isLoading && !state.hasResults -> FinderContent.LOADING
+        // Offline with nothing saved is its own answer. It is decided before `failure` so a device
+        // with no connection never shows an API-error panel, and before the empty result so it says
+        // "nothing saved" rather than "no mosques here".
+        state.isOfflineEmpty -> FinderContent.OFFLINE_EMPTY
         failure != null && !state.hasResults -> FinderContent.FAILURE
         state.center == null && !state.hasResults -> FinderContent.NO_LOCATION
         state.isEmptyResult && !state.hasResults -> FinderContent.EMPTY
@@ -161,6 +169,9 @@ fun MosqueFinderScreen(
                 onSelectView = viewModel::setViewMode,
                 onRefresh = viewModel::refresh,
                 onDismissNotice = viewModel::dismissNotice,
+                onDownloadOfflineMap = { viewModel.downloadOfflineMap(darkTheme) },
+                onCancelOfflineMapDownload = viewModel::cancelOfflineMapDownload,
+                onDeleteOfflineMap = viewModel::deleteOfflineMap,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -195,6 +206,10 @@ fun MosqueFinderScreen(
                         FinderContent.NO_LOCATION -> NoLocationPanel(
                             onUseCurrentLocation = requestCurrentLocation,
                         )
+                        FinderContent.OFFLINE_EMPTY -> OfflineEmptyPanel(
+                            cacheUnavailable = state.cacheUnavailable,
+                            onRetry = viewModel::refresh,
+                        )
                         FinderContent.EMPTY -> EmptyPanel(
                             radiusMetres = state.radiusMetres,
                             onRetry = viewModel::refresh,
@@ -211,12 +226,13 @@ fun MosqueFinderScreen(
     }
 }
 
-/** Which of the screen's six bodies is showing. Decided once, so the layout and the body agree. */
+/** Which of the screen's bodies is showing. Decided once, so the layout and the body agree. */
 private enum class FinderContent {
     LOADING,
     FAILURE,
     NO_LOCATION,
     EMPTY,
+    OFFLINE_EMPTY,
     MAP,
     LIST,
 }
@@ -329,6 +345,9 @@ private fun MapTopBar(
     onSelectView: (MosqueViewMode) -> Unit,
     onRefresh: () -> Unit,
     onDismissNotice: () -> Unit,
+    onDownloadOfflineMap: () -> Unit,
+    onCancelOfflineMapDownload: () -> Unit,
+    onDeleteOfflineMap: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val container = MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
@@ -374,6 +393,202 @@ private fun MapTopBar(
             }
         }
         StatusNotices(state = state, onDismissNotice = onDismissNotice)
+        OfflineMapBar(
+            state = state,
+            container = container,
+            onDownload = onDownloadOfflineMap,
+            onCancel = onCancelOfflineMapDownload,
+            onDelete = onDeleteOfflineMap,
+        )
+    }
+}
+
+/** The one action the offline map row offers, decided once so the label and handler agree. */
+private enum class OfflineMapAction {
+    NONE,
+    DOWNLOAD,
+    CANCEL,
+    DELETE,
+}
+
+/**
+ * One compact row stating whether the map is available offline and offering the one relevant action.
+ *
+ * It is the whole offline-map interface: availability, the estimated or saved size, live progress, a
+ * failure reason, and download / cancel / delete. No dialog and no second screen — saving a map is a
+ * single deliberate tap whose cost is stated before it is spent.
+ */
+@Composable
+private fun OfflineMapBar(
+    state: MosqueFinderUiState,
+    container: Color,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val offlineMap = state.offlineMap
+    val download = offlineMap.download
+    val shape = MaterialTheme.shapes.small
+    val action = when {
+        download is OfflineMapDownload.InProgress -> OfflineMapAction.CANCEL
+        offlineMap.coveringRegion != null -> OfflineMapAction.DELETE
+        state.isOnline && offlineMap.plan?.isWithinLimit == true -> OfflineMapAction.DOWNLOAD
+        else -> OfflineMapAction.NONE
+    }
+    val stored = offlineMap.coveringRegion
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(container)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MapGlyph(
+                tint = if (offlineMap.isAvailable || state.isOnline) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = offlineMapStatusText(state),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (action != OfflineMapAction.NONE) {
+                TextButton(
+                    onClick = {
+                        when (action) {
+                            OfflineMapAction.DOWNLOAD -> onDownload()
+                            OfflineMapAction.CANCEL -> onCancel()
+                            OfflineMapAction.DELETE ->
+                                stored?.let { region -> onDelete(region.id) }
+                            OfflineMapAction.NONE -> Unit
+                        }
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        text = stringResource(
+                            when (action) {
+                                OfflineMapAction.DOWNLOAD -> R.string.mosque_offline_map_download
+                                OfflineMapAction.CANCEL -> R.string.mosque_offline_map_cancel
+                                OfflineMapAction.DELETE -> R.string.mosque_offline_map_delete
+                                OfflineMapAction.NONE -> R.string.mosque_offline_map_download
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+        if (download is OfflineMapDownload.InProgress) {
+            val fraction = download.progress.fraction
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, end = 6.dp, bottom = 2.dp)
+                    .height(3.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                if (fraction != null && fraction > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The offline map row's sentence, chosen from the one condition that applies. */
+@Composable
+private fun offlineMapStatusText(state: MosqueFinderUiState): String {
+    val offlineMap = state.offlineMap
+    val download = offlineMap.download
+    val stored = offlineMap.coveringRegion
+    val plan = offlineMap.plan
+    return when {
+        download is OfflineMapDownload.InProgress -> {
+            val percent = download.progress.percent
+            if (percent == null) {
+                stringResource(R.string.mosque_offline_map_downloading)
+            } else {
+                stringResource(
+                    R.string.mosque_offline_map_progress,
+                    FORMATTING.localizeDigits(percent.toString(), currentLocale()),
+                    storageText(download.progress.downloadedBytes),
+                )
+            }
+        }
+
+        download is OfflineMapDownload.Failed -> when (download.reason) {
+            OfflineMapFailure.NETWORK -> stringResource(R.string.mosque_offline_map_failed_network)
+            OfflineMapFailure.STORAGE -> stringResource(R.string.mosque_offline_map_failed_storage)
+            OfflineMapFailure.UNKNOWN -> stringResource(R.string.mosque_offline_map_failed_unknown)
+        }
+
+        stored != null -> stringResource(
+            R.string.mosque_offline_map_available,
+            storageText(stored.downloadedBytes),
+        )
+
+        !state.isOnline -> stringResource(R.string.mosque_offline_map_missing_offline)
+
+        plan != null && !plan.isWithinLimit ->
+            stringResource(R.string.mosque_offline_map_area_too_large)
+
+        plan != null -> stringResource(
+            R.string.mosque_offline_map_missing,
+            storageText(plan.estimatedBytes),
+        )
+
+        else -> stringResource(R.string.mosque_offline_map_area_unknown)
+    }
+}
+
+/** A byte count in the interface language's numerals, as MB above a megabyte and KB below it. */
+@Composable
+private fun storageText(bytes: Long): String {
+    val locale = currentLocale()
+    val formatter = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = 1
+        }
+    }
+    return if (bytes >= BYTES_PER_MEGABYTE) {
+        stringResource(
+            R.string.mosque_offline_map_megabytes,
+            FORMATTING.localizeDigits(
+                formatter.format(bytes / BYTES_PER_MEGABYTE.toDouble()),
+                locale,
+            ),
+        )
+    } else {
+        stringResource(
+            R.string.mosque_offline_map_kilobytes,
+            FORMATTING.localizeDigits(
+                formatter.format((bytes / BYTES_PER_KILOBYTE.toDouble()).coerceAtLeast(0.0)),
+                locale,
+            ),
+        )
     }
 }
 
@@ -603,7 +818,8 @@ private fun StatusNotices(
 
             MosqueNotice.LOCATION_TIMED_OUT,
             MosqueNotice.LOCATION_UNAVAILABLE,
-            MosqueNotice.DIRECTIONS_UNAVAILABLE -> SalahUnavailableNote(
+            MosqueNotice.DIRECTIONS_UNAVAILABLE,
+            MosqueNotice.OFFLINE_MAP_CANCELLED -> SalahUnavailableNote(
                 text = noticeText(notice),
                 actionLabel = stringResource(R.string.mosque_action_dismiss),
                 onAction = onDismissNotice,
@@ -999,6 +1215,9 @@ private fun MapResults(
 
     Box(modifier = Modifier.fillMaxSize()) {
         MosqueMap(
+            // When offline, a stored region's own style is used; that is the one whose tiles were
+            // downloaded. With no region, the map says so instead of loading a style that cannot
+            // arrive.
             styleUrl = viewModel.mapStyleUrl(darkTheme = darkTheme),
             center = state.center,
             mosques = state.mosques,
@@ -1009,6 +1228,8 @@ private fun MapResults(
             bottomInset = if (selected != null) MAP_BOTTOM_INSET else 0.dp,
             isAcquiringLocation = state.isAcquiringLocation,
             onUseCurrentLocation = onUseCurrentLocation,
+            isOnline = state.isOnline,
+            offlineMapAvailable = state.isMapAvailableOffline,
             modifier = Modifier.fillMaxSize(),
         )
         if (selected != null) {
@@ -1163,6 +1384,48 @@ private fun FailurePanel(
     }
 }
 
+/** Offline with nothing saved for this centre: an answer, not a spinner and not an API error. */
+@Composable
+private fun OfflineEmptyPanel(
+    cacheUnavailable: Boolean,
+    onRetry: () -> Unit,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        SalahSectionCard {
+            Text(
+                text = stringResource(R.string.mosque_offline_empty_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.mosque_offline_empty_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (cacheUnavailable) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.mosque_cache_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(text = stringResource(R.string.action_retry))
+            }
+        }
+    }
+}
+
 /** A search that succeeded and found nothing. */
 @Composable
 private fun EmptyPanel(
@@ -1261,6 +1524,7 @@ private fun noticeText(notice: MosqueNotice): String = when (notice) {
     MosqueNotice.LOCATION_TIMED_OUT -> stringResource(R.string.mosque_location_timeout)
     MosqueNotice.LOCATION_UNAVAILABLE -> stringResource(R.string.mosque_location_unavailable)
     MosqueNotice.DIRECTIONS_UNAVAILABLE -> stringResource(R.string.mosque_directions_unavailable)
+    MosqueNotice.OFFLINE_MAP_CANCELLED -> stringResource(R.string.mosque_offline_map_cancelled)
 }
 
 /**
@@ -1376,6 +1640,14 @@ private const val DISABLED_ALPHA = 0.5f
 /** The URI scheme that names an Android package, used to open this app's own settings page. */
 private const val PACKAGE_URI_SCHEME = "package"
 
-/** Heights of the floating top bar and the selected-mosque bar; the map pads its camera by them. */
-private val MAP_TOP_INSET = 72.dp
+/**
+ * Heights of the floating top bar and the selected-mosque bar; the map pads its camera by them.
+ *
+ * The top bar now carries the offline-map row as well as the controls, so its inset grew with it.
+ */
+private val MAP_TOP_INSET = 132.dp
 private val MAP_BOTTOM_INSET = 100.dp
+
+/** Byte units used only for stating an offline map's estimated or saved size. */
+private const val BYTES_PER_KILOBYTE = 1_000L
+private const val BYTES_PER_MEGABYTE = 1_000_000L

@@ -459,7 +459,7 @@
     <string name="mosque_map_loading">মানচিত্র লোড হচ্ছে…</string>
     <string name="mosque_map_unavailable">মানচিত্র পাওয়া যায়নি। তালিকা এখনও ব্যবহার করা যাবে।</string>
     <string name="mosque_map_failed">মানচিত্র লোড করা যায়নি। তালিকা এখনও পাওয়া যাচ্ছে।</string>
-    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors</string>
+    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors, © OpenMapTiles</string>
     <string name="mosque_map_description">আশপাশের মসজিদের মানচিত্র। %1$sটি মসজিদ দেখানো হচ্ছে।</string>
     <string name="mosque_map_description_one">আশপাশের মসজিদের মানচিত্র। ১টি মসজিদ দেখানো হচ্ছে।</string>
     <string name="mosque_marker_description">%1$s, %2$s</string>
@@ -477,6 +477,26 @@
     <string name="mosque_address_unknown">ঠিকানা দেওয়া হয়নি</string>
     <string name="mosque_phone">ফোন</string>
     <string name="mosque_website">ওয়েবসাইট</string>
+    <string name="mosque_map_offline_unavailable">এই এলাকার কোনো অফলাইন মানচিত্র সংরক্ষিত নেই। ডাউনলোড করতে ইন্টারনেট সংযোগ করুন।</string>
+    <string name="mosque_offline_empty_title">এই এলাকার জন্য সংরক্ষিত কোনো মসজিদ নেই</string>
+    <string name="mosque_offline_empty_body">অনলাইনে থাকলে যে মসজিদগুলো লোড হয় সেগুলো এখানে সংরক্ষিত থাকে। ইন্টারনেট সংযোগ দিয়ে রিফ্রেশ করুন।</string>
+    <string name="mosque_cache_unavailable">এই ডিভাইসে সংরক্ষিত ফলাফল পড়া যায়নি।</string>
+    <string name="mosque_offline_map_available">অফলাইনে পাওয়া যাবে · %1$s</string>
+    <string name="mosque_offline_map_missing">মানচিত্র সংরক্ষিত নয় · প্রায় %1$s</string>
+    <string name="mosque_offline_map_missing_offline">এই এলাকার অফলাইন মানচিত্র নেই। ডাউনলোড করতে ইন্টারনেট সংযোগ করুন।</string>
+    <string name="mosque_offline_map_area_too_large">এই এলাকা অফলাইনে সংরক্ষণের জন্য খুব বড়।</string>
+    <string name="mosque_offline_map_area_unknown">সংরক্ষণ করার মতো কোনো মানচিত্র এলাকা এখনও নেই।</string>
+    <string name="mosque_offline_map_download">ডাউনলোড</string>
+    <string name="mosque_offline_map_cancel">বাতিল</string>
+    <string name="mosque_offline_map_delete">মুছুন</string>
+    <string name="mosque_offline_map_downloading">মানচিত্র সংরক্ষণ হচ্ছে…</string>
+    <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
+    <string name="mosque_offline_map_failed_network">অফলাইন মানচিত্র ডাউনলোড করা যায়নি। ইন্টারনেট সংযোগ দেখুন।</string>
+    <string name="mosque_offline_map_failed_storage">অফলাইন মানচিত্র সংরক্ষণ করা যায়নি। কিছু জায়গা খালি করে আবার চেষ্টা করুন।</string>
+    <string name="mosque_offline_map_failed_unknown">অফলাইন মানচিত্র সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।</string>
+    <string name="mosque_offline_map_megabytes">%1$s মেগাবাইট</string>
+    <string name="mosque_offline_map_kilobytes">%1$s কিলোবাইট</string>
+    <string name="mosque_offline_map_cancelled">অফলাইন মানচিত্র ডাউনলোড বাতিল হয়েছে। কিছুই সংরক্ষিত হয়নি।</string>
 
     <!--
       তাসবিহ: গণনার স্ক্রিন ও সেশনের হিসাব।

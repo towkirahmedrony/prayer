@@ -244,7 +244,7 @@
     <string name="mosque_map_loading">Loading map…</string>
     <string name="mosque_map_unavailable">Map unavailable. The list still works.</string>
     <string name="mosque_map_failed">The map could not be loaded. The list is still available.</string>
-    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors</string>
+    <string name="mosque_map_attribution">© Geoapify, © OpenStreetMap contributors, © OpenMapTiles</string>
     <string name="mosque_map_description">Map of nearby mosques. %1$s mosques shown.</string>
     <string name="mosque_map_description_one">Map of nearby mosques. 1 mosque shown.</string>
     <string name="mosque_marker_description">%1$s, %2$s</string>
@@ -262,6 +262,26 @@
     <string name="mosque_address_unknown">Address not provided</string>
     <string name="mosque_phone">Phone</string>
     <string name="mosque_website">Website</string>
+    <string name="mosque_map_offline_unavailable">No offline map is saved for this area. Connect to the internet to download it.</string>
+    <string name="mosque_offline_empty_title">No saved mosques for this area</string>
+    <string name="mosque_offline_empty_body">Mosques you load while online are saved here. Connect to the internet and refresh.</string>
+    <string name="mosque_cache_unavailable">Saved results could not be read on this device.</string>
+    <string name="mosque_offline_map_available">Available offline · %1$s</string>
+    <string name="mosque_offline_map_missing">Map not saved · about %1$s</string>
+    <string name="mosque_offline_map_missing_offline">No offline map for this area. Connect to download it.</string>
+    <string name="mosque_offline_map_area_too_large">This area is too large to save offline.</string>
+    <string name="mosque_offline_map_area_unknown">No map area to save yet.</string>
+    <string name="mosque_offline_map_download">Download</string>
+    <string name="mosque_offline_map_cancel">Cancel</string>
+    <string name="mosque_offline_map_delete">Delete</string>
+    <string name="mosque_offline_map_downloading">Saving map…</string>
+    <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
+    <string name="mosque_offline_map_failed_network">The offline map could not be downloaded. Check your connection.</string>
+    <string name="mosque_offline_map_failed_storage">The offline map could not be saved. Free some space and try again.</string>
+    <string name="mosque_offline_map_failed_unknown">The offline map could not be saved. Try again.</string>
+    <string name="mosque_offline_map_megabytes">%1$s MB</string>
+    <string name="mosque_offline_map_kilobytes">%1$s KB</string>
+    <string name="mosque_offline_map_cancelled">Offline map download cancelled. Nothing was saved.</string>
 
     <!--
       Tasbih: the counting screen and its session history.

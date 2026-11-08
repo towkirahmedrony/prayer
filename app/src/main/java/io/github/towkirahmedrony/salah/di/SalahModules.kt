@@ -51,7 +51,9 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCache
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueRepository
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchConfig
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchSource
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkMonitor
 import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
+import io.github.towkirahmedrony.salah.core.domain.mosque.OfflineMapStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.ActivePrayerConfigStore
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigApplier
 import io.github.towkirahmedrony.salah.core.domain.prayerconfig.PrayerConfigResolver
@@ -83,6 +85,7 @@ import io.github.towkirahmedrony.salah.data.mosque.DefaultMosqueRepository
 import io.github.towkirahmedrony.salah.data.mosque.GeoapifyMosqueSource
 import io.github.towkirahmedrony.salah.data.mosque.MosqueDao
 import io.github.towkirahmedrony.salah.data.mosque.MosqueDatabase
+import io.github.towkirahmedrony.salah.data.mosque.MapLibreOfflineMapStore
 import io.github.towkirahmedrony.salah.data.mosque.RoomMosqueCache
 import io.github.towkirahmedrony.salah.data.location.DataStoreLocationRepository
 import io.github.towkirahmedrony.salah.data.notification.AlarmManagerPrayerNotificationScheduler
@@ -94,6 +97,7 @@ import io.github.towkirahmedrony.salah.data.notification.AndroidPrayerNotificati
 import io.github.towkirahmedrony.salah.data.notification.BundledAzanAudioSource
 import io.github.towkirahmedrony.salah.data.notification.DataStorePrayerNotificationPreferencesRepository
 import io.github.towkirahmedrony.salah.data.notification.MediaPlayerAudioPlaybackEngine
+import io.github.towkirahmedrony.salah.data.network.AndroidNetworkMonitor
 import io.github.towkirahmedrony.salah.data.network.AndroidNetworkStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationCoordinator
 import io.github.towkirahmedrony.salah.core.domain.notification.PrayerNotificationDeliverer
@@ -264,6 +268,9 @@ val salahModules = module {
     // The cheap "is there obviously no network?" hint the two synchronisers consult before a request. It is
     // a single synchronous lookup, not a registered callback, so no continuous connectivity observer runs.
     single<NetworkStatusProvider> { AndroidNetworkStatusProvider(androidContext()) }
+    // Connectivity as a flow, for the mosque finder's recovery. The observer is registered only while
+    // the screen collects it, so no process-wide connectivity listener is left running.
+    single<NetworkMonitor> { AndroidNetworkMonitor(androidContext()) }
     single<RemoteDatasetSource> { SupabaseRemoteDatasetSource(transport = get(), config = get()) }
     single<DatasetSyncStateStore> {
         FileDatasetSyncStateStore(
@@ -426,6 +433,9 @@ val salahModules = module {
     }
     single<MosqueDao> { get<MosqueDatabase>().mosqueDao() }
     single<MosqueCache> { RoomMosqueCache(dao = get()) }
+    // Genuine offline map areas. MapLibre stores the region's style, fonts, sprites and tiles in its own
+    // persistent database; Geoapify's open tile policy permits caching and offline storage of its tiles.
+    single<OfflineMapStore> { MapLibreOfflineMapStore(androidContext()) }
     single<MosqueRepository> {
         DefaultMosqueRepository(
             config = get(),
@@ -434,6 +444,8 @@ val salahModules = module {
             // The one UTC clock the rest of the app reads. It decides the cache timestamp written on a
             // successful fetch and the age cutoff used to prune, so a test can pin both.
             clock = get(),
+            // Skips a doomed request on a plainly offline device so the cache is reached immediately.
+            networkStatus = get(),
         )
     }
 
@@ -757,6 +769,8 @@ val salahModules = module {
             locationProvider = get(),
             permissionChecker = get(),
             config = get(),
+            networkMonitor = get(),
+            offlineMapStore = get(),
         )
     }
 }

@@ -1,6 +1,7 @@
 package io.github.towkirahmedrony.salah.data.mosque
 
 import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailureKind
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCacheRead
 import io.github.towkirahmedrony.salah.core.domain.mosque.Mosque
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCache
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueDataOrigin
@@ -13,6 +14,8 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchConfig
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchSource
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSourceResult
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
+import io.github.towkirahmedrony.salah.core.domain.network.AlwaysOnlineNetworkStatusProvider
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import java.time.Clock
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -30,7 +33,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *  3. Write the accepted mosques to the cache and prune rows older than the configured age. Both are
  *     best-effort: a database that cannot be written must not turn a successful search into a
  *     failure, because the list in memory is still correct.
- *  4. If no page succeeded, read the cache. A cached list is returned as a success with
+ *  4. If no request can be made at all (no key, or the device is plainly offline), read the cache
+ *     immediately instead of spending a timeout on a request that cannot succeed.
+ *  5. If no page succeeded, read the cache. A cached list is returned as a success with
  *     [MosqueLoadResult.Success.refreshFailure] set, which is how the screen says "these are real
  *     results, and the refresh did not succeed" without replacing them with an error.
  *
@@ -49,11 +54,25 @@ class DefaultMosqueRepository(
     private val source: MosqueSearchSource,
     private val cache: MosqueCache,
     private val clock: Clock = Clock.systemUTC(),
+    /**
+     * The cheap "is there obviously no network?" hint, consulted before a request.
+     *
+     * A device in airplane mode used to spend a full connect timeout on a request that could not
+     * succeed before the cache was even read. This gate removes that wait: a plainly offline device
+     * goes straight to the cache and reports [MosqueFailure.NETWORK_UNAVAILABLE] as the refresh
+     * outcome. It fails open — an inconclusive answer attempts the request and lets the transport
+     * decide, because a false "offline" would hide fresh data behind a stale cache.
+     */
+    private val networkStatus: NetworkStatusProvider = AlwaysOnlineNetworkStatusProvider,
 ) : MosqueRepository {
 
     override suspend fun nearby(query: MosqueQuery): MosqueLoadResult {
         if (!config.isConfigured) {
             return cachedOrFailure(query, MosqueFailure.NOT_CONFIGURED)
+        }
+
+        if (!isOnline()) {
+            return cachedOrFailure(query, MosqueFailure.NETWORK_UNAVAILABLE)
         }
 
         val pageSize = query.pageSize.coerceIn(1, MAX_PAGE_SIZE)
@@ -101,13 +120,31 @@ class DefaultMosqueRepository(
         )
     }
 
-    override suspend fun cachedNearby(query: MosqueQuery): MosqueLoadResult {
-        val snapshot = readCache(query) ?: return MosqueLoadResult.Failure(MosqueFailure.UNKNOWN)
-        return MosqueLoadResult.Success(
-            mosques = snapshot.mosques,
-            origin = MosqueDataOrigin.CACHE,
-            cachedAtEpochMillis = snapshot.cachedAtEpochMillis,
-        )
+    override suspend fun cachedNearby(query: MosqueQuery): MosqueCacheRead {
+        if (!query.center.isFinite || query.radiusMetres <= 0) return MosqueCacheRead.Empty
+
+        val snapshot = try {
+            cache.read(query.center, query.radiusMetres)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Reported as its own case, not as "no saved mosques": a corrupt cache is a device
+            // problem and the screen says so instead of pretending the area was never searched.
+            return MosqueCacheRead.Unavailable
+        }
+
+        return snapshot
+            ?.let { value -> MosqueCacheRead.Available(value) }
+            ?: MosqueCacheRead.Empty
+    }
+
+    /** Fails open: only a definite "no network" skips the request. */
+    private suspend fun isOnline(): Boolean = try {
+        networkStatus.isOnline()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        true
     }
 
     /** Reads the cache and packages it as the fallback outcome, or reports [reason]. */

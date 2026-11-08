@@ -74,7 +74,9 @@ import java.util.Locale
  *
  * **MapLibre renders, Geoapify supplies.** The SDK contains no map data. [styleUrl] is a Geoapify
  * style document; without a key there is no URL to load and the screen says so rather than showing an
- * empty canvas. The Places cache in Room makes the *list* usable offline; tiles are not pre-downloaded.
+ * empty canvas. Offline rendering is real: when the user has downloaded the area, MapLibre draws the
+ * stored style, glyphs, sprites and tiles from its own database with no network, and
+ * [offlineMapAvailable] says whether that is the case here.
  *
  * **Full-page mode.** With [fullBleed] the map has no frame and fills whatever it is given; the screen
  * floats a thin bar at the top and a thin card at the bottom. [topInset] and [bottomInset] are those
@@ -103,10 +105,22 @@ fun MosqueMap(
     bottomInset: Dp = 0.dp,
     isAcquiringLocation: Boolean = false,
     onUseCurrentLocation: (() -> Unit)? = null,
+    isOnline: Boolean = true,
+    offlineMapAvailable: Boolean = true,
 ) {
     if (styleUrl == null) {
         MapFallback(
             text = stringResource(R.string.mosque_map_unavailable),
+            modifier = modifier,
+        )
+        return
+    }
+
+    // No connection and no stored region: loading the style could only fail, and reporting that after
+    // a timeout would look exactly like the endless spinner this state replaces. Say it immediately.
+    if (!isOnline && !offlineMapAvailable) {
+        MapFallback(
+            text = stringResource(R.string.mosque_map_offline_unavailable),
             modifier = modifier,
         )
         return

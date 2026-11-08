@@ -658,6 +658,9 @@ class LocalizationResourcesTest {
             "qibla_bearing_value_degrees",
             "mosque_map_attribution",
             "mosque_marker_description",
+            // A percentage, a separator and a size: the sentence that reads them is the map's
+            // offline availability line, whose words are localised there.
+            "mosque_offline_map_progress",
         )
 
         /**

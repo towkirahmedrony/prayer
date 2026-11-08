@@ -18,8 +18,13 @@ Implemented:
   the broader category.
 - **Nearest-first list** and **map view** of the same result set, with selection, distances calculated
   locally, and a compact detail card.
-- Persistent **Room cache** of previously fetched mosques, usable with no connection, with a visible
-  cached/refresh-failed state.
+- Persistent **Room cache** of previously fetched mosques, read and drawn **before** any request, so
+  saved results appear immediately with no connection and never wait behind a network timeout.
+- **Genuine offline map areas**: an explicitly downloaded MapLibre region (style, fonts, sprites and
+  tiles) stored on the device and reused with no connection, with progress, cancellation, deletion
+  and a stated size estimate.
+- **Connectivity recovery**: a cached or failed list refreshes once when the connection returns,
+  without clearing what is on screen.
 - **Saved-location** default search centre and an explicit one-shot **current-location** action with
   permission, GPS-off, timeout and provider-failure handling.
 - Bangla and English interface strings, light and dark map styles, and screen-reader descriptions.
@@ -32,7 +37,11 @@ Deliberately **not** implemented:
   search response itself.
 - A routing engine or turn-by-turn navigation. Directions are handed to an installed maps app.
 - Background location, continuous location updates or a location listener left running.
-- Offline map tiles, tile pre-downloading or any claim that the map works without a connection.
+- **Automatic** tile prefetching or any download the user did not request. An offline area is saved
+  only from the explicit action described in §4.4; the app never bulk-downloads tiles, and never
+  contacts `tile.openstreetmap.org`.
+- Offline **search**. Only the mosque list that was already fetched is available; a new area still
+  needs a connection.
 - Fake or hardcoded mosques, and treating every Islamic institution as a mosque.
 
 ---
@@ -44,9 +53,12 @@ Deliberately **not** implemented:
 | Domain model and contracts | `core/domain/mosque/` |
 | Geoapify request and GeoJSON parsing | `data/mosque/GeoapifyMosqueSource.kt`, `GeoapifyMosqueParser.kt` |
 | Filtering and ordering rules | `core/domain/mosque/MosqueGeo.kt` |
-| Network-first / cache-second policy | `data/mosque/DefaultMosqueRepository.kt` |
+| Cache-first read, network refresh, cache fallback | `data/mosque/DefaultMosqueRepository.kt` |
 | Room entity, DAO, database, cache | `data/mosque/CachedMosqueEntity.kt`, `MosqueDao.kt`, `MosqueDatabase.kt`, `RoomMosqueCache.kt` |
 | Map style URL | `data/mosque/MosqueMapStyle.kt` |
+| Offline map area rules | `core/domain/mosque/OfflineMap.kt` |
+| MapLibre offline regions | `data/mosque/MapLibreOfflineMapStore.kt` |
+| Connectivity flow | `core/domain/network/NetworkMonitor.kt`, `data/network/AndroidNetworkMonitor.kt` |
 | Screen and map | `feature/mosque/` |
 | Dependency wiring | `di/SalahModules.kt` |
 | Navigation and Tools entry | `navigation/SalahDestination.kt`, `SalahNavHost.kt`, `feature/tools/ToolsEntry.kt` |
@@ -161,19 +173,56 @@ area says the map is unavailable and the list remains fully usable.
   the camera to it.
 - The `MapView` render loop is forwarded from the screen lifecycle and destroyed with the composition.
 - A style load failure is reported over the map after the failure callback or a bounded 20-second
-  timeout.
+  timeout. With no connection and no downloaded area the map says so immediately instead of attempting
+  a style load that cannot succeed.
 
-Attribution is rendered over the map: **© Geoapify, © OpenStreetMap contributors**.
+Attribution is rendered over the map: **© Geoapify, © OpenStreetMap contributors, © OpenMapTiles**.
 
-### 4.3 Offline terms
+### 4.3 Offline terms and attribution
 
-The map is **not** an offline map. The app does not download tiles in advance, does not bulk-copy tiles
-from public OpenStreetMap servers, and makes no claim that tiles remain available without a connection.
-Map tiles are governed by the map style provider's own terms, which are separate from the Places API
-terms.
+Geoapify's published open tile policy permits caching, storing and redistributing the tiles it
+generates, which is what makes an offline region lawful here. The attribution the tiles require is
+drawn over the map at all times: **© Geoapify, © OpenStreetMap contributors, © OpenMapTiles**. The
+OpenMapTiles credit is required because the styles are built on the OpenMapTiles schema. No request is
+ever made to `tile.openstreetmap.org`, and no tile is redistributed by the app.
 
-The **list** is the offline-capable representation: it is read from the Room cache and includes
-locally calculated distances. That is why the list is the default view.
+The **list** remains the always-offline representation: it is read from the Room cache and includes
+locally calculated distances. The **map** is offline only for areas the user chose to download.
+
+### 4.4 Offline map areas
+
+MapLibre's offline support is real tile storage, not a screenshot or a blank canvas.
+`OfflineManager.createOfflineRegion` is given the style URL, the area's bounds, a zoom range and the
+display pixel ratio. The engine downloads and persists the style document, its fonts and sprites and
+every vector tile in that range in its own database under the app's files directory. The same
+`MapView` later renders those stored URLs with no connection.
+
+How it behaves:
+
+- **One deliberate action.** The map view carries one compact row stating whether the current area is
+  available offline, the estimated size, or the live download state. Nothing is downloaded until the
+  user taps Download, and the row states the estimate first (`OfflineMapArea`: 10–16 zoom, about
+  14 KB per tile plus the shared style overhead).
+- **Bounded.** The area is the current 5 km search circle, and an area above 4 000 tiles is refused
+  rather than offered. `OfflineMapArea.plan` returns the plan, or nothing when no honest plan exists
+  (an invalid centre, or a circle near the antimeridian widened to a full globe).
+- **Progress, cancellation, failure.** Progress is the engine's own completed/required resource
+  count and completed bytes. Cancel stops the download and **deletes the partial region**, so a
+  cancelled area cannot occupy storage. A failure is reported as network, storage or unknown, and a
+  failed download deletes its partial region too.
+- **Persistent.** Regions live in MapLibre's database and survive app restarts; the region list is
+  read at screen start.
+- **Deletion.** The row offers Delete for the region covering the current centre.
+- **Used automatically when offline.** With no connection, the stored region's own style URL is loaded
+  (the one whose tiles exist) and its tiles are served from the database. With a connection the active
+  theme's style is used, exactly as before.
+- **No silent data use.** Nothing downloads in the background, on screen entry, or when the theme
+  changes.
+
+**Limitation stated plainly.** A region belongs to the style it was downloaded with (light `positron`
+or dark `dark-matter`). The app draws that stored style offline rather than requesting the other one,
+so the map may be light while the app is in dark mode. Downloading in each theme stores two regions;
+the app does not do that automatically.
 
 ---
 
@@ -222,16 +271,38 @@ rather than dividing by a cosine that approaches zero.
 
 ### 5.3 Offline behaviour
 
-If the request fails and the cache has a result for the current circle, the repository returns that
-result as `Success(origin = CACHE, refreshFailure = <reason>)`. The screen shows the saved list, a
-“Saved” pill and a notice naming the refresh failure **and when the cache was written**, so a saved
-list cannot pass for a live one. It never replaces a real cached list with a bare error panel.
+The view model reads the cache **before** it makes a request and draws it immediately. A saved list
+never waits behind a connect timeout, and a request that later fails cannot hide it. The list is
+marked “Saved”, and a notice names the refresh failure and when the cache was written, so a saved list
+cannot pass for a live one.
+
+The repository also consults `NetworkStatusProvider` before a request. A plainly offline device does
+not attempt one at all: it goes straight to the cache and reports `NETWORK_UNAVAILABLE` as the refresh
+outcome, instead of spending a timeout on a request that cannot succeed. The check fails open, so an
+inconclusive answer still attempts the request.
+
+Three cache outcomes are distinguished by `MosqueCacheRead`:
+
+| Outcome | Screen |
+|---|---|
+| `Available` | The saved mosques, with distances and the cache timestamp. |
+| `Empty` | An offline empty state (“no saved mosques for this area”), never a spinner. |
+| `Unavailable` | The same empty state plus a line saying saved results could not be read. |
 
 If no request can be made at all (blank key) the same rule applies: cached results are shown with
 “not configured” as the refresh reason; only when there is no cache does the screen show the
 configuration failure.
 
-### 5.4 Migrations and downgrade
+### 5.4 Connectivity recovery
+
+The mosque finder collects `NetworkMonitor.connectivity()` for the life of the screen. A transition
+from offline to online refreshes **only** when the screen is showing cached data, a failure or no
+results — a healthy live list is not re-fetched. The refresh is guarded by the in-flight search job,
+so a flapping connection cannot produce duplicate requests. Refreshing keeps the current list on
+screen, preserves the selected mosque when it is still in the result, and does not move the map camera
+because the search centre did not change.
+
+### 5.5 Migrations and downgrade
 
 Version 1 has no migration because no earlier version shipped. `MosqueDatabase.MIGRATIONS` is declared
 empty rather than omitted, so the next schema change has an obvious place to add its migration.
@@ -369,9 +440,10 @@ The feature is covered by JVM unit tests:
 | `MosqueGeoTest` | Category and name filtering, rejection of madrasas/shrines, dedupe, unusable-feature rejection, local distance, radius filtering, nearest-first ordering and deterministic tie-breaks. |
 | `GeoapifyMosqueParserTest` | Coordinate swap, field mapping, address fallback, optional fields, stable fallback identity, malformed features not discarding siblings, malformed roots, empty page. |
 | `GeoapifyMosqueSourceTest` | Both categories in one request, circle/bias/paging/language/key parameters, blank-key short-circuit, status mapping (401/403/429/5xx), network failures, oversized body, page-size bound. |
-| `DefaultMosqueRepositoryTest` | Page merge/dedupe, short-page stop, page ceiling, failure-after-usable-page, cache fallback with refresh reason, failure mapping, unconfigured key, cache read/write exceptions, empty network result, radius filtering, `cachedNearby`. |
+| `DefaultMosqueRepositoryTest` | Page merge/dedupe, short-page stop, page ceiling, failure-after-usable-page, cache fallback with refresh reason, failure mapping, unconfigured key, cache read/write exceptions, empty network result, radius filtering, `cachedNearby`, the offline gate (no request on a plainly offline device), and the empty-vs-unreadable cache distinction. |
 | `RoomMosqueCacheTest` | Rectangle pre-filter plus exact circle, nearest-first sort, upsert by identity, duplicate collapse, non-mosque rejection, unreadable row skipping, age pruning, newest timestamp, invalid query short-circuit, polar bounding box. |
-| `MosqueFinderViewModelTest` | Saved-location first search, no-location state, loading, empty vs failure, cached origin, failed refresh keeping the list, per-search language, selection toggle, view switch without re-query, permission/GPS/timeout/provider failures, acquired fix replacing the centre without writing the saved location, refresh-without-centre, map style configuration. |
+| `MosqueFinderViewModelTest` | Saved-location first search, no-location state, loading, empty vs failure, cached origin, failed refresh keeping the list, per-search language, selection toggle, view switch without re-query, permission/GPS/timeout/provider failures, acquired fix replacing the centre without writing the saved location, refresh-without-centre, map style configuration, cached data drawn before a gated network response, offline cache use with no request, offline empty and unreadable-cache states, one refresh on online recovery with the selection preserved, offline map download progress/completion/style/delete, cancellation discarding the region, storage failure, and refusing a download while offline. |
+| `OfflineMapAreaTest` | Bounds around a radius, antimeridian and near-polar widening, tile-count growth with zoom, estimate components, invalid centre/radius/zoom refusal, whole-globe refusal, and bounds coverage. |
 | `MosqueMapStyleTest` | Blank key → no style, light/dark style selection, key encoding and trimming. |
 
 The existing `LocalizationResourcesTest` also covers the new strings: every `mosque_` key has a Bengali
@@ -383,6 +455,11 @@ proper attribution. Its hardcoded-sentence audit includes the new mosque composa
 CI is the authoritative build environment. The GitHub Actions workflow runs the JVM unit tests,
 Android lint and the signed release assembly. The APK is never built locally as part of validation.
 
+The MapLibre offline store itself is exercised on a device: it talks to the map engine's database and
+has no JVM representation. Its view-model contract (progress, completion, cancellation, failure,
+coverage, deletion) is covered with a fake store, and the pure geometry/estimate rules are covered by
+`OfflineMapAreaTest`.
+
 ---
 
 ## 10. Known limitations
@@ -393,7 +470,13 @@ Android lint and the signed release assembly. The APK is never built locally as 
 - **The name filter is heuristic.** It is deliberately biased toward rejecting non-mosques. A mosque
   with an unorthodox name that carries only the broad category will not appear.
 - **No Place Details.** Phone and website are present only when the search response carried them.
-- **The map needs a connection and a key.** No offline tiles are bundled or pre-downloaded.
+- **The map needs a key and an area download.** No tiles are bundled; only areas the user saved from
+the map view render without a connection. An area saved in one theme is drawn in that theme's style
+offline.
+- **Offline map areas are per style and per location.** Moving the search centre away from a saved
+region leaves the map unavailable until a region covering the new centre is downloaded.
+- **Offline search needs a connection.** The cache answers for places already fetched; a new area does
+not.
 - **No routing.** Directions leave the app.
 - **No background location.** A current-location search requires the screen to be open.
 - **Cache age is 30 days.** Older rows are pruned on the next successful write; a stale row can still

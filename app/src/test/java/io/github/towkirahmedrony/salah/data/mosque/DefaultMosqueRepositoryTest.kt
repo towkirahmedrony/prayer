@@ -4,6 +4,7 @@ import io.github.towkirahmedrony.salah.core.domain.dataset.remote.NetworkFailure
 import io.github.towkirahmedrony.salah.core.domain.location.GeoPoint
 import io.github.towkirahmedrony.salah.core.domain.mosque.Mosque
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCache
+import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCacheRead
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueCacheSnapshot
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueDataOrigin
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueFailure
@@ -13,6 +14,7 @@ import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchConfig
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSearchSource
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueSourceResult
 import io.github.towkirahmedrony.salah.core.domain.mosque.MosqueWithDistance
+import io.github.towkirahmedrony.salah.core.domain.network.NetworkStatusProvider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -249,20 +251,72 @@ class DefaultMosqueRepositoryTest {
 
         val result = repository(source, cache).cachedNearby(query)
 
+        val available = result as MosqueCacheRead.Available
+        assertEquals(listOf("cached"), available.snapshot.mosques.map { it.mosque.placeId })
+        assertEquals(CACHED_AT, available.snapshot.cachedAtEpochMillis)
+        assertTrue(source.requestedOffsets.isEmpty())
+    }
+
+    @Test
+    fun `cachedNearby separates an empty cache from an unreadable one`() = runTest {
+        assertEquals(
+            MosqueCacheRead.Empty,
+            repository(ScriptedSource(pages = emptyMap()), FakeCache()).cachedNearby(query),
+        )
+        assertEquals(
+            MosqueCacheRead.Unavailable,
+            repository(
+                ScriptedSource(pages = emptyMap()),
+                FakeCache(readError = IllegalStateException("corrupt")),
+            ).cachedNearby(query),
+        )
+    }
+
+    @Test
+    fun `a plainly offline device reads the cache without a request`() = runTest {
+        val source = ScriptedSource(pages = mapOf(0 to success(mosque("live", "Live Mosque"))))
+        val cache = FakeCache(snapshot = snapshot(mosque("cached", "Cached Mosque")))
+
+        val result = DefaultMosqueRepository(
+            config = MosqueSearchConfig(apiKey = "test-key"),
+            source = source,
+            cache = cache,
+            clock = clock,
+            networkStatus = FixedNetworkStatus(online = false),
+        ).nearby(query)
+
         val success = result as MosqueLoadResult.Success
         assertEquals(MosqueDataOrigin.CACHE, success.origin)
+        assertEquals(MosqueFailure.NETWORK_UNAVAILABLE, success.refreshFailure)
+        assertEquals(listOf("cached"), success.mosques.map { it.mosque.placeId })
+        // The defect this gate removes: a doomed request spending a timeout before the cache is read.
         assertTrue(source.requestedOffsets.isEmpty())
+    }
+
+    @Test
+    fun `a plainly offline device with no cache reports network unavailable`() = runTest {
+        val result = DefaultMosqueRepository(
+            config = MosqueSearchConfig(apiKey = "test-key"),
+            source = ScriptedSource(pages = emptyMap()),
+            cache = FakeCache(),
+            clock = clock,
+            networkStatus = FixedNetworkStatus(online = false),
+        ).nearby(query)
+
+        assertEquals(MosqueLoadResult.Failure(MosqueFailure.NETWORK_UNAVAILABLE), result)
     }
 
     private fun repository(
         source: MosqueSearchSource,
         cache: MosqueCache,
         config: MosqueSearchConfig = MosqueSearchConfig(apiKey = "test-key"),
+        networkStatus: NetworkStatusProvider = AllOnlineNetworkStatus,
     ) = DefaultMosqueRepository(
         config = config,
         source = source,
         cache = cache,
         clock = clock,
+        networkStatus = networkStatus,
     )
 
     private fun success(vararg mosques: Mosque) =
@@ -291,6 +345,14 @@ class DefaultMosqueRepositoryTest {
         },
         cachedAtEpochMillis = cachedAt,
     )
+
+    private object AllOnlineNetworkStatus : NetworkStatusProvider {
+        override suspend fun isOnline(): Boolean = true
+    }
+
+    private class FixedNetworkStatus(private val online: Boolean) : NetworkStatusProvider {
+        override suspend fun isOnline(): Boolean = online
+    }
 
     private class ScriptedSource(
         private val pages: Map<Int, MosqueSourceResult>,

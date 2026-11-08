@@ -135,6 +135,27 @@ data class MosqueCacheSnapshot(
 )
 
 /**
+ * The outcome of reading the cache without making a request.
+ *
+ * The three cases are distinct on purpose. "Nothing is stored here" is a normal first-run answer and
+ * the screen shows an empty offline state for it; "the database could not be read" is a device
+ * problem and is said so; only an [Available] snapshot is data. Collapsing them into a nullable or an
+ * empty list would make the screen claim there are no saved mosques when there are, or claim a read
+ * failure was an empty area.
+ */
+sealed interface MosqueCacheRead {
+
+    /** Previously stored mosques around the requested centre. */
+    data class Available(val snapshot: MosqueCacheSnapshot) : MosqueCacheRead
+
+    /** The cache is healthy and holds nothing for this centre. */
+    data object Empty : MosqueCacheRead
+
+    /** The cache could not be read at all — usually a corrupt or unreadable database. */
+    data object Unavailable : MosqueCacheRead
+}
+
+/**
  * Persistent storage of previously fetched mosques.
  *
  * The port speaks in domain values so the repository can be tested without a database, and the Room
@@ -163,8 +184,14 @@ interface MosqueRepository {
     /** Fetches nearby mosques, falling back to the cache when the service cannot be used. */
     suspend fun nearby(query: MosqueQuery): MosqueLoadResult
 
-    /** Reads the cache without making a request. */
-    suspend fun cachedNearby(query: MosqueQuery): MosqueLoadResult
+    /**
+     * Reads the cache without making a request.
+     *
+     * Called before [nearby] so a saved list can be drawn immediately instead of after a network
+     * attempt has failed. Implementations must not throw for a storage problem: they report
+     * [MosqueCacheRead.Unavailable] instead.
+     */
+    suspend fun cachedNearby(query: MosqueQuery): MosqueCacheRead
 }
 
 /** The places service, as the repository sees it. */
