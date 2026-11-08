@@ -11,8 +11,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -26,11 +34,15 @@ import io.github.towkirahmedrony.salah.core.designsystem.GearGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionAction
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionPolicy
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionStatusProvider
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.app.ProvideAppLanguageStrings
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionContext
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionScreen
+import org.koin.androidx.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -75,6 +87,44 @@ fun SalahApp(
     val uiStyle by appViewModel.uiStyle.collectAsStateWithLifecycle()
     val appLanguage by appViewModel.appLanguage.collectAsStateWithLifecycle()
     val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
+    val notificationPermissionRequested by
+        appViewModel.notificationPermissionRequested.collectAsStateWithLifecycle()
+    val permissionStatusProvider: NotificationPermissionStatusProvider = koinInject()
+
+    // --- First-launch notification permission ------------------------------------
+    // Asked once, at the appropriate moment: when the location gate has just opened and the
+    // app itself (with its prayer times) is first on screen — not on the setup screen, where
+    // no reminder exists yet to grant permission for. The persisted flag plus the saveable
+    // guard together ensure the native dialog is shown once and never repeatedly, whatever
+    // the user answers; a denial simply leaves the app fully usable, with the settings
+    // screen as the way back. Below Android 13 there is no runtime permission to ask for.
+    var hasLaunchedFirstPrompt by rememberSaveable { mutableStateOf(false) }
+    val firstNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        // The answer is read from the platform on the next entry to the permissions screen;
+        // nothing here needs to act on it, and this shell never re-prompts on its own.
+    }
+    LaunchedEffect(setupState, notificationPermissionRequested) {
+        if (setupState !is LocationSetupState.Complete) return@LaunchedEffect
+        if (hasLaunchedFirstPrompt || notificationPermissionRequested) return@LaunchedEffect
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+        val action = NotificationPermissionPolicy.action(
+            notificationsAllowed = runCatching { permissionStatusProvider.status() }
+                .getOrNull()?.notificationsAllowed ?: false,
+            hasRequestedDialog = notificationPermissionRequested,
+            // Before the first request the rationale flag is always false; passing it through
+            // keeps this decision identical to the settings screen's.
+            shouldShowRationale = false,
+            requiresRuntimePermission = true,
+        )
+        if (action != NotificationPermissionAction.REQUEST) return@LaunchedEffect
+        hasLaunchedFirstPrompt = true
+        // Mark before launching, so a rotation or process death under the dialog cannot
+        // trigger a second prompt.
+        appViewModel.markNotificationPermissionRequested()
+        firstNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     ProvideAppLanguageStrings(language = appLanguage) {
         SalahTheme(themeMode = themeMode, themePreset = themePreset, uiStyle = uiStyle) {

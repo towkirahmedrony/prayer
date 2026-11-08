@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
  * read. The snapshot is already populated by then, so the gate can decide on the first pass.
  */
 class AppViewModel(
-    userPreferencesRepository: UserPreferencesRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val startup: StartupSnapshot,
     private val areaCatalog: BangladeshAreaCatalog,
 ) : ViewModel() {
@@ -85,6 +85,33 @@ class AppViewModel(
         started = SharingStarted.Eagerly,
         initialValue = AppLanguage.DEFAULT,
     )
+
+    /**
+     * Whether the native notification-permission dialog has already been shown.
+     *
+     * The shell reads this to decide its one first-launch prompt: it fires only while this is
+     * `false`, so a denial is never re-prompted on a later launch. The initial value is `false`
+     * (not yet asked) — the same optimistic default the other preferences use — and the stored
+     * value replaces it as soon as the store has been read.
+     */
+    val notificationPermissionRequested: StateFlow<Boolean> =
+        userPreferencesRepository.notificationPermissionRequested.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
+    /**
+     * Records that the dialog is being shown. Called *before* launching it, so a rotation or
+     * process death while the dialog is up cannot show it a second time. A store that cannot be
+     * written is swallowed here on purpose: the shell's in-memory guard still prevents a repeat
+     * in this session, and the app must stay usable either way.
+     */
+    fun markNotificationPermissionRequested() {
+        viewModelScope.launch {
+            runCatching { userPreferencesRepository.markNotificationPermissionRequested() }
+        }
+    }
 
     private val dataset = MutableStateFlow<BangladeshLocationDataset?>(null)
     private val datasetRead = MutableStateFlow(false)

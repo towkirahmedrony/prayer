@@ -3,13 +3,14 @@
 
     <!--
       Salah's permissions, each with the exact feature that needs it. Nothing is declared "just in
-      case", and no permission is requested at startup: every one is either granted at install time
-      or asked for from the prayer-notification settings screen, when the user takes the action that
+      case", and no permission is requested before the app itself is on screen: every one is either
+      granted at install time, asked for once on first launch (when the location gate opens), or
+      asked for from the prayer-notification settings screen when the user takes the action that
       requires it. See docs/PRAYER_NOTIFICATIONS.md §3.
 
         POST_NOTIFICATIONS    API 33+ runtime permission. Without it the platform accepts a posted
-                              notification but never shows it. Asked for from the notifications
-                              screen when the user enables reminders.
+                              notification but never shows it. Asked for once on first launch, and
+                              from the notifications screen when the user enables reminders.
 
         RECEIVE_BOOT_COMPLETED
                               Alarms do not survive a reboot. Without this the schedule would be

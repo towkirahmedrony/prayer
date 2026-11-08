@@ -721,6 +721,7 @@ val salahModules = module {
             coordinator = get(),
             soundPreviewer = get(),
             azanPlayback = get(),
+            userPreferences = get(),
         )
     }
     // The Tasbih counter's one view model, and the only holder of its state. The counter is not read by

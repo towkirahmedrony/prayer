@@ -324,6 +324,7 @@ class FakeUserPreferencesRepository(
     initialAppLanguage: AppLanguage = AppLanguage.DEFAULT,
     initialOverrides: PrayerConfigOverrides = PrayerConfigOverrides.NONE,
     initialDashboardConfig: DashboardConfig = DashboardConfig.DEFAULT,
+    initialNotificationPermissionRequested: Boolean = false,
 ) : UserPreferencesRepository {
 
     private val settingsState = MutableStateFlow(initialSettings)
@@ -334,6 +335,8 @@ class FakeUserPreferencesRepository(
     private val languageState = MutableStateFlow(initialAppLanguage)
     private val overridesState = MutableStateFlow(initialOverrides)
     private val dashboardState = MutableStateFlow(initialDashboardConfig.normalized())
+    private val notificationPermissionRequestedState =
+        MutableStateFlow(initialNotificationPermissionRequested)
 
     /**
      * When set, the next [setAppLanguage] throws this instead of storing anything, which models a
@@ -398,6 +401,12 @@ class FakeUserPreferencesRepository(
 
     override suspend fun updateDashboardConfig(transform: (DashboardConfig) -> DashboardConfig) {
         dashboardState.value = transform(dashboardState.value).normalized()
+    }
+
+    override val notificationPermissionRequested: Flow<Boolean> = notificationPermissionRequestedState
+
+    override suspend fun markNotificationPermissionRequested() {
+        notificationPermissionRequestedState.value = true
     }
 
     /** Moves the stored Hijri offset, for a scenario where the user realigns the calendar. */

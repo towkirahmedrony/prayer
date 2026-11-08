@@ -16,6 +16,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
@@ -221,8 +222,39 @@ class AppViewModelTest {
             assertEquals(LocationSetupReason.NO_LOCATION, viewModel.locationSetup.value.requiredReason())
         }
 
-    private fun TestScope.viewModel(catalog: BangladeshAreaCatalog): AppViewModel = AppViewModel(
-        userPreferencesRepository = FakeUserPreferencesRepository(),
+    @Test
+    fun `the notification permission prompt starts unasked and marking it is stored`() =
+        runTest(mainDispatcher) {
+            val preferences = FakeUserPreferencesRepository()
+            val viewModel = viewModel(FakeBangladeshAreaCatalog(syntheticDataset()), preferences)
+            runCurrent()
+
+            assertEquals(false, viewModel.notificationPermissionRequested.value)
+
+            viewModel.markNotificationPermissionRequested()
+            runCurrent()
+
+            assertEquals(true, viewModel.notificationPermissionRequested.value)
+            assertEquals(true, preferences.notificationPermissionRequested.first())
+        }
+
+    @Test
+    fun `a previously asked notification permission is exposed without re-asking`() =
+        runTest(mainDispatcher) {
+            val preferences = FakeUserPreferencesRepository(
+                initialNotificationPermissionRequested = true,
+            )
+            val viewModel = viewModel(FakeBangladeshAreaCatalog(syntheticDataset()), preferences)
+            runCurrent()
+
+            assertEquals(true, viewModel.notificationPermissionRequested.value)
+        }
+
+    private fun TestScope.viewModel(
+        catalog: BangladeshAreaCatalog,
+        preferences: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
+    ): AppViewModel = AppViewModel(
+        userPreferencesRepository = preferences,
         startup = StartupSnapshot(
             storedLocationSource = storedLocation,
             prayerSettingsSource = MutableStateFlow(PrayerSettings.DEFAULT),

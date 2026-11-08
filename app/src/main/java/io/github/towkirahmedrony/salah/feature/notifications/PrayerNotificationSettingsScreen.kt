@@ -2,10 +2,15 @@ package io.github.towkirahmedrony.salah.feature.notifications
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -23,14 +28,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionAction
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionPolicy
 import io.github.towkirahmedrony.salah.R
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahStyle
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
@@ -81,10 +93,22 @@ fun PrayerNotificationSettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Re-read the permission state when the screen appears: the user may have changed it in system
     // settings since Salah last looked.
     LaunchedEffect(Unit) { viewModel.refreshPermissionState() }
+
+    // And on every return to the foreground: a change made in system settings is only visible
+    // here once the screen resumes, and some devices return from settings without a result.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermissionState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -94,16 +118,48 @@ fun PrayerNotificationSettingsScreen(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) { viewModel.refreshPermissionState() }
 
+    // Opens the app's notification settings, falling back to the App Info page if that screen is
+    // unavailable on this device, and doing nothing further if neither can be opened — the app
+    // must stay usable even when its settings cannot be reached.
+    val openAppNotificationSettings: () -> Unit = {
+        try {
+            systemSettingsLauncher.launch(appNotificationSettingsIntent(context.packageName))
+        } catch (_: ActivityNotFoundException) {
+            try {
+                systemSettingsLauncher.launch(appDetailsSettingsIntent(context.packageName))
+            } catch (_: ActivityNotFoundException) {
+                // No settings activity can be opened; there is nowhere else to send the user.
+            }
+        }
+    }
+
     // One definition of "ask for notification access", used both by the explicit grant button and
     // by the moment the user turns reminders on — the point at which the permission becomes the
-    // thing that decides whether anything is ever shown.
+    // thing that decides whether anything is ever shown. A first denial is asked again through
+    // the native dialog; a permanent denial (or an Android version without the runtime
+    // permission) goes straight to system settings, where the permission can actually change.
+    val permissionAction = NotificationPermissionPolicy.action(
+        notificationsAllowed = uiState.permissions.notificationsAllowed,
+        hasRequestedDialog = uiState.notificationPermissionRequested,
+        shouldShowRationale = activity?.let { host ->
+            ActivityCompat.shouldShowRequestPermissionRationale(
+                host,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+        } ?: false,
+        requiresRuntimePermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+    )
     val requestNotifications: () -> Unit = {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            // The permission does not exist below API 33; notifications there are turned off at the
-            // app level, so the only useful destination is the app's settings page.
-            systemSettingsLauncher.launch(appNotificationSettingsIntent(context.packageName))
+        when (permissionAction) {
+            NotificationPermissionAction.REQUEST -> {
+                // Record the attempt before launching, so the next decision can distinguish a
+                // first denial from a permanent one.
+                viewModel.markNotificationPermissionRequested()
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+
+            NotificationPermissionAction.OPEN_APP_SETTINGS -> openAppNotificationSettings()
+            NotificationPermissionAction.ALREADY_GRANTED -> Unit
         }
     }
 
@@ -123,13 +179,17 @@ fun PrayerNotificationSettingsScreen(
 
         PermissionCard(
             uiState = uiState,
+            permissionAction = permissionAction,
             onRequestNotificationPermission = requestNotifications,
             onRequestExactAlarms = {
-                systemSettingsLauncher.launch(exactAlarmSettingsIntent(context.packageName))
+                try {
+                    systemSettingsLauncher.launch(exactAlarmSettingsIntent(context.packageName))
+                } catch (_: ActivityNotFoundException) {
+                    // No exact-alarm screen on this device; the fallback note already states
+                    // what that costs, and the app remains usable without it.
+                }
             },
-            onOpenAppNotificationSettings = {
-                systemSettingsLauncher.launch(appNotificationSettingsIntent(context.packageName))
-            },
+            onOpenAppNotificationSettings = openAppNotificationSettings,
         )
 
         RemindersCard(
@@ -178,6 +238,7 @@ fun PrayerNotificationSettingsScreen(
 @Composable
 private fun PermissionCard(
     uiState: PrayerNotificationSettingsUiState,
+    permissionAction: NotificationPermissionAction,
     onRequestNotificationPermission: () -> Unit,
     onRequestExactAlarms: () -> Unit,
     onOpenAppNotificationSettings: () -> Unit,
@@ -208,8 +269,19 @@ private fun PermissionCard(
                 Text(text = stringResource(R.string.notifications_permission_manage))
             }
         } else {
+            // Denied: the action matches what tapping it will actually do — "Allow
+            // notifications" while the native dialog can still be shown, "Enable
+            // Notifications" when only system settings can change it.
             TextButton(onClick = onRequestNotificationPermission) {
-                Text(text = stringResource(R.string.notifications_permission_grant))
+                Text(
+                    text = stringResource(
+                        if (permissionAction == NotificationPermissionAction.OPEN_APP_SETTINGS) {
+                            R.string.notifications_permission_enable
+                        } else {
+                            R.string.notifications_permission_grant
+                        },
+                    ),
+                )
             }
         }
         if (!uiState.permissions.exactAlarmsAllowed) {
@@ -682,6 +754,23 @@ private fun appNotificationSettingsIntent(packageName: String): Intent =
         putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
+
+/**
+ * Opens the App Info page — the fallback when the per-app notification settings page cannot be
+ * opened. The notification toggle lives there on every supported Android version.
+ */
+private fun appDetailsSettingsIntent(packageName: String): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", packageName, null)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+/** The hosting [Activity], found through any [ContextWrapper] the Compose tree was handed. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 /**
  * Opens the system's exact-alarm grant screen.

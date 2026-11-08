@@ -129,4 +129,20 @@ interface UserPreferencesRepository {
      * or a toggle and a reorder — cannot lose one another's change.
      */
     suspend fun updateDashboardConfig(transform: (DashboardConfig) -> DashboardConfig)
+
+    /**
+     * Whether Salah has already shown the native `POST_NOTIFICATIONS` runtime dialog.
+     *
+     * Persisted so the first-launch prompt fires once and never repeatedly: a user who denied on
+     * that first ask must not be re-prompted on every launch, and a user who permanently denied
+     * must be routed to system settings instead of a dialog the system will no longer show. A
+     * fresh install reads `false`; the flow always emits a value.
+     */
+    val notificationPermissionRequested: Flow<Boolean>
+
+    /**
+     * Records that the runtime dialog has been shown. Writes exactly one key; called *before*
+     * launching the dialog, so a rotation or process death during the dialog cannot re-trigger it.
+     */
+    suspend fun markNotificationPermissionRequested()
 }

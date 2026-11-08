@@ -3,6 +3,7 @@ package io.github.towkirahmedrony.salah.data.preferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -272,6 +273,23 @@ class DataStoreUserPreferencesRepository(
         hidden = this[Keys.DASHBOARD_HIDDEN_CARDS]?.toCardIds()?.toSet() ?: DashboardConfig.DEFAULT.hidden,
     ).normalized()
 
+    // --- Notification permission prompt -------------------------------------------
+
+    /**
+     * Whether the native notification-permission dialog has already been shown.
+     *
+     * Its own key, like every other preference here, so marking it cannot rewrite the theme, the
+     * calculation settings or anything else in the store. Absent reads as `false` — a fresh install
+     * (or a store written before this flag existed) has not been asked yet.
+     */
+    override val notificationPermissionRequested: Flow<Boolean> = dataStore.data
+        .catch { error -> if (error is IOException) emit(emptyPreferences()) else throw error }
+        .map { preferences -> preferences[Keys.NOTIFICATION_PERMISSION_REQUESTED] ?: false }
+
+    override suspend fun markNotificationPermissionRequested() {
+        dataStore.edit { preferences -> preferences[Keys.NOTIFICATION_PERMISSION_REQUESTED] = true }
+    }
+
     private fun String.toCardIds(): List<String> =
         split(CARD_ID_SEPARATOR).filter { id -> id.isNotBlank() }
 
@@ -292,6 +310,7 @@ class DataStoreUserPreferencesRepository(
         val DASHBOARD_CONFIG_VERSION = intPreferencesKey("dashboard_config_version")
         val DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
         val DASHBOARD_HIDDEN_CARDS = stringPreferencesKey("dashboard_hidden_cards")
+        val NOTIFICATION_PERMISSION_REQUESTED = booleanPreferencesKey("notification_permission_requested")
 
         fun adjustment(prayer: PrayerName) = intPreferencesKey("prayer_adjustment_${prayer.name}")
     }

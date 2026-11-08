@@ -11,6 +11,7 @@ import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileReason
 import io.github.towkirahmedrony.salah.core.domain.notification.ReconcileOutcome
 import io.github.towkirahmedrony.salah.core.domain.repository.LocationRepository
 import io.github.towkirahmedrony.salah.core.domain.repository.PrayerNotificationPreferencesRepository
+import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationPreference
@@ -43,6 +44,7 @@ class PrayerNotificationSettingsViewModel(
     private val coordinator: PrayerNotificationCoordinator,
     private val soundPreviewer: NotificationSoundPreviewer,
     private val azanPlayback: AzanPlaybackManager,
+    private val userPreferences: UserPreferencesRepository,
 ) : ViewModel() {
 
     /** Read once so the very first frame already reports the real state rather than a guess. */
@@ -59,10 +61,12 @@ class PrayerNotificationSettingsViewModel(
         permissionState,
         scheduleSummary,
         message,
-    ) { settings, location, permissions, summary, currentMessage ->
+        userPreferences.notificationPermissionRequested,
+    ) { settings, location, permissions, summary, currentMessage, permissionRequested ->
         PrayerNotificationSettingsUiState(
             settings = settings,
             permissions = permissions,
+            notificationPermissionRequested = permissionRequested,
             locationConfigured = location != null,
             azanAvailable = azanPlayback.isAvailable,
             azanAttribution = azanPlayback.attribution(),
@@ -92,6 +96,18 @@ class PrayerNotificationSettingsViewModel(
      */
     fun refreshPermissionState() {
         permissionState.value = permissions.status()
+    }
+
+    /**
+     * Records that the native permission dialog is being shown, so a later tap can tell a
+     * first denial (dialog again) from a permanent one (system settings). Called *before*
+     * launching the dialog. A store that cannot be written is swallowed: the screen's own
+     * state still reflects the attempt in this session, and the app stays usable either way.
+     */
+    fun markNotificationPermissionRequested() {
+        viewModelScope.launch {
+            runCatching { userPreferences.markNotificationPermissionRequested() }
+        }
     }
 
     // --- Global ---------------------------------------------------------------

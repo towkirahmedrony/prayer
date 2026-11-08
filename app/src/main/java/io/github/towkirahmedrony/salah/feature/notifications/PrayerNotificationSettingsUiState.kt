@@ -49,6 +49,12 @@ data class NotificationScheduleSummary(
 data class PrayerNotificationSettingsUiState(
     val settings: PrayerNotificationSettings,
     val permissions: NotificationPermissionStatus,
+    /**
+     * Whether the native notification-permission dialog has already been shown (persisted).
+     * Together with the platform's rationale flag this decides whether the denied-state action
+     * re-launches the dialog or opens system settings — see [NotificationPermissionPolicy].
+     */
+    val notificationPermissionRequested: Boolean = false,
     /** Whether the configured location is set, which is what a schedule needs. */
     val locationConfigured: Boolean,
     /** True when a licensed Azan recording is available to play. `false` in this build. */

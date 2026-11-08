@@ -424,5 +424,10 @@ class CalendarViewModelTest {
         override suspend fun updateDashboardConfig(
             transform: (DashboardConfig) -> DashboardConfig,
         ) = Unit
+
+        // The calendar view model never asks for notification permission.
+        override val notificationPermissionRequested: Flow<Boolean> = MutableStateFlow(false)
+
+        override suspend fun markNotificationPermissionRequested() = Unit
     }
 }

@@ -367,6 +367,27 @@ class DataStoreUserPreferencesRepositoryTest {
         assertEquals(1, repository.calendarSettings.first().hijriAdjustmentDays)
     }
 
+    // --- Notification permission prompt -------------------------------------------
+
+    @Test
+    fun `the notification permission prompt defaults to not yet asked`() = runTest {
+        assertFalse(repository.notificationPermissionRequested.first())
+    }
+
+    @Test
+    fun `marking the notification permission prompt survives a restart and touches nothing else`() =
+        runTest {
+            repository.setThemeMode(ThemeMode.DARK)
+
+            repository.markNotificationPermissionRequested()
+
+            // A fresh repository over the same file stands in for a process restart.
+            val restarted = DataStoreUserPreferencesRepository(dataStore)
+            assertTrue(restarted.notificationPermissionRequested.first())
+            // Marking the prompt must not reset an unrelated preference in the same store.
+            assertEquals(ThemeMode.DARK, restarted.themeMode.first())
+        }
+
     @Test
     fun `a language write adds exactly one key and rewrites nothing else`() = runTest {
         // The strongest form of "unrelated settings are preserved": the stored key set is compared
