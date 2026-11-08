@@ -138,7 +138,8 @@ private fun PrayerTimeRow(state: HomeUiState.Ready, row: PrayerRow) {
         null
     }
     val nextDay = if (row.endsNextDay) stringResource(R.string.home_ends_next_day) else null
-    val detail = listOfNotNull(countdown, adjustment, nextDay).joinToString(" · ")
+    val detailSeparator = stringResource(R.string.home_date_separator)
+    val detail = listOfNotNull(countdown, adjustment, nextDay).joinToString(detailSeparator)
 
     TimetableRow(
         name = stringResource(row.prayer.labelRes()),
