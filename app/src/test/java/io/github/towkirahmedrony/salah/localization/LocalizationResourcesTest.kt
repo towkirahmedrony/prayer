@@ -943,8 +943,8 @@ class LocalizationResourcesTest {
             "nafl_note_awwabin",
             "nafl_note_disliked",
             "home_hero_status_nafl",
-            "home_hero_status_prohibited",
-            "home_hero_prohibited_left",
+            // The prohibited hero uses its title and end/countdown strings; it has no separate tag or
+            // "time left" label, so keep those unused keys out of this rendered-string inventory.
             "home_prayer_status_later",
         )
 
