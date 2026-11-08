@@ -16,6 +16,7 @@ import io.github.towkirahmedrony.salah.core.model.NotificationSound
 import io.github.towkirahmedrony.salah.core.model.PrayerName
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationPreference
 import io.github.towkirahmedrony.salah.core.model.PrayerNotificationSettings
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -55,24 +56,32 @@ class PrayerNotificationSettingsViewModel(
     private val scheduleSummary = MutableStateFlow<NotificationScheduleSummary?>(null)
     private val message = MutableStateFlow<NotificationSettingsMessage?>(null)
 
+    // The settings state, combined from its five original flows; the persisted has-requested flag
+    // is layered on in a second combine below (the typed `combine` overloads stop at five flows).
+    private val settingsState: Flow<PrayerNotificationSettingsUiState> =
+        combine(
+            notificationPreferences.settings,
+            locationRepository.location,
+            permissionState,
+            scheduleSummary,
+            message,
+        ) { settings, location, permissions, summary, currentMessage ->
+            PrayerNotificationSettingsUiState(
+                settings = settings,
+                permissions = permissions,
+                locationConfigured = location != null,
+                azanAvailable = azanPlayback.isAvailable,
+                azanAttribution = azanPlayback.attribution(),
+                scheduleSummary = summary,
+                message = currentMessage,
+            )
+        }
+
     val uiState: StateFlow<PrayerNotificationSettingsUiState> = combine(
-        notificationPreferences.settings,
-        locationRepository.location,
-        permissionState,
-        scheduleSummary,
-        message,
+        settingsState,
         userPreferences.notificationPermissionRequested,
-    ) { settings, location, permissions, summary, currentMessage, permissionRequested ->
-        PrayerNotificationSettingsUiState(
-            settings = settings,
-            permissions = permissions,
-            notificationPermissionRequested = permissionRequested,
-            locationConfigured = location != null,
-            azanAvailable = azanPlayback.isAvailable,
-            azanAttribution = azanPlayback.attribution(),
-            scheduleSummary = summary,
-            message = currentMessage,
-        )
+    ) { state, permissionRequested ->
+        state.copy(notificationPermissionRequested = permissionRequested)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(SUBSCRIBE_TIMEOUT_MILLIS),

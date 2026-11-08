@@ -6,6 +6,7 @@ import io.github.towkirahmedrony.salah.StartupTrace
 import io.github.towkirahmedrony.salah.core.domain.location.BangladeshLocationDataset
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetup
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
+import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionStatusProvider
 import io.github.towkirahmedrony.salah.core.domain.repository.BangladeshAreaCatalog
 import io.github.towkirahmedrony.salah.core.domain.repository.UserPreferencesRepository
 import io.github.towkirahmedrony.salah.core.domain.startup.StartupSnapshot
@@ -42,6 +43,7 @@ class AppViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val startup: StartupSnapshot,
     private val areaCatalog: BangladeshAreaCatalog,
+    private val permissions: NotificationPermissionStatusProvider,
 ) : ViewModel() {
 
     val themeMode: StateFlow<ThemeMode> = userPreferencesRepository.themeMode.stateIn(
@@ -112,6 +114,16 @@ class AppViewModel(
             runCatching { userPreferencesRepository.markNotificationPermissionRequested() }
         }
     }
+
+    /**
+     * Whether notifications are currently allowed, read fresh from the platform.
+     *
+     * The shell consults this once, when the location gate first opens, to decide whether the
+     * one first-launch prompt is still needed. An unreadable state reports not allowed, which
+     * is the safe direction: the prompt (or the settings screen) is offered rather than assumed.
+     */
+    fun notificationsAllowed(): Boolean =
+        runCatching { permissions.status() }.getOrNull()?.notificationsAllowed ?: false
 
     private val dataset = MutableStateFlow<BangladeshLocationDataset?>(null)
     private val datasetRead = MutableStateFlow(false)

@@ -10,6 +10,7 @@ import io.github.towkirahmedrony.salah.core.model.LocationInfo
 import io.github.towkirahmedrony.salah.core.model.PrayerSettings
 import io.github.towkirahmedrony.salah.testing.BundledDataset
 import io.github.towkirahmedrony.salah.testing.FakeBangladeshAreaCatalog
+import io.github.towkirahmedrony.salah.testing.FakePermissionStatusProvider
 import io.github.towkirahmedrony.salah.testing.FakeUserPreferencesRepository
 import io.github.towkirahmedrony.salah.testing.syntheticDataset
 import kotlinx.coroutines.CompletableDeferred
@@ -261,6 +262,7 @@ class AppViewModelTest {
             scope = backgroundScope,
         ),
         areaCatalog = catalog,
+        permissions = FakePermissionStatusProvider(),
     )
 
     private fun LocationSetupState.requiredReason(): LocationSetupReason? =

@@ -36,13 +36,11 @@ import io.github.towkirahmedrony.salah.core.designsystem.theme.SalahTheme
 import io.github.towkirahmedrony.salah.core.domain.location.LocationSetupState
 import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionAction
 import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionPolicy
-import io.github.towkirahmedrony.salah.core.domain.notification.NotificationPermissionStatusProvider
 import io.github.towkirahmedrony.salah.feature.app.AppViewModel
 import io.github.towkirahmedrony.salah.feature.app.ProvideAppLanguageStrings
 import io.github.towkirahmedrony.salah.feature.home.components.HomeSkeleton
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionContext
 import io.github.towkirahmedrony.salah.feature.location.LocationSelectionScreen
-import org.koin.androidx.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -89,7 +87,6 @@ fun SalahApp(
     val setupState by appViewModel.locationSetup.collectAsStateWithLifecycle()
     val notificationPermissionRequested by
         appViewModel.notificationPermissionRequested.collectAsStateWithLifecycle()
-    val permissionStatusProvider: NotificationPermissionStatusProvider = koinInject()
 
     // --- First-launch notification permission ------------------------------------
     // Asked once, at the appropriate moment: when the location gate has just opened and the
@@ -110,8 +107,7 @@ fun SalahApp(
         if (hasLaunchedFirstPrompt || notificationPermissionRequested) return@LaunchedEffect
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
         val action = NotificationPermissionPolicy.action(
-            notificationsAllowed = runCatching { permissionStatusProvider.status() }
-                .getOrNull()?.notificationsAllowed ?: false,
+            notificationsAllowed = appViewModel.notificationsAllowed(),
             hasRequestedDialog = notificationPermissionRequested,
             // Before the first request the rationale flag is always false; passing it through
             // keeps this decision identical to the settings screen's.

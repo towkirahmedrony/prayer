@@ -630,6 +630,7 @@ val salahModules = module {
             userPreferencesRepository = get(),
             startup = get(),
             areaCatalog = get(),
+            permissions = get(),
         )
     }
     // One view model for the first-launch location setup and the location screen: they differ in what
