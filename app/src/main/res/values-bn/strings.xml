@@ -124,6 +124,13 @@
     <string name="prayer_page_title">নামাজের সময়</string>
     <string name="prayer_section_sawm">সাওমের সময়সূচি</string>
     <string name="prayer_section_sun">সূর্যোদয় ও সূর্যাস্ত</string>
+    <string name="prayer_reference_action">রেফারেন্স</string>
+    <string name="prayer_reference_dialog_title">%1$s-এর রেফারেন্স</string>
+    <string name="prayer_reference_close">বন্ধ করুন</string>
+    <string name="prayer_reference_daily_body">আপনার নির্ধারিত অবস্থান ও নির্বাচিত নামাজের হিসাব-পদ্ধতি অনুযায়ী সময়গুলো গণনা করা হয়।</string>
+    <string name="prayer_reference_sawm_body">সেহরির শেষ সময় হলো গণনা করা ফজরের সময়, আর ইফতার হলো একই অবস্থানের নামাজের সময়সূচিতে গণনা করা মাগরিবের সময়।</string>
+    <string name="prayer_reference_sun_body">নির্বাচিত অবস্থানের জন্য সময়সূচিতে সূর্যোদয় ও সূর্যাস্ত সৌর ঘটনা হিসেবে গণনা করা হয়; এগুলো পাঁচ ওয়াক্ত নামাজের সময় থেকে আলাদা।</string>
+    <string name="prayer_reference_night_body">রাতের সময়সীমা মাগরিব থেকে পরের দিনের ফজর পর্যন্ত। ইসলামি মধ্যরাত ও রাতের শেষ তৃতীয়াংশ এই সময়সীমা থেকে নির্ণয় করা হয়।</string>
     <string name="home_prayer_timetable_title">দৈনিক সময়সূচি</string>
     <string name="home_solar_title">সূর্যোদয়, সৌর মধ্যাহ্ন ও সূর্যাস্ত</string>
     <string name="home_solar_note">সৌর ঘটনাগুলো পাঁচ ওয়াক্ত নামাজ থেকে আলাদা করে দেখানো হয়েছে।</string>

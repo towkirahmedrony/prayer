@@ -39,6 +39,13 @@
     <string name="prayer_page_title">Prayer times</string>
     <string name="prayer_section_sawm">Sawm schedule</string>
     <string name="prayer_section_sun">Sunrise &amp; sunset</string>
+    <string name="prayer_reference_action">Reference</string>
+    <string name="prayer_reference_dialog_title">Reference · %1$s</string>
+    <string name="prayer_reference_close">Close</string>
+    <string name="prayer_reference_daily_body">Prayer times are calculated for this location using the selected prayer-time method.</string>
+    <string name="prayer_reference_sawm_body">Sehri ends at the calculated Fajr time, and Iftar uses the calculated Maghrib time from this location’s prayer schedule.</string>
+    <string name="prayer_reference_sun_body">Sunrise and sunset are solar events in the schedule calculated for this location, shown separately from the five prayer times.</string>
+    <string name="prayer_reference_night_body">The night interval runs from Maghrib to the following Fajr. Islamic midnight and the last third are derived from that interval.</string>
 
     <!-- Home: prayer schedule -->
     <string name="home_prayer_timetable_title">Daily timetable</string>

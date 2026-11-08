@@ -837,6 +837,15 @@ class LocalizationResourcesTest {
             // The prayer screen Home's two actions open.
             "nav_prayer",
             "home_prayer_timetable_title",
+            "prayer_section_sawm",
+            "prayer_section_sun",
+            "prayer_reference_action",
+            "prayer_reference_dialog_title",
+            "prayer_reference_close",
+            "prayer_reference_daily_body",
+            "prayer_reference_sawm_body",
+            "prayer_reference_sun_body",
+            "prayer_reference_night_body",
             "home_next_prayer_title",
             "home_next_prayer_none",
             "home_next_prayer_at",
@@ -927,6 +936,7 @@ class LocalizationResourcesTest {
             "home_solar_night_length",
             "home_solar_geometry_note",
             "home_prohibited_note",
+            "prohibited_convention_not_reviewed",
             // The Nafl prayers: card, detail page and notes.
             "home_card_nafl_title",
             "home_card_nafl_description",

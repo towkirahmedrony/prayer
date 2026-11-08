@@ -13,10 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.towkirahmedrony.salah.R
@@ -137,11 +140,9 @@ fun PrayerTimesList(state: HomeUiState.Ready, modifier: Modifier = Modifier) {
                 color = scheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                text = stringResource(R.string.home_prayer_times_arabic),
-                style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Rtl),
-                color = scheme.primary,
-                textAlign = TextAlign.Start,
+            ReferenceAction(
+                title = stringResource(R.string.home_prayer_timetable_title),
+                body = stringResource(R.string.prayer_reference_daily_body),
             )
         }
         HorizontalDivider(
@@ -259,6 +260,7 @@ fun NaflTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier
         title = stringResource(R.string.nafl_page_title),
         glyph = { tint -> TasbihGlyph(tint, Modifier.size(20.dp)) },
         modifier = modifier,
+        referenceBody = stringResource(R.string.nafl_home_note),
     ) {
         if (nafl.unavailable != null) {
             SalahUnavailableNote(text = stringResource(nafl.unavailable.messageRes()))
@@ -311,6 +313,10 @@ fun ProhibitedTimetableSection(section: ProhibitedSection, modifier: Modifier = 
         title = stringResource(R.string.home_prohibited_title),
         glyph = { tint -> ClockGlyph(tint, Modifier.size(20.dp)) },
         modifier = modifier,
+        referenceBody = listOf(
+            stringResource(R.string.home_prohibited_note),
+            stringResource(R.string.prohibited_convention_not_reviewed),
+        ).joinToString("\n\n"),
     ) {
         if (section.windows.isEmpty()) {
             SalahUnavailableNote(
@@ -373,6 +379,7 @@ fun SawmTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier
         title = stringResource(R.string.prayer_section_sawm),
         glyph = { tint -> RamadanGlyph(tint, Modifier.size(20.dp)) },
         modifier = modifier,
+        referenceBody = stringResource(R.string.prayer_reference_sawm_body),
     ) {
         val sehriActive = fasting.nextEvent == FastingEvent.SEHRI_END
         val iftarActive = fasting.nextEvent == FastingEvent.IFTAR
@@ -431,6 +438,7 @@ fun SunTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifier)
         title = stringResource(R.string.prayer_section_sun),
         glyph = { tint -> SunGlyph(tint, Modifier.size(20.dp)) },
         modifier = modifier,
+        referenceBody = stringResource(R.string.prayer_reference_sun_body),
     ) {
         val sunRows = state.solarRows.filter { row ->
             row.event == SolarEvent.SUNRISE || row.event == SolarEvent.SUNSET
@@ -486,6 +494,7 @@ fun NightTimetableSection(state: HomeUiState.Ready, modifier: Modifier = Modifie
         title = stringResource(R.string.home_night_title),
         glyph = { tint -> NightGlyph(tint, Modifier.size(20.dp)) },
         modifier = modifier,
+        referenceBody = stringResource(R.string.prayer_reference_night_body),
     ) {
         if (night.unavailable != null) {
             SalahUnavailableNote(text = stringResource(night.unavailable.messageRes()))
@@ -525,6 +534,7 @@ private fun TimetableSection(
     title: String,
     glyph: @Composable (Color) -> Unit,
     modifier: Modifier = Modifier,
+    referenceBody: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -543,9 +553,43 @@ private fun TimetableSection(
                 modifier = Modifier.weight(1f),
                 color = scheme.outlineVariant.copy(alpha = 0.6f),
             )
+            if (referenceBody != null) {
+                Spacer(Modifier.width(6.dp))
+                ReferenceAction(title = title, body = referenceBody)
+            }
         }
         Spacer(Modifier.height(10.dp))
         Column(content = content)
+    }
+}
+
+/** A small action beside a section heading that explains the basis for its displayed times. */
+@Composable
+private fun ReferenceAction(title: String, body: String) {
+    val showReference = remember { mutableStateOf(false) }
+    TextButton(
+        onClick = { showReference.value = true },
+        modifier = Modifier.heightIn(min = 36.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.prayer_reference_action),
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+        )
+    }
+    if (showReference.value) {
+        AlertDialog(
+            onDismissRequest = { showReference.value = false },
+            title = {
+                Text(stringResource(R.string.prayer_reference_dialog_title, title))
+            },
+            text = { Text(body) },
+            confirmButton = {
+                TextButton(onClick = { showReference.value = false }) {
+                    Text(stringResource(R.string.prayer_reference_close))
+                }
+            },
+        )
     }
 }
 
