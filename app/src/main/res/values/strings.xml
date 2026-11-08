@@ -35,6 +35,11 @@
     <string name="home_location_coordinates">%1$.4f, %2$.4f</string>
     <string name="home_location_timezone">Time zone: %1$s</string>
 
+    <!-- Prayer timetable page -->
+    <string name="prayer_page_title">Prayer times</string>
+    <string name="prayer_section_sawm">Sawm schedule</string>
+    <string name="prayer_section_sun">Sunrise &amp; sunset</string>
+
     <!-- Home: prayer schedule -->
     <string name="home_prayer_timetable_title">Daily timetable</string>
     <string name="home_solar_title">Sunrise, solar noon and sunset</string>

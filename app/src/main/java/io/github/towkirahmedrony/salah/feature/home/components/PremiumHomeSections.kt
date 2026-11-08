@@ -959,7 +959,7 @@ private fun PrayerListRow(row: PrayerRow, currentCountdown: String?) {
 
 /** The per-prayer marks: sunrise for Fajr, a sun for Dhuhr, a clock for Asr, sunset for Maghrib, night for Isha. */
 @Composable
-private fun PrayerRowGlyph(prayer: PrayerName, tint: Color) {
+internal fun PrayerRowGlyph(prayer: PrayerName, tint: Color) {
     when (prayer) {
         PrayerName.FAJR -> SunrisePrayerGlyph(tint, modifier = Modifier.size(22.dp))
         PrayerName.DHUHR -> SunGlyph(tint, modifier = Modifier.size(22.dp))

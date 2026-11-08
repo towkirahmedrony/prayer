@@ -32,7 +32,7 @@ import io.github.towkirahmedrony.salah.feature.home.NaflRow
 import io.github.towkirahmedrony.salah.feature.home.ProhibitedSection
 
 @StringRes
-private fun NaflKind.titleRes(): Int = when (this) {
+internal fun NaflKind.titleRes(): Int = when (this) {
     NaflKind.DUHA -> R.string.nafl_duha
     NaflKind.AWWABIN -> R.string.nafl_awwabin
     NaflKind.TAHAJJUD -> R.string.nafl_tahajjud

@@ -121,6 +121,9 @@
     <string name="home_calculation_adjusted">এতে আপনার নিজে দেওয়া মিনিট সমন্বয় ধরা আছে।</string>
 
     <!-- Home: the timetable, the solar events and the next-prayer card. -->
+    <string name="prayer_page_title">নামাজের সময়</string>
+    <string name="prayer_section_sawm">সাওমের সময়সূচি</string>
+    <string name="prayer_section_sun">সূর্যোদয় ও সূর্যাস্ত</string>
     <string name="home_prayer_timetable_title">দৈনিক সময়সূচি</string>
     <string name="home_solar_title">সূর্যোদয়, সৌর মধ্যাহ্ন ও সূর্যাস্ত</string>
     <string name="home_solar_note">সৌর ঘটনাগুলো পাঁচ ওয়াক্ত নামাজ থেকে আলাদা করে দেখানো হয়েছে।</string>

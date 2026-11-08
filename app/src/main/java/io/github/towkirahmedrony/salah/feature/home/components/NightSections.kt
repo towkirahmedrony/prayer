@@ -111,7 +111,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun PhaseLine(
+internal fun PhaseLine(
     phase: NightPhase?,
     boundary: NightBoundary?,
     countdown: String?,
