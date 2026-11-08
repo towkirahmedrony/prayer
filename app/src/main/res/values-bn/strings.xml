@@ -499,6 +499,10 @@
     <string name="mosque_offline_map_download">ডাউনলোড</string>
     <string name="mosque_offline_map_cancel">বাতিল</string>
     <string name="mosque_offline_map_delete">অফলাইন মানচিত্র মুছুন</string>
+    <string name="mosque_offline_map_options">অফলাইন মানচিত্রের বিকল্প</string>
+    <string name="mosque_offline_map_delete_confirm_title">অফলাইন মানচিত্র মুছবেন?</string>
+    <string name="mosque_offline_map_delete_confirm_body">এতে এই এলাকার সংরক্ষিত মানচিত্রটি ডিভাইস থেকে মুছে যাবে। অনলাইনে থাকলে আবার ডাউনলোড করতে পারবেন।</string>
+    <string name="mosque_offline_map_delete_confirm_action">মুছুন</string>
     <string name="mosque_offline_map_downloading">মানচিত্র সংরক্ষণ হচ্ছে…</string>
     <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
     <string name="mosque_offline_map_failed_network">অফলাইন মানচিত্র ডাউনলোড করা যায়নি। ইন্টারনেট সংযোগ দেখুন।</string>

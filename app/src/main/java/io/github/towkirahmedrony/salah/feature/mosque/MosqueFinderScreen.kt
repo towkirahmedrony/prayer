@@ -28,8 +28,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +66,7 @@ import io.github.towkirahmedrony.salah.core.designsystem.ListGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinFilledGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.LocationPinGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.MapGlyph
+import io.github.towkirahmedrony.salah.core.designsystem.MoreVertGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.MosqueGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.RefreshGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.components.SalahSectionCard
@@ -336,8 +341,8 @@ private fun FinderHeader(
 }
 
 /**
- * The map's whole top overlay: back, the list/map switch and refresh on one 48dp row. No title, no
- * count and no location card — the map is the content. A notice, when there is one, sits under it.
+ * The map's whole top overlay: back, the list/map switch and refresh on one 48dp row. A saved map is
+ * managed from a three-dot menu in that row; the download/progress row disappears after saving.
  */
 @Composable
 private fun MapTopBar(
@@ -354,6 +359,7 @@ private fun MapTopBar(
     val container = MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
     val backLabel = stringResource(R.string.mosque_back)
     val refreshLabel = stringResource(R.string.mosque_action_refresh)
+    val storedRegion = state.offlineMap.coveringRegion
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -392,36 +398,106 @@ private fun MapTopBar(
                     )
                 }
             }
+            if (storedRegion != null && !state.offlineMap.isDownloading) {
+                OfflineMapOverflowAction(
+                    regionId = storedRegion.id,
+                    container = container,
+                    onDelete = onDeleteOfflineMap,
+                )
+            }
         }
         StatusNotices(
             state = state,
             onDismissNotice = onDismissNotice,
             compactForMap = true,
         )
-        OfflineMapBar(
-            state = state,
+        if (storedRegion == null || state.offlineMap.isDownloading) {
+            OfflineMapBar(
+                state = state,
+                container = container,
+                onDownload = onDownloadOfflineMap,
+                onCancel = onCancelOfflineMapDownload,
+            )
+        }
+    }
+}
+
+/** A saved map's small overflow control and deletion confirmation. */
+@Composable
+private fun OfflineMapOverflowAction(
+    regionId: Long,
+    container: Color,
+    onDelete: (Long) -> Unit,
+) {
+    val expanded = remember { mutableStateOf(false) }
+    val confirmDelete = remember { mutableStateOf(false) }
+    val optionsLabel = stringResource(R.string.mosque_offline_map_options)
+
+    Box {
+        SurfaceIconButton(
+            label = optionsLabel,
             container = container,
-            onDownload = onDownloadOfflineMap,
-            onCancel = onCancelOfflineMapDownload,
-            onDelete = onDeleteOfflineMap,
+            onClick = { expanded.value = true },
+        ) {
+            MoreVertGlyph(
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded.value,
+            onDismissRequest = { expanded.value = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.mosque_offline_map_delete)) },
+                leadingIcon = {
+                    DeleteGlyph(
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                onClick = {
+                    expanded.value = false
+                    confirmDelete.value = true
+                },
+            )
+        }
+    }
+
+    if (confirmDelete.value) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete.value = false },
+            title = { Text(stringResource(R.string.mosque_offline_map_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.mosque_offline_map_delete_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete.value = false
+                        onDelete(regionId)
+                    },
+                ) {
+                    Text(stringResource(R.string.mosque_offline_map_delete_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete.value = false }) {
+                    Text(stringResource(R.string.mosque_offline_map_cancel))
+                }
+            },
         )
     }
 }
 
-/** The one action the offline map row offers, decided once so the label and handler agree. */
+/** The actions available while a map is not saved yet or is currently downloading. */
 private enum class OfflineMapAction {
     NONE,
     DOWNLOAD,
     CANCEL,
-    DELETE,
 }
 
 /**
- * One compact row stating whether the map is available offline and offering the one relevant action.
- *
- * It is the whole offline-map interface: availability, the estimated or saved size, live progress, a
- * failure reason, and download / cancel / delete. No dialog and no second screen — saving a map is a
- * single deliberate tap whose cost is stated before it is spent.
+ * Download option and progress row. Once a map is saved, this entire row is hidden and management
+ * moves to the small overflow action in [MapTopBar].
  */
 @Composable
 private fun OfflineMapBar(
@@ -429,25 +505,22 @@ private fun OfflineMapBar(
     container: Color,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
-    onDelete: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val offlineMap = state.offlineMap
     val download = offlineMap.download
     val shape = MaterialTheme.shapes.small
+    val stored = offlineMap.coveringRegion
     val action = when {
         download is OfflineMapDownload.InProgress -> OfflineMapAction.CANCEL
-        offlineMap.coveringRegion != null -> OfflineMapAction.DELETE
-        state.isOnline && offlineMap.plan?.isWithinLimit == true -> OfflineMapAction.DOWNLOAD
+        stored == null && state.isOnline && offlineMap.plan?.isWithinLimit == true ->
+            OfflineMapAction.DOWNLOAD
         else -> OfflineMapAction.NONE
     }
-    val stored = offlineMap.coveringRegion
-    val deleteLabel = stringResource(R.string.mosque_offline_map_delete)
     val performAction: () -> Unit = {
         when (action) {
             OfflineMapAction.DOWNLOAD -> onDownload()
             OfflineMapAction.CANCEL -> onCancel()
-            OfflineMapAction.DELETE -> stored?.let { region -> onDelete(region.id) }
             OfflineMapAction.NONE -> Unit
         }
     }
@@ -481,17 +554,7 @@ private fun OfflineMapBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (action == OfflineMapAction.DELETE) {
-                IconButton(
-                    onClick = performAction,
-                    modifier = Modifier.semantics { contentDescription = deleteLabel },
-                ) {
-                    DeleteGlyph(
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            } else if (action != OfflineMapAction.NONE) {
+            if (action != OfflineMapAction.NONE) {
                 TextButton(
                     onClick = performAction,
                     modifier = Modifier.heightIn(min = 48.dp),

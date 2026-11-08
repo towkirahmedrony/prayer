@@ -284,6 +284,10 @@
     <string name="mosque_offline_map_download">Download</string>
     <string name="mosque_offline_map_cancel">Cancel</string>
     <string name="mosque_offline_map_delete">Delete offline map</string>
+    <string name="mosque_offline_map_options">Offline map options</string>
+    <string name="mosque_offline_map_delete_confirm_title">Delete offline map?</string>
+    <string name="mosque_offline_map_delete_confirm_body">This removes the saved map for this area from your device. You can download it again while online.</string>
+    <string name="mosque_offline_map_delete_confirm_action">Delete</string>
     <string name="mosque_offline_map_downloading">Saving map…</string>
     <string name="mosque_offline_map_progress">%1$s%% · %2$s</string>
     <string name="mosque_offline_map_failed_network">The offline map could not be downloaded. Check your connection.</string>

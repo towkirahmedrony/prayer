@@ -541,6 +541,14 @@ fun DeleteGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifi
     drawLine(tint, Offset(14f, 10.5f), Offset(14f, 17f), strokeWidth = 1.4f)
 }
 
+/** Three vertical dots: the offline-map overflow menu. */
+@Composable
+fun MoreVertGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
+    listOf(5.5f, 12f, 18.5f).forEach { y ->
+        drawCircle(color = tint, radius = 1.6f, center = Offset(12f, y))
+    }
+}
+
 /** Three lines with leading dots: the list view's mark. */
 @Composable
 fun ListGlyph(tint: Color, modifier: Modifier = Modifier) = Glyph(tint, modifier) {
