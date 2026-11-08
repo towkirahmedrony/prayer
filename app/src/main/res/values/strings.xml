@@ -1190,8 +1190,6 @@
 
     <!-- Home: the Nafl prayers, the hero ring's prohibited-time reading and the timetable's "later today" label. -->
     <string name="home_hero_status_nafl">NAFL</string>
-    <string name="home_hero_status_prohibited">PROHIBITED TIME</string>
-    <string name="home_hero_prohibited_left">Prohibited · %1$s left</string>
     <string name="home_prayer_status_later">Later today</string>
     <string name="home_card_nafl_title">Nafl prayers</string>
     <string name="home_card_nafl_description">Duha, Awwabin and Tahajjud, with the time of each.</string>
@@ -1207,4 +1205,7 @@
     <string name="nafl_note_duha">Duha opens when the disliked time after sunrise ends and closes before the zawal interval begins. Some scholars call the early part Ishraq; Salah shows one Duha period. The preferred part begins a quarter of the way through the day.</string>
     <string name="nafl_note_awwabin">Six rak\'at after Maghrib called Awwabin is a tradition among South Asian Hanafis. Some scholars hold that the narrations for it are weak and that the hadith about the Awwabin prayer refers to Duha. Salah shows the tradition and does not rule between the views.</string>
     <string name="nafl_note_disliked">In the Hanafi school Nafl prayer is also disliked after Fajr until sunrise and after Asr until sunset. That is a different category from the prohibited intervals and is not shown as prohibited time.</string>
+    <string name="home_hero_prohibited_title">Prohibited time</string>
+    <string name="home_hero_prohibited_prayer_until">%1$s until %2$s</string>
+    <string name="home_hero_prohibited_then_duha">Duha starts %1$s</string>
 </resources>

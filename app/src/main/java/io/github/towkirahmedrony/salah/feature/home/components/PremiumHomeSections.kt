@@ -46,7 +46,9 @@ import io.github.towkirahmedrony.salah.core.designsystem.SunsetGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.TasbihGlyph
 import io.github.towkirahmedrony.salah.core.designsystem.theme.GoldAccent
 import io.github.towkirahmedrony.salah.core.designsystem.theme.LocalSalahAccents
+import io.github.towkirahmedrony.salah.core.domain.nafl.NaflKind
 import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedPeriodPhase
+import io.github.towkirahmedrony.salah.core.domain.prohibited.ProhibitedWindowKind
 import io.github.towkirahmedrony.salah.core.model.CalendarHeadline
 import io.github.towkirahmedrony.salah.core.model.CalendarSystem
 import io.github.towkirahmedrony.salah.core.model.PrayerName
@@ -211,6 +213,9 @@ private val HeroRingMint = Color(0xFF7FDDB6)
 /** The prohibited-time red: light enough to read on the brand surface in both themes. */
 private val ProhibitedRed = Color(0xFFFF8A80)
 
+/** The hero card's surface while a prohibited window is open: unmistakably not the usual green. */
+private val ProhibitedSurface = Color(0xFF3F1F1C)
+
 /**
  * The hero card: today's three dates over the open prayer, drawn as a ring, beside the next Sehri end
  * and Iftar.
@@ -248,8 +253,18 @@ fun CurrentPrayerHeroCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(accents.brandSurface)
-            .border(1.dp, GoldAccent.copy(alpha = 0.28f), shape),
+            .background(
+                if (state.heroNafl?.kind == HeroNaflKind.PROHIBITED) ProhibitedSurface else accents.brandSurface,
+            )
+            .border(
+                1.dp,
+                if (state.heroNafl?.kind == HeroNaflKind.PROHIBITED) {
+                    ProhibitedRed.copy(alpha = 0.55f)
+                } else {
+                    GoldAccent.copy(alpha = 0.28f)
+                },
+                shape,
+            ),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
             if (state.heroDates.isNotEmpty()) {
@@ -317,14 +332,21 @@ private fun HeroDateRow(
                     .weight(1f)
                     .padding(start = if (index == 0) 4.dp else 12.dp, end = 4.dp),
             ) {
-                Text(
-                    text = date.primary,
-                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = onBrand,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // Two lines are reserved, bottom-aligned: a long Hijri month can wrap while the other
+                // columns stay on one line, and the small gold lines must still sit at one height.
+                Box(
+                    modifier = Modifier.heightIn(min = 40.dp),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
+                    Text(
+                        text = date.primary,
+                        style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = onBrand,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
@@ -413,7 +435,7 @@ private fun PrayerRing(
                         MaterialTheme.typography.titleLarge
                     },
                     fontWeight = FontWeight.Bold,
-                    color = onBrand,
+                    color = reading.nameColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -431,20 +453,6 @@ private fun PrayerRing(
                         color = onBrand.copy(alpha = 0.82f),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                // A prohibited window that overlaps the open fard period (Asr through the sunset window)
-                // is a red line beneath it: the prayer is still the open one, and the prohibition is
-                // what the reader must not miss.
-                reading.warning?.let { warning ->
-                    Text(
-                        text = warning,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 13.sp),
-                        fontWeight = FontWeight.SemiBold,
-                        color = ProhibitedRed,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -470,13 +478,18 @@ private data class RingReading(
     val subtitle: String?,
     val progress: Float?,
     val arcColor: Color,
-    val warning: String?,
+    val nameColor: Color,
 )
 
 /**
- * The ring's reading. A fard period that is open always leads. With none open, an open prohibited
- * window or open Duha takes the ring over, because it is what explains the moment; otherwise the ring
- * names the prayer that opens next.
+ * The ring's reading, in the order of what the reader must not miss.
+ *
+ *  1. An open prohibited window takes the ring over, even while a fard period is still open (Asr
+ *     through the sunset window): the card turns dark red, the ring says "Prohibited time" and counts
+ *     down to the window's end, and the open prayer is named beneath it. Before, the open prayer led
+ *     and the prohibition was one small line under it, which read as "it is Asr time" first.
+ *  2. Otherwise an open fard period leads.
+ *  3. With none open, open Duha takes the ring; otherwise the ring names the prayer that opens next.
  */
 @Composable
 private fun ringReadingOf(state: HomeUiState.Ready): RingReading {
@@ -484,26 +497,48 @@ private fun ringReadingOf(state: HomeUiState.Ready): RingReading {
     val next = state.nextPrayer
     val nafl = state.heroNafl
     val open = hero.isActive && hero.prayer != null
+    val onBrand = LocalSalahAccents.current.onBrandSurface
+
+    if (nafl != null && nafl.kind == HeroNaflKind.PROHIBITED) {
+        val openPrayer = hero.prayer
+        val openEnd = hero.endTime
+        val duhaFollows = state.nafl.rows.any { row -> row.kind == NaflKind.DUHA }
+        val subtitle = when {
+            // The prohibition overlaps a prayer that is still open: say which, and until when.
+            open && openPrayer != null && openEnd != null -> stringResource(
+                R.string.home_hero_prohibited_prayer_until,
+                stringResource(openPrayer.labelRes()),
+                openEnd,
+            )
+            // After the sunrise window Duha begins at exactly the minute the window closes.
+            nafl.windowKind == ProhibitedWindowKind.SUNRISE_ASCENT && duhaFollows ->
+                stringResource(R.string.home_hero_prohibited_then_duha, nafl.endLabel)
+            else -> stringResource(R.string.home_hero_ends, nafl.endLabel)
+        }
+        return RingReading(
+            tag = null,
+            tagColor = GoldAccent,
+            name = stringResource(R.string.home_hero_prohibited_title),
+            compactName = true,
+            clock = nafl.countdownClock,
+            subtitle = subtitle,
+            progress = nafl.progress,
+            arcColor = ProhibitedRed,
+            nameColor = ProhibitedRed,
+        )
+    }
 
     if (!open && nafl != null) {
-        val prohibited = nafl.kind == HeroNaflKind.PROHIBITED
-        val windowKind = nafl.windowKind
         return RingReading(
-            tag = stringResource(
-                if (prohibited) R.string.home_hero_status_prohibited else R.string.home_hero_status_nafl,
-            ),
-            tagColor = if (prohibited) ProhibitedRed else GoldAccent,
-            name = if (prohibited && windowKind != null) {
-                stringResource(windowKind.labelRes())
-            } else {
-                stringResource(R.string.nafl_duha)
-            },
-            compactName = prohibited,
+            tag = stringResource(R.string.home_hero_status_nafl),
+            tagColor = GoldAccent,
+            name = stringResource(R.string.nafl_duha),
+            compactName = false,
             clock = nafl.countdownClock,
             subtitle = stringResource(R.string.home_hero_ends, nafl.endLabel),
             progress = nafl.progress,
-            arcColor = if (prohibited) ProhibitedRed else HeroRingMint,
-            warning = null,
+            arcColor = HeroRingMint,
+            nameColor = onBrand,
         )
     }
 
@@ -523,7 +558,6 @@ private fun ringReadingOf(state: HomeUiState.Ready): RingReading {
     } else {
         hero.countdownClock ?: next.countdown ?: hero.next.countdown
     }
-    val overlapping = open && nafl != null && nafl.kind == HeroNaflKind.PROHIBITED
 
     return RingReading(
         tag = if (!open && prayer != null) stringResource(R.string.home_hero_status_up_next) else null,
@@ -534,11 +568,7 @@ private fun ringReadingOf(state: HomeUiState.Ready): RingReading {
         subtitle = subtitle,
         progress = if (open) hero.periodProgress else null,
         arcColor = HeroRingMint,
-        warning = if (overlapping && nafl != null) {
-            stringResource(R.string.home_hero_prohibited_left, nafl.countdownCompact)
-        } else {
-            null
-        },
+        nameColor = onBrand,
     )
 }
 
