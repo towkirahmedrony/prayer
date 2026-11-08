@@ -81,10 +81,10 @@ class DataStoreDashboardConfigTest {
 
         assertTrue(restarted.isEnabled(DashboardCard.QIBLA))
         assertFalse(restarted.isEnabled(DashboardCard.FORBIDDEN_TIMES))
-        // Moving daily tools up by one put it just before night periods.
+        // Moving daily tools up by one puts it just after night periods; Nafl now sits after it.
         assertEquals(
-            restarted.order.indexOf(DashboardCard.DAILY_TOOLS.id) + 1,
-            restarted.order.indexOf(DashboardCard.NIGHT_PERIODS.id),
+            restarted.order.indexOf(DashboardCard.NIGHT_PERIODS.id) + 1,
+            restarted.order.indexOf(DashboardCard.DAILY_TOOLS.id),
         )
     }
 
